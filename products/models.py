@@ -30,7 +30,9 @@ class Product(models.Model):
         self.slug=slugify(self.name) # import slugify
         super(Product,self).save(*args,**kwargs) 
 
-
+    def __str__(self):
+        return self.name
+    
 class ProductsImage(models.Model):
     product=models.ForeignKey(Product,verbose_name=_('product'),related_name='product_imge',on_delete=models.CASCADE)#relation delete all cascade
     imge=models.ImageField(_('imge')upload_to='productimages')
@@ -47,6 +49,11 @@ class Brand(models.Model):
         self.slug=slugify(self.name) # import slugify
         super(Brand,self).save(*args,**kwargs) 
 
+    def __str__(self):
+        return self.name
+    
+
+
 class Review(models.Model):
     user=models.ForeignKey(User,verbose_name=_('user'),related_name='review_user',on_delete=models.SET_NULL,null=True)#relation with user djago
     product=models.ForeignKey(Product,verbose_name=_('product'),related_name='review_product',on_delete=models.CASCADE) #relation المنتج مع التقيمات
@@ -54,3 +61,6 @@ class Review(models.Model):
     rate=models.IntegerField(_('rate'),choices=[(i,i)for i in range(1,6)])
     created_at=models.DateTimeField(default=timezone.now) # import untie
 
+    def __str__(self):
+        return f"{self.user}-{self.product}-{self.review}"
+    
