@@ -21,7 +21,6 @@ products:
     -images
     -subtitle
     -tags
-    -related
     -descrition
     
 
