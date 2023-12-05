@@ -35,11 +35,11 @@ class Product(models.Model):
     
 class ProductsImage(models.Model):
     product=models.ForeignKey(Product,verbose_name=_('product'),related_name='product_imge',on_delete=models.CASCADE)#relation delete all cascade
-    imge=models.ImageField(_('imge')upload_to='productimages')
+    imge=models.ImageField(_('imge'),upload_to='productimages')
     
 
 class Brand(models.Model):
-    name=models.CharField(_('name')max_length=100)
+    name=models.CharField(_('name'),max_length=100)
     image=models.ImageField(_("image"),upload_to='brand')
 
 
