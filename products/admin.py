@@ -10,6 +10,8 @@ class ProductAdmin(admin.ModelAdmin):
     inlines=[ProductImageinline]
 
 # alot of upload
+#product image merge in product
+
 
 admin.site.register(Product,ProductAdmin)
 admin.site.register(Brand)
