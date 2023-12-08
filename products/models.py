@@ -42,7 +42,6 @@ class Brand(models.Model):
     name=models.CharField(_('name'),max_length=100)
     image=models.ImageField(_("image"),upload_to='brand')
 
-
     slug=models.SlugField(blank=True,null=True) #take title convert to url
     #override
     def save(self,*args,**kwargs):
@@ -52,8 +51,6 @@ class Brand(models.Model):
     def __str__(self):
         return self.name
     
-
-
 class Review(models.Model):
     user=models.ForeignKey(User,verbose_name=_('user'),related_name='review_user',on_delete=models.SET_NULL,null=True)#relation with user djago
     product=models.ForeignKey(Product,verbose_name=_('product'),related_name='review_product',on_delete=models.CASCADE) #relation المنتج مع التقيمات
