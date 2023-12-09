@@ -1,11 +1,12 @@
 from django.shortcuts import render
+from .models import Product,Brand,Review
+from django.views.generic import ListView , DetailView
 
-from django.views.generic import ListView,DetailView
-from .models import Product , Brand , Review 
 
-class ProductList(ListView):
-    model=Product
+# Create your views here.
 
-class ProductDetails(DetailView):
-    model=Product
+class ProductList (ListView) :
+    model = Product
 
+class ProductDetail (DetailView):
+    model = Product
