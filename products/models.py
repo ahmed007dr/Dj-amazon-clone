@@ -34,10 +34,6 @@ class Product (models.Model):
     def __str__(self):
         return self.name
 
-
-
-
-
 class ProductImage (models.Model):
     product = models.ForeignKey(Product,related_name='product_image',on_delete=models.CASCADE,verbose_name=_('product'))
     image = models.ImageField(_('image'),upload_to='productimages')
