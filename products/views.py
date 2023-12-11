@@ -5,7 +5,7 @@ from django.views.generic import ListView , DetailView
 
 # Create your views here.
 
-class ProductList (ListView) :
+class ProductList (ListView) : #object_list
     model = Product
 
 class ProductDetail (DetailView):
