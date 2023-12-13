@@ -367,13 +367,13 @@
                                 <div class="product-card">
                                     <div class="product-media">
                                         <div class="product-label">
-                                            <label class="label-text new">new</label>
+                                            <label class="label-text new">{{object.flag}}</label>
                                         </div>
                                         <button class="product-wish wish">
                                             <i class="fas fa-heart"></i>
                                         </button>
-                                        <a class="product-image" href="product-video.html">
-                                            <img src="images/product/01.jpg" alt="product">
+                                        <a class="product-image" href="/products/{{object.slug}}">
+                                            <img src="{{object.image.url}}" alt="product">
                                         </a>
                                         <div class="product-widget">
                                             <a title="Product Compare" href="compare.html" class="fas fa-random"></a>
@@ -391,11 +391,10 @@
                                             <a href="product-video.html">(3)</a>
                                         </div>
                                         <h6 class="product-name">
-                                            <a href="product-video.html">fresh green chilis</a>
+                                            <a href="/products/{{object.slug}}">{{object.name}}</a>
                                         </h6>
                                         <h6 class="product-price">
-                                            <del>$34</del>
-                                            <span>$28<small>/piece</small></span>
+                                            <span>{{object.price}}</span>
                                         </h6>
                                         <button class="product-add" title="Add to Cart">
                                             <i class="fas fa-shopping-basket"></i>
@@ -410,7 +409,6 @@
                                 </div>
                             
                                 </div>
-
                             {% endfor %}
 
                         </div>
