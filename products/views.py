@@ -1,6 +1,6 @@
 from django.shortcuts import render
-from .models import Product,Brand,Review
 from django.views.generic import ListView , DetailView
+from .models import Product,Brand,Review,ProductImage
 
 
 # Create your views here.
@@ -19,6 +19,7 @@ class ProductDetail (DetailView):
 
     def get_context_data(self, **kwargs) :
         context = super().get_context_data(**kwargs) # dict : object one prouduct
-        context["reviews"] = Review.objects.filter(product=self.get_object())
+        context["reviews"] = Review.objects.filter(product=self.get_object()) # make filter and give review for one product
+        context['images']=ProductImage.objects.filter(product=self.get_object()) # make filter and give imge for one product
         return context
     
