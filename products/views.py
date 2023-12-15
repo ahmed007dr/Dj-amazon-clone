@@ -10,6 +10,7 @@ from .models import Product,Brand,Review,ProductImage
 #context : user
 class ProductList (ListView) : #object_list
     model = Product
+    paginate_by=10
 
 
 # def>> context{} , queryset : product.objects.all  (option) (method override)
@@ -30,6 +31,7 @@ class ProductDetail (DetailView):
     
 class BrandList(ListView):
     model = Brand
+    paginate_by=50
 
 
 class BrandDetail(ListView): #filter product of brand 
