@@ -1,9 +1,10 @@
 Products :
-    - list & detail products
-    - list detail brands
-    - reviews
-    - pagination
-    - api products
+    - list & detail products (done)
+    - list detail brands (done)
+    - reviews (done)
+    - pagination (done)
+    - add review
+    - api products (done) >>> setup rest framework
 
 Order :
     - desgin models
