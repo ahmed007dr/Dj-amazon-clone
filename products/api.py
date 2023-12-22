@@ -15,7 +15,7 @@ class ProductDetailAPI(generics.RetrieveAPIView):
 class BrandListAPI(generics.ListAPIView):
     queryset=Brand.objects.all()
     serializer_class=serializers.BrandListSerializer
-    pagination_class=MyPagination  
+    pagination_class=MyPagination  #custom pagaintion
 
 class BrandDetailAPI(generics.RetrieveAPIView):
     queryset=Brand.objects.all()
