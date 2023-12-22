@@ -5,6 +5,8 @@ Products :
     - pagination (done)
     - add review
     - api products (done) >>> setup rest framework
+    - qury set API : models
+    - custom filter , code refactor
 
 Order :
     - desgin models
