@@ -70,6 +70,7 @@ def mydebug(request):
     #data=Product.objects.annotate(is_new=Value(0))
     data=Product.objects.annotate(price_with_tax=F('price')*1.15) # price by 1.15 =value in new column not in db
 
+    #all of that's queryset API
 
 
 
