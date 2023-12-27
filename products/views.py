@@ -67,7 +67,9 @@ def mydebug(request):
     #data=Product.objects.aggregate(myavg=Avg('price') , mycount=Count('id'))
 
         #annotation # create new column in result not in model databas
-    data=Product.objects.annotate(is_new=Value(0))
+    #data=Product.objects.annotate(is_new=Value(0))
+    data=Product.objects.annotate(price_with_tax=F('price')*1.15) # price by 1.15 =value in new column not in db
+
 
 
 
