@@ -64,7 +64,7 @@ def mydebug(request):
         # aggregation-------- count min max sum avg ( interview question )
     #from django.db.models.aggregates import Count,Sum,Avg,Max,Min
     #data=Product.objects.annotate(Count('brand'),Sum('price'),Avg('price'),Max('price'),Min('
-    
+    data=Product.objects.aggregate(myavg=Avg('price'))
 
 
 
