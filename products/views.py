@@ -5,6 +5,11 @@ from django.views.generic import ListView , DetailView
 from .models import Product,Brand,Review,ProductImage
 
 
+
+def mydebug(request):
+    data=Product.objects.all()
+    return render(request,'products/debug.html',{'data':data})
+
 # Create your views here.
 #queryset : filter علشان بتغير ف الكويري اللي راجع
 #context : user
