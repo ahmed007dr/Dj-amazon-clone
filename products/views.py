@@ -70,7 +70,7 @@ def mydebug(request):
     #data=Product.objects.annotate(is_new=Value(0))
     data=Product.objects.annotate(price_with_tax=F('price')*1.15) # price by 1.15 =value in new column not in db
 
-    #all of that's queryset API
+    #all of thats queryset API
 
 
 
@@ -104,6 +104,7 @@ class ProductDetail (DetailView):
 class BrandList(ListView):
     model = Brand
     paginate_by=50
+    queryset=Brand.objects.annotate(product_count=Count('product_brand')) # num of product in one brand with related_name
 
 
 class BrandDetail(ListView): #filter product of brand 
