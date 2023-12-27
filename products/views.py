@@ -3,7 +3,8 @@ from django.db.models.query import QuerySet
 from django.shortcuts import render
 from django.views.generic import ListView , DetailView
 from .models import Product,Brand,Review,ProductImage
-from django.db.models import Q
+from django.db.models import Q , F
+from django.db.models.aggregates import Count,Sum,Avg,Max,Min
 
 
 def mydebug(request):
@@ -14,17 +15,17 @@ def mydebug(request):
     #data=Product.objects.filter(price__lt= 90) #less than
     #data=Product.objects.filter(price__range=(80,83)) #range #column number
 
-    #relation
+    #relation --------
     #data=Product.objects.filter(brand__id=5)#__ table__coulm name 
     #data=Product.objects.filter(brand__id__gt=100)#__ table__coulm name 
 
-    #text
+    #text --------
     #data=Product.objects.filter(name__contains='bob')#have this name
     #data=Product.objects.filter(name__startswith='bob')#have this name in start
     #data=Product.objects.filter(name__endswith='thomas')#have this name in end
     #data=Product.objects.filter(price__isnull=True)#give me any product have not price "empty" int or str
 
-    #dates
+    #dates -------
     #data=Product.objects.filter(date_column__year=2022)#get any prodcut 2022
     #data=Product.objects.filter(date_column__month=2)#get any prodcut 2022
     #data=Product.objects.filter(date_column__day=15)#get any prodcut 2022
@@ -34,9 +35,36 @@ def mydebug(request):
     #data=Product.objects.filter(flag='New').filter(price__gt=20) # make 2 filter with new type
 
 
-    #from django.db.models import Q      filter  ( or )
-    data=Product.objects.filter(flag='New',price__gt=20) # make 2 filter 
+    #from django.db.models import Q  (Q look up)    filter  ( or )
+    #data=Product.objects.filter(Q(flag='New') & Q(price__gt=20))  # make 2 filter  and
+    #data=Product.objects.filter(Q(flag='New') | Q(price__gt=20))  # make 2 filter  or ( Q lookup )
 
+
+        #field refrence ---------
+        #from django.db.models import F
+    #data=Product.objects.filter(quantity=F('price')) # COLUMN OF PRICE الكميه = السعر
+
+        #ORDER -------
+    #data=Product.objects.all().order_by('name') # ترتيب تصاعدي 
+    #data=Product.objects.all().order_by('-name') # ترتيب تنازل
+    #data=Product.objects.all().order_by('-name','price') # two column
+    #data=Product.objects.order_by('name')[:10] # oRDER BY "products_product"."name" ASC LIMIT 10
+
+        #limit fields
+    #data=Product.objects.values('name','price') #dic
+    #data=Product.objects.values_list('name','price') #list  
+    #data=Product.objects.only('name','price') #  
+
+        #SELECT RELATED
+    #data=Product.objects.select_related('brand').all()#  LEFT OUTER JOIN  #foriegnkey , one to one
+    #data=Product.objects.prefetch_related('brand').all() #many to many
+
+    #data=Product.objects.prefetch_related('brand').select_related('category')all() #many to many akter mn relation
+
+        # aggregation-------- count min max sum avg ( interview question )
+    #from django.db.models.aggregates import Count,Sum,Avg,Max,Min
+    #data=Product.objects.annotate(Count('brand'),Sum('price'),Avg('price'),Max('price'),Min('
+    
 
 
 
