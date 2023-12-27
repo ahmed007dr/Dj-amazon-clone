@@ -3,11 +3,44 @@ from django.db.models.query import QuerySet
 from django.shortcuts import render
 from django.views.generic import ListView , DetailView
 from .models import Product,Brand,Review,ProductImage
-
+from django.db.models import Q
 
 
 def mydebug(request):
-    data=Product.objects.all()
+    #data=Product.objects.all() # to get all products
+    #data=Product.objects.filter(price = 20)
+    #data=Product.objects.filter(price__gt= 90) #Greater than
+    #data=Product.objects.filter(price__gte= 90) #Greater than or equl
+    #data=Product.objects.filter(price__lt= 90) #less than
+    #data=Product.objects.filter(price__range=(80,83)) #range #column number
+
+    #relation
+    #data=Product.objects.filter(brand__id=5)#__ table__coulm name 
+    #data=Product.objects.filter(brand__id__gt=100)#__ table__coulm name 
+
+    #text
+    #data=Product.objects.filter(name__contains='bob')#have this name
+    #data=Product.objects.filter(name__startswith='bob')#have this name in start
+    #data=Product.objects.filter(name__endswith='thomas')#have this name in end
+    #data=Product.objects.filter(price__isnull=True)#give me any product have not price "empty" int or str
+
+    #dates
+    #data=Product.objects.filter(date_column__year=2022)#get any prodcut 2022
+    #data=Product.objects.filter(date_column__month=2)#get any prodcut 2022
+    #data=Product.objects.filter(date_column__day=15)#get any prodcut 2022
+
+    #complex queries -----
+    #data=Product.objects.filter(flag='New',price__gt=20) # make 2 filter 
+    #data=Product.objects.filter(flag='New').filter(price__gt=20) # make 2 filter with new type
+
+
+    #from django.db.models import Q      filter  ( or )
+    data=Product.objects.filter(flag='New',price__gt=20) # make 2 filter 
+
+
+
+
+
     return render(request,'products/debug.html',{'data':data})
 
 # Create your views here.
