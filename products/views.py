@@ -3,7 +3,7 @@ from django.db.models.query import QuerySet
 from django.shortcuts import render
 from django.views.generic import ListView , DetailView
 from .models import Product,Brand,Review,ProductImage
-from django.db.models import Q , F
+from django.db.models import Q , F , Value
 from django.db.models.aggregates import Count,Sum,Avg,Max,Min
 
 
@@ -64,7 +64,10 @@ def mydebug(request):
         # aggregation-------- count min max sum avg ( interview question )
     #from django.db.models.aggregates import Count,Sum,Avg,Max,Min
     #data=Product.objects.annotate(Count('brand'),Sum('price'),Avg('price'),Max('price'),Min('
-    data=Product.objects.aggregate(myavg=Avg('price') , mycount=Count('id'))
+    #data=Product.objects.aggregate(myavg=Avg('price') , mycount=Count('id'))
+
+        #annotation # create new column in result not in model databas
+    data=Product.objects.annotate(is_new=Value(0))
 
 
 
