@@ -35,10 +35,11 @@ class Product (models.Model):
         return self.name
 
 #copy from serializers
+    @property #coulmn in db
     def reviews_count(self): #name of function (get_)+ name of column # self couz in class #object product activae
         reviews = self.review_product.all().count()
         return reviews
-
+    @property 
     def avg_rate(self):
         total=0 #sum rate: object (one product)
         reviews=self.review_product.all()

@@ -21,24 +21,30 @@ class ProductListSerializer(serializers.ModelSerializer):
         fields='__all__'
 
     def get_reviews_count(self,object): #name of function (get_)+ name of column # self couz in class #object product activae
-        reviews = object.reviews_count()
+        reviews = object.review_product.all().count()
         return reviews
     
     def get_avg_rate(self,object):
-        avg=object.avg_rate()
+        total=0 #sum rate: object (one product)
+        reviews=object.review_product.all()
+        
+        if len(reviews)>0:
+            for item in reviews:
+                total+= item.rate
+            avg= total / len(reviews)
+        else:
+            avg=0
         return avg
 
 class ProductDetailSerializer(serializers.ModelSerializer):
     brand=serializers.StringRelatedField() # to add column in api
-    reviews_count=serializers.SerializerMethodField() # to add column in api
-    avg_rate=serializers.SerializerMethodField()#method_name="get_avg_rate" # to add column in api
     images=ProductImagesSerializer(source="product_image",many=True) # for every product imge self (related)
     review=ProductReviewSerializer(source="review_product",many=True)
     class Meta:
         model=Product
         fields='__all__'
 
-
+ 
 
 class BrandListSerializer(serializers.ModelSerializer):
     class Meta:
