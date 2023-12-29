@@ -5,8 +5,9 @@ from django.views.generic import ListView , DetailView
 from .models import Product,Brand,Review,ProductImage
 from django.db.models import Q , F , Value
 from django.db.models.aggregates import Count,Sum,Avg,Max,Min
+from django.views.decorators.cache import cache_page
 
-
+@cache_page(60 * 1)
 def mydebug(request):
     #data=Product.objects.all() # to get all products
     #data=Product.objects.filter(price = 20)
@@ -68,11 +69,12 @@ def mydebug(request):
 
         #annotation # create new column in result not in model databas
     #data=Product.objects.annotate(is_new=Value(0))
-    data=Product.objects.annotate(price_with_tax=F('price')*1.15) # price by 1.15 =value in new column not in db
+    #data=Product.objects.annotate(price_with_tax=F('price')*1.15) # price by 1.15 =value in new column not in db
 
     #all of thats queryset API
 
 
+    data=Product.objects.all()
 
 
     return render(request,'products/debug.html',{'data':data})
