@@ -3,11 +3,11 @@ Products :
     - list detail brands (done)
     - reviews (done)
     - pagination (done)
-    - add review
     - api products (done) >>> setup rest framework
     - qury set API : models (done)
-    - home page 
     - custom filter , code refactor ( done )
+    - home page 
+    - add review
 
 Order :
     - desgin models
