@@ -52,7 +52,10 @@ class Product (models.Model):
             avg=0
         return avg
 #end copy serializers
-    
+    class Meta: #any query
+        ordering=['id']
+        verbose_name='Product'
+        verbose_name_plural='Products'
 
 
 class ProductImage (models.Model):
