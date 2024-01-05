@@ -19,6 +19,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     class Meta:
         model=Product
         fields='__all__'
+        #fields=['name','brand','price','review_count','avg_rate']
 
     def get_reviews_count(self,object): #name of function (get_)+ name of column # self couz in class #object product activae
         reviews = object.review_product.all().count()
@@ -43,8 +44,6 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model=Product
         fields='__all__'
-
- 
 
 class BrandListSerializer(serializers.ModelSerializer):
     class Meta:

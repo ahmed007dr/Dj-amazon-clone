@@ -7,8 +7,15 @@ from django.db.models import Q , F , Value
 from django.db.models.aggregates import Count,Sum,Avg,Max,Min
 from django.views.decorators.cache import cache_page
 
+
 @cache_page(60 * 1)
 def mydebug(request):
+
+    data=Product.objects.all()
+    return render(request,'products/debug.html',{'data':data})
+
+
+
     #data=Product.objects.all() # to get all products
     #data=Product.objects.filter(price = 20)
     #data=Product.objects.filter(price__gt= 90) #Greater than
@@ -74,10 +81,6 @@ def mydebug(request):
     #all of thats queryset API
 
 
-    data=Product.objects.all()
-
-
-    return render(request,'products/debug.html',{'data':data})
 
 # Create your views here.
 #queryset : filter علشان بتغير ف الكويري اللي راجع

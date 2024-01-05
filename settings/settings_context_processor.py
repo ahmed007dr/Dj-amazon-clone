@@ -1,9 +1,11 @@
 from .models import Settings
-from django.views.decorators.cache import cache_page
+from django.core.cache import cache
 
-from context_cache.decorators import cache_for_context
-
-@cache_page(60 * 10 )
 def get_settings(request):
-    data=Settings.objects.last()
-    return{'settings_data':data}
+    #check data in cashe
+    try:
+        settings_data=cache.get('settings_data')
+    except Exception:
+            settings_data=Settings.objects.last()
+            cache.set('settings_data',settings_data,60*60*24)
+    return{'settings_data':settings_data}
