@@ -1,56 +1,42 @@
 from rest_framework import serializers
-from .models import Product,Brand,ProductImage,Review
+from taggit.serializers import TagListSerializerField, TaggitSerializer
+
+from .models import Product, Brand, ProductImage, Review
 
 class ProductImagesSerializer(serializers.ModelSerializer):
-    class  Meta:
-        model=ProductImage
-        fields=['image']
+    class Meta:
+        model = ProductImage
+        fields = ['image']
 
 class ProductReviewSerializer(serializers.ModelSerializer):
     class Meta:
-        model=Review
-        fields=['user','review','rate','created_at']
+        model = Review
+        fields = ['user', 'review', 'rate', 'created_at']
 
-class ProductListSerializer(serializers.ModelSerializer):
-    brand=serializers.StringRelatedField() # to add column in api 
-    reviews_count=serializers.SerializerMethodField()#method_name="get_review_count" # to add column in api #link def 
-    avg_rate=serializers.SerializerMethodField()#method_name="get_avg_rate" # to add column in api
-    
+class ProductListSerializer(TaggitSerializer, serializers.ModelSerializer):
+    brand = serializers.StringRelatedField()  # to add column in api
+    tags = TagListSerializerField()
+
     class Meta:
-        model=Product
-        fields='__all__'
-        #fields=['name','brand','price','review_count','avg_rate']
+        model = Product
+        fields = ['name', 'price', 'flag', 'image', 'subtitle', 'description', 'sku', 'brand', 'reviews_count', 'avg_rate', 'tags']
 
-    def get_reviews_count(self,object): #name of function (get_)+ name of column # self couz in class #object product activae
-        reviews = object.review_product.all().count()
-        return reviews
-    
-    def get_avg_rate(self,object):
-        total=0 #sum rate: object (one product)
-        reviews=object.review_product.all()
-        
-        if len(reviews)>0:
-            for item in reviews:
-                total+= item.rate
-            avg= total / len(reviews)
-        else:
-            avg=0
-        return avg
+class ProductDetailSerializer(TaggitSerializer, serializers.ModelSerializer):
+    brand = serializers.StringRelatedField()  # to add column in api
+    images = ProductImagesSerializer(source="product_image", many=True)  # for every product image self (related)
+    review = ProductReviewSerializer(source="review_product", many=True)
+    tags = TagListSerializerField()
 
-class ProductDetailSerializer(serializers.ModelSerializer):
-    brand=serializers.StringRelatedField() # to add column in api
-    images=ProductImagesSerializer(source="product_image",many=True) # for every product imge self (related)
-    review=ProductReviewSerializer(source="review_product",many=True)
     class Meta:
-        model=Product
-        fields='__all__'
+        model = Product
+        fields = ['name', 'price', 'flag', 'image', 'subtitle', 'description', 'sku', 'brand', 'reviews_count', 'avg_rate', 'images', 'review', 'tags']
 
 class BrandListSerializer(serializers.ModelSerializer):
     class Meta:
-        model=Brand
-        fields='__all__'
+        model = Brand
+        fields = '__all__'
 
 class BrandDetailSerializer(serializers.ModelSerializer):
     class Meta:
-        model=Brand
-        fields='__all__'
+        model = Brand
+        fields = '__all__'
