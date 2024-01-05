@@ -43,7 +43,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_filters',
     'drf_yasg',
-    "debug_toolbar",
+    'debug_toolbar',
 
 
     #ur app
@@ -65,9 +65,8 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'context_cache.middleware.ContextCacheMiddleware',
-
-    "debug_toolbar.middleware.DebugToolbarMiddleware",
-
+    'django.middleware.cache.CacheMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',

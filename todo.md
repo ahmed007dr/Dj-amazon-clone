@@ -28,6 +28,6 @@ intermediate:
     - redis
     - payment
     - ajax (Java script & django)mix
-    - caching
+    - caching ( done 36 )
     - linting
     - deploy
