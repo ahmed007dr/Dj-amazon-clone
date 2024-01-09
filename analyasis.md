@@ -54,3 +54,19 @@ user:
         -dashbord
         -profile
         -edit profile
+
+        ________________________________
+
+    app orders : 
+        - address
+        - product
+        - brand
+        - price
+        - quantity
+        - order time
+        - delivery_time
+        - order_id
+        - discount
+        - delivery fee
+        - statues=['Recieved','Processed','Shipped','Delivered']
+

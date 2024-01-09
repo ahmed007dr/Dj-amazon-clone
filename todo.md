@@ -6,8 +6,8 @@ Products :
     - api products (done) >>> setup rest framework
     - qury set API : models (done)
     - custom filter , code refactor ( done )
-    - home page 
-    - add review
+    - home page ( done 37)
+    - add review ( done 37)
 
 Order :
     - desgin models
