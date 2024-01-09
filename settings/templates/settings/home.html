@@ -101,6 +101,7 @@
                     </div>
                 </div>
                 <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5">
+                    
                     {% for item in sale_products %}
                         <div class="col">
                             <div class="product-card">
@@ -111,8 +112,8 @@
                                     <button class="product-wish wish">
                                         <i class="fas fa-heart"></i>
                                     </button>
-                                    <a class="product-image" href="product-video.html">
-                                        <img src="{{item.image.url}}" alt="product">
+                                    <a class="product-image" href="products/{{ item.slug }}">
+                                        <img src="{{ item.image.url }}" alt="product">
                                     </a>
                                     <div class="product-widget">
                                         <a title="Product Compare" href="compare.html" class="fas fa-random"></a>
@@ -130,10 +131,10 @@
                                         <a href="product-video.html">(3)</a>
                                     </div>
                                     <h6 class="product-name">
-                                        <a href="product-video.html">{{item}}</a>
+                                        <a href="products/{{ item.slug }}">{{ item }}</a>
                                     </h6>
                                     <h6 class="product-price">
-                                        <span>${{item.price}}</span>
+                                        <span>${{ item.price }}<small>/piece</small></span>
                                     </h6>
                                     <button class="product-add" title="Add to Cart">
                                         <i class="fas fa-shopping-basket"></i>
@@ -180,7 +181,7 @@
                     </div>
                 </div>
                 <div class="row row-cols-1 row-cols-md-1 row-cols-lg-2 row-cols-xl-2">
-                    {% for item in feature_products %}
+                    {% for item in feature_product %}
                         <div class="col">
                             <div class="feature-card">
                                 <div class="feature-media">
@@ -214,7 +215,7 @@
                                     <h6 class="feature-price">
                                         <span>${{item.price}}</span>
                                     </h6>
-                                    <p class="feature-desc">{{item.subtitle|truncatewords:15}}</p>
+                                    <p class="feature-desc">{{item.subtitle|truncatewords:16}}</p>
                                     <button class="product-add" title="Add to Cart">
                                         <i class="fas fa-shopping-basket"></i>
                                         <span>add</span>
@@ -226,13 +227,13 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </div>    
                     {% endfor %}
                 </div>
                 <div class="row">
                     <div class="col-lg-12">
                         <div class="section-btn-25">
-                            <a href="/products" class="btn btn-outline">
+                            <a href="/products/" class="btn btn-outline">
                                 <i class="fas fa-eye"></i>
                                 <span>show more</span>
                             </a>
