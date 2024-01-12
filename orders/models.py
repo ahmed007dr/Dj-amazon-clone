@@ -33,6 +33,28 @@ class OrderDetails(models.Model):
     price = models.FloatField()
     total = models.FloatField()
     
+
+CART_STATUS = (
+    ('Inprogress', 'Inprogress'),
+    ('Completed', 'Completed'),
+)
+
+
+class Cart(models.Model):
+    user = models.ForeignKey(User, related_name='cart_owner', on_delete=models.SET_NULL ,blank=True,null=True)
+    status = models.CharField(max_length=20,choices=CART_STATUS )
+    coupon = models.ForeignKey('Coupon', related_name='cart_coupon', on_delete=models.SET_NULL, null=True,blank=True)
+    total_with_coupon = models.FloatField(blank=True,null=True)
+    
+
+class CartDetails(models.Model):
+    cart = models.ForeignKey(Order, related_name='cart_detail', on_delete=models.CASCADE)
+    product = models.ForeignKey(Product , related_name='cartdetail_product', on_delete=models.SET_NULL, blank=True,null=True)
+    quatity = models.IntegerField(default=1)
+    total = models.FloatField(null=True,blank=True)
+    
+
+
 class Coupon(models.Model):
     code = models.CharField(max_length=20)
     start_date = models.DateField(default=timezone.now)
@@ -45,4 +67,3 @@ class Coupon(models.Model):
         self.end_date = self.start_date + week
         super(Coupon, self).save(*args, **kwargs)
         
-    
