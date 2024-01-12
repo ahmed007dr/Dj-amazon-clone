@@ -31,7 +31,7 @@ class OrderDetails(models.Model):
     product = models.ForeignKey(Product , related_name='orderdetail_product', on_delete=models.SET_NULL, blank=True,null=True)
     quatity = models.IntegerField()
     price = models.FloatField()
-    total = models.FloatField()
+    total = models.FloatField(blank=True,null=True)
     
 
 CART_STATUS = (
