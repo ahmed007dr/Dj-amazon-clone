@@ -1,13 +1,11 @@
+{% extends 'base.html' %}
+{% load static %}
 
-        {% extends 'base.html' %}
-        {% load static %}
+{% block css %}
+    <link rel="stylesheet" href="{% static 'en/css/orderlist.css'%}">
+{% endblock css %}
 
-        {% block css %}
-            <link rel="stylesheet" href="{% static 'en/css/orderlist.css'%}">
-        {% endblock css %}
-
-        {% block body %}
-
+{% block body %} 
 
         <!--=====================================
                     BANNER PART START
