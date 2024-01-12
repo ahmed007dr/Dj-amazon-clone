@@ -45,6 +45,13 @@ class Cart(models.Model):
     status = models.CharField(max_length=20,choices=CART_STATUS )
     coupon = models.ForeignKey('Coupon', related_name='cart_coupon', on_delete=models.SET_NULL, null=True,blank=True)
     total_with_coupon = models.FloatField(blank=True,null=True)
+
+    @property
+    def cart_total(self):
+        total=0
+        for item in self.cart_detail.all():
+            total += item.total
+        return round(total,2)
     
 
 class CartDetails(models.Model):
