@@ -48,7 +48,7 @@ class Cart(models.Model):
     
 
 class CartDetails(models.Model):
-    cart = models.ForeignKey(Order, related_name='cart_detail', on_delete=models.CASCADE)
+    cart = models.ForeignKey(Cart, related_name='cart_detail', on_delete=models.CASCADE)
     product = models.ForeignKey(Product , related_name='cartdetail_product', on_delete=models.SET_NULL, blank=True,null=True)
     quatity = models.IntegerField(default=1)
     total = models.FloatField(null=True,blank=True)
