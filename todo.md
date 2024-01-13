@@ -10,9 +10,9 @@ Products :
     - add review ( done 37)
 
 Order :
-    - desgin models
-    - add views order
-    - add cart
+    - desgin models  (done 38)
+    - add views order (done 38)
+    - add cart    (done 38)
     - add checkout
     - add coupons
     - api orders & cart
