@@ -28,10 +28,10 @@ class Order(models.Model):
 
 class OrderDetails(models.Model):
     order = models.ForeignKey(Order, related_name='order_detail', on_delete=models.CASCADE)
-    product = models.ForeignKey(Product , related_name='orderdetail_product', on_delete=models.SET_NULL, blank=True,null=True)
-    quatity = models.IntegerField()
+    product = models.ForeignKey(Product, related_name='orderdetail_product', on_delete=models.SET_NULL, blank=True, null=True)
+    quantity = models.IntegerField()
     price = models.FloatField()
-    total = models.FloatField(blank=True,null=True)
+    total = models.FloatField(blank=True, null=True)
     
 
 CART_STATUS = (
@@ -55,9 +55,9 @@ class Cart(models.Model):
 
 class CartDetails(models.Model):
     cart = models.ForeignKey(Cart, related_name='cart_detail', on_delete=models.CASCADE)
-    product = models.ForeignKey(Product , related_name='cartdetail_product', on_delete=models.SET_NULL, blank=True,null=True)
-    quatity = models.IntegerField(default=1)
-    total = models.FloatField(null=True,blank=True)
+    product = models.ForeignKey(Product, related_name='cartdetail_product', on_delete=models.SET_NULL, blank=True, null=True)
+    quantity = models.IntegerField(default=1)
+    total = models.FloatField(null=True, blank=True)
     
 
 
