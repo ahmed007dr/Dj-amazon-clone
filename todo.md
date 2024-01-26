@@ -13,9 +13,9 @@ Order :
     - desgin models  (done 38)
     - add views order (done 38)
     - add cart    (done 38)
-    - add checkout
-    - add coupons
-    - api orders & cart
+    - add checkout  (done 39)
+    - add coupons (done 39)
+    - api orders & cart  (done 39)
 
 users:
     - desgin models
