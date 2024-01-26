@@ -28,6 +28,8 @@ def checkout(request):
                 cart.coupon = copoun
                 cart.total_with_coupon = sub_total
                 cart.save()
+                copoun.quantity -= 1
+                copoun.save()
                             
                 return render(request, 'orders/checkout.html', {
                     'cart_detail': cart_details,
