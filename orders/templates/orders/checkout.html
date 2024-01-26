@@ -69,8 +69,9 @@
                                 </div>
                                 <div class="chekout-coupon">
                                     <button class="coupon-btn">Do you have a coupon code?</button>
-                                    <form class="coupon-form">
-                                        <input type="text" placeholder="Enter your coupon code">
+                                    <form class="coupon-form" method='post'>
+                                        {% csrf_token %}
+                                        <input type="text" name='copoun_code' placeholder="Enter your coupon code">
                                         <button type="submit"><span>apply</span></button>
                                     </form>
                                 </div>
@@ -78,7 +79,7 @@
                                     <ul>
                                         <li>
                                             <span>Sub total</span>
-                                            <span>${{sub_total}}</span>
+                                            <span>${{subtotal}}</span>
                                         </li>
                                         <li>
                                             <span>delivery fee</span>

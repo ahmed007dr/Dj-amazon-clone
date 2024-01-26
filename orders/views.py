@@ -1,4 +1,6 @@
 from django.shortcuts import render ,redirect
+from django.shortcuts import get_object_or_404
+import datetime
 from .models import Order,OrderDetails,Cart,CartDetails,Coupon
 from products.models import Product
 from settings.models import DeliveryFee
@@ -11,6 +13,33 @@ def checkout(request):
     cart = Cart.objects.get(user=request.user, status='Inprogress')
     cart_details = CartDetails.objects.filter(cart=cart)
     delivery_fee = DeliveryFee.objects.last().fee
+
+    if request.method == 'POST':
+        code=request.POST['copoun_code']
+        #copoun=Coupon.objects.get(code=code)
+        copoun = get_object_or_404(Coupon,code=code)
+        if copoun and copoun.quantity > 0 :
+            today_date=datetime.datetime.today().date()
+            if today_date >= copoun.start_date and today_date <= copoun.end_date:
+                copoun_value= round (cart.cart_total / 100*copoun.discount,2)
+                sub_total = cart.cart_total - copoun_value
+                total = sub_total + delivery_fee
+
+                cart.coupon = copoun
+                cart.total_with_coupon = sub_total
+                cart.save()
+                            
+                return render(request, 'orders/checkout.html', {
+                    'cart_detail': cart_details,
+                    'delivery_fee': delivery_fee,
+                    'subtotal': sub_total,
+                    'discount': copoun_value,
+                    'total': total
+                })
+
+
+
+
 
     # Access the property without parentheses
     sub_total = cart.cart_total
