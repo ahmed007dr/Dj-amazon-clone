@@ -172,4 +172,7 @@ MEDIA_ROOT=BASE_DIR / "media"
 #         "LOCATION": "redis://127.0.0.1:6379",
 #     }
 # }
+AUTHENTICATION_BACKENDS = [
+    'accounts.backend.EmailOrUsernameLogin'
+]
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
