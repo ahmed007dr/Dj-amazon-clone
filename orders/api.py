@@ -107,5 +107,39 @@ class CreateOrderAPI(generics.GenericAPIView):
         return Response ({'messge':'order was create successfully'},status=status.HTTP_201_CREATED)
 
 class CartCreateUpdateDelete(generics.GenericAPIView):
-    pass
+    
+    def get(self,request,*args, **kwargs): # get or create
+        user = User.objects.get(username=self.kwargs['username'])
+        cart, created = Cart.objects.get_or_create(user=user,status='Inprogress')
+        data = CartSerializer(cart).data
+        return Response({'cart':data})
+
+    def post(self,request,*args, **kwargs): # add update
+        user = User.objects.get(username=self.kwargs['username'])
+        product_id = Product.objects.get(id=request.data['product_id'])
+        quantity = int(request.data['quantity'])
+
+        cart = Cart.objects.get(user=user, status='Inprogress')
+        cart_details, created = CartDetails.objects.get_or_create(cart=cart, product=product_instance)
+
+        cart_details.quantity = quantity  # delete old quantity and add new quantity
+        cart_details.total = round(product_id.price * cart_details.quantity, 2)
+        cart_details.save()
+        return Response({'message':'cart was updated '},status=status.HTTP_201_CREATED)
+
+
+
+
+    def delete(self,request,*args, **kwargs): # delete from cart
+        user = User.objects.get(username=self.kwargs['username'])
+        #cart = Cart.objects.get_or_create(user=user,status='Inprogress')
+        product = CartDetails.objects.get(id=request.data['item_id'])
+        product.delete()
+        return Response({'message':'item was deleted successfully'},status=status.HTTP_202_ACCEPTED)
+
+
+
+
+
+
 
