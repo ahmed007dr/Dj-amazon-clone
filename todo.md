@@ -15,15 +15,17 @@ Order :
     - add cart    (done 38)
     - add checkout  (done 39)
     - add coupons (done 39)
-    - api orders & cart  (done 39)
+    - api orders & cart  (done 39, 40)
+    - product quantity ( done 40 )
 
 users:
-    - desgin models
+    - desgin models (41)
     - add templates
     - api
 
 intermediate:
     - docker
+    - translation
     - celery
     - redis
     - payment
@@ -31,3 +33,6 @@ intermediate:
     - caching ( done 36+37 raist )
     - linting
     - deploy
+
+    - interview
+    - multiple type user
