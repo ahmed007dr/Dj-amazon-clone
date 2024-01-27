@@ -20,11 +20,11 @@ class Product (models.Model):
     sku = models.IntegerField(_('sku'))
     subtitle = models.CharField(_('subtitle'),max_length=500)
     description = models.TextField(_('description'),max_length=50000)
-
+    
     brand = models.ForeignKey('Brand',related_name='product_brand',on_delete=models.SET_NULL,null=True,verbose_name=_('brand'))
     tags = TaggableManager(_('tags'))
 
-    #quantity=''
+    quantity=models.IntegerField()
     slug = models.SlugField(_('slug'),blank=True,null=True,unique=True)
 
     def save(self, *args, **kwargs):
