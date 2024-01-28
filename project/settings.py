@@ -31,6 +31,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'accounts',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -44,13 +45,13 @@ INSTALLED_APPS = [
     'django_filters',
     'drf_yasg',
     'debug_toolbar',
+    "django_bootstrap5",
 
 
     #ur app
     'products',
     'settings',
     'orders',
-    'accounts',
 
 ]
 
@@ -175,4 +176,15 @@ MEDIA_ROOT=BASE_DIR / "media"
 AUTHENTICATION_BACKENDS = [
     'accounts.backend.EmailOrUsernameLogin'
 ]
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+LOGIN_REDIRECT_URL = '/'
+
+#EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp-relay.gmail.com"
+EMAIL_HOST_PASSWORD = "Dr#ahmed007"
+EMAIL_HOST_USER = "ahmed007eg@gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+

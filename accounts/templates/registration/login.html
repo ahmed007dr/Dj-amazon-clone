@@ -11,8 +11,8 @@
                         </div>
                         <div class="user-form-card">
                             <div class="user-form-title">
-                                <h2>join now!</h2>
-                                <p>setup ur account</p>
+                                <h2>welcome!</h2>
+                                <p>Use your credentials to access</p>
                             </div>
                             <div class="user-form-group">
                                 <ul class="user-form-social">
@@ -28,16 +28,16 @@
                                     {% csrf_token %}
                                     {% bootstrap_form form %}
                                     <div class='form-button'>
-                                        {% bootstrap_button button_type="submit" content="register" %}
+                                        {% bootstrap_button button_type="submit" content="login" %}
                                     </div>
                                 </form>
                             </div>
                         </div>
                         <div class="user-form-remind">
-                            <p>have  account?<a href="/account/login">log in</a></p>
+                            <p>Don't have any account?<a href="/accounts/signup">register here</a></p>
                         </div>
                         <div class="user-form-footer">
-                            <p>Greeny | &COPY; Copyright by <a href="#">{{settings_data.name}}</a></p>
+                            <p>Greeny | &COPY; Copyright by <a href="/">{{settings_data.name}}</a></p>
                         </div>
                     </div>
                 </div>
