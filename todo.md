@@ -21,7 +21,7 @@ Order :
 users:
     - desgin models (41)
     - add templates
-    - api
+    - api : library
 
 intermediate:
     - docker
