@@ -20,15 +20,17 @@ Order :
 
 users:
     - desgin models (41)
-    - add templates
+    - add templates (42)
     - api : library
 
 intermediate:
-    - docker
+    - chart js
     - translation
+    - docker
     - celery
     - redis
     - payment
+    - js
     - ajax (Java script & django)mix
     - caching ( done 36+37 raist )
     - linting
@@ -36,3 +38,6 @@ intermediate:
 
     - interview
     - multiple type user
+    - filter quntity 
+    - out of stock
+    - 
