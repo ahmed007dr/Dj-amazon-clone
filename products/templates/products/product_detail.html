@@ -88,7 +88,7 @@
                                 </ul>
                             </div>
                             <div class="details-add-group">
-                                {% if object.quantity >0 %}
+                                {% if object.quantity > 0 %}
                                     <form action='/orders/add-to-cart' method='post' class='row'>
                                         {% csrf_token %}
                                         <div class='col-lg-6'>
