@@ -185,11 +185,11 @@ AUTHENTICATION_BACKENDS = [
 LOGIN_REDIRECT_URL = '/'
 
 #EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp-relay.gmail.com"
-EMAIL_HOST_PASSWORD = "Dr#ahmed007"
+EMAIL_HOST_PASSWORD = "zssdmbodbjxebbov"
 EMAIL_HOST_USER = "ahmed007eg@gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
 

@@ -88,6 +88,13 @@ def mydebug(request):
 class ProductList (ListView) : #object_list
     model = Product
     paginate_by=10
+ 
+    # def get_queryset(self):     # if any product quantity = zero will hide 
+    #     queryset=super().get_queryset()
+    #     queryset=queryset.filter(quantity__get=0)
+    #     return queryset
+    
+    
 
 
 # def>> context{} , queryset : product.objects.all  (option) (method override)
