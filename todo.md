@@ -21,7 +21,8 @@ Order :
 users:
     - desgin models (41)
     - add templates (42)
-    - api : library
+    - out of stock : admin
+    - api : library : JWT
 
 intermediate:
     - chart js
