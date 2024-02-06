@@ -23,6 +23,7 @@ users:
     - add templates (42)
     - out of stock : admin
     - api : library : JWT
+    - admin customization
 
 intermediate:
     - chart js
