@@ -5,6 +5,9 @@ from django.core.mail import send_mail
 from .forms import SignupForm , UserActivateForm
 from .models import Profile
 
+from products.models import Product,Brand,Review
+from orders.models import Order
+
 # Create your views here.
 
 
@@ -42,9 +45,6 @@ def signup(request):
     return render(request, 'accounts/signup.html', {'form': form})
 
 
-
-
-
 def user_activate(request,username):
     '''
     -code ---> activate
@@ -71,3 +71,7 @@ def user_activate(request,username):
     else:
         form = UserActivateForm()
     return render(request, 'accounts/activate.html', {'form': form})
+
+
+def dashbord(request):
+    return render (request,'accounts/dashbord.html',{})
