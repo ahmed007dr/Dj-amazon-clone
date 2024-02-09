@@ -1,0 +1,20 @@
+# Use the official Python image with tag 3.11.8-slim-bullseye
+FROM python:3.11.8-slim-bullseye
+
+# Show logs in Python without buffering
+ENV PYTHONUNBUFFERED=1
+
+# Update package lists and install necessary dependencies
+RUN apt-get update && apt-get -y install gcc libpq-dev
+
+# Set the working directory to /app
+WORKDIR /app
+
+# Copy the requirements file into the container at /app
+COPY requirements.txt /app/requirements.txt
+
+# Install the project dependencies
+RUN pip install -r requirements.txt
+
+# Copy all project files into the container at /app
+COPY . /app/

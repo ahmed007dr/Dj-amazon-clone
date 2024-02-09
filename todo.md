@@ -29,7 +29,7 @@ users:
 intermediate:
     - chart js
     - translation ( done 43)
-    - docker
+    - docker 
     - celery
     - redis
     - payment
