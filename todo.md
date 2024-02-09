@@ -24,10 +24,11 @@ users:
     - out of stock : admin
     - api : library : JWT
     - admin customization
+    - app name & brands translation
 
 intermediate:
     - chart js
-    - translation
+    - translation ( done 43)
     - docker
     - celery
     - redis
