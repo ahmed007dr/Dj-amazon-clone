@@ -74,4 +74,22 @@ def user_activate(request,username):
 
 
 def dashbord(request):
-    return render (request,'accounts/dashbord.html',{})
+    users = User.objects.all().count()
+    product = Product.objects.all().count()
+    order = Order.objects.all().count()
+    brand = Brand.objects.all().count()
+    reviews = Review.objects.all().count()
+    new_products = Product.objects.filter(flag='new').count()
+    sale_products = Product.objects.filter(flag='sale').count()
+    feature_products = Product.objects.filter(flag='feature').count()
+
+    return render (request,'accounts/dashbord.html',{
+        'user':users ,
+        'product' : product ,
+        'order':order,
+        'brand':brand,
+        'reviews':reviews,
+        'new_products':new_products,
+        "sale_products":sale_products,
+        "feature_products":feature_products
+    })
