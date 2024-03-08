@@ -143,8 +143,8 @@
                         {% if user.is_authenticated %}
                             <img src="images/user.png" alt="user">
                         {% else %}
-                            <a href='#'>{% translate "log in" %}</a>
-                            <a href='#'>{% translate "sign up" %}</a>
+                            <a href='/accounts/login'>{% translate "log in" %}</a>
+                            <a href='/accounts/signup'>{% translate "sign up" %}</a>
                         {% endif %}
                     </a>
                     <form class="header-form">

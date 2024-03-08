@@ -141,6 +141,18 @@ DATABASES = {
 }
 
 
+##data base with docker postgressql
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         "NAME": "amazon",
+#         "USER": "postgres",
+#         "PASSWORD": "postgres",
+#         "HOST": "db",
+#         "PORT": "5432",
+#     }
+# }
+
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 
@@ -189,12 +201,25 @@ MEDIA_ROOT=BASE_DIR / "media"
 
 # DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379",
+    }
+}
+
+
+
+# #redis with docker
+
 # CACHES = {
 #     "default": {
 #         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-#         "LOCATION": "redis://127.0.0.1:6379",
+#         "LOCATION": "redis://redis:6379/0",
 #     }
 # }
+
+
 AUTHENTICATION_BACKENDS = [
     'accounts.backend.EmailOrUsernameLogin'
 ]

@@ -2,7 +2,7 @@ from .models import Settings
 from django.core.cache import cache
 
 def get_settings(request):
-    #check data in cashe
+    # ##check data in cashe
     # try:
     #     settings_data=cache.get('settings_data')
     # except Exception:
