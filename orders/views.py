@@ -81,9 +81,11 @@ def add_to_cart(request):
     #get new data after create with ajax
     cart = Cart.objects.get(user=request.user, status='Inprogress')
     cart_details = CartDetails.objects.filter(cart=cart)
-    page = render_to_string('cart-includes.html',{"cart_detail_data":cart_details ,'cart_data':cart})
+    total = cart.cart_total
+    cart_count = len(cart_details)
 
-    return JsonResponse({"result":page})
+    page = render_to_string('cart-includes.html', {"cart_detail_data": cart_details, 'cart_data': cart})
 
+    return JsonResponse({"result": page, "total": total, "cart_count": cart_count})
 
     # return redirect(f'/products/{product_instance.slug}')
