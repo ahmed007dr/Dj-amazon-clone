@@ -5,6 +5,9 @@ from .models import Order,OrderDetails,Cart,CartDetails,Coupon
 from products.models import Product
 from settings.models import DeliveryFee
 
+from django.http import JsonResponse
+from django.template.loader import render_to_string
+
 def order_list(request):
     data=Order.objects.filter(user=request.user)
     return render(request,'orders/order_list.html',{'orders':data})
@@ -71,8 +74,16 @@ def add_to_cart(request):
     # if not created:
     #     cart_details.quatity=cart_details.quatity+quantity # if want to make more + 
 
-    cart_details.quantity = quantity  # delete old quantity and add new quantity
-    cart_details.total = round(product_instance.price * cart_details.quantity, 2)
-    cart_details.save()
+    # cart_details.quantity = quantity  # delete old quantity and add new quantity
+    # cart_details.total = round(product_instance.price * cart_details.quantity, 2)
+    # cart_details.save()
 
-    return redirect(f'/products/{product_instance.slug}')
+    #get new data after create with ajax
+    cart = Cart.objects.get(user=request.user, status='Inprogress')
+    cart_details = CartDetails.objects.filter(cart=cart)
+    page = render_to_string('cart-includes.html',{"cart_detail_data":cart_details ,'cart_data':cart})
+
+    return JsonResponse({"result":page})
+
+
+    # return redirect(f'/products/{product_instance.slug}')
