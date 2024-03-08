@@ -140,64 +140,35 @@
                                 <p>{{object.description}}</p>
                             </div>
                         </div>
-
-                            <h3 class="frame-title">Reviews (2)</h3>
-                            <ul class="review-list">
-                                {% for review in reviews %}
-                                    <li class="review-item">
-                                        <div class="review-media">
-                                            <a class="review-avatar" href="#">
-                                                <img src="images/avatar/01.jpg" alt="review">
-                                            </a>
-                                            <h5 class="review-meta">
-                                                <a href="#">{{review.user}}</a>
-                                                <span>June 02, 2020</span>
-                                                <span> {{review.created_at}} </span>
-                                            </h5>
-                                        </div>
-                                        <ul class="review-rating">
-                                            <li class="icofont-ui-{% if review.rate > 0 %}rating{% else %}rate-blank{% endif %}"></li>
-                                            <li class="icofont-ui-{% if review.rate > 1 %}rating{% else %}rate-blank{% endif %}"></li>
-                                            <li class="icofont-ui-{% if review.rate > 3 %}rating{% else %}rate-blank{% endif %}"></li>
-                                            <li class="icofont-ui-{% if review.rate > 3 %}rating{% else %}rate-blank{% endif %}"></li>
-                                            <li class="icofont-ui-{% if review.rate > 4 %}rating{% else %}rate-blank{% endif %}"></li>
-                                        </ul>
-                                        <p class="review-desc">{{review.review}}</p>
-                                        <form class="review-reply">
-                                            <input type="text" placeholder="reply your thoughts">
-                                            <button><i class="icofont-reply"></i>reply</button>
-                                        </form>
-                                    </li>
-                                {% endfor %}
-                            </ul>
+                            {% include 'includes/reviews.html' %}
                         </div>
-                        <div class="product-details-frame">
+                        <div class="product-details-frame" id='all-review'>
                             <h3 class="frame-title">add your review</h3>
-                            <form class="review-form" method='post' action='/products/{{object.slug}}/add-review'>
+                            <form id="review-form" class="review-form" method="post" action="/products/{{ object.slug }}/add-review">
                                 {% csrf_token %}
                                 <div class="row">
                                     <div class="col-lg-12">
                                         <div class="star-rating">
-                                            <input type="radio" name="rating" value=5 id="star-1"><label for="star-1"></label>
-                                            <input type="radio" name="rating" value=4 id="star-2"><label for="star-2"></label>
-                                            <input type="radio" name="rating" value=3 id="star-3"><label for="star-3"></label>
-                                            <input type="radio" name="rating" value=2 id="star-4"><label for="star-4"></label>
-                                            <input type="radio" name="rating" value=14 id="star-5"><label for="star-5"></label>
+                                            <input type="radio" name="rating" value="5" id="star-1"><label for="star-1"></label>
+                                            <input type="radio" name="rating" value="4" id="star-2"><label for="star-2"></label>
+                                            <input type="radio" name="rating" value="3" id="star-3"><label for="star-3"></label>
+                                            <input type="radio" name="rating" value="2" id="star-4"><label for="star-4"></label>
+                                            <input type="radio" name="rating" value="1" id="star-5"><label for="star-5"></label>
                                         </div>
                                     </div>
                                     <div class="col-lg-12">
                                         <div class="form-group">
-                                            <textarea class="form-control" name='review' placeholder="Describe"></textarea>
+                                            <textarea class="form-control" name="review" placeholder="Describe"></textarea>
                                         </div>
                                     </div>
                                     <div class="col-lg-12">
-                                        <button class="btn btn-inline" type='submit'>
+                                        <button class="btn btn-inline" type="submit">
                                             <i class="icofont-water-drop"></i>
                                             <span>drop your review</span>
                                         </button>
                                     </div>
                                 </div>
-                            </form>
+                            </form>                            
                         </div>
                     </div>
                 </div>
@@ -288,7 +259,32 @@
         <!--=====================================
                  PRODUCT RELATED PART END
         =======================================-->
+        <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
 
-        {% endblock body %}
+        <script>
+            $(document).ready(function(){ // execute code on loading
+        
+                $(document).on('submit','#review-form',function(event){
+                    // prevent form submission
+                    event.preventDefault();
+        
+                    // ajax
+                    $.ajax({
+                        type: $(this).attr('method'),
+                        url: $(this).attr('action'),
+                        data: $(this).serialize(),
+                        dataType: 'json',
+                        success: function(response){
+                            $('#all-review').html(response['result']);
+                            $('#review-form').trigger('reset');
+                        },
+                        error: function(){
+                            // handle error if needed
+                        }
+                    });
+                });
+            });
+        </script>
+                {% endblock body %}
 
 

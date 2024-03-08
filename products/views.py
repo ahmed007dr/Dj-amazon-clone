@@ -6,7 +6,8 @@ from .models import Product,Brand,Review,ProductImage
 from django.db.models import Q , F , Value
 from django.db.models.aggregates import Count,Sum,Avg,Max,Min
 from django.views.decorators.cache import cache_page
-
+from django.http import JsonResponse
+from django.template.loader import render_to_string
 
 @cache_page(60 * 1)
 def mydebug(request):
@@ -154,4 +155,8 @@ def add_review(request,slug):
         review=review,
         rate=rate
     )
-    return redirect(f'/products/{slug}')
+    #get all reviews for this products
+    review =Review.objects.filter(product=product)
+    page = render_to_string('includes/reviews.html',{"reviews":review})
+    return JsonResponse({"result":page})
+    # return redirect(f'/products/{slug}')
