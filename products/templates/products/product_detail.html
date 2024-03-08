@@ -89,7 +89,7 @@
                             </div>
                             <div class="details-add-group">
                                 {% if object.quantity > 0 %}
-                                    <form action='/orders/add-to-cart' method='post' class='row'>
+                                    <form id='addToCart' action='/orders/add-to-cart' method='post' class='row'>
                                         {% csrf_token %}
                                         <div class='col-lg-6'>
                                             <input class="action-input" title="Quantity Number" type="number" name="quantity" value="1">
@@ -263,7 +263,7 @@
 
         <script>
             $(document).ready(function(){ // execute code on loading
-        
+                // add reviews
                 $(document).on('submit','#review-form',function(event){
                     // prevent form submission
                     event.preventDefault();
@@ -284,6 +284,27 @@
                     });
                 });
             });
+
+            // add to cart
+            $(document).on('submit','#addToCart',function(event){
+                // prevent form submission
+                event.preventDefault();
+    
+                // ajax
+                $.ajax({
+                    type: $(this).attr('method'),
+                    url: $(this).attr('action'),
+                    data: $(this).serialize(),
+                    dataType: 'json',
+                    success: function(response){
+                        $('#cart-sidebar').html(response['result']);
+                    },
+                    error: function(){
+                        // handle error if needed
+                    }
+                });
+            });
+
         </script>
                 {% endblock body %}
 
