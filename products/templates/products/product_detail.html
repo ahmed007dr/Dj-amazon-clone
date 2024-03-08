@@ -298,6 +298,8 @@
                     dataType: 'json',
                     success: function(response){
                         $('#cart-sidebar').html(response['result']);
+                        $("#carttotal").text(response['total']) // total from view.py function add to Cart
+                        $("#cartcount").text(response['cart_count']) // total from view.py function add to Cart
                     },
                     error: function(){
                         // handle error if needed

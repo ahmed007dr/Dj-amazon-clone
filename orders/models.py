@@ -50,7 +50,8 @@ class Cart(models.Model):
     def cart_total(self):
         total = 0
         for item in self.cart_detail.all():
-            total += item.total
+            if item.total is not None:
+                total += item.total
         return round(total, 2)
 
 class CartDetails(models.Model):
