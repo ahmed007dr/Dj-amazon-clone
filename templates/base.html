@@ -133,13 +133,13 @@
                 <div class="header-content">
                     <div class="header-media-group">
                         <button class="header-user"><img src="images/user.png" alt="user"></button>
-                        <a href="index.html"><img src="images/logo.png" alt="logo"></a>
+                        <a href="/"><img src="images/logo.png" alt="logo"></a>
                         <button class="header-src"><i class="fas fa-search"></i></button>
                     </div>
-                    <a href="index.html" class="header-logo">
+                    <a href="/" class="header-logo">
                         <img src="{{settings_data.logo.url}}" alt="logo">
                     </a>
-                    <a href="login.html" class="header-widget" title="My Account">
+                    <a href="/" class="header-widget" title="My Account">
                         {% if user.is_authenticated %}
                             <img src="images/user.png" alt="user">
                         {% else %}
@@ -432,7 +432,7 @@
                         <a class="nav-link dropdown-link" href="#"><i class="icofont-home"></i>Home</a>
                         <ul class="dropdown-list">
                             <li><a href="home-grid.html">Home grid</a></li>
-                            <li><a href="index.html">Home index</a></li>
+                            <li><a href="/">Home index</a></li>
                             <li><a href="home-classic.html">Home classic</a></li>
                             <li><a href="home-standard.html">Home standard</a></li>
                             <li><a href="home-category.html">Home category</a></li>
@@ -527,7 +527,7 @@
                     MOBILE-MENU PART START
         =======================================-->
         <div class="mobile-menu">
-            <a href="index.html" title="Home Page">
+            <a href="/" title="Home Page">
                 <i class="fas fa-home"></i>
                 <span>Home</span>
             </a>
