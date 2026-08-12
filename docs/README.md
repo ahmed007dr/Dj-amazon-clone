@@ -22,6 +22,7 @@
 | [shared/02-REPOSITORY-AUDIT.md](shared/02-REPOSITORY-AUDIT.md) | نتائج تدقيق المستودع · انتهاكات الحدود · الأخطاء الحرجة |
 | [shared/03-ROADMAP.md](shared/03-ROADMAP.md) | **متتبّع المراحل** — الحالة والمهام وبوابات الجودة |
 | [shared/04-DECISIONS.md](shared/04-DECISIONS.md) | سجل القرارات المعمارية (ADR) · قواعد العمل المعلّقة |
+| [shared/05-DEVELOPMENT.md](shared/05-DEVELOPMENT.md) | **بيئة التطوير** · Git · جودة الكود · الاختبارات · تعريف الإنجاز |
 
 ### ⚙️ الباك إند
 
@@ -33,6 +34,8 @@
 | [backend/04-DOMAINS.md](backend/04-DOMAINS.md) | نقطة البيع · المالية · بوابات الدفع · **الهوية البصرية** |
 | [backend/05-MIGRATION.md](backend/05-MIGRATION.md) | خريطة إعادة الاستخدام · الحقول المبكرة الإلزامية · استراتيجية الانتقال |
 | [backend/06-IDENTIFIERS.md](backend/06-IDENTIFIERS.md) | **استراتيجية المعرّفات** — ممنوع ID تسلسلي في أي رابط · UUIDv7 · slug · أرقام العمل |
+| [backend/07-DATA-MODEL.md](backend/07-DATA-MODEL.md) | **نموذج البيانات (ERD)** للمرحلة ١ · الهوية · **الضريبة** |
+| [backend/08-API-CONVENTIONS.md](backend/08-API-CONVENTIONS.md) | **اتفاقيات الـ API** — الاستجابة · الترقيم · الأخطاء · المصادقة · الإصدارات |
 
 ### 🎨 الفرونت إند
 

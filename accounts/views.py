@@ -1,4 +1,5 @@
 from django.shortcuts import render , redirect
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 
@@ -33,7 +34,7 @@ def signup(request):
             send_mail(
                 "activate ur account",
                 f"welcome {username} \n use this code {profile.code} to activate your account",
-                "ahmed007eg@gmail.com",
+                settings.DEFAULT_FROM_EMAIL,
                 [email],
                 fail_silently=False,
             )
