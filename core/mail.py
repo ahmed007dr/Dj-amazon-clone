@@ -140,6 +140,46 @@ ACCOUNT_SUSPENDED = register(
     )
 )
 
+EMAIL_CHANGE_CONFIRM = register(
+    MailTemplate(
+        key="email_change_confirm",
+        subject_ar="أكّد بريدك الجديد",
+        subject_en="Confirm your new email",
+        body_ar=(
+            "مرحبًا {name}،\n\n"
+            "لتأكيد تغيير بريد حسابك إلى هذا العنوان، افتح الرابط:\n{link}\n\n"
+            "الرابط صالح لمدة ٢٤ ساعة.\n\n"
+            "إن لم تطلب ذلك، تجاهل هذه الرسالة."
+        ),
+        body_en=(
+            "Hello {name},\n\n"
+            "To confirm changing your account email to this address, open:\n{link}\n\n"
+            "The link is valid for 24 hours.\n\n"
+            "If you did not request this, ignore this message."
+        ),
+    )
+)
+
+EMAIL_CHANGE_ALERT = register(
+    MailTemplate(
+        key="email_change_alert",
+        subject_ar="طلب تغيير بريد حسابك",
+        subject_en="Email change requested on your account",
+        body_ar=(
+            "مرحبًا {name}،\n\n"
+            "وصلنا طلب لتغيير بريد حسابك إلى: {new_email}\n\n"
+            "⚠️ إن لم تكن أنت، غيّر كلمة مرورك فورًا وتواصل معنا — "
+            "لم يتم التغيير بعد."
+        ),
+        body_en=(
+            "Hello {name},\n\n"
+            "We received a request to change your account email to: {new_email}\n\n"
+            "⚠️ If this was not you, change your password immediately and "
+            "contact us — the change has not been applied yet."
+        ),
+    )
+)
+
 ACCOUNT_ACTIVATED = register(
     MailTemplate(
         key="account_activated",

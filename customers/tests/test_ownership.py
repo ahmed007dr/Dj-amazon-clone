@@ -192,13 +192,96 @@ class TestDocumentSecurity:
     def test_file_path_is_never_returned(self, alice_client):
         """
         ⚠️  المسار المباشر يُخمَّن ويُشارك بلا فحص صلاحية.
-            التقديم عبر نقطة تفحص الملكية حصرًا.
+            التقديم عبر رابط موقّع بصلاحية زمنية حصرًا.
         """
         response = self._upload(alice_client)
 
         assert response.status_code == 201
         assert "file" not in response.data
-        assert "download" in response.data["download_url"]
+        assert "signed-url" in response.data["signed_url_endpoint"]
+
+    def test_signed_url_grants_access_to_owner(self, alice_client, alice):
+        from customers.models import CustomerDocument
+
+        self._upload(alice_client)
+        document = CustomerDocument.objects.get(customer__user=alice)
+
+        issued = alice_client.get(reverse("v1:customers:document-signed-url", args=[document.pk]))
+        assert issued.status_code == 200
+        assert issued.data["expires_in"] == 300
+
+        download = alice_client.get(issued.data["url"])
+        assert download.status_code == 200
+
+    def test_signed_url_does_not_work_for_another_user(self, alice_client, alice, bob):
+        """
+        ⚠️  التوقيع يحمل معرّف المستخدم — مشاركة الرابط لا تمنح الوصول.
+        """
+        from customers.models import CustomerDocument
+
+        self._upload(alice_client)
+        document = CustomerDocument.objects.get(customer__user=alice)
+
+        issued = alice_client.get(reverse("v1:customers:document-signed-url", args=[document.pk]))
+        signed_url = issued.data["url"]
+
+        bob_client = APIClient()
+        bob_client.force_authenticate(user=bob)
+        assert bob_client.get(signed_url).status_code == 404
+
+    def test_signed_url_expires(self, alice_client, alice):
+        from core import files
+        from customers.models import CustomerDocument
+
+        self._upload(alice_client)
+        document = CustomerDocument.objects.get(customer__user=alice)
+
+        signature = files.sign_file_access("customer-document", document.pk, alice.pk)
+
+        # محاكاة انقضاء المدة
+        original_ttl = files.SIGNED_URL_TTL
+        files.SIGNED_URL_TTL = -1
+        try:
+            assert files.verify_file_access(signature, "customer-document", alice.pk) is None
+        finally:
+            files.SIGNED_URL_TTL = original_ttl
+
+    def test_tampered_signature_is_rejected(self, alice_client, alice):
+        response = alice_client.get(
+            reverse("v1:customers:document-download", args=["forged-signature-value"])
+        )
+        assert response.status_code == 404
+
+    def test_oversized_upload_is_rejected(self, alice_client):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        response = alice_client.post(
+            reverse("v1:customers:documents"),
+            {
+                "document_type": "MEDICAL_LICENSE",
+                "file": SimpleUploadedFile(
+                    "huge.pdf", b"x" * (11 * 1024 * 1024), content_type="application/pdf"
+                ),
+            },
+            format="multipart",
+        )
+        assert response.status_code == 400
+        assert "file" in response.data["fields"]
+
+    def test_disallowed_file_type_is_rejected(self, alice_client):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        response = alice_client.post(
+            reverse("v1:customers:documents"),
+            {
+                "document_type": "MEDICAL_LICENSE",
+                "file": SimpleUploadedFile(
+                    "script.exe", b"MZ", content_type="application/x-msdownload"
+                ),
+            },
+            format="multipart",
+        )
+        assert response.status_code == 400
 
     def test_stored_filename_is_randomised(self, alice_client, alice):
         from customers.models import CustomerDocument
@@ -209,7 +292,7 @@ class TestDocumentSecurity:
         assert "my-license" not in document.file.name
         assert document.file.name.startswith("private/customer-documents/")
 
-    def test_cannot_download_another_users_document(self, alice_client, bob):
+    def test_cannot_request_signed_url_for_another_users_document(self, alice_client, bob):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
         from customers.models import CustomerDocument
@@ -221,7 +304,7 @@ class TestDocumentSecurity:
             file=SimpleUploadedFile("secret.pdf", b"private", content_type="application/pdf"),
         )
 
-        response = alice_client.get(reverse("v1:customers:document-download", args=[document.pk]))
+        response = alice_client.get(reverse("v1:customers:document-signed-url", args=[document.pk]))
         assert response.status_code == 404
 
     def test_approved_document_cannot_be_deleted(self, alice_client, alice):

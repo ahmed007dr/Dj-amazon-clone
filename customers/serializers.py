@@ -37,7 +37,7 @@ class CustomerDocumentSerializer(serializers.ModelSerializer):
     """
 
     file = serializers.FileField(write_only=True)
-    download_url = serializers.SerializerMethodField()
+    signed_url_endpoint = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomerDocument
@@ -45,7 +45,7 @@ class CustomerDocumentSerializer(serializers.ModelSerializer):
             "id",
             "document_type",
             "file",
-            "download_url",
+            "signed_url_endpoint",
             "status",
             "rejection_reason",
             "expires_at",
@@ -53,13 +53,33 @@ class CustomerDocumentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "status", "rejection_reason", "created_at"]
 
-    def get_download_url(self, obj) -> str | None:
+    def validate_file(self, value):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from core.files import validate_upload
+
+        try:
+            validate_upload(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
+        return value
+
+    def get_signed_url_endpoint(self, obj) -> str | None:
+        """
+        ⚠️  لا يُرجَع رابط التحميل مباشرةً.
+
+        الرابط الموقّع يُطلب عند الحاجة فقط — إدراجه في كل استجابة
+        قائمة يعني توليد توقيعات لملفات قد لا تُفتح، وتسريبها في
+        سجلات وتخزين مؤقت بلا داعٍ.
+        """
         request = self.context.get("request")
         if request is None:
             return None
         from django.urls import reverse
 
-        return request.build_absolute_uri(reverse("v1:customers:document-download", args=[obj.pk]))
+        return request.build_absolute_uri(
+            reverse("v1:customers:document-signed-url", args=[obj.pk])
+        )
 
 
 class CustomerProfileSerializer(serializers.ModelSerializer):

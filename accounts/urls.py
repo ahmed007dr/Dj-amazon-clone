@@ -24,6 +24,13 @@ urlpatterns = [
         name="password-reset-confirm",
     ),
     path("password/change/", api.PasswordChangeAPI.as_view(), name="password-change"),
+    # تغيير البريد — تأكيد من العنوانين
+    path("email/change/", api.EmailChangeRequestAPI.as_view(), name="email-change"),
+    path(
+        "email/change/confirm/",
+        api.EmailChangeConfirmAPI.as_view(),
+        name="email-change-confirm",
+    ),
     # الحساب الحالي
     path("me/", api.MeAPI.as_view(), name="me"),
     path("sessions/", api.SessionListAPI.as_view(), name="sessions"),

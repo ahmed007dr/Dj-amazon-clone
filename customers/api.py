@@ -9,11 +9,13 @@
 """
 
 from django.http import FileResponse
+from django.urls import reverse
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core import files
 from core.errors import BusinessError, ErrorCode
 from customers import serializers as s
 from customers import services
@@ -100,21 +102,57 @@ class DocumentListCreateAPI(generics.ListCreateAPIView):
         serializer.save(customer=services.get_or_create_profile(self.request.user))
 
 
-class DocumentDownloadAPI(APIView):
+class DocumentSignedUrlAPI(APIView):
     """
-    تقديم وثيقة حساسة.
+    إصدار رابط موقّع بصلاحية زمنية.
 
-    ⚠️  الملف **غير عام**. لا يُقدَّم من `MEDIA_URL` مباشرة —
-        المسار المباشر يُخمَّن ويُشارك بلا أي فحص.
-
-        كل تحميل يمر بفحص ملكية. صلاحية المراجعة للأدمن تُضاف
-        في المرحلة ٢ مع نظام الأدوار.
+    ⚠️  التوقيع يحمل معرّف المستخدم — الرابط لا يعمل لغيره.
+        مشاركته لا تمنح الوصول.
     """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         document = CustomerDocument.objects.filter(pk=pk, customer__user=request.user).first()
+
+        if document is None or not document.file:
+            raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
+
+        signature = files.sign_file_access("customer-document", document.pk, request.user.pk)
+
+        return Response(
+            {
+                "url": request.build_absolute_uri(
+                    reverse("v1:customers:document-download", args=[signature])
+                ),
+                "expires_in": files.SIGNED_URL_TTL,
+            }
+        )
+
+
+class DocumentDownloadAPI(APIView):
+    """
+    تقديم وثيقة حساسة عبر رابط موقّع.
+
+    ⚠️  الملف **غير عام**، ولا يُقدَّم من `MEDIA_URL` مباشرة.
+
+        الحماية ثلاث طبقات:
+          ١. اسم ملف عشوائي بمسار مجزّأ — لا يُخمَّن
+          ٢. توقيع بصلاحية ٥ دقائق — لا يُعاد استخدامه بعدها
+          ٣. فحص ملكية عند التقديم — شبكة أمان لو تسرّب التوقيع
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, signature):
+        document_id = files.verify_file_access(signature, "customer-document", request.user.pk)
+        if document_id is None:
+            raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
+
+        # الطبقة الثالثة — الملكية تُفحص رغم صحة التوقيع
+        document = CustomerDocument.objects.filter(
+            pk=document_id, customer__user=request.user
+        ).first()
 
         if document is None or not document.file:
             raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)

@@ -142,6 +142,37 @@ class VerifyEmailSerializer(serializers.Serializer):
     token = serializers.CharField()
 
 
+class EmailChangeRequestSerializer(serializers.Serializer):
+    """
+    ⚠️  كلمة المرور مطلوبة.
+
+    جهاز مفتوح بلا صاحبه يكفي لتغيير البريد ثم الاستيلاء على
+    الحساب عبر «نسيت كلمة المرور». طلبها يقطع هذا الطريق.
+    """
+
+    new_email = serializers.EmailField()
+    current_password = serializers.CharField(write_only=True)
+
+    def validate_current_password(self, value: str) -> str:
+        if not self.context["request"].user.check_password(value):
+            raise serializers.ValidationError("كلمة المرور غير صحيحة")
+        return value
+
+    def validate_new_email(self, value: str) -> str:
+        value = value.lower().strip()
+        user = self.context["request"].user
+
+        if value == user.email.lower():
+            raise serializers.ValidationError("هذا هو بريدك الحالي")
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("هذا البريد مسجل بالفعل", code="unique")
+        return value
+
+
+class EmailChangeConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField()
+
+
 class UserSessionSerializer(serializers.ModelSerializer):
     """
     جلسات المستخدم — يراها هو ليُنهي ما لا يعرفه.
