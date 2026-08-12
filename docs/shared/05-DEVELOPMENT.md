@@ -52,6 +52,32 @@ python manage.py migrate
 python manage.py runserver
 ```
 
+## ⚠️ ويندوز — GNU gettext
+
+`makemessages` و`compilemessages` يحتاجان أدوات GNU gettext، وهي غير
+مضمّنة في ويندوز:
+
+```
+CommandError: Can't find msguniq. Make sure you have GNU gettext tools 0.19 or newer installed.
+```
+
+**التثبيت:**
+
+```powershell
+winget install --id GnuWin32.GetText
+# أو حمّل من: https://mlocati.github.io/articles/gettext-iconv-windows.html
+```
+
+ثم أضف مجلد `bin` إلى `PATH` وتحقق:
+
+```bash
+msguniq --version
+```
+
+**الأثر قبل التثبيت:** رسائل النظام تظهر بالعربية لكل المستخدمين —
+النص المصدري عربي، وبلا ملف `.mo` مُصرَّف لا توجد نسخة إنجليزية
+يُرجَع إليها. **حاجز إلزامي قبل المرحلة ٦.**
+
 ## ⚠️ ويندوز — `PYTHONUTF8=1`
 
 الطرفية على ويندوز تفترض ترميز **cp1252**، فتنهار الأدوات على أول
