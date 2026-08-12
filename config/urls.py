@@ -31,6 +31,8 @@ api_v1 = [
     path("customers/", include("customers.urls")),
     path("administration/", include("administration.urls")),
     path("access/", include("access.urls")),
+    path("catalog/", include("catalog.urls")),
+    path("reviews/", include("reviews.urls")),
     # path('branding/',       include('branding.urls')),        المرحلة ١.٥
     # path('customers/',      include('customers.urls')),       المرحلة ١
     # path('administration/', include('administration.urls')),  المرحلة ٢

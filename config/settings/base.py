@@ -58,13 +58,14 @@ LOCAL_APPS = [
     "branding",
     # L1 — الهوية
     "accounts",
+    # L1.5 — سياسات الوصول: تعتمد على accounts فقط ويستهلكها الجميع
+    "access",
     # L2 — الشخصيات ونطاقات الأساس
     "customers",
     "administration",
     "catalog",
     "shipping",
     # L3
-    "access",
     "pricing",
     "inventory",
     "reviews",

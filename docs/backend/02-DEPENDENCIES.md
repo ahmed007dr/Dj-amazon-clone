@@ -13,9 +13,12 @@ L0   core ── branding
        ↑
 L1   accounts                          ← الهوية فقط. كل شيء يقف عليها
        ↑
+L1.5 access                            ← ⚠️ تحت catalog لا فوقه
+       ↑                                  يعتمد على accounts+core فقط
+       ↑                                  ويستهلكه: catalog · cart · orders · البحث
 L2   customers ── administration ── academic ── shipping ── catalog
        ↑
-L3   access ── pricing ── inventory ── reviews
+L3   pricing ── inventory ── reviews
        ↑
 L4   promotions
        ↑
@@ -79,6 +82,7 @@ L9   finance                           ← إيراد · COGS · مصروف · P
 | `pos ↔ orders` | `pos` يستدعي `orders.services.create(channel=POS)`. `orders` لا يعرف بوجود POS |
 | `finance ↔ orders` | `finance` يستمع لـ `order_completed` و `pos_session_closed`. لا نطاق يستورد `finance` |
 | `payments ↔ orders` | `orders` يعرف واجهة الدفع المجرّدة فقط، لا أي بوابة بعينها |
+| `catalog ↔ access` | **`access` أسفل `catalog`.** `Product` يشير إلى `AccessPolicy`؛ و`access` لا يعرف بوجود المنتجات إطلاقًا |
 | أي نطاق ↔ `notifications` | لا أحد يستورد `notifications`. النطاقات تبعث إشارات؛ `notifications` يستمع |
 | `accounts ↔ notifications` | استرجاع كلمة المرور: `accounts` يبعث `password_reset_requested`؛ `notifications` يرسل البريد |
 
@@ -270,3 +274,24 @@ forbidden_modules =
 10. هل يمكن اختبارها مستقلة؟
 
 **إن كانت الإجابات متضاربة، صمّم الحدود قبل أن تكتب سطرًا.**
+
+
+---
+
+# ٧. سجل تصحيحات الحدود
+
+> تصحيحات أمسكها `import-linter` أثناء التنفيذ. تُوثَّق لأن كل واحدة
+> تمثّل تناقضًا كان بين التصميم والتنفيذ.
+
+| التاريخ | الانتهاك | التصحيح |
+|---|---|---|
+| 2026-08-12 | `core.tests` يستورد `accounts.models` | الفحوص المعمارية تستخدم `apps.get_model` (بحث نصي لا استيراد) واختبارات المستخدم انتقلت إلى `accounts/tests/` |
+| 2026-08-12 | `accounts.tests` يستورد `administration.models` | اختبار «المالك لا يُوقَف» انتقل إلى `administration/tests/` |
+| 2026-08-12 | **`catalog` يستورد `access`** | **العقد كان يضع `access` في L3 فوق `catalog`، بينما الوثيقة تقول إنه يعتمد على `accounts`+`core` فقط ويستهلكه الجميع. صُحّح العقد إلى L1.5** |
+| 2026-08-12 | `access.tests` يستورد `administration.models` | اختبارات المعاينة انتقلت إلى `administration/tests/` |
+
+## القاعدة المستخلصة
+
+> **الاختبار يسكن في النطاق الأعلى بين ما يلمسه** — فتبقى التبعية نازلة.
+
+اختبار يمس `access` و`administration` مكانه `administration`، لا `access`.

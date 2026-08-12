@@ -75,12 +75,19 @@ root_packages = [
 [[tool.importlinter.contracts]]
 name = "Domain layering - dependencies flow downward only"
 type = "layers"
+# ⚠️  `access` تحت `catalog` لا فوقه.
+#
+#     يعتمد على accounts + core فقط، **ويستهلكه الجميع**:
+#     catalog · cart · orders · البحث. وضعه فوق catalog كان خطأً
+#     في العقد خالف ما توثّقه docs/backend/02-DEPENDENCIES.md،
+#     وأمسكه import-linter عند أول استيراد فعلي.
 layers = [
     "orders",
     "cart",
     "promotions",
-    "access | pricing | inventory | reviews",
+    "pricing | inventory | reviews",
     "customers | administration | catalog | shipping",
+    "access",
     "accounts",
     "core | branding",
 ]

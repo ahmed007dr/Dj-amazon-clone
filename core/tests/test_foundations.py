@@ -74,6 +74,10 @@ INTERNAL_BIGINT_MODELS = {
     ("accounts", "UserSession"),
     ("accounts", "AccountStatusChange"),
     ("accounts", "SecurityToken"),
+    # تجميع مُخزَّن يُقرأ عبر select_related — لا يظهر في رابط
+    ("reviews", "ProductRating"),
+    # جدول وصل — لا يُعرَّف خارجيًا
+    ("reviews", "ReviewHelpfulVote"),
 }
 
 #: نماذج بمفتاح طبيعي — المفتاح نفسه هو المعنى، لا رقم تسلسلي.
@@ -217,6 +221,9 @@ class TestTax:
         )
         assert tax.is_currently_valid
 
+        # ⚠️  ينتهي بالأمس **ويبدأ قبله** — وإلا صار valid_from
+        #     اليوم وvalid_to الأمس، وهو مدى مقلوب لا معنى له.
+        tax.valid_from = date.today() - timedelta(days=10)
         tax.valid_to = date.today() - timedelta(days=1)
         tax.save()
         assert not tax.is_currently_valid

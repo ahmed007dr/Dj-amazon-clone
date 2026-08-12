@@ -22,8 +22,17 @@ from core.money import RateField
 
 
 def today():
-    """قيمة افتراضية لحقل DateField — `timezone.now` يعيد datetime لا date."""
-    return timezone.now().date()
+    """
+    قيمة افتراضية لحقل `DateField`.
+
+    ⚠️  `timezone.localdate()` لا `timezone.now().date()`.
+
+        الثاني يعطي تاريخ **UTC**. مع `TIME_ZONE='Africa/Cairo'`
+        تكون الساعة ١٢:٣٠ ليلًا في القاهرة بينما UTC ما زال في
+        اليوم السابق — فتُطبَّق نسبة ضريبية قبل موعدها بيوم أو
+        تبقى سارية يومًا زائدًا.
+    """
+    return timezone.localdate()
 
 
 class TaxClass(BilingualNameMixin, BaseModel):
@@ -65,7 +74,8 @@ class TaxClass(BilingualNameMixin, BaseModel):
 
     @property
     def is_currently_valid(self) -> bool:
-        today = timezone.now().date()
+        # التاريخ المحلي لا UTC — انظر `today()` أعلاه
+        today = timezone.localdate()
         if self.valid_from > today:
             return False
         return self.valid_to is None or self.valid_to >= today

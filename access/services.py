@@ -152,13 +152,25 @@ class PolicyAwareQuerySetMixin:
     يُدمج في أي view يقدّم موارد محكومة بسياسة.
 
         class ProductListAPI(PolicyAwareQuerySetMixin, ListAPIView):
-            policy_field = 'access_policy'
+            policy_field = "access_policy"
+
+            def get_base_queryset(self):
+                return Product.objects.filter(is_active=True)
 
     ⚠️  الفلترة في الـ queryset — لا في الـ serializer.
 
         الفلترة في الـ serializer تعني أن الصف يُقرأ من قاعدة
         البيانات ثم يُخفى: العدّ يبقى خاطئًا، والترقيم يعطي صفحات
         ناقصة، ووجود المورد يتسرّب من فارق الأعداد.
+
+    ⚠️  **الفلاتر المخصصة تُكتب في `get_base_queryset` لا `get_queryset`.**
+
+        تجاوز `get_queryset` في صنف فرعي **يُعطّل فلترة السياسات
+        بصمت** — لا خطأ، ولا تحذير، فقط منتجات مقيّدة تظهر للجميع.
+        وهو خطأ وقعنا فيه فعلًا وأمسكته الاختبارات.
+
+        لذا `get_queryset` هنا `final` عمليًا: يستدعي
+        `get_base_queryset` ثم يطبّق الفلتر دائمًا.
     """
 
     policy_field = "access_policy"
@@ -172,9 +184,18 @@ class PolicyAwareQuerySetMixin:
         """
         return getattr(self.request, "user", None)
 
+    def get_base_queryset(self):
+        """
+        الـ queryset قبل فلترة السياسات.
+
+        **هنا** تُكتب الفلاتر والترتيب والبحث — لا في `get_queryset`.
+        """
+        return super().get_queryset()
+
     def get_queryset(self):
-        queryset = super().get_queryset()
-        return queryset.filter(accessible_filter(self.get_access_user(), self.policy_field))
+        return self.get_base_queryset().filter(
+            accessible_filter(self.get_access_user(), self.policy_field)
+        )
 
 
 def require_access(user, policy: AccessPolicy | None, *, reveal_existence: bool = False):
