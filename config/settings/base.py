@@ -47,6 +47,7 @@ THIRD_PARTY_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "django_filters",
     "drf_yasg",
+    "corsheaders",
 ]
 
 # ⚠️  الترتيب يعكس مخطط الطبقات في docs/backend/02-DEPENDENCIES.md
@@ -81,18 +82,35 @@ AUTH_USER_MODEL = "accounts.User"
 # ═══════════════════════════════════════════════════════════
 #  الوسائط (Middleware)
 # ═══════════════════════════════════════════════════════════
-# ملاحظة: ترتيب الكاش الحالي غير سليم ويُعالج في المرحلة 0.5
-#         (CacheMiddleware وحده في منتصف السلسلة).
+# ⚠️  الترتيب مقصود:
+#     CorsMiddleware قبل CommonMiddleware (متطلب الحزمة)
+#     LanguageMiddleware بعد المصادقة — يحتاج request.user لقراءة تفضيله
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.LanguageMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+
+# ═══════════════════════════════════════════════════════════
+#  CORS — الفرونت إند منفصل (ADR-03)
+# ═══════════════════════════════════════════════════════════
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-language",
+    "authorization",
+    "content-type",
+    "idempotency-key",
+    "x-requested-with",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -157,7 +175,8 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "core.api.pagination.DefaultCursorPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # يفحص الإيقاف على كل طلب — الطبقة ٣ من ADR-16
+        "accounts.authentication.StatefulJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -166,6 +185,18 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "COERCE_DECIMAL_TO_STRING": True,  # المال نصًا لا رقمًا (ADR-31)
     "DATETIME_FORMAT": "%Y-%m-%dT%H:%M:%SZ",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/minute",
+        "user": "300/minute",
+        # نقاط المصادقة — حدود مشدّدة تمنع التخمين
+        "login": "5/minute",
+        "register": "3/hour",
+        "password_reset": "3/hour",
+    },
 }
 
 
@@ -290,3 +321,6 @@ FIELD_ENCRYPTION_KEY = env("FIELD_ENCRYPTION_KEY", default="")
 
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# drf-yasg — تعطيل العارضات المتوافقة القديمة
+SWAGGER_USE_COMPAT_RENDERERS = False

@@ -1,0 +1,33 @@
+"""مسارات نطاق الهوية — /api/v1/auth/"""
+
+from django.urls import path
+from rest_framework_simplejwt.views import TokenRefreshView
+
+from accounts import api
+
+app_name = "accounts"
+
+urlpatterns = [
+    # التسجيل والتفعيل
+    path("register/", api.RegisterAPI.as_view(), name="register"),
+    path("verify-email/", api.VerifyEmailAPI.as_view(), name="verify-email"),
+    path("resend-verification/", api.ResendVerificationAPI.as_view(), name="resend-verification"),
+    # الدخول والخروج
+    path("login/", api.LoginAPI.as_view(), name="login"),
+    path("logout/", api.LogoutAPI.as_view(), name="logout"),
+    path("token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
+    # كلمة المرور
+    path("password/reset/", api.PasswordResetRequestAPI.as_view(), name="password-reset"),
+    path(
+        "password/reset/confirm/",
+        api.PasswordResetConfirmAPI.as_view(),
+        name="password-reset-confirm",
+    ),
+    path("password/change/", api.PasswordChangeAPI.as_view(), name="password-change"),
+    # الحساب الحالي
+    path("me/", api.MeAPI.as_view(), name="me"),
+    path("sessions/", api.SessionListAPI.as_view(), name="sessions"),
+    path(
+        "sessions/<int:session_id>/revoke/", api.SessionRevokeAPI.as_view(), name="session-revoke"
+    ),
+]

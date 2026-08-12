@@ -33,8 +33,5 @@ EMAIL_BACKEND = env(
 )
 
 
-# ── تخفيف قيود كلمة المرور أثناء التطوير ───────────────────
-
-AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
-]
+# ⚠️  مدققات كلمة المرور تبقى كاملة كما في الإنتاج.
+#     تخفيفها هنا يخلق فجوة بين البيئتين تُخفي أخطاء حتى النشر.
