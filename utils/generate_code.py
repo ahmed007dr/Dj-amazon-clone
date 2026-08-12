@@ -1,6 +1,21 @@
-import random
+"""
+مهجور — يُحذف مع إزالة النماذج القديمة.
 
-def generate_code(length=8):
-    data='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    code=''.join(random.choice(data) for x in range (length))
-    return code
+الاستبدال: core.identifiers
+
+الأصل كان يستخدم `random` (Mersenne Twister) لتوليد كود تفعيل
+الحساب — قابل للتنبؤ من يراقب مخرجات كافية.
+"""
+
+import warnings
+
+from core.identifiers import random_code
+
+
+def generate_code(length: int = 8) -> str:
+    warnings.warn(
+        "utils.generate_code مهجور — استخدم core.identifiers.random_code",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return random_code(length)

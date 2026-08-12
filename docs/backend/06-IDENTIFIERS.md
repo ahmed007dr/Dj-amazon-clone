@@ -31,7 +31,8 @@
 ```python
 # ❌ خطأ شائع قاتل — "المعرّف UUID فهو آمن"
 class OrderDetailAPI(RetrieveAPIView):
-    queryset = Order.objects.all()          # أي مستخدم يقرأ أي طلب
+    queryset = Order.objects.all()  # أي مستخدم يقرأ أي طلب
+
 
 # ✅ الصحيح — UUID + فحص ملكية
 class OrderDetailAPI(RetrieveAPIView):
@@ -98,12 +99,14 @@ class OrderDetailAPI(RetrieveAPIView):
 # uuid_utils أو uuid6 من PyPI  (وuuid.uuid7 مضمّن في إصدارات Python الحديثة)
 import uuid_utils
 
+
 class UUIDPrimaryKeyModel(models.Model):
     id = models.UUIDField(
         primary_key=True,
         default=lambda: uuid.UUID(bytes=uuid_utils.uuid7().bytes),
         editable=False,
     )
+
     class Meta:
         abstract = True
 ```
@@ -164,11 +167,12 @@ class UUIDPrimaryKeyModel(models.Model):
 `utils/generate_code.py`:
 
 ```python
-import random                              # ⛔ Mersenne Twister — قابل للتنبؤ
+import random  # ⛔ Mersenne Twister — قابل للتنبؤ
+
 
 def generate_code(length=8):
-    data = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    code = ''.join(random.choice(data) for x in range(length))
+    data = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    code = "".join(random.choice(data) for x in range(length))
     return code
 ```
 
@@ -180,10 +184,11 @@ def generate_code(length=8):
 ```python
 import secrets
 
-ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'   # Crockford — بلا I L O U
+ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"  # Crockford — بلا I L O U
+
 
 def generate_code(length=8):
-    return ''.join(secrets.choice(ALPHABET) for _ in range(length))
+    return "".join(secrets.choice(ALPHABET) for _ in range(length))
 ```
 
 ## ٢. ملفات الوسائط بأسماء تسلسلية

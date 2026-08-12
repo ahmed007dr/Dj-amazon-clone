@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'phase/**', 'fix/**']
+  pull_request:
+    branches: [main]
+
+env:
+  DJANGO_SECRET_KEY: ci-only-not-a-real-secret
+  DJANGO_DEBUG: 'True'
+  DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+  DATABASE_URL: sqlite:///ci.sqlite3
+  EMAIL_BACKEND: django.core.mail.backends.locmem.EmailBackend
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: تثبيت الاعتماديات
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff pytest pytest-django factory-boy import-linter uuid-utils
+
+      # ═══ جودة الكود ═══
+      - name: Ruff — lint
+        run: ruff check .
+
+      - name: Ruff — تنسيق
+        run: ruff format --check .
+
+      # ═══ الحدود المعمارية ═══
+      # صفر استيراد صاعد · صفر تبعية دائرية
+      - name: فرض حدود النطاقات
+        run: lint-imports
+
+      # ═══ Django ═══
+      - name: فحص النظام
+        run: python manage.py check
+
+      - name: فحص النشر
+        run: python manage.py check --deploy
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          DJANGO_DEBUG: 'False'
+          DJANGO_ALLOWED_HOSTS: example.com
+
+      - name: لا migrations منسية
+        run: python manage.py makemigrations --check --dry-run
+
+      # ═══ الاختبارات ═══
+      - name: pytest
+        run: pytest -q
+
+      # ═══ الأسرار ═══
+      - name: فحص الأسرار المثبّتة
+        run: |
+          if git ls-files -z | xargs -0 grep -lE "SECRET_KEY *= *['\"][^'\"]|PASSWORD *= *['\"][^'\"]" 2>/dev/null; then
+            echo "::error::سر مثبّت في الكود"
+            exit 1
+          fi
+          echo "✅ صفر أسرار"

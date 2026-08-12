@@ -1,0 +1,115 @@
+[project]
+name = "medical-commerce-platform"
+version = "0.5.0"
+requires-python = ">=3.11"
+
+# ═══════════════════════════════════════════════════════════
+#  Ruff — lint + تنسيق
+# ═══════════════════════════════════════════════════════════
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "*/migrations/*", "full-temp", "static", "media"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "C4", "DJ", "S", "RUF"]
+ignore = [
+    "S101",    # assert مسموح
+    "RUF001",  # محارف عربية تشبه لاتينية — مقصودة
+    "RUF002",
+    "RUF003",
+    "RUF012",  # ClassVar على سمات Django
+]
+
+[tool.ruff.lint.per-file-ignores]
+"*/tests/*" = ["S105", "S106", "S311"]
+"config/settings/*" = ["F403", "F405", "E402"]
+"core/models/__init__.py" = ["F401"]
+"core/api/__init__.py" = ["F401"]
+# أسماء أكواد أخطاء لا أسرار — TOKEN_EXPIRED/TOKEN_INVALID
+"core/errors.py" = ["S105"]
+# object_id نصي ليستوعب UUID وBigInt معًا في مرجع عام؛
+# null=True مقصود لأن القيد قد لا يرتبط بكائن
+"core/models/audit.py" = ["DJ001"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "core", "branding", "accounts", "customers", "administration",
+    "catalog", "shipping", "access", "pricing", "inventory",
+    "reviews", "promotions", "cart", "orders", "config",
+]
+
+# ═══════════════════════════════════════════════════════════
+#  pytest
+# ═══════════════════════════════════════════════════════════
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.dev"
+python_files = ["test_*.py"]
+addopts = "--reuse-db --strict-markers -q"
+testpaths = [
+    "core", "accounts", "customers", "administration", "branding",
+    "catalog", "shipping", "access", "pricing", "inventory",
+    "reviews", "promotions", "cart", "orders",
+]
+
+[tool.coverage.run]
+source = ["."]
+omit = ["*/migrations/*", "*/tests/*", ".venv/*", "config/*", "manage.py"]
+
+# ═══════════════════════════════════════════════════════════
+#  import-linter — فرض حدود النطاقات
+# ═══════════════════════════════════════════════════════════
+#  التوثيق لا يفرض معمارية. فشل البناء يفرضها. (ADR-08)
+#  انظر docs/backend/02-DEPENDENCIES.md
+# ═══════════════════════════════════════════════════════════
+
+[tool.importlinter]
+root_packages = [
+    "core", "branding", "accounts", "customers", "administration",
+    "catalog", "shipping", "access", "pricing", "inventory",
+    "reviews", "promotions", "cart", "orders",
+]
+
+[[tool.importlinter.contracts]]
+name = "Domain layering - dependencies flow downward only"
+type = "layers"
+layers = [
+    "orders",
+    "cart",
+    "promotions",
+    "access | pricing | inventory | reviews",
+    "customers | administration | catalog | shipping",
+    "accounts",
+    "core | branding",
+]
+
+[[tool.importlinter.contracts]]
+name = "Core is infrastructure - never imports a business domain"
+type = "forbidden"
+source_modules = ["core"]
+forbidden_modules = [
+    "accounts", "customers", "administration", "catalog",
+    "shipping", "access", "pricing", "inventory", "reviews",
+    "promotions", "cart", "orders",
+]
+
+[[tool.importlinter.contracts]]
+name = "Identity domains expand independently"
+type = "independence"
+modules = ["customers", "administration"]
+
+[[tool.importlinter.contracts]]
+name = "Domains never import each other models directly"
+type = "forbidden"
+source_modules = ["orders", "cart", "promotions"]
+forbidden_modules = ["catalog.models", "inventory.models", "pricing.models"]
+
+[[tool.importlinter.contracts]]
+name = "Branding is independent of business domains"
+type = "forbidden"
+source_modules = ["branding"]
+forbidden_modules = [
+    "accounts", "customers", "catalog", "orders", "cart", "inventory",
+]
