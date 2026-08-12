@@ -254,6 +254,70 @@ class PasswordChangeAPI(APIView):
 
 
 # ═══════════════════════════════════════════════════════════
+#  تغيير البريد — تأكيد من العنوانين
+# ═══════════════════════════════════════════════════════════
+
+
+class EmailChangeRequestAPI(APIView):
+    """
+    طلب تغيير البريد.
+
+    ⚠️  رسالتان لا واحدة:
+
+        القديم  →  تحذير: «طُلب تغيير بريدك». من اختُرق حسابه يعلم.
+        الجديد  →  رمز تأكيد. يثبت أن الطالب يملك العنوان.
+
+        الاكتفاء بالجديد يعني أن مهاجمًا يغيّر البريد بصمت ثم
+        يستولي على الحساب عبر «نسيت كلمة المرور».
+    """
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = s.EmailChangeRequestSerializer
+
+    def post(self, request):
+        serializer = s.EmailChangeRequestSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        new_email = serializer.validated_data["new_email"]
+
+        _, raw_token = services.issue_token(
+            request.user,
+            TokenPurpose.EMAIL_CHANGE,
+            request=request,
+            new_email=new_email,
+        )
+
+        # ١ — تحذير للعنوان القديم
+        mail.send_to_user(mail.EMAIL_CHANGE_ALERT.key, request.user, {"new_email": new_email})
+
+        # ٢ — تأكيد للعنوان الجديد
+        mail.send_mail(
+            mail.EMAIL_CHANGE_CONFIRM.key,
+            to=new_email,
+            language=request.user.preferred_language,
+            context={
+                "name": request.user.get_short_name(),
+                "link": services.frontend_url(f"/auth/confirm-email?token={raw_token}"),
+            },
+        )
+
+        return Response({"message": "أُرسل رابط التأكيد إلى بريدك الجديد."})
+
+
+class EmailChangeConfirmAPI(APIView):
+    permission_classes = [AllowAny]
+    serializer_class = s.EmailChangeConfirmSerializer
+
+    def post(self, request):
+        serializer = s.EmailChangeConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        services.confirm_email_change(serializer.validated_data["token"])
+
+        # البريد هو المعرّف — تغييره يبطل كل الجلسات
+        return Response({"message": "تم تغيير البريد. سجّل الدخول من جديد."})
+
+
+# ═══════════════════════════════════════════════════════════
 #  الحساب الحالي
 # ═══════════════════════════════════════════════════════════
 

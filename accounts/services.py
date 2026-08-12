@@ -345,6 +345,53 @@ def reset_password(raw_token: str, new_password: str) -> User:
     return user
 
 
+@transaction.atomic
+def confirm_email_change(raw_token: str) -> User:
+    """
+    إتمام تغيير البريد.
+
+    ⚠️  التأكيد من العنوانين معًا:
+
+        ١. رسالة تحذير للعنوان **القديم** — من اختُرق حسابه يعلم
+           بالمحاولة ويستطيع التصرف.
+        ٢. رمز تأكيد للعنوان **الجديد** — يثبت أن الطالب يملكه.
+
+        الاكتفاء بالجديد يعني أن مهاجمًا يسرق الحساب بتغيير بريده
+        بصمت ثم إعادة تعيين كلمة المرور.
+    """
+    record = consume_token(raw_token, TokenPurpose.EMAIL_CHANGE)
+    user = record.user
+    new_email = (record.new_email or "").lower().strip()
+
+    if not new_email:
+        raise BusinessError(ErrorCode.TOKEN_INVALID)
+
+    # قد يكون شخص آخر سجّل بهذا البريد بين الطلب والتأكيد
+    if User.objects.filter(email__iexact=new_email).exclude(pk=user.pk).exists():
+        raise BusinessError(
+            ErrorCode.UNIQUE,
+            detail="هذا البريد صار مسجلًا لحساب آخر",
+            status_code=409,
+        )
+
+    previous = user.email
+    user.email = new_email
+    user.email_verified_at = timezone.now()
+    user.save(update_fields=["email", "email_verified_at"])
+
+    # البريد هو المعرّف — تغييره يبطل كل الجلسات
+    revoke_all_tokens(user)
+    close_all_sessions(user, revoked=True)
+
+    AuditLog.objects.create(
+        actor=user,
+        action=AuditAction.UPDATE,
+        object_repr=str(user),
+        changes={"email": {"old": previous, "new": new_email}},
+    )
+    return user
+
+
 def issue_jwt(user: User) -> dict[str, str]:
     refresh = RefreshToken.for_user(user)
     return {"access": str(refresh.access_token), "refresh": str(refresh)}

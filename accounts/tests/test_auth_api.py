@@ -452,3 +452,112 @@ class TestLanguageNegotiation:
             HTTP_ACCEPT_LANGUAGE="fr",
         )
         assert response.headers["Content-Language"] == "ar"
+
+
+# ═══════════════════════════════════════════════════════════
+#  تغيير البريد — تأكيد من العنوانين
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.django_db
+class TestEmailChange:
+    def _authenticate(self, client, user):
+        client.force_authenticate(user=user)
+        return client
+
+    def test_requires_current_password(self, client, active_user):
+        """
+        ⚠️  جهاز مفتوح بلا صاحبه يكفي لتغيير البريد ثم الاستيلاء
+            على الحساب عبر «نسيت كلمة المرور».
+        """
+        self._authenticate(client, active_user)
+
+        response = client.post(
+            reverse("v1:accounts:email-change"),
+            {"new_email": "new@test.local", "current_password": "WrongPass!123"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert "current_password" in response.data["fields"]
+
+    def test_sends_two_emails_old_and_new(self, client, active_user):
+        """
+        القديم يتلقى تحذيرًا · الجديد يتلقى رمز تأكيد.
+        الاكتفاء بالجديد يسمح بسرقة الحساب بصمت.
+        """
+        django_mail.outbox.clear()
+        self._authenticate(client, active_user)
+
+        response = client.post(
+            reverse("v1:accounts:email-change"),
+            {"new_email": "brand-new@test.local", "current_password": PASSWORD},
+            format="json",
+        )
+        assert response.status_code == 200
+        assert len(django_mail.outbox) == 2
+
+        recipients = {msg.to[0] for msg in django_mail.outbox}
+        assert recipients == {"active@test.local", "brand-new@test.local"}
+
+    def test_email_is_not_changed_before_confirmation(self, client, active_user):
+        self._authenticate(client, active_user)
+        client.post(
+            reverse("v1:accounts:email-change"),
+            {"new_email": "pending@test.local", "current_password": PASSWORD},
+            format="json",
+        )
+
+        active_user.refresh_from_db()
+        assert active_user.email == "active@test.local"
+
+    def test_confirmation_applies_change_and_revokes_sessions(self, client, active_user):
+        from accounts import services
+
+        services.open_session(active_user, session_key="before-change")
+        _, raw = services.issue_token(
+            active_user, TokenPurpose.EMAIL_CHANGE, new_email="confirmed@test.local"
+        )
+
+        response = client.post(
+            reverse("v1:accounts:email-change-confirm"), {"token": raw}, format="json"
+        )
+        assert response.status_code == 200
+
+        active_user.refresh_from_db()
+        assert active_user.email == "confirmed@test.local"
+        assert active_user.is_email_verified
+        # البريد هو المعرّف — تغييره يبطل كل الجلسات
+        assert not UserSession.objects.filter(user=active_user, logout_at__isnull=True).exists()
+
+    def test_cannot_take_an_email_already_registered(self, client, active_user):
+        User.objects.create_user(email="taken@test.local", password=PASSWORD)
+        self._authenticate(client, active_user)
+
+        response = client.post(
+            reverse("v1:accounts:email-change"),
+            {"new_email": "taken@test.local", "current_password": PASSWORD},
+            format="json",
+        )
+        assert response.status_code == 400
+        assert "new_email" in response.data["fields"]
+
+    def test_race_between_request_and_confirmation_is_caught(self, client, active_user):
+        """
+        شخص آخر قد يسجّل بالبريد بين الطلب والتأكيد — الفحص
+        عند الطلب وحده لا يكفي.
+        """
+        from accounts import services
+
+        _, raw = services.issue_token(
+            active_user, TokenPurpose.EMAIL_CHANGE, new_email="contested@test.local"
+        )
+        User.objects.create_user(email="contested@test.local", password=PASSWORD)
+
+        response = client.post(
+            reverse("v1:accounts:email-change-confirm"), {"token": raw}, format="json"
+        )
+
+        assert response.status_code == 409
+        active_user.refresh_from_db()
+        assert active_user.email == "active@test.local"

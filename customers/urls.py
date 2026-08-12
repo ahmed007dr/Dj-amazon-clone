@@ -19,7 +19,13 @@ urlpatterns = [
     # الوثائق
     path("documents/", api.DocumentListCreateAPI.as_view(), name="documents"),
     path(
-        "documents/<uuid:pk>/download/",
+        "documents/<uuid:pk>/signed-url/",
+        api.DocumentSignedUrlAPI.as_view(),
+        name="document-signed-url",
+    ),
+    # التوقيع في المسار — لا معرّف الوثيقة
+    path(
+        "documents/download/<str:signature>/",
         api.DocumentDownloadAPI.as_view(),
         name="document-download",
     ),
