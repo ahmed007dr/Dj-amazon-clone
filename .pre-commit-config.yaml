@@ -21,12 +21,18 @@ repos:
   - repo: local
     hooks:
       # الحدود النطاقية — التوثيق لا يفرض معمارية، فشل البناء يفرضها
+      #
+      # ⚠️  PYTHONUTF8=1 إلزامي على ويندوز:
+      #     بدونه تُقرأ ملفات المشروع بترميز cp1252 فينهار على
+      #     أول محرف عربي في تعليق أو نص.
       - id: lint-imports
         name: فرض حدود النطاقات
         entry: lint-imports
         language: system
         pass_filenames: false
         types: [python]
+        env:
+          PYTHONUTF8: '1'
 
       - id: django-check
         name: فحص Django

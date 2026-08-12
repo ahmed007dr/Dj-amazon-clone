@@ -110,9 +110,9 @@ class TestIdentifiers:
         """UUID على جدول لا يظهر في رابط تكلفة بلا مقابل."""
         for app_label, model_name in INTERNAL_BIGINT_MODELS:
             model = apps.get_model(app_label, model_name)
-            assert isinstance(model._meta.pk, models.BigAutoField), (
-                f"{model._meta.label} يجب أن يبقى BigInt"
-            )
+            assert isinstance(
+                model._meta.pk, models.BigAutoField
+            ), f"{model._meta.label} يجب أن يبقى BigInt"
 
     def test_uuid7_is_time_ordered(self):
         """

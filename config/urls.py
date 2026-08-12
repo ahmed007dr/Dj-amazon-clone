@@ -27,7 +27,7 @@ schema_view = get_schema_view(
 #  /api/v1/  — تُفعَّل كل نقطة في مرحلتها
 # ═══════════════════════════════════════════════════════════
 api_v1 = [
-    # path('auth/',           include('accounts.urls')),        المرحلة ١
+    path("auth/", include("accounts.urls")),
     # path('branding/',       include('branding.urls')),        المرحلة ١.٥
     # path('customers/',      include('customers.urls')),       المرحلة ١
     # path('administration/', include('administration.urls')),  المرحلة ٢

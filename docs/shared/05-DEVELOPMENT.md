@@ -52,6 +52,31 @@ python manage.py migrate
 python manage.py runserver
 ```
 
+## ⚠️ ويندوز — `PYTHONUTF8=1`
+
+الطرفية على ويندوز تفترض ترميز **cp1252**، فتنهار الأدوات على أول
+محرف عربي في تعليق أو رسالة اختبار:
+
+```
+UnicodeEncodeError: 'charmap' codec can't encode characters ...
+'charmap' codec can't decode byte 0x90 ...
+```
+
+**الحل الدائم** — يُضبط مرة واحدة:
+
+```powershell
+setx PYTHONUTF8 1
+```
+
+أو لكل أمر:
+
+```bash
+PYTHONUTF8=1 lint-imports
+PYTHONIOENCODING=utf-8 pytest -q
+```
+
+مضبوط أصلًا في `.pre-commit-config.yaml` وفي الـ CI (لينكس لا يحتاجه).
+
 ## التحقق من السلامة
 
 ```bash
