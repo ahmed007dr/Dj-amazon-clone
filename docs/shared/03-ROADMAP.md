@@ -17,7 +17,7 @@
 |---|---|---|---|---|
 | **0** | الاكتشاف والتدقيق المعماري | — | ✅ **مكتملة** | 2026-08-12 |
 | **0.1** | إصلاح أمني عاجل | ٣ أيام | ✅ **مكتملة** | 2026-08-12 |
-| **0.5** | إعادة الهيكلة النطاقية | ٧-١٠ أيام | ⬜ | — |
+| **0.5** | إعادة الهيكلة النطاقية | ٧-١٠ أيام | ✅ **مكتملة** | 2026-08-12 |
 | **1** | الأساس: User + Decimal + i18n + البريد | ٢ أسبوع | ⬜ | — |
 | **1.5** | بذرة الفرونت إند + نظام الثيم | ٢-٣ أسابيع | ⬜ | — |
 | **2** | RBAC + سياسات الوصول + المراقبة | ٢ أسبوع | ⬜ | — |
@@ -87,27 +87,46 @@
 
 ---
 
-# ⬜ المرحلة 0.5 — إعادة الهيكلة النطاقية (٧-١٠ أيام)
+# ✅ المرحلة 0.5 — إعادة الهيكلة النطاقية (مكتملة 2026-08-12)
 
-| اليوم | العمل |
-|---|---|
-| ١-٢ | `project/` ← `config/` · الانتقال إلى PostgreSQL |
-| ٣-٤ | `core/` + `accounts/` بـ Custom User ← **إعادة تهيئة DB مرة واحدة** |
-| ٥ | حذف كل `templates/` و `*/templates/` والـ views المرندرة والـ context processors |
-| ٦-٧ | فصل النطاقات (أدناه) |
-| ٨ | سقالات فارغة: `access/` `pricing/` `inventory/` + طبقة `services.py` |
-| ٩ | `import-linter` + العقود + `pytest` + CI ← **الحدود تصير مُلزِمة** |
-| ١٠ | `README.md` لكل نطاق + مخطط التبعيات |
+## الهيكل
 
-## عمليات الفصل
+- [x] `project/` ← `config/`
+- [x] `core/` — نماذج أساسية · UUIDv7 · المال · التدقيق · الأخطاء · الترقيم · الضريبة · الإعدادات
+- [x] ١٣ نطاق سقالة بحدود معرّفة + `README.md` لكل واحد
+- [x] حذف كل `templates/` والـ views المرندرة و context processors *(قرار SPA)*
+- [x] حذف تطبيقَي `products/` و `settings/` القديمين
+- [x] حذف نماذج `orders/` القديمة *(FloatField · IDOR · APIs لا تعمل)*
+- [x] إعادة تهيئة قاعدة البيانات مرة واحدة
 
-- [ ] `products/` ← `catalog/` + `reviews/` (مع إزالة `quantity`)
-- [ ] `orders/` ← `cart/` + `orders/` + `promotions/`
-- [ ] `Address` + `DeliveryFee` ← `shipping/` *(يكسر التبعية الدائرية H1)*
-- [ ] `Settings` ← **`branding/`** (لا `core`) — انظر [backend/04-DOMAINS.md](../backend/04-DOMAINS.md)
-- [ ] `accounts.views.dashbord()` ← `reporting/`
+## الهوية
 
-**بوابة الخروج:** `lint-imports` ينجح · صفر استيراد صاعد · صفر تبعية دائرية · `migrate` ينجح على PostgreSQL نظيفة · CI أخضر.
+- [x] `accounts.User` مخصص بـ **UUIDv7** — نحيف، صفر حقول تجارية
+- [x] `AccountStatus` منفصل عن `VerificationStatus`
+- [x] `UserSession` · `AccountStatusChange` · `SecurityToken`
+- [x] باكند مصادقة يفحص الحالة *(القديم كان يُدخِل الموقوفين)*
+
+## المعرّفات والمال
+
+- [x] `core.identifiers` — `secrets` بدل `random` · أرقام عمل Crockford · أسماء ملفات عشوائية
+- [x] `core.money` — `Decimal` حصرًا · `ROUND_HALF_UP` · تسلسل نصي
+- [x] `core.models.tax` — `TaxClass` بفترة صلاحية
+
+## الأدوات
+
+- [x] **`import-linter` — ٥ عقود · صفر انتهاك**
+- [x] `ruff` + `pytest` + `pre-commit` + CI على GitHub Actions
+- [x] **٣٤ اختبارًا** تحرس القرارات المعمارية
+
+**بوابة الخروج:** ✅ `check` · `check --deploy` · `makemigrations --check` · `lint-imports` · `pytest` · `ruff` — كلها خضراء.
+
+## مؤجّل من هذه المرحلة
+
+| البند | السبب | متى |
+|---|---|---|
+| **PostgreSQL** | غير مثبّت على الجهاز ولا Docker | **إلزامي قبل المرحلة ٤** — `select_for_update` لا يعمل على SQLite فمنع البيع الزائد مستحيل |
+| ترقية Django 4.2 → 5.2 | البيئة العامة على 5.2 والمشروع على 4.2 | المرحلة ١ |
+| `reporting/` | لا تقارير بعد | المرحلة ١٣ |
 
 ---
 
