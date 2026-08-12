@@ -1,0 +1,272 @@
+# مخطط التبعيات وفرض الحدود
+
+[← العودة للفهرس](../README.md)
+
+> **القاعدة الوحيدة الحاكمة: التبعية تسير للأسفل فقط. أي استيراد صاعد = فشل بناء.**
+
+---
+
+# ١. مخطط الطبقات
+
+```text
+L0   core ── branding
+       ↑
+L1   accounts                          ← الهوية فقط. كل شيء يقف عليها
+       ↑
+L2   customers ── administration ── academic ── shipping ── catalog
+       ↑
+L3   access ── pricing ── inventory ── reviews
+       ↑
+L4   promotions
+       ↑
+L5   cart
+       ↑
+L6   orders                            ← channel · location · attribution
+       ↑
+L7   payments                          ← سجل بوابات قابل للضبط
+       ↑
+L8   pos                               ← ينشئ Order بـ channel=POS
+       ↑
+L9   finance                           ← إيراد · COGS · مصروف · P&L
+
+     ══════ مستهلكون فقط — لا أحد يعتمد عليهم ══════
+     notifications        (تستمع للأحداث · بريد · داخل التطبيق)
+     reporting            (تقرأ الكل، لا تكتب شيئًا)
+
+     ══════ فرع الموظفين — ما بعد الإطلاق ══════
+     employees (L2.5)  →  targets  →  commissions
+         ↓                                  ↓
+     customers                    يقرأ orders قراءةً فقط
+```
+
+---
+
+# ٢. عزل مجموعة الهوية
+
+```text
+                    accounts  (L1)
+                   ╱     │     ╲
+                  ╱      │      ╲
+        customers  administration  employees
+          (L2)         (L2)        (L2.5)
+                                      │
+                                      ↓
+                                 customers
+                            (إسناد العملاء فقط)
+```
+
+| القاعدة | السبب |
+|---|---|
+| `customers` **لا يستورد** `employees` | يمنع الدائرة. الإسناد يملكه `employees` |
+| `employees` **قد يستورد** `customers` | اتجاه واحد نازل — مسموح |
+| `administration` **لا يستورد** أيًّا منهما | إدارة النظام مستقلة عن بيانات البيع |
+| الثلاثة تعتمد على `accounts` فقط | **كل واحد يتوسع دون أن يمس الآخر** |
+| `User` يبقى نحيفًا أبدًا | بيانات اعتماد وحالة ولغة فقط · صفر حقول تجارية |
+
+---
+
+# ٣. القرارات التي تكسر الدوائر
+
+| الدائرة المحتملة | الحل الملزِم |
+|---|---|
+| `catalog ↔ inventory` | **`catalog` لا يملك أي حقل مخزون إطلاقًا.** لا `quantity`. الـ serializer يُثري عبر `InventoryService.availability_for(product_ids)` — استدعاء مجمّع واحد، لا N+1 |
+| `catalog ↔ pricing` | **`Product` بلا `get_price()`.** التسعير عبر `PricingService.price_for(product, customer)` |
+| `orders ↔ inventory` | `orders` لا يلمس موديلات المخزون. يستدعي `inventory.services.reserve()` / `commit()` / `release()` فقط |
+| `orders ↔ promotions` | `orders` يستهلك **نتيجة** التحقق من الكوبون، ولا ينفّذ محرك الكوبونات |
+| `orders ↔ commissions` | `orders` لا يعرف بوجود العمولات. `commissions` يستمع لإشارة `order_completed` |
+| `accounts ↔ orders` | ⛔ **الدائرة القائمة حاليًا (H1).** تُحَل بنقل `Address` ← `shipping` و `dashbord()` ← `reporting` |
+| `customers ↔ employees` | **`CustomerAssignment` يسكن في `employees/`.** `Customer` بلا حقل `assigned_employee` |
+| `pos ↔ orders` | `pos` يستدعي `orders.services.create(channel=POS)`. `orders` لا يعرف بوجود POS |
+| `finance ↔ orders` | `finance` يستمع لـ `order_completed` و `pos_session_closed`. لا نطاق يستورد `finance` |
+| `payments ↔ orders` | `orders` يعرف واجهة الدفع المجرّدة فقط، لا أي بوابة بعينها |
+| أي نطاق ↔ `notifications` | لا أحد يستورد `notifications`. النطاقات تبعث إشارات؛ `notifications` يستمع |
+| `accounts ↔ notifications` | استرجاع كلمة المرور: `accounts` يبعث `password_reset_requested`؛ `notifications` يرسل البريد |
+
+---
+
+# ٤. ناقل الأحداث
+
+**Django Signals.** لا Celery ولا event bus معقّد في المرحلة الأولى (ADR-07). يُرقّى لاحقًا خلف نفس الواجهة دون تغيير المستدعين.
+
+```text
+inventory يكتشف LOW_STOCK
+        ↓
+    يبعث إشارة stock_low
+        ↓
+notifications يستمع
+        ↓
+    إشعار للأدمن + بريد
+```
+
+**`inventory` لا يستورد `notifications`. أبدًا.**
+
+## الإشارات الأساسية
+
+| الإشارة | الباعث | المستمعون |
+|---|---|---|
+| `order_created` | `orders` | `notifications` · `inventory` |
+| `order_completed` | `orders` | `notifications` · `finance` · `loyalty` · `commissions` |
+| `order_cancelled` | `orders` | `notifications` · `inventory` (إفراج) |
+| `payment_succeeded` / `payment_failed` | `payments` | `orders` · `notifications` |
+| `stock_low` / `stock_critical` / `stock_out` | `inventory` | `notifications` |
+| `batch_expiring` / `batch_expired` | `inventory` | `notifications` |
+| `pos_session_closed` | `pos` | `finance` · `notifications` |
+| `password_reset_requested` | `accounts` | `notifications` |
+| `account_suspended` / `account_activated` | `accounts` | `notifications` · `core.audit` |
+| `customer_verified` / `customer_rejected` | `customers` | `notifications` |
+| `branding_updated` | `branding` | إبطال الكاش |
+
+---
+
+# ٥. فرض القواعد آليًا
+
+> **التوثيق لا يفرض معمارية. فشل البناء يفرضها.** (ADR-08)
+
+`import-linter` في `pyproject.toml`، يعمل في كل CI run:
+
+```ini
+[importlinter]
+root_package = config
+include_external_packages = True
+
+[importlinter:contract:layers]
+name = Domain layering — dependencies flow downward only
+type = layers
+layers =
+    finance
+    pos
+    payments
+    orders
+    cart
+    promotions
+    access | pricing | inventory | reviews
+    academic | customers | administration | shipping | catalog
+    accounts
+    core | branding
+
+[importlinter:contract:identity-isolation]
+name = Identity domains must expand independently
+type = independence
+modules =
+    customers
+    administration
+
+[importlinter:contract:customers-never-knows-employees]
+name = Customers must not depend on employees (assignment lives in employees)
+type = forbidden
+source_modules = customers
+forbidden_modules = employees
+
+[importlinter:contract:thin-user]
+name = Persona domains attach profiles; they never reach into accounts internals
+type = forbidden
+source_modules =
+    customers.models
+    employees.models
+    administration.models
+forbidden_modules =
+    accounts.services
+    accounts.api
+
+[importlinter:contract:no-cross-domain-models]
+name = Domains must not import each other's models directly
+type = forbidden
+source_modules =
+    orders
+    cart
+    promotions
+    pos
+    finance
+forbidden_modules =
+    catalog.models
+    inventory.models
+
+[importlinter:contract:pos-uses-orders-service]
+name = POS must create orders through the orders service, never its own model
+type = forbidden
+source_modules = pos
+forbidden_modules = orders.models
+
+[importlinter:contract:notifications-isolated]
+name = Nothing may import notifications
+type = forbidden
+source_modules =
+    catalog
+    inventory
+    orders
+    cart
+    accounts
+    pricing
+    promotions
+    pos
+    finance
+    payments
+forbidden_modules =
+    notifications
+
+[importlinter:contract:reporting-isolated]
+name = Nothing may import reporting
+type = forbidden
+source_modules =
+    catalog
+    inventory
+    orders
+    cart
+    accounts
+    pos
+    finance
+forbidden_modules =
+    reporting
+
+[importlinter:contract:finance-isolated]
+name = Nothing may import finance
+type = forbidden
+source_modules =
+    orders
+    pos
+    payments
+    inventory
+forbidden_modules =
+    finance
+
+[importlinter:contract:core-is-infrastructure]
+name = Core must never import any business domain
+type = forbidden
+source_modules = core
+forbidden_modules =
+    accounts
+    catalog
+    orders
+    inventory
+    customers
+    pos
+    finance
+    payments
+```
+
+## في الـ CI
+
+```yaml
+- run: lint-imports          # يفشل البناء عند أي انتهاك حدود
+- run: pytest
+- run: python manage.py makemigrations --check --dry-run
+```
+
+---
+
+# ٦. فحص الحدود قبل أي ميزة جديدة
+
+قبل كتابة أي كود، أجب:
+
+1. أي نطاق يملك هذه الميزة؟
+2. أي نطاق يملك بياناتها؟
+3. أي نطاق يملك قواعد عملها؟
+4. أي نطاقات تستهلكها؟
+5. ما اتجاه التبعية؟
+6. هل تنشئ دائرة؟
+7. هل هي مشتركة فعلًا؟
+8. هل تنتمي إلى `core`؟
+9. هل يوجد تنفيذ قائم لها بالفعل؟
+10. هل يمكن اختبارها مستقلة؟
+
+**إن كانت الإجابات متضاربة، صمّم الحدود قبل أن تكتب سطرًا.**
