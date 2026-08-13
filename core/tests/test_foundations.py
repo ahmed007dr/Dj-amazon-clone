@@ -78,6 +78,12 @@ INTERNAL_BIGINT_MODELS = {
     ("reviews", "ProductRating"),
     # جدول وصل — لا يُعرَّف خارجيًا
     ("reviews", "ReviewHelpfulVote"),
+    # أرصدة المخزون: تُقرأ بالمنتج والموقع لا بمعرّفها
+    ("inventory", "Stock"),
+    # سجل الحركات: أضخم جدول في النظام ولا يظهر في رابط
+    ("inventory", "StockMovement"),
+    # سطر جرد — تابع لجلسة الجرد
+    ("inventory", "StockCountLine"),
 }
 
 #: نماذج بمفتاح طبيعي — المفتاح نفسه هو المعنى، لا رقم تسلسلي.
