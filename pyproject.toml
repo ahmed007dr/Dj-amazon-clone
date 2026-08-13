@@ -38,7 +38,7 @@ known-first-party = [
     "core", "branding", "accounts", "customers", "administration",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
-    "academic", "notifications", "config",
+    "academic", "notifications", "devtools", "config",
 ]
 
 # ═══════════════════════════════════════════════════════════
@@ -53,7 +53,7 @@ testpaths = [
     "core", "accounts", "customers", "administration", "branding",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
-    "academic", "notifications",
+    "academic", "notifications", "devtools",
 ]
 
 [tool.coverage.run]
@@ -72,7 +72,7 @@ root_packages = [
     "core", "branding", "accounts", "customers", "administration",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
-    "academic", "notifications",
+    "academic", "notifications", "devtools",
 ]
 
 [[tool.importlinter.contracts]]
@@ -85,6 +85,12 @@ type = "layers"
 #     في العقد خالف ما توثّقه docs/backend/02-DEPENDENCIES.md،
 #     وأمسكه import-linter عند أول استيراد فعلي.
 layers = [
+    # ⚠️  `devtools` فوق الجميع — يستورد كل شيء ولا يستورده أحد.
+    #
+    #     بذرة البيانات تلمس كل نطاق؛ وضعها داخل أحدها يجعله يعتمد
+    #     على نطاقات لا علاقة له بها فيكذب المخطط. وهي غير مثبّتة
+    #     خارج بيئة التطوير أصلًا (config/settings/dev.py).
+    "devtools",
     "orders",
     "cart",
     # ⚠️  `payments` **تحت** `orders` لا فوقه.

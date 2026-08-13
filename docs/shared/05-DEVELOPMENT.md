@@ -48,9 +48,67 @@ python -c "from django.core.management.utils import get_random_secret_key; print
 # ٥. قاعدة البيانات
 python manage.py migrate
 
-# ٦. التشغيل
+# ٦. بذرة بيانات كاملة — نظام قابل للتجربة فورًا
+python manage.py seed_dev
+
+# ٧. التشغيل
 python manage.py runserver
 ```
+
+## بذرة التطوير — `seed_dev`
+
+```bash
+python manage.py seed_dev              # بذرة كاملة
+python manage.py seed_dev --minimal    # البنية فقط — بلا منتجات ولا مستخدمين
+python manage.py seed_dev --reset      # حذف كل البيانات ثم إعادة البناء
+```
+
+**قابل للتشغيل مرارًا.** كل وحدة تستخدم مفتاحًا طبيعيًا؛ والمخزون
+والطلبات — وهما وحدهما يغيّران أرصدة حقيقية — لهما حارس صريح يمنع
+التكرار.
+
+الحسابات كلها بكلمة المرور `Dev-Pass!2026`:
+
+| البريد | الدور |
+|---|---|
+| `owner@dev.local` | مالك النظام — صلاحية كاملة |
+| `catalog@dev.local` · `finance@dev.local` · `support@dev.local` | أدمن بأدوار محدودة |
+| `warehouse@dev.local` · `cashier@dev.local` | موظفون |
+| `customer@dev.local` | عميل تجزئة — له طلبات وتقييمات |
+| `suspended@dev.local` | **حساب موقوف** |
+| `pharmacist@dev.local` · `rejected@dev.local` | **ينتظر التوثيق · توثيق مرفوض** |
+| `pharmacy@dev.local` · `trader@dev.local` | حسابات جملة موثّقة |
+| `student@dev.local` · `student3@dev.local` | **طالب موثّق · طالب غير موثّق** |
+
+الكوبونات: `WELCOME10` · `FREESHIP` · `STUDENT50` · `EXPIRED2025` (منتهٍ عمدًا).
+
+### ⚠️ لماذا لا يعمل في الإنتاج
+
+`devtools` مُثبَّت في `config/settings/dev.py` **وحده**، فالأمر غير
+موجود خارج بيئة التطوير:
+
+```console
+$ DJANGO_SETTINGS_MODULE=config.settings.prod python manage.py seed_dev
+Unknown command: 'seed_dev'
+```
+
+هذا أقوى من فحص `if DEBUG` داخل الأمر — متغيّر بيئة خاطئ واحد يقلب
+الفحص، ولا شيء يخلق أمرًا من العدم. (الفحص موجود أيضًا، كحزام ثانٍ.)
+
+### ما تغطّيه البذرة عمدًا
+
+ليست بيانات لملء الشاشة — إنها **الحالات التي لا يراها أحد حتى
+يشتكي عميل**:
+
+| الحالة | لماذا |
+|---|---|
+| دفعة منتهية الصلاحية | أمر حجر الدفعات لا شيء له ليفعله بدونها |
+| دفعة تنتهي بعد ٤٥ يومًا | داخل نافذة التنبيه — يُظهر التنبيه فعلًا |
+| دفعتان لنفس الصنف | FEFO مرئي: الأقرب انتهاءً تُستهلك أولًا |
+| نسخة نافدة ومنتجها متوفر | يكشف لماذا يُتتبَّع المخزون على النسخة |
+| كوبون منتهٍ | رسالة الرفض مسار لا يمرّ به أحد عادةً |
+| حساب موقوف · توثيق مرفوض | شاشات لا تُختبر إن كان كل شيء مثاليًا |
+| عنوان بمحافظة نائية | يكشف رسوم المنطقة الافتراضية |
 
 ## ⚠️ ويندوز — GNU gettext
 

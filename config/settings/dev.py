@@ -21,6 +21,16 @@ ALLOWED_HOSTS = env.list(
 INSTALLED_APPS += ["debug_toolbar"]
 MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
 
+
+# ── أدوات التطوير — بيئة التطوير وحدها ─────────────────────
+# ⚠️  `seed_dev` تُنشئ حسابات بكلمة مرور معروفة ومنشورة.
+#
+#     عدم تثبيت التطبيق في الإنتاج يجعل الأمر **غير موجود** هناك —
+#     وهذا أقوى من فحص `if DEBUG` داخله، لأن متغيّر بيئة خاطئًا
+#     واحدًا يقلب الفحص بينما لا يخلق أمرًا من العدم.
+
+INSTALLED_APPS += ["devtools"]
+
 INTERNAL_IPS = ["127.0.0.1"]
 
 

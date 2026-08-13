@@ -9,6 +9,23 @@ import pytest
 from django.core.cache import cache
 
 
+@pytest.fixture(autouse=True, scope="session")
+def fast_password_hashing():
+    """
+    ⚠️  تجزئة كلمات المرور تهيمن على زمن أي اختبار يُنشئ مستخدمين.
+
+        PBKDF2 مُعايَر ليكون **بطيئًا عمدًا** — وهو صحيح في الإنتاج
+        وعبء خالص في الاختبار. بذرة التطوير وحدها تُنشئ ١٧ حسابًا،
+        فتقضي معظم وقتها في التجزئة لا فيما تختبره.
+
+        هذا لا يخلق فجوة سلوكية: `check_password` تعمل كما هي،
+        ومدققات قوة كلمة المرور تبقى كاملة كما في الإنتاج.
+    """
+    from django.conf import settings
+
+    settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+
 @pytest.fixture(autouse=True)
 def isolated_media(settings):
     """

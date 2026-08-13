@@ -58,7 +58,6 @@ api_v1 = [
     path("notifications/", include("notifications.urls")),
     # ── لاحقًا ─────────────────────────────────────────────
     # path("branding/", include("branding.urls")),      المرحلة ١.٥
-
     # path("pos/",      include("pos.urls")),           المرحلة ٧
     # path("finance/",  include("finance.urls")),       المرحلة ٨
     # path("employees/", include("employees.urls")),    المرحلة ١٠
