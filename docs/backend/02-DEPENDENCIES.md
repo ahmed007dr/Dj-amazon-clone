@@ -24,13 +24,14 @@ L4   promotions
        ↑
 L5   cart
        ↑
+L5.5 payments                          ← ⚠️ تحت orders لا فوقه
+       ↑                                  orders يستدعي charge()
+       ↑                                  وpayments لا يعرف بوجود الطلبات
 L6   orders                            ← channel · location · attribution
        ↑
-L7   payments                          ← سجل بوابات قابل للضبط
+L7   pos                               ← ينشئ Order بـ channel=POS
        ↑
-L8   pos                               ← ينشئ Order بـ channel=POS
-       ↑
-L9   finance                           ← إيراد · COGS · مصروف · P&L
+L8   finance                           ← إيراد · COGS · مصروف · P&L
 
      ══════ مستهلكون فقط — لا أحد يعتمد عليهم ══════
      notifications        (تستمع للأحداث · بريد · داخل التطبيق)
@@ -289,6 +290,9 @@ forbidden_modules =
 | 2026-08-12 | `accounts.tests` يستورد `administration.models` | اختبار «المالك لا يُوقَف» انتقل إلى `administration/tests/` |
 | 2026-08-12 | **`catalog` يستورد `access`** | **العقد كان يضع `access` في L3 فوق `catalog`، بينما الوثيقة تقول إنه يعتمد على `accounts`+`core` فقط ويستهلكه الجميع. صُحّح العقد إلى L1.5** |
 | 2026-08-12 | `access.tests` يستورد `administration.models` | اختبارات المعاينة انتقلت إلى `administration/tests/` |
+| 2026-08-12 | `academic` يستورد `catalog` (`SlugMixin`) | `SlugMixin` و`unique_slug` بنية تحتية عامة — نُقلا إلى `core/models/slug.py` |
+| 2026-08-12 | `academic.services` يستدعي `cart.services` | `add_bundle_to_cart` انتقل إلى `cart.add_bundle` — السلة تعرف الحزم لا العكس |
+| 2026-08-12 | **`orders` يستورد `payments`** | **العقد كان يضع `payments` في L7 فوق `orders`، بينما التبعية الفعلية `orders → payments.charge()`. صُحّح إلى L5.5 — ثاني تناقض من نوع `access`** |
 
 ## القاعدة المستخلصة
 

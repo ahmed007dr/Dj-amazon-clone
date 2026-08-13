@@ -447,8 +447,8 @@ class TestCouponIntegration:
 
     def test_lowercase_code_is_accepted(self, cart, customer, coupon):
         """`SAVE10` و`save10` كوبون واحد."""
-        result = cart_services.apply_coupon(cart, "save10")
-        assert result.is_valid
+        snapshot = cart_services.apply_coupon(cart, "save10")
+        assert snapshot.coupon_result.is_valid
 
 
 # ═══════════════════════════════════════════════════════════

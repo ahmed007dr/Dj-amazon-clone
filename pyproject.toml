@@ -85,9 +85,18 @@ type = "layers"
 #     في العقد خالف ما توثّقه docs/backend/02-DEPENDENCIES.md،
 #     وأمسكه import-linter عند أول استيراد فعلي.
 layers = [
-    "payments",
     "orders",
     "cart",
+    # ⚠️  `payments` **تحت** `orders` لا فوقه.
+    #
+    #     التبعية `orders → payments.services.charge()` — والطلب
+    #     يعرف الواجهة المجرّدة لا أي بوابة بعينها. أما `payments`
+    #     فلا يعرف بوجود الطلبات إطلاقًا: مرجعه نصي.
+    #
+    #     وضعه فوق `orders` كان خطأً في العقد خالف ما توثّقه
+    #     docs/backend/02-DEPENDENCIES.md — وهو ثاني تناقض من نوعه
+    #     بعد `access`.
+    "payments",
     "promotions",
     "pricing | inventory | reviews",
     "customers | administration | academic | catalog | shipping",

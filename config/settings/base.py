@@ -70,11 +70,12 @@ LOCAL_APPS = [
     "pricing",
     "inventory",
     "reviews",
-    # L4 → L7
+    # L4 → L6
     "promotions",
+    # payments تحت orders — الطلب يستدعي الدفع لا العكس
+    "payments",
     "cart",
     "orders",
-    "payments",
     # مستهلك فقط — لا نطاق يستورده
     "notifications",
 ]

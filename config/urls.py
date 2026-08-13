@@ -39,24 +39,28 @@ schema_view = get_schema_view(
 #  /api/v1/  — تُفعَّل كل نقطة في مرحلتها
 # ═══════════════════════════════════════════════════════════
 api_v1 = [
+    # ── الهوية ─────────────────────────────────────────────
     path("auth/", include("accounts.urls")),
     path("customers/", include("customers.urls")),
     path("administration/", include("administration.urls")),
+    # ── الوصول والكتالوج ───────────────────────────────────
     path("access/", include("access.urls")),
     path("catalog/", include("catalog.urls")),
     path("reviews/", include("reviews.urls")),
+    path("academic/", include("academic.urls")),
+    # ── المخزون والتجارة ───────────────────────────────────
     path("inventory/", include("inventory.urls")),
-    # path('branding/',       include('branding.urls')),        المرحلة ١.٥
-    # path('customers/',      include('customers.urls')),       المرحلة ١
-    # path('administration/', include('administration.urls')),  المرحلة ٢
-    # path('catalog/',        include('catalog.urls')),         المرحلة ٣
-    # path('reviews/',        include('reviews.urls')),         المرحلة ٣
-    # path('inventory/',      include('inventory.urls')),       المرحلة ٤
-    # path('pricing/',        include('pricing.urls')),         المرحلة ٥
-    # path('promotions/',     include('promotions.urls')),      المرحلة ٥
-    # path('cart/',           include('cart.urls')),            المرحلة ٥
-    # path('orders/',         include('orders.urls')),          المرحلة ٥
-    # path('shipping/',       include('shipping.urls')),        المرحلة ٥
+    path("cart/", include("cart.urls")),
+    path("orders/", include("orders.urls")),
+    path("shipping/", include("shipping.urls")),
+    # ── الإشعارات ──────────────────────────────────────────
+    path("notifications/", include("notifications.urls")),
+    # ── لاحقًا ─────────────────────────────────────────────
+    # path("branding/", include("branding.urls")),      المرحلة ١.٥
+    # path("payments/", include("payments.urls")),      واجهات البوابات
+    # path("pos/",      include("pos.urls")),           المرحلة ٧
+    # path("finance/",  include("finance.urls")),       المرحلة ٨
+    # path("employees/", include("employees.urls")),    المرحلة ١٠
 ]
 
 urlpatterns = [

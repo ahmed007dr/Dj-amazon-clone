@@ -242,10 +242,10 @@ class TestCoupons:
 
     def test_valid_coupon_applies(self, cart, product, user, coupon):
         services.add_line(cart, product, 2, user=user)
-        result = services.apply_coupon(cart, "SAVE20")
+        snapshot = services.apply_coupon(cart, "SAVE20")
 
-        assert result.is_valid
-        assert result.discount_amount == Decimal("40.00")
+        assert snapshot.coupon_result.is_valid
+        assert snapshot.coupon_result.discount_amount == Decimal("40.00")
 
         cart.refresh_from_db()
         assert cart.coupon_code == "SAVE20"
@@ -279,9 +279,9 @@ class TestCoupons:
         )
         services.add_line(cart, product, 1, user=user)
 
-        result = services.apply_coupon(cart, "BIG50")
-        assert not result.is_valid
-        assert result.reason.value == "MINIMUM_ORDER_NOT_MET"
+        snapshot = services.apply_coupon(cart, "BIG50")
+        assert not snapshot.coupon_result.is_valid
+        assert snapshot.coupon_result.reason.value == "MINIMUM_ORDER_NOT_MET"
 
     def test_percentage_cap_is_respected(self, cart, product, user):
         Coupon.objects.create(
@@ -294,16 +294,16 @@ class TestCoupons:
         )
         services.add_line(cart, product, 5, user=user)  # ٥٠٠
 
-        result = services.apply_coupon(cart, "CAP")
-        assert result.discount_amount == Decimal("30.00")  # لا ٢٥٠
+        snapshot = services.apply_coupon(cart, "CAP")
+        assert snapshot.coupon_result.discount_amount == Decimal("30.00")  # لا ٢٥٠
 
     def test_unknown_code_is_rejected_without_raising(self, cart, product, user):
         """العميل يجرّب أكوادًا — الرفض حالة متوقعة لا خطأ."""
         services.add_line(cart, product, 1, user=user)
-        result = services.apply_coupon(cart, "NOPE")
+        snapshot = services.apply_coupon(cart, "NOPE")
 
-        assert not result.is_valid
-        assert result.reason.value == "COUPON_NOT_FOUND"
+        assert not snapshot.coupon_result.is_valid
+        assert snapshot.coupon_result.reason.value == "COUPON_NOT_FOUND"
 
 
 # ═══════════════════════════════════════════════════════════

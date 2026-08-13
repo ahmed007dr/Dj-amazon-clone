@@ -223,23 +223,28 @@ def clear(cart: Cart) -> None:
     cart.touch()
 
 
-def apply_coupon(cart: Cart, code: str) -> promotion_services.CouponResult:
+def apply_coupon(cart: Cart, code: str) -> CartSnapshot:
     """
-    تطبيق كوبون على السلة.
+    تطبيق كوبون على السلة. يعيد **اللقطة كاملة**.
 
     ⚠️  يُخزَّن **الكود** لا قيمة الخصم.
 
         تخزين القيمة يعني خصمًا محسوبًا على سلة تغيّرت بعده. الكود
         يُعاد التحقق منه عند كل عرض وعند إتمام الشراء.
+
+    ⚠️  ويُعاد اللقطة لا نتيجة الكوبون وحدها.
+
+        الكود المرفوض لا يُحفظ — فإعادة التحقق في الواجهة بعدها
+        تفقد سببَ الرفض تمامًا، ويرى العميل «حدث خطأ» بدل
+        «انتهت صلاحية الكوبون». وتوفّر تحققًا كاملًا مكررًا.
     """
     snapshot = revalidate(cart, coupon_code=code)
-    result = snapshot.coupon_result
 
-    if result and result.is_valid:
+    if snapshot.coupon_result and snapshot.coupon_result.is_valid:
         cart.coupon_code = code.strip().upper()
         cart.save(update_fields=["coupon_code"])
 
-    return result
+    return snapshot
 
 
 def remove_coupon(cart: Cart) -> None:
