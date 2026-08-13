@@ -12,6 +12,7 @@ from core.models.settings import (
     SettingValueType,
     SystemSetting,
 )
+from core.models.slug import SlugMixin, unique_slug
 from core.models.tax import TaxClass, TaxSettings
 from core.models.translatable import BilingualNameMixin, TranslatedFieldMixin
 
@@ -23,6 +24,7 @@ __all__ = [
     "BilingualNameMixin",
     "SettingGroup",
     "SettingValueType",
+    "SlugMixin",
     "SoftDeleteModel",
     "SystemSetting",
     "TaxClass",
@@ -30,5 +32,6 @@ __all__ = [
     "TimeStampedModel",
     "TranslatedFieldMixin",
     "UUIDPrimaryKeyModel",
+    "unique_slug",
     "uuid7",
 ]

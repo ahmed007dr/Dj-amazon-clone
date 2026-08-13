@@ -12,6 +12,17 @@ from django.urls import include, path
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.settings import api_settings
+
+# ⚠️  صفحة التوثيق نفسها محمية بـ IsAdminUser، وفئة التوثيق الافتراضية
+#     هي JWT وحدها — فالمتصفح لا يستطيع فتحها أصلًا ليلصق فيها توكنًا.
+#     في التطوير فقط نقبل جلسة لوحة الإدارة حتى تُفتح الصفحة بعد
+#     تسجيل الدخول في /admin/. الصلاحية IsAdminUser تبقى مفروضة كما هي،
+#     والإنتاج يبقى على JWT وحده.
+_schema_auth = list(api_settings.DEFAULT_AUTHENTICATION_CLASSES)
+if settings.DEBUG:
+    _schema_auth.append(SessionAuthentication)
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -20,6 +31,7 @@ schema_view = get_schema_view(
         description="واجهة برمجية لمنصة التجارة الطبية",
     ),
     public=False,
+    authentication_classes=_schema_auth,
     permission_classes=(permissions.IsAdminUser,),
 )
 

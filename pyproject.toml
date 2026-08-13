@@ -37,7 +37,8 @@ ignore = [
 known-first-party = [
     "core", "branding", "accounts", "customers", "administration",
     "catalog", "shipping", "access", "pricing", "inventory",
-    "reviews", "promotions", "cart", "orders", "payments", "config",
+    "reviews", "promotions", "cart", "orders", "payments",
+    "academic", "notifications", "config",
 ]
 
 # ═══════════════════════════════════════════════════════════
@@ -52,6 +53,7 @@ testpaths = [
     "core", "accounts", "customers", "administration", "branding",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
+    "academic", "notifications",
 ]
 
 [tool.coverage.run]
@@ -70,6 +72,7 @@ root_packages = [
     "core", "branding", "accounts", "customers", "administration",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
+    "academic", "notifications",
 ]
 
 [[tool.importlinter.contracts]]
@@ -87,7 +90,7 @@ layers = [
     "cart",
     "promotions",
     "pricing | inventory | reviews",
-    "customers | administration | catalog | shipping",
+    "customers | administration | academic | catalog | shipping",
     "access",
     "accounts",
     "core | branding",
@@ -131,3 +134,18 @@ source_modules = ["branding"]
 forbidden_modules = [
     "accounts", "customers", "catalog", "orders", "cart", "inventory",
 ]
+
+[[tool.importlinter.contracts]]
+name = "Nothing may import notifications"
+type = "forbidden"
+# ⚠️  النطاقات تبعث إشارات؛ `notifications` يستمع.
+#
+#     الاستيراد المباشر يعني أن `inventory` يعرف بوجود البريد،
+#     و`orders` يعرف قوالب الرسائل — وكل تغيير في الإشعارات يمس
+#     نطاقات لا علاقة لها به.
+source_modules = [
+    "core", "accounts", "customers", "administration", "academic",
+    "catalog", "shipping", "access", "pricing", "inventory",
+    "reviews", "promotions", "cart", "orders", "payments",
+]
+forbidden_modules = ["notifications"]

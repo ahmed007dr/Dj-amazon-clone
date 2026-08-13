@@ -15,11 +15,11 @@
 
 from django.core.validators import MinValueValidator
 from django.db import models
-from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
 from core.identifiers import random_filename
 from core.models.base import BaseModel
+from core.models.slug import SlugMixin
 from core.models.translatable import BilingualNameMixin
 from core.money import MoneyField
 
@@ -32,51 +32,6 @@ def catalog_image_path(instance, filename: str) -> str:
     للتعداد بالكامل.
     """
     return f"catalog/{random_filename(filename)}"
-
-
-def unique_slug(model, base: str, instance_pk=None) -> str:
-    """
-    slug فريد **وثابت**.
-
-    ⚠️  الكود القديم كان يعيد توليد الـ slug في **كل حفظ** — أي أن
-        تعديل اسم منتج يكسر رابطه وكل ما أشار إليه من فهرسة وروابط
-        خارجية. هنا يُولَّد مرة واحدة عند الإنشاء ثم لا يُمَس.
-    """
-    candidate = slugify(base, allow_unicode=True) or "item"
-    queryset = model.all_objects.filter(slug=candidate)
-    if instance_pk:
-        queryset = queryset.exclude(pk=instance_pk)
-
-    if not queryset.exists():
-        return candidate
-
-    from core.identifiers import random_code
-
-    return f"{candidate}-{random_code(5).lower()}"
-
-
-class SlugMixin(models.Model):
-    """يولّد الـ slug عند الإنشاء فقط."""
-
-    slug = models.SlugField(
-        _("المعرّف النصي"),
-        max_length=255,
-        unique=True,
-        allow_unicode=True,
-        blank=True,
-        help_text=_("يُولَّد تلقائيًا ولا يتغيّر بعدها — تغييره يكسر الروابط"),
-    )
-
-    class Meta:
-        abstract = True
-
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = unique_slug(type(self), self.slug_source(), self.pk)
-        super().save(*args, **kwargs)
-
-    def slug_source(self) -> str:
-        return getattr(self, "name_en", "") or getattr(self, "name_ar", "")
 
 
 # ═══════════════════════════════════════════════════════════

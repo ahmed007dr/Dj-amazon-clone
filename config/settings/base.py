@@ -63,6 +63,7 @@ LOCAL_APPS = [
     # L2 — الشخصيات ونطاقات الأساس
     "customers",
     "administration",
+    "academic",
     "catalog",
     "shipping",
     # L3
@@ -74,6 +75,8 @@ LOCAL_APPS = [
     "cart",
     "orders",
     "payments",
+    # مستهلك فقط — لا نطاق يستورده
+    "notifications",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

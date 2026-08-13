@@ -385,3 +385,63 @@ def abandon_stale_carts(days: int = 30) -> int:
     return Cart.objects.filter(status=CartStatus.ACTIVE, last_activity_at__lt=cutoff).update(
         status=CartStatus.ABANDONED
     )
+
+
+# ═══════════════════════════════════════════════════════════
+#  الحزم الدراسية
+# ═══════════════════════════════════════════════════════════
+
+
+@transaction.atomic
+def add_bundle(cart: Cart, bundle, *, user=None, essentials_only: bool = False) -> dict:
+    """
+    إضافة حزمة دراسية إلى السلة.
+
+    ⚠️  **يسكن هنا لا في `academic`.**
+
+        `academic` في L2 و`cart` في L5 — استدعاء السلة من هناك
+        استيراد صاعد أمسكه `import-linter`. الاتجاه الصحيح:
+        السلة تعرف الحزم، والحزم لا تعرف السلة.
+
+    ⚠️  والحزمة تُفكَّك إلى **أسطر مستقلة**.
+
+        إضافتها كصنف واحد يعني مخزونًا وهميًا لا يعكس توفر
+        مكوّناتها، وتسعيرًا لا يحترم قائمة أسعار العميل.
+
+    ⚠️  والفشل الجزئي **مقبول ومُبلَّغ عنه**.
+
+        صنف نافد من عشرة يجب ألا يمنع التسعة الباقية. رفض الحزمة
+        كاملة لأجل صنف واحد يفقد المبيعة كلها.
+    """
+    items = bundle.items.select_related("product", "variant").all()
+    if essentials_only:
+        items = [item for item in items if item.is_essential]
+
+    added, skipped = [], []
+
+    for item in items:
+        try:
+            add_line(cart, item.product, item.quantity, variant=item.variant, user=user)
+            added.append(
+                {
+                    "sku": item.product.sku,
+                    "name": item.product.name_ar,
+                    "quantity": item.quantity,
+                }
+            )
+        except BusinessError as exc:
+            skipped.append(
+                {
+                    "sku": item.product.sku,
+                    "name": item.product.name_ar,
+                    "code": exc.code,
+                    "reason": exc.error_detail or "",
+                }
+            )
+
+    return {
+        "bundle": bundle.name_ar,
+        "added": added,
+        "skipped": skipped,
+        "is_complete": not skipped,
+    }

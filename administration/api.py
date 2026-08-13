@@ -17,7 +17,6 @@ from accounts import services as account_services
 from accounts.models import AccountStatusChange, UserSession
 from administration import selectors
 from administration import serializers as s
-from core import mail
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditLog
@@ -177,11 +176,12 @@ class SuspendAccountAPI(APIView):
             actor=request.user,
             status=serializer.validated_data["status"],
         )
-        mail.send_to_user(
-            mail.ACCOUNT_SUSPENDED.key,
-            user,
-            {"reason": serializer.validated_data["reason"]},
-        )
+        # ⚠️  لا إرسال بريد هنا.
+        #
+        #     `suspend_account` ينشئ `AccountStatusChange`، ويستمع
+        #     له `notifications` فيرسل الإشعار والبريد معًا.
+        #     الإرسال هنا أيضًا كان يضاعف الرسالة — وقد أمسكه
+        #     الاختبار فور إضافة المستمع.
 
         return Response(
             s.AccountDetailSerializer(user, context=selectors.enrich_context([user.pk])).data
@@ -205,7 +205,7 @@ class ActivateAccountAPI(APIView):
             reason=serializer.validated_data.get("reason", ""),
             actor=request.user,
         )
-        mail.send_to_user(mail.ACCOUNT_ACTIVATED.key, user, {})
+        # الإشعار من مستمع `AccountStatusChange` — انظر أعلاه
 
         return Response(
             s.AccountDetailSerializer(user, context=selectors.enrich_context([user.pk])).data

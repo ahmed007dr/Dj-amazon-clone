@@ -88,6 +88,7 @@ INTERNAL_BIGINT_MODELS = {
     ("shipping", "ShipmentEvent"),
     ("orders", "OrderStatusHistory"),
     ("payments", "WebhookEvent"),
+    ("notifications", "NotificationLog"),
 }
 
 #: نماذج بمفتاح طبيعي — المفتاح نفسه هو المعنى، لا رقم تسلسلي.
