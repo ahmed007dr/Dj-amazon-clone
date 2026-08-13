@@ -53,11 +53,12 @@ api_v1 = [
     path("cart/", include("cart.urls")),
     path("orders/", include("orders.urls")),
     path("shipping/", include("shipping.urls")),
+    path("payments/", include("payments.urls")),
     # ── الإشعارات ──────────────────────────────────────────
     path("notifications/", include("notifications.urls")),
     # ── لاحقًا ─────────────────────────────────────────────
     # path("branding/", include("branding.urls")),      المرحلة ١.٥
-    # path("payments/", include("payments.urls")),      واجهات البوابات
+
     # path("pos/",      include("pos.urls")),           المرحلة ٧
     # path("finance/",  include("finance.urls")),       المرحلة ٨
     # path("employees/", include("employees.urls")),    المرحلة ١٠
