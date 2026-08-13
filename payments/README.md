@@ -1,20 +1,20 @@
-# `promotions/`
+# `payments/`
 
-> الكوبونات والعروض
+> سجل بوابات قابل للضبط من الأدمن
 
 | | |
 |---|---|
-| **الطبقة** | L4 |
-| **يعتمد على** | pricing · catalog · customers · core |
+| **الطبقة** | L7 |
+| **يعتمد على** | orders · customers · core |
 | **الحالة** | مكتمل — المرحلة ٥ |
 
 ## المسؤوليات
 
-Coupon بثلاثة مستويات حدود · CouponRedemption سجل دائم · محرك تحقق واحد
+PaymentProvider · ProviderCredential · PaymentTransaction · Refund · WebhookEvent
 
 ## القرار المحوري
 
-يستبدل نسختين متعارضتين كانتا في `orders/views.py` و`orders/api.py` (H7). `orders` يستهلك النتيجة ولا ينفّذ المحرك.
+**لا بوابة مثبتة في الكود.** إضافة بوابة = محوّل + صف في السجل — بلا مساس بأي نطاق آخر (ADR-15).
 
 ## الحدود
 

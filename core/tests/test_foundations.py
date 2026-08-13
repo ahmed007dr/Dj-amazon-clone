@@ -84,6 +84,10 @@ INTERNAL_BIGINT_MODELS = {
     ("inventory", "StockMovement"),
     # سطر جرد — تابع لجلسة الجرد
     ("inventory", "StockCountLine"),
+    # سجلات أحداث: إضافة فقط · تُقرأ بمرجع أبيها لا بمعرّفها
+    ("shipping", "ShipmentEvent"),
+    ("orders", "OrderStatusHistory"),
+    ("payments", "WebhookEvent"),
 }
 
 #: نماذج بمفتاح طبيعي — المفتاح نفسه هو المعنى، لا رقم تسلسلي.

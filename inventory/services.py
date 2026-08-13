@@ -774,3 +774,52 @@ def resolve_alerts(product, location) -> int:
     return StockAlert.objects.filter(
         resolvable, product=product, location=location, is_resolved=False
     ).update(is_resolved=True, resolved_at=timezone.now())
+
+
+# ═══════════════════════════════════════════════════════════
+#  الواجهة بالمرجع — للنطاقات العليا
+# ═══════════════════════════════════════════════════════════
+#
+#  ⚠️  `orders` و`cart` **لا يستوردان موديلات المخزون**.
+#
+#      استيراد `StockReservation` هناك للاستعلام عن حجوزات طلب
+#      يعني نطاقًا أعلى يعرف بنية جداول نطاق أدنى — فيصير أي
+#      تغيير في تلك البنية كسرًا في مكانين.
+#
+#      هذه الدوال تقبل المرجع النصي وتعيد النتيجة، فلا يحتاج
+#      المستدعي معرفة أي موديل.
+
+
+def default_location() -> StockLocation | None:
+    """الموقع الافتراضي — بلا حاجة لاستيراد `StockLocation`."""
+    return StockLocation.get_default()
+
+
+def active_reservations_for(reference_type: str, reference_id) -> list[StockReservation]:
+    return list(
+        StockReservation.objects.filter(
+            reference_type=reference_type,
+            reference_id=str(reference_id),
+            status=ReservationStatus.ACTIVE,
+        )
+    )
+
+
+@transaction.atomic
+def commit_for_reference(reference_type: str, reference_id) -> int:
+    """تنفيذ كل حجوزات مرجع — عند الشحن."""
+    count = 0
+    for reservation in active_reservations_for(reference_type, reference_id):
+        commit(reservation)
+        count += 1
+    return count
+
+
+@transaction.atomic
+def release_for_reference(reference_type: str, reference_id) -> int:
+    """الإفراج عن كل حجوزات مرجع — عند الإلغاء."""
+    count = 0
+    for reservation in active_reservations_for(reference_type, reference_id):
+        release(reservation)
+        count += 1
+    return count

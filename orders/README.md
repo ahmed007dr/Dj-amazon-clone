@@ -1,26 +1,28 @@
 # `orders/`
 
-> الطلب — معاملة تجارية مؤكدة
+> الطلب — «معاملة تجارية مؤكدة»
 
 | | |
 |---|---|
 | **الطبقة** | L6 |
 | **يعتمد على** | cart · inventory · pricing · promotions · shipping · core |
-| **الحالة** | المرحلة ٥ |
+| **الحالة** | مكتمل — المرحلة ٥ |
 
 ## المسؤوليات
 
-Order · OrderLine · state machine · channel · الإسناد · لقطة الضريبة
+Order بآلة حالة · OrderLine بلقطات · channel · location · حقول الإسناد
+
+## القرار المحوري
+
+**كل رقم لقطة تاريخية.** الفاتورة الصادرة لا تتغيّر بتغيّر الكتالوج أو الضريبة أو قوائم الأسعار.
 
 ## الحدود
 
-- الواجهة العامة الوحيدة لهذا النطاق هي **`services.py`**.
-- النطاقات الأخرى تستدعي الخدمات ولا تلمس `models.py` مطلقًا.
-- التبعية تسير للأسفل فقط — يفرضها `import-linter` في الـ CI.
+الواجهة العامة الوحيدة هي **`services.py`**. النطاقات الأخرى تستدعي
+الخدمات ولا تلمس `models.py` مطلقًا — يفرضه `import-linter` في الـ CI.
 
 ## المراجع
 
-- [خريطة النطاقات](../docs/backend/01-ARCHITECTURE.md)
-- [مخطط التبعيات وعقود الفرض](../docs/backend/02-DEPENDENCIES.md)
+- [معمارية الباك إند](../docs/backend/01-ARCHITECTURE.md)
+- [مخطط التبعيات](../docs/backend/02-DEPENDENCIES.md)
 - [نموذج البيانات](../docs/backend/07-DATA-MODEL.md)
-- [اتفاقيات الـ API](../docs/backend/08-API-CONVENTIONS.md)

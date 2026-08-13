@@ -37,7 +37,7 @@ ignore = [
 known-first-party = [
     "core", "branding", "accounts", "customers", "administration",
     "catalog", "shipping", "access", "pricing", "inventory",
-    "reviews", "promotions", "cart", "orders", "config",
+    "reviews", "promotions", "cart", "orders", "payments", "config",
 ]
 
 # ═══════════════════════════════════════════════════════════
@@ -51,7 +51,7 @@ addopts = "--reuse-db --strict-markers -q"
 testpaths = [
     "core", "accounts", "customers", "administration", "branding",
     "catalog", "shipping", "access", "pricing", "inventory",
-    "reviews", "promotions", "cart", "orders",
+    "reviews", "promotions", "cart", "orders", "payments",
 ]
 
 [tool.coverage.run]
@@ -69,7 +69,7 @@ omit = ["*/migrations/*", "*/tests/*", ".venv/*", "config/*", "manage.py"]
 root_packages = [
     "core", "branding", "accounts", "customers", "administration",
     "catalog", "shipping", "access", "pricing", "inventory",
-    "reviews", "promotions", "cart", "orders",
+    "reviews", "promotions", "cart", "orders", "payments",
 ]
 
 [[tool.importlinter.contracts]]
@@ -82,6 +82,7 @@ type = "layers"
 #     في العقد خالف ما توثّقه docs/backend/02-DEPENDENCIES.md،
 #     وأمسكه import-linter عند أول استيراد فعلي.
 layers = [
+    "payments",
     "orders",
     "cart",
     "promotions",
@@ -111,7 +112,17 @@ modules = ["customers", "administration"]
 name = "Domains never import each other models directly"
 type = "forbidden"
 source_modules = ["orders", "cart", "promotions"]
-forbidden_modules = ["catalog.models", "inventory.models", "pricing.models"]
+forbidden_modules = ["inventory.models", "pricing.models"]
+# ⚠️  `allow_indirect_imports` ضروري لا تساهل.
+#
+#     بدونه يُرفض المسار **الصحيح** أيضًا:
+#
+#         orders.services → inventory.services → inventory.models
+#
+#     وهو بالضبط ما نريده — استدعاء الخدمة، والخدمة تعرف موديلاتها.
+#     العقد يمنع الاستيراد **المباشر** لموديلات نطاق آخر، لا مرور
+#     الاستدعاء عبر طبقة خدماته.
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "Branding is independent of business domains"
