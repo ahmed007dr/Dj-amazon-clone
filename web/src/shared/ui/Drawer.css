@@ -1,0 +1,58 @@
+.drawer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-drawer);
+}
+
+.drawer__backdrop {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  background: rgb(0 0 0 / 45%);
+}
+
+.drawer__panel {
+  position: absolute;
+  inset-block: 0;
+  /* ⚠️  منطقي: يمين في RTL ويسار في LTR بلا كود اتجاهي */
+  inset-inline-start: 0;
+
+  display: grid;
+  grid-template-rows: auto 1fr;
+  inline-size: min(20rem, 85vw);
+
+  background: var(--color-surface);
+  border-inline-end: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  animation: drawer-in 180ms ease;
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(calc(-100% * var(--drawer-dir, 1)));
+  }
+}
+
+[dir='rtl'] .drawer__panel {
+  --drawer-dir: -1;
+}
+
+.drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-block-size: var(--header-height);
+  padding-inline: var(--space-4);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.drawer__head button {
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+  border-radius: var(--radius);
+}
+
+.drawer__body {
+  overflow-y: auto;
+  padding: var(--space-3);
+}

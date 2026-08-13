@@ -1,0 +1,53 @@
+.admin-sidebar {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: var(--space-2);
+  block-size: 100%;
+}
+
+.admin-sidebar__nav {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  padding: var(--space-2);
+}
+
+.admin-sidebar__group {
+  display: grid;
+  gap: 2px;
+  list-style: none;
+  padding-block-end: var(--space-3);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.admin-sidebar__group:last-child {
+  border-block-end: none;
+}
+
+.admin-sidebar__link {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  text-decoration: none;
+  border-radius: var(--radius);
+
+  /* ⚠️  شريط التحديد `inline-start` — ينتقل للحافة الصحيحة
+       تلقائيًا عند تبديل اللغة */
+  border-inline-start: 3px solid transparent;
+}
+
+.admin-sidebar__link:hover {
+  text-decoration: none;
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+
+.admin-sidebar__link.is-active {
+  font-weight: 700;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  border-inline-start-color: var(--color-primary);
+}

@@ -9,8 +9,11 @@
 # ١. مخطط الطبقات
 
 ```text
-L0   core ── branding
+L0   core                              ← بنية تحتية بحتة
        ↑
+L0.5 branding                          ← ⚠️ فوق core لا شقيقًا له
+       ↑                                  يستهلك BaseModel وrandom_filename
+       ↑                                  ولا نطاق عمل يستهلكه
 L1   accounts                          ← الهوية فقط. كل شيء يقف عليها
        ↑
 L1.5 access                            ← ⚠️ تحت catalog لا فوقه

@@ -1,0 +1,39 @@
+.list-layout {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.list-layout__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.list-layout__body {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.list-layout__content {
+  min-inline-size: 0; /* ⚠️  يمنع تجاوز عنصر شبكة لعرض الحاوية */
+}
+
+.list-layout__footer {
+  display: flex;
+  justify-content: center;
+  padding-block: var(--space-4);
+}
+
+/* الفلاتر شريط جانبي من الديسكتوب فقط */
+@media (min-width: 992px) {
+  .list-layout__body.has-filters {
+    grid-template-columns: 15rem 1fr;
+    align-items: start;
+  }
+
+  .list-layout__filters {
+    position: sticky;
+    inset-block-start: calc(var(--header-height) + var(--space-4));
+  }
+}

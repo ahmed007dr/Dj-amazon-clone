@@ -111,15 +111,14 @@ celerybeat.pid
 *.mo
 
 # ═══════════════════════════════════════════════════════════
-#  الفرونت إند — Next.js / Node
+#  الفرونت إند — React / Vite / Node
 # ═══════════════════════════════════════════════════════════
 node_modules/
-.next/
-out/
+web/dist/
+.vite/
+*.tsbuildinfo
 .turbo/
 .vercel/
-*.tsbuildinfo
-next-env.d.ts
 .eslintcache
 npm-debug.log*
 yarn-debug.log*

@@ -1,0 +1,72 @@
+.product-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.product-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.product-card__media {
+  position: relative;
+  display: grid;
+  place-items: center;
+
+  /* ⚠️  نسبة ثابتة تحجز المساحة قبل تحميل الصورة — تمنع قفز
+       التخطيط الذي يجعل المستخدم ينقر على العنصر الخطأ. */
+  aspect-ratio: 4 / 3;
+
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+  overflow: hidden;
+}
+
+.product-card__media img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+}
+
+.product-card__placeholder {
+  font-size: 2.5rem;
+  color: var(--color-text-muted);
+  opacity: 0.4;
+}
+
+.product-card__flag {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-start: var(--space-2);
+}
+
+.product-card__body {
+  display: grid;
+  gap: var(--space-1);
+  align-content: start;
+  padding: var(--space-3);
+}
+
+.product-card__name {
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+  min-block-size: 2.8em;
+}
+
+.product-card__name:hover {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.product-card__brand,
+.product-card__sku {
+  font-size: 0.8125rem;
+}
+
+.product-card__price {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}

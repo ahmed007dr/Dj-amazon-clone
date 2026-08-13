@@ -1,0 +1,43 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.15rem var(--space-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.6;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+/*
+  ⚠️  `color-mix` بدل ألوان خلفية ثابتة.
+
+      الخلفية مشتقّة من نفس الرمز، فتغيير `--color-danger` من لوحة
+      الأدمن ينقل الشارة كلها معه. لون خلفية مكتوب يدويًا يبقى
+      أحمر بعد أن يصير الخطر برتقاليًا.
+*/
+.badge--neutral {
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-text-muted) 12%, transparent);
+}
+
+.badge--success {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+}
+
+.badge--warning {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 16%, transparent);
+}
+
+.badge--danger {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+}
+
+.badge--info {
+  color: var(--color-info);
+  background: color-mix(in srgb, var(--color-info) 14%, transparent);
+}

@@ -1,0 +1,35 @@
+.category-filter__title {
+  margin-block-end: var(--space-2);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.category-filter__list {
+  display: grid;
+  gap: 2px;
+  list-style: none;
+}
+
+.category-filter__item {
+  inline-size: 100%;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+
+  /* ⚠️  منطقي — يحاذي لليمين في العربية ولليسار في الإنجليزية */
+  text-align: start;
+
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  border-radius: var(--radius);
+}
+
+.category-filter__item:hover {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+
+.category-filter__item.is-active {
+  font-weight: 700;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}

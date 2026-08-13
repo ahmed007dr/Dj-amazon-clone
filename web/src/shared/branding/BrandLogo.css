@@ -1,0 +1,36 @@
+.brand-logo {
+  inline-size: auto;
+  object-fit: contain;
+}
+
+.brand-logo--sm {
+  block-size: 1.5rem;
+}
+
+.brand-logo--md {
+  block-size: 2rem;
+}
+
+.brand-logo--lg {
+  block-size: 2.75rem;
+}
+
+.brand-logo--text {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 700;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+.brand-logo--text.brand-logo--sm {
+  font-size: 0.9375rem;
+}
+
+.brand-logo--text.brand-logo--md {
+  font-size: 1.125rem;
+}
+
+.brand-logo--text.brand-logo--lg {
+  font-size: 1.375rem;
+}

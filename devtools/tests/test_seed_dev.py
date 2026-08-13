@@ -156,6 +156,22 @@ class TestSeededData:
     def test_default_price_list_exists(self, seeded):
         assert PriceList.get_default() is not None
 
+    def test_seeded_palettes_pass_contrast(self, seeded):
+        """
+        ⚠️  اللوحة التي يرفضها فحص التباين **لا يمكن تفعيلها أصلًا**.
+
+            فبذرة بألوان فاشلة تعني نظامًا لا يقلع — والاختبار يقع
+            هنا لا في `branding` لأن البذرة تسكن `devtools`، وهي
+            فوقه في مخطط الطبقات.
+        """
+        from branding.models import BrandProfile
+
+        profile = BrandProfile.get_active()
+        assert profile is not None
+
+        for palette in profile.palettes.all():
+            palette.clean()  # لا يرفع
+
     def test_student_prices_are_independent_not_derived(self, seeded):
         """
         ⚠️  قاعدة العمل ٩ — قائمة منفصلة لا نسبة خصم.

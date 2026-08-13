@@ -1,0 +1,17 @@
+.store-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  text-decoration: none;
+}
+
+.store-logo:hover {
+  text-decoration: none;
+}
+
+.store-logo__tagline {
+  padding-inline-start: var(--space-3);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  border-inline-start: 1px solid var(--color-border);
+}

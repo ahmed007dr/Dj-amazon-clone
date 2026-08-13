@@ -1,0 +1,123 @@
+/*
+  أدوات التخطيط.
+
+  ⚠️  Mobile-first: القاعدة الأساسية للهاتف، والتوسيع بـ
+      `min-width` فقط. القاعدة المكتوبة للديسكتوب ثم المضغوطة
+      للهاتف تنتج شاشة هاتف مليئة بتجاوزات، وهي الشاشة الأكثر
+      استخدامًا في متجر الطلاب.
+
+  نقاط الكسر — موروثة، لا تُخترع غيرها:
+      sm 576  ·  md 768  ·  lg 992  ·  xl 1200  ·  xxl 1400
+*/
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.container {
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding-inline: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding-inline: var(--space-6);
+  }
+}
+
+/*
+  ⚠️  شبكة تلقائية بـ `auto-fill` لا بنقاط كسر يدوية.
+
+      `minmax(min(100%, 15rem), 1fr)` يمنع تجاوز العنصر لعرض
+      الشاشة على ٣٦٠px — وهو الخطأ الذي يسبّب التمرير الأفقي.
+*/
+.grid-auto {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+}
+
+.grid-auto-sm {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
+}
+
+/* حاوية التمرير الأفقي — الجداول والمخططات العريضة */
+.scroll-x {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* شريط تبويبات يتمرّر أفقيًا على الهاتف ويمتد على الديسكتوب */
+.tabs-scroll {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: inline mandatory;
+}
+
+.tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs-scroll > * {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+.surface {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* يظهر على الديسكتوب فقط */
+.desktop-only {
+  display: none;
+}
+
+@media (min-width: 992px) {
+  .desktop-only {
+    display: revert;
+  }
+
+  .mobile-only {
+    display: none;
+  }
+}

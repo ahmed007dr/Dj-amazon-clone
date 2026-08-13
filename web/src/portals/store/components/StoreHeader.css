@@ -1,0 +1,37 @@
+.store-header {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--z-header);
+
+  background: var(--color-surface);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.store-header__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-block-size: var(--header-height);
+}
+
+.store-header__burger {
+  display: grid;
+  place-items: center;
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+  font-size: 1.25rem;
+  border-radius: var(--radius);
+}
+
+.store-header__nav {
+  /* ⚠️  يأخذ المساحة المتبقية فتُدفع الإجراءات إلى الحافة —
+       بلا `margin-left` الذي ينكسر في RTL */
+  flex: 1;
+}
+
+.store-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}

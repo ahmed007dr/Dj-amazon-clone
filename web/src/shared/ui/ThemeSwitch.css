@@ -1,0 +1,29 @@
+.theme-switch {
+  display: inline-flex;
+  padding: 2px;
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+  border-radius: var(--radius-pill);
+}
+
+.theme-switch__option {
+  display: grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  border-radius: 50%;
+  transition: background var(--transition), color var(--transition);
+}
+
+.theme-switch__option.is-active {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
+
+@media (pointer: coarse) {
+  .theme-switch__option {
+    inline-size: var(--touch-target);
+    block-size: var(--touch-target);
+  }
+}

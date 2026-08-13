@@ -25,6 +25,7 @@ from django.db import transaction
 
 from devtools.seeds import (
     academia,
+    branding,
     catalog,
     configuration,
     logistics,
@@ -75,6 +76,11 @@ class Command(BaseCommand):
 
         self._step("الإعدادات والضرائب")
         report["configuration"] = configuration.seed()["counts"]
+
+        # ⚠️  الهوية تُبذر حتى في الوضع المختصر — الواجهة بلا ألوان
+        #     تبدو معطّلة لا «غير مضبوطة بعد».
+        self._step("الهوية البصرية")
+        report["branding"] = branding.seed()["counts"]
 
         # ⚠️  الإخراج مكتوم: الأمران يطبعان تعليماتهما الخاصة، وهي
         #     ضجيج وسط تقرير البذرة لا معلومة.

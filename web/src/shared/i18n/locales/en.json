@@ -1,0 +1,95 @@
+{
+  "common": {
+    "appName": "Medical Store",
+    "search": "Search",
+    "searchPlaceholder": "Search for a product or SKU…",
+    "loading": "Loading…",
+    "retry": "Try again",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "more": "More",
+    "all": "All",
+    "filters": "Filters",
+    "clearFilters": "Clear filters",
+    "results": "results",
+    "menu": "Menu",
+    "skipToContent": "Skip to content"
+  },
+  "language": {
+    "label": "Language",
+    "ar": "العربية",
+    "en": "English",
+    "switchTo": "Switch to {{name}}"
+  },
+  "theme": {
+    "label": "Appearance",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "toggle": "Toggle appearance"
+  },
+  "state": {
+    "emptyTitle": "No results",
+    "emptyBody": "Try adjusting your search or removing some filters.",
+    "errorTitle": "Could not load data",
+    "offlineTitle": "No connection",
+    "offlineBody": "Check your internet connection and try again.",
+    "notFoundTitle": "Page not found",
+    "notFoundBody": "The link you opened is no longer available.",
+    "forbiddenTitle": "You do not have access to this page"
+  },
+  "nav": {
+    "home": "Home",
+    "catalog": "Products",
+    "categories": "Categories",
+    "bundles": "Student bundles",
+    "cart": "Cart",
+    "orders": "My orders",
+    "account": "My account",
+    "login": "Sign in",
+    "logout": "Sign out",
+    "dashboard": "Dashboard",
+    "products": "Products",
+    "inventory": "Inventory",
+    "payments": "Payment gateways",
+    "branding": "Branding",
+    "users": "Users",
+    "settings": "Settings",
+    "pos": "Point of sale"
+  },
+  "portal": {
+    "store": "Store",
+    "account": "My account",
+    "employee": "Employee portal",
+    "admin": "Admin panel",
+    "pos": "Point of sale"
+  },
+  "catalog": {
+    "title": "Products",
+    "product": "product",
+    "sku": "SKU",
+    "brand": "Brand",
+    "category": "Category",
+    "inStock": "In stock",
+    "lowStock": "Low stock",
+    "outOfStock": "Out of stock",
+    "addToCart": "Add to cart",
+    "sortBy": "Sort by",
+    "sortNewest": "Newest",
+    "sortPriceAsc": "Price: low to high",
+    "sortPriceDesc": "Price: high to low",
+    "signInToView": "Sign in to view this product"
+  },
+  "footer": {
+    "contact": "Contact us",
+    "follow": "Follow us",
+    "rights": "All rights reserved",
+    "about": "About",
+    "policies": "Policies"
+  }
+}

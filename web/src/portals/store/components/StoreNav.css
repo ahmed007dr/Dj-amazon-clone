@@ -1,0 +1,38 @@
+.store-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.store-nav__link {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+  border-radius: var(--radius);
+}
+
+.store-nav__link:hover {
+  text-decoration: none;
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+
+.store-nav__link.is-active {
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+/* أفقي على الديسكتوب — رأسي داخل الـ Drawer على الهاتف */
+@media (min-width: 992px) {
+  .store-nav {
+    flex-direction: row;
+    gap: var(--space-2);
+  }
+
+  .store-nav__link {
+    min-block-size: 2.25rem;
+  }
+}

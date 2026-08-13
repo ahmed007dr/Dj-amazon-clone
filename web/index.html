@@ -1,0 +1,32 @@
+<!doctype html>
+<!--
+  ⚠️  `lang` و`dir` قيمتان ابتدائيتان فقط.
+
+      يضبطهما `useDirection` عند الإقلاع وعند كل تبديل لغة. تثبيتهما
+      هنا وحدهما يعني صفحة عربية بتخطيط إنجليزي للحظة أولى مرئية.
+-->
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>المتجر الطبي</title>
+
+    <!--
+      ⚠️  خطوط محلية لا طلب خارجي حاجب.
+          سقوط شبكة الخطوط الخارجية يترك النص بلا محارف عربية
+          مناسبة، وهو أسوأ من خط نظام مباشر.
+    -->
+    <style>
+      /* لون الخلفية قبل تحميل الثيم — يمنع وميضًا أبيض في الوضع الداكن */
+      :root { color-scheme: light dark; }
+      html { background: #f7f8fa; }
+      @media (prefers-color-scheme: dark) { html { background: #12161a; } }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

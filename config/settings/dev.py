@@ -31,6 +31,24 @@ MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
 
 INSTALLED_APPS += ["devtools"]
 
+
+# ── CORS — خادم Vite ───────────────────────────────────────
+# ⚠️  الفرونت إند على منفذ آخر، فكل نداء منه طلب عابر للأصل.
+#
+#     بلا هذا يحجب المتصفح **كل** استجابة بصمت — تصل ٢٠٠ من
+#     الخادم ويرفض المتصفح تسليمها للكود. والخطأ يظهر في وحدة
+#     تحكّم المتصفح لا في سجل Django، فيُبحث عنه في المكان الخطأ.
+#
+#     التطوير وحده. الإنتاج يضبطها من CORS_ALLOWED_ORIGINS صراحةً.
+
+CORS_ALLOWED_ORIGINS = env.list(
+    "CORS_ALLOWED_ORIGINS",
+    default=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+)
+
 INTERNAL_IPS = ["127.0.0.1"]
 
 

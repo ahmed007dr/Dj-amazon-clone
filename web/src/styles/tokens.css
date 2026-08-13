@@ -1,0 +1,107 @@
+/*
+  رموز التصميم.
+
+  ⚠️  الألوان هنا **قيم ابتدائية فقط** — تُستبدل وقت التشغيل من
+      `GET /api/v1/branding/theme/`. (ADR-22)
+
+      لو كُتبت كمتغيرات Sass لصار التحكم من لوحة الأدمن مستحيلًا
+      دون إعادة بناء، ولاحتاج كل ملف أنماط إعادة كتابة لاحقًا.
+      لذلك: خصائص CSS مخصّصة من اليوم الأول.
+
+  ⚠️  المسافات ونقاط الكسر **ليست** قابلة للتحكم من الأدمن.
+      تغييرها يكسر التخطيط لا يعيد تلوينه.
+*/
+
+:root {
+  /* ── الألوان: تُحقن من branding ─────────────────────── */
+  --color-primary: #2e7d32;
+  --color-on-primary: #ffffff;
+  --color-secondary: #00695c;
+  --color-accent: #a05a00;
+
+  --color-success: #2e7d32;
+  --color-warning: #a04100;
+  --color-danger: #c62828;
+  --color-info: #01579b;
+
+  --color-bg: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-border: #e3e6ea;
+  --color-text: #1b1f23;
+  --color-text-muted: #5c6670;
+
+  /* ── الخطوط: تُحقن من branding ──────────────────────── */
+  --font-ar: 'Cairo', 'Segoe UI', system-ui, sans-serif;
+  --font-en: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-active: var(--font-ar);
+  --font-size-base: 1rem;
+
+  /* ── الشكل: يُحقن من branding ───────────────────────── */
+  --radius: 0.5rem;
+  --shadow-level: 1;
+
+  /* ── المسافات: ثابتة ────────────────────────────────── */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* ── مقاييس مشتقّة ──────────────────────────────────── */
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-lg: calc(var(--radius) * 1.75);
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 6%);
+  --shadow-md: 0 2px 8px rgb(0 0 0 / 8%);
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 12%);
+
+  /* ⚠️  هدف اللمس ٤٤px — ليس تفضيلًا جماليًا بل حد إرشادات
+       الوصول. الزر الأصغر يُخطئه الإصبع على الهاتف. */
+  --touch-target: 2.75rem;
+
+  --header-height: 3.5rem;
+  --sidebar-width: 16rem;
+  --content-max: 80rem;
+
+  --transition: 150ms ease;
+
+  /* ── الطبقات ────────────────────────────────────────── */
+  --z-header: 100;
+  --z-drawer: 200;
+  --z-modal: 300;
+  --z-toast: 400;
+}
+
+/*
+  ⚠️  لوحة الوضع الداكن الافتراضية.
+
+      تُستبدل بالكامل من `branding` عند الإقلاع. وجودها هنا يمنع
+      وميضًا أبيض قبل وصول الاستجابة على شاشة داكنة.
+*/
+:root[data-theme='dark'] {
+  --color-primary: #66bb6a;
+  --color-on-primary: #0b1f10;
+  --color-secondary: #4db6ac;
+  --color-accent: #ffca28;
+
+  --color-success: #66bb6a;
+  --color-warning: #ffa726;
+  --color-danger: #ef5350;
+  --color-info: #42a5f5;
+
+  --color-bg: #12161a;
+  --color-surface: #1b2127;
+  --color-border: #2b333b;
+  --color-text: #eef2f6;
+  --color-text-muted: #9aa7b4;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-md: 0 2px 8px rgb(0 0 0 / 45%);
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 55%);
+}

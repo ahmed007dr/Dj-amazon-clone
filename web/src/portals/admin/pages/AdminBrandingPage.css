@@ -1,0 +1,35 @@
+.swatches {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+}
+
+.swatch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.swatch__chip {
+  flex: 0 0 auto;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.swatch__meta {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.swatch__token,
+.swatch__value {
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* ⚠️  الرموز لاتينية دائمًا — تُقرأ يسارًا حتى في واجهة عربية */
+  direction: ltr;
+  text-align: start;
+}

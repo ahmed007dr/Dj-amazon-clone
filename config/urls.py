@@ -39,6 +39,8 @@ schema_view = get_schema_view(
 #  /api/v1/  — تُفعَّل كل نقطة في مرحلتها
 # ═══════════════════════════════════════════════════════════
 api_v1 = [
+    # ── الهوية البصرية — يُقرأ قبل أي شيء آخر عند تحميل الواجهة ──
+    path("branding/", include("branding.urls")),
     # ── الهوية ─────────────────────────────────────────────
     path("auth/", include("accounts.urls")),
     path("customers/", include("customers.urls")),
@@ -57,7 +59,6 @@ api_v1 = [
     # ── الإشعارات ──────────────────────────────────────────
     path("notifications/", include("notifications.urls")),
     # ── لاحقًا ─────────────────────────────────────────────
-    # path("branding/", include("branding.urls")),      المرحلة ١.٥
     # path("pos/",      include("pos.urls")),           المرحلة ٧
     # path("finance/",  include("finance.urls")),       المرحلة ٨
     # path("employees/", include("employees.urls")),    المرحلة ١٠

@@ -1,0 +1,29 @@
+.lang-switch {
+  display: inline-flex;
+  padding: 2px;
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+  border-radius: var(--radius-pill);
+}
+
+.lang-switch__option {
+  min-block-size: 2rem;
+  padding-inline: var(--space-3);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-pill);
+  transition: background var(--transition), color var(--transition);
+}
+
+.lang-switch__option.is-active {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
+
+/* على الهاتف تكبر أهداف اللمس */
+@media (pointer: coarse) {
+  .lang-switch__option {
+    min-block-size: var(--touch-target);
+    min-inline-size: var(--touch-target);
+  }
+}

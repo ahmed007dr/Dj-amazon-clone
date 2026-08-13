@@ -1,0 +1,95 @@
+{
+  "common": {
+    "appName": "المتجر الطبي",
+    "search": "بحث",
+    "searchPlaceholder": "ابحث عن منتج أو رمز…",
+    "loading": "جارٍ التحميل…",
+    "retry": "إعادة المحاولة",
+    "cancel": "إلغاء",
+    "confirm": "تأكيد",
+    "save": "حفظ",
+    "close": "إغلاق",
+    "back": "رجوع",
+    "next": "التالي",
+    "previous": "السابق",
+    "more": "المزيد",
+    "all": "الكل",
+    "filters": "الفلاتر",
+    "clearFilters": "مسح الفلاتر",
+    "results": "نتيجة",
+    "menu": "القائمة",
+    "skipToContent": "تخطَّ إلى المحتوى"
+  },
+  "language": {
+    "label": "اللغة",
+    "ar": "العربية",
+    "en": "English",
+    "switchTo": "التبديل إلى {{name}}"
+  },
+  "theme": {
+    "label": "المظهر",
+    "light": "فاتح",
+    "dark": "داكن",
+    "system": "حسب الجهاز",
+    "toggle": "تبديل المظهر"
+  },
+  "state": {
+    "emptyTitle": "لا توجد نتائج",
+    "emptyBody": "جرّب تعديل البحث أو إزالة بعض الفلاتر.",
+    "errorTitle": "تعذّر تحميل البيانات",
+    "offlineTitle": "لا يوجد اتصال",
+    "offlineBody": "تحقّق من اتصالك بالإنترنت ثم أعد المحاولة.",
+    "notFoundTitle": "الصفحة غير موجودة",
+    "notFoundBody": "الرابط الذي فتحته لم يعد متاحًا.",
+    "forbiddenTitle": "لا تملك صلاحية هذه الصفحة"
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "catalog": "المنتجات",
+    "categories": "الفئات",
+    "bundles": "حزم الطلاب",
+    "cart": "السلة",
+    "orders": "طلباتي",
+    "account": "حسابي",
+    "login": "تسجيل الدخول",
+    "logout": "تسجيل الخروج",
+    "dashboard": "لوحة التحكم",
+    "products": "المنتجات",
+    "inventory": "المخزون",
+    "payments": "بوابات الدفع",
+    "branding": "الهوية البصرية",
+    "users": "المستخدمون",
+    "settings": "الإعدادات",
+    "pos": "نقطة البيع"
+  },
+  "portal": {
+    "store": "المتجر",
+    "account": "حسابي",
+    "employee": "بوابة الموظفين",
+    "admin": "لوحة الأدمن",
+    "pos": "نقطة البيع"
+  },
+  "catalog": {
+    "title": "المنتجات",
+    "product": "منتج",
+    "sku": "الرمز",
+    "brand": "البراند",
+    "category": "الفئة",
+    "inStock": "متوفر",
+    "lowStock": "كمية محدودة",
+    "outOfStock": "غير متوفر",
+    "addToCart": "أضف إلى السلة",
+    "sortBy": "ترتيب حسب",
+    "sortNewest": "الأحدث",
+    "sortPriceAsc": "السعر: من الأقل",
+    "sortPriceDesc": "السعر: من الأعلى",
+    "signInToView": "سجّل الدخول لعرض هذا المنتج"
+  },
+  "footer": {
+    "contact": "تواصل معنا",
+    "follow": "تابعنا",
+    "rights": "جميع الحقوق محفوظة",
+    "about": "عن المتجر",
+    "policies": "السياسات"
+  }
+}

@@ -1,0 +1,21 @@
+.admin-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  text-decoration: none;
+}
+
+.admin-logo:hover {
+  text-decoration: none;
+}
+
+.admin-logo__badge {
+  padding: 0.1rem var(--space-2);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}

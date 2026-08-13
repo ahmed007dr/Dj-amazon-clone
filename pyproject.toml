@@ -108,7 +108,16 @@ layers = [
     "customers | administration | academic | catalog | shipping",
     "access",
     "accounts",
-    "core | branding",
+    # ⚠️  `branding` **فوق** `core` لا شقيقًا له.
+    #
+    #     كان في نفس الطبقة حين كان تطبيقًا فارغًا، فلم يستورد شيئًا
+    #     ولم ينكشف الخطأ. أول موديل حقيقي جعله يستورد `BaseModel`
+    #     و`random_filename` — والشقيقان لا يستوردان بعضهما.
+    #
+    #     الترتيب الصحيح يعبّر عن الحقيقة: الهوية البصرية تستهلك
+    #     البنية التحتية، ولا نطاق عمل يستهلكها.
+    "branding",
+    "core",
 ]
 
 [[tool.importlinter.contracts]]
