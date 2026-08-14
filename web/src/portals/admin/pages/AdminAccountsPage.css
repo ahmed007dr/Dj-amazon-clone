@@ -1,0 +1,44 @@
+.admin-accounts__stats {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  margin-block-end: var(--space-4);
+}
+
+.admin-accounts__online {
+  padding: var(--space-4);
+  margin-block-end: var(--space-4);
+}
+
+.admin-accounts__heading {
+  margin-block-end: var(--space-3);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.admin-accounts__list {
+  display: grid;
+  gap: var(--space-2);
+  list-style: none;
+  font-size: 0.9375rem;
+}
+
+.admin-accounts__list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.admin-accounts__list span {
+  font-size: 0.8125rem;
+}
+
+.account-cell {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.account-cell span {
+  font-size: 0.8125rem;
+}

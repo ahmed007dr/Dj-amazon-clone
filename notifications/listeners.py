@@ -52,6 +52,26 @@ def _safe(handler):
 # ═══════════════════════════════════════════════════════════
 
 
+def _order_context(order) -> dict:
+    """
+    سياق قوالب بريد الطلب.
+
+    ⚠️  **كل رقم من الطلب المخزَّن** — لقطة وقت البيع (ADR-30).
+
+        إعادة حساب أي مبلغ هنا تنتج رسالة تخالف الفاتورة، والعميل
+        يقارنهما.
+    """
+    from accounts.services import frontend_url
+
+    return {
+        "number": order.number,
+        "total": f"{order.grand_total} {order.currency}",
+        "address": f"{order.governorate} — {order.city}، {order.street}",
+        "reason": order.cancellation_reason or "—",
+        "link": frontend_url(f"/orders/{order.pk}"),
+    }
+
+
 def _register_order_listeners():
     from orders.events import order_completed
     from orders.models import Order, OrderStatus
@@ -65,7 +85,9 @@ def _register_order_listeners():
             category=NotificationCategory.ORDER,
             title=f"اكتمل طلبك {order.number}",
             body=f"تم تسليم طلبك بنجاح. إجماليه {order.grand_total} جنيه.",
-            action_url=f"/account/orders/{order.pk}",
+            template_key=mail.ORDER_DELIVERED.key,
+            template_context=_order_context(order),
+            action_url=f"/orders/{order.pk}",
             reference_type="order",
             reference_id=order.pk,
         )
@@ -87,30 +109,44 @@ def _register_order_listeners():
                 category=NotificationCategory.ORDER,
                 title=f"استلمنا طلبك {instance.number}",
                 body="طلبك قيد المراجعة وسنبلغك بتأكيده.",
-                action_url=f"/account/orders/{instance.pk}",
+                template_key=mail.ORDER_PLACED.key,
+                template_context=_order_context(instance),
+                action_url=f"/orders/{instance.pk}",
                 reference_type="order",
                 reference_id=instance.pk,
             )
             return
 
+        # ⚠️  القالب جزء من الرسالة لا إضافة عليها.
+        #
+        #     المستمع كان يُنشئ إشعارًا داخل التطبيق بلا بريد، فكان
+        #     العميل الذي لا يفتح الموقع لا يعرف أن طلبه شُحن.
+        #     `notify` ترسل البريد **حين يُمرَّر قالب** — والغياب
+        #     كان يُقرأ كأنه اختيار.
         messages = {
-            OrderStatus.CONFIRMED: ("تأكد طلبك", "جارٍ تجهيز طلبك للشحن."),
-            OrderStatus.SHIPPED: ("شُحن طلبك", "طلبك في الطريق إليك."),
-            OrderStatus.DELIVERED: ("سُلّم طلبك", "نتمنى أن ينال رضاك."),
-            OrderStatus.CANCELLED: ("أُلغي طلبك", instance.cancellation_reason or ""),
+            OrderStatus.CONFIRMED: ("تأكد طلبك", "جارٍ تجهيز طلبك للشحن.", mail.ORDER_CONFIRMED),
+            OrderStatus.SHIPPED: ("شُحن طلبك", "طلبك في الطريق إليك.", mail.ORDER_SHIPPED),
+            OrderStatus.DELIVERED: ("سُلّم طلبك", "نتمنى أن ينال رضاك.", mail.ORDER_DELIVERED),
+            OrderStatus.CANCELLED: (
+                "أُلغي طلبك",
+                instance.cancellation_reason or "",
+                mail.ORDER_CANCELLED,
+            ),
         }
 
         entry = messages.get(instance.status)
         if entry is None:
             return
 
-        title, body = entry
+        title, body, template = entry
         services.notify(
             user,
             category=NotificationCategory.ORDER,
             title=f"{title} {instance.number}",
             body=body,
-            action_url=f"/account/orders/{instance.pk}",
+            template_key=template.key,
+            template_context=_order_context(instance),
+            action_url=f"/orders/{instance.pk}",
             reference_type="order",
             reference_id=instance.pk,
             priority=(

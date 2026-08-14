@@ -38,7 +38,7 @@ known-first-party = [
     "core", "branding", "accounts", "customers", "administration",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
-    "academic", "notifications", "devtools", "config",
+    "academic", "notifications", "devtools", "ops", "config",
 ]
 
 # ═══════════════════════════════════════════════════════════
@@ -53,7 +53,7 @@ testpaths = [
     "core", "accounts", "customers", "administration", "branding",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
-    "academic", "notifications", "devtools",
+    "academic", "notifications", "devtools", "ops",
 ]
 
 [tool.coverage.run]
@@ -72,7 +72,7 @@ root_packages = [
     "core", "branding", "accounts", "customers", "administration",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
-    "academic", "notifications", "devtools",
+    "academic", "notifications", "devtools", "ops",
 ]
 
 [[tool.importlinter.contracts]]
@@ -91,6 +91,13 @@ layers = [
     #     على نطاقات لا علاقة له بها فيكذب المخطط. وهي غير مثبّتة
     #     خارج بيئة التطوير أصلًا (config/settings/dev.py).
     "devtools",
+    # ⚠️  `ops` فوق نطاقات العمل وتحت `devtools`.
+    #
+    #     أوامر التشغيل تمسّ `inventory` و`cart` معًا؛ وضعها في
+    #     أحدهما يجعله يستورد الآخر، وفي `core` يجعل البنية التحتية
+    #     تعرف نطاقات العمل. ولا تصلح `devtools` لأنه غير مثبّت في
+    #     الإنتاج — والمهام الدورية تعمل هناك قبل أي مكان آخر.
+    "ops",
     "orders",
     "cart",
     # ⚠️  `payments` **تحت** `orders` لا فوقه.

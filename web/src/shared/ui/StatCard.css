@@ -1,0 +1,45 @@
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  /* شريط اللون على حافة البداية — ينتقل مع اتجاه اللغة */
+  border-inline-start: 3px solid var(--color-border);
+}
+
+.stat-card--success {
+  border-inline-start-color: var(--color-success);
+}
+
+.stat-card--warning {
+  border-inline-start-color: var(--color-warning);
+}
+
+.stat-card--danger {
+  border-inline-start-color: var(--color-danger);
+}
+
+.stat-card__icon {
+  font-size: 1.5rem;
+  opacity: 0.5;
+}
+
+.stat-card__body {
+  display: grid;
+  gap: 0.15rem;
+  min-inline-size: 0;
+}
+
+.stat-card__label {
+  font-size: 0.8125rem;
+}
+
+.stat-card__value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-card__hint {
+  font-size: 0.75rem;
+}

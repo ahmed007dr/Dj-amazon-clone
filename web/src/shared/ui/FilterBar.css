@@ -1,0 +1,36 @@
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.filter-bar__input,
+.filter-bar__select {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.filter-bar__input {
+  flex: 1;
+  min-inline-size: min(100%, 14rem);
+}
+
+.filter-bar__input:focus,
+.filter-bar__select:focus {
+  border-color: var(--color-primary);
+}
+
+.filter-bar__clear {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: underline;
+}

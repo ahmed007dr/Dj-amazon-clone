@@ -1,0 +1,20 @@
+.dashboard {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+}
+
+.dashboard__link {
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius);
+  transition: transform var(--transition);
+}
+
+.dashboard__link:hover {
+  text-decoration: none;
+}
+
+.dashboard__link:hover .stat-card {
+  border-color: var(--color-primary);
+}

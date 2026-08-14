@@ -78,6 +78,9 @@ LOCAL_APPS = [
     "orders",
     # مستهلك فقط — لا نطاق يستورده
     "notifications",
+    # ⚠️  أوامر التشغيل عابرة النطاقات — **مثبّت في الإنتاج**.
+    #     بخلاف `devtools` الذي يبقى في بيئة التطوير وحدها.
+    "ops",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

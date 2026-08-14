@@ -32,17 +32,18 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
   {
     key: 'commerce',
     links: [
+      { to: '/admin/orders', key: 'nav.orders', permission: 'orders.view_order' },
       { to: '/admin/products', key: 'nav.products', permission: 'catalog.view_product' },
       { to: '/admin/inventory', key: 'nav.inventory', permission: 'inventory.view_stock' },
-      { to: '/admin/payments', key: 'nav.payments', permission: 'payments.view_paymentprovider' },
     ],
   },
   {
     key: 'system',
     links: [
       { to: '/admin/users', key: 'nav.users', permission: 'accounts.view_user' },
+      { to: '/admin/tax', key: 'admin.tax', permission: 'core.change_taxclass' },
+      { to: '/admin/payments', key: 'nav.payments', permission: 'payments.view_paymentprovider' },
       { to: '/admin/branding', key: 'nav.branding', permission: 'branding.change_brandprofile' },
-      { to: '/admin/settings', key: 'nav.settings', permission: 'core.change_systemsetting' },
     ],
   },
 ];

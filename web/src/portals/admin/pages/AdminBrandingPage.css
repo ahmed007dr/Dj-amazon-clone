@@ -1,35 +1,95 @@
-.swatches {
+.branding-editor {
   display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-4);
+  align-items: start;
+  margin-block-start: var(--space-4);
 }
 
-.swatch {
+.branding-editor__box {
+  padding: var(--space-4);
+  margin-block-end: var(--space-4);
+}
+
+.branding-editor__title {
+  margin-block-end: var(--space-3);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.branding-editor__grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+}
+
+.branding-editor__side {
+  display: grid;
+}
+
+/*
+  ⚠️  المعاينة تستخدم متغيّراتها الخاصة (`--p-*`) لا رموز الثيم.
+
+      استخدام `--color-*` هنا يجعل التعديل يقلب لوحة الأدمن نفسها
+      أثناء التحرير — فيصير كل خطأ لون خطأً في الأداة التي يصححه بها.
+*/
+.branding-preview {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+
+  color: var(--p-text);
+  background: var(--p-bg);
+  border: 1px solid var(--p-border);
+  border-radius: var(--radius);
+}
+
+.branding-preview__title {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.branding-preview__muted {
+  font-size: 0.875rem;
+  color: var(--p-muted);
+}
+
+.branding-preview__actions {
   display: flex;
+  gap: var(--space-2);
+}
+
+.branding-preview__button {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  font-weight: 600;
+
+  color: var(--p-on-primary);
+  background: var(--p-primary);
+  border-radius: var(--radius);
 }
 
-.swatch__chip {
-  flex: 0 0 auto;
-  inline-size: 2.5rem;
-  block-size: 2.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+.branding-preview__ghost {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  font-weight: 600;
+
+  color: var(--p-text);
+  background: var(--p-surface);
+  border: 1px solid var(--p-border);
+  border-radius: var(--radius);
 }
 
-.swatch__meta {
-  display: grid;
-  min-inline-size: 0;
+.branding-preview__danger {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--p-danger);
 }
 
-.swatch__token,
-.swatch__value {
-  font-size: 0.75rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  /* ⚠️  الرموز لاتينية دائمًا — تُقرأ يسارًا حتى في واجهة عربية */
-  direction: ltr;
-  text-align: start;
+@media (min-width: 1200px) {
+  .branding-editor {
+    grid-template-columns: 1fr 24rem;
+    gap: var(--space-6);
+  }
 }

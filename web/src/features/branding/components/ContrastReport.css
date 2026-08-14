@@ -1,0 +1,50 @@
+.contrast {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.contrast__summary {
+  font-weight: 700;
+  color: var(--color-success);
+}
+
+.contrast__summary.is-failing {
+  color: var(--color-danger);
+}
+
+.contrast__list {
+  display: grid;
+  gap: var(--space-2);
+  list-style: none;
+}
+
+.contrast__row {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr auto auto;
+  gap: var(--space-3);
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.contrast__swatch {
+  display: grid;
+  place-items: center;
+  block-size: 2rem;
+  font-weight: 700;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.contrast__ratio {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  direction: ltr;
+}
+
+.contrast__ratio.is-pass {
+  color: var(--color-success);
+}
+
+.contrast__ratio.is-fail {
+  color: var(--color-danger);
+}

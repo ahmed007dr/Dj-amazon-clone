@@ -1,0 +1,47 @@
+.color-field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.color-field__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.color-field__inputs {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.color-field__picker {
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  padding: 2px;
+  cursor: pointer;
+
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.color-field__text {
+  flex: 1;
+  min-inline-size: 0;
+  min-block-size: 2.75rem;
+  padding-inline: var(--space-3);
+
+  /* الأكواد لاتينية دائمًا */
+  direction: ltr;
+  text-align: start;
+  font-family: ui-monospace, monospace;
+  text-transform: lowercase;
+
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.color-field__text:focus {
+  border-color: var(--color-primary);
+}

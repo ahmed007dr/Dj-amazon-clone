@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { AuthProvider } from '@/features/auth/AuthProvider';
 import { useDirection } from '@/shared/i18n/useDirection';
 import { ThemeProvider } from '@/shared/theme';
+import { ToastProvider } from '@/shared/ui/ToastProvider';
 
 import { queryClient } from './queryClient';
 
@@ -30,7 +31,9 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ThemeProvider>
-          <DirectionGate>{children}</DirectionGate>
+          <ToastProvider>
+            <DirectionGate>{children}</DirectionGate>
+          </ToastProvider>
         </ThemeProvider>
       </AuthProvider>
     </QueryClientProvider>

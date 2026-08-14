@@ -1,0 +1,81 @@
+.gateways {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+}
+
+.gateway {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  padding: var(--space-4);
+  /* شريط الحالة على حافة البداية — ينتقل مع اتجاه اللغة */
+  border-inline-start: 3px solid var(--color-border);
+}
+
+.gateway.is-active {
+  border-inline-start-color: var(--color-success);
+}
+
+.gateway__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.gateway__name {
+  display: block;
+  font-size: 1rem;
+}
+
+.gateway__code {
+  font-size: 0.75rem;
+  direction: ltr;
+}
+
+.gateway__facts {
+  display: grid;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+}
+
+.gateway__facts > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.gateway__facts dt {
+  color: var(--color-text-muted);
+}
+
+.gateway__facts dd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+.gateway__action {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.gateway__reason {
+  flex: 1;
+  min-inline-size: 0;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.gateway__reason:focus {
+  border-color: var(--color-primary);
+}

@@ -1,0 +1,87 @@
+.data-table__wrap {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.data-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: var(--space-3) var(--space-4);
+  /* منطقي — يحاذي لليمين في العربية ولليسار في الإنجليزية */
+  text-align: start;
+  white-space: nowrap;
+}
+
+.data-table th {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-text) 3%, transparent);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.data-table td {
+  border-block-end: 1px solid var(--color-border);
+}
+
+.data-table tbody tr:last-child td {
+  border-block-end: none;
+}
+
+.data-table .is-end {
+  text-align: end;
+}
+
+.data-table tr.is-clickable {
+  cursor: pointer;
+}
+
+.data-table tr.is-clickable:hover td {
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+}
+
+/* ── بطاقات الهاتف ─────────────────────────────────────── */
+
+.data-cards {
+  display: grid;
+  gap: var(--space-3);
+  list-style: none;
+}
+
+.data-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  font-size: 0.9375rem;
+}
+
+.data-card.is-clickable {
+  cursor: pointer;
+}
+
+.data-card.is-clickable:hover {
+  border-color: var(--color-primary);
+}
+
+.data-card__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.data-card__label {
+  flex: 0 0 auto;
+  font-size: 0.8125rem;
+}
+
+.data-card__value {
+  text-align: end;
+  min-inline-size: 0;
+}

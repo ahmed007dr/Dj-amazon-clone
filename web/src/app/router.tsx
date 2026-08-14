@@ -46,6 +46,41 @@ const AdminBrandingPage = lazy(() =>
     default: module.AdminBrandingPage,
   })),
 );
+const AdminOrdersPage = lazy(() =>
+  import('@/portals/admin/pages/AdminOrdersPage').then((module) => ({
+    default: module.AdminOrdersPage,
+  })),
+);
+const AdminOrderDetailPage = lazy(() =>
+  import('@/portals/admin/pages/AdminOrderDetailPage').then((module) => ({
+    default: module.AdminOrderDetailPage,
+  })),
+);
+const AdminProductsPage = lazy(() =>
+  import('@/portals/admin/pages/AdminProductsPage').then((module) => ({
+    default: module.AdminProductsPage,
+  })),
+);
+const AdminInventoryPage = lazy(() =>
+  import('@/portals/admin/pages/AdminInventoryPage').then((module) => ({
+    default: module.AdminInventoryPage,
+  })),
+);
+const AdminAccountsPage = lazy(() =>
+  import('@/portals/admin/pages/AdminAccountsPage').then((module) => ({
+    default: module.AdminAccountsPage,
+  })),
+);
+const AdminTaxPage = lazy(() =>
+  import('@/portals/admin/pages/AdminTaxPage').then((module) => ({
+    default: module.AdminTaxPage,
+  })),
+);
+const AdminPaymentsPage = lazy(() =>
+  import('@/portals/admin/pages/AdminPaymentsPage').then((module) => ({
+    default: module.AdminPaymentsPage,
+  })),
+);
 
 function Lazy({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<Spinner />}>{children}</Suspense>;
@@ -146,22 +181,15 @@ const router = createBrowserRouter([
       </RequireAuth>
     ),
     children: [
-      {
-        index: true,
-        element: (
-          <Lazy>
-            <AdminDashboardPage />
-          </Lazy>
-        ),
-      },
-      {
-        path: 'branding',
-        element: (
-          <Lazy>
-            <AdminBrandingPage />
-          </Lazy>
-        ),
-      },
+      { index: true, element: <Lazy><AdminDashboardPage /></Lazy> },
+      { path: 'orders', element: <Lazy><AdminOrdersPage /></Lazy> },
+      { path: 'orders/:id', element: <Lazy><AdminOrderDetailPage /></Lazy> },
+      { path: 'products', element: <Lazy><AdminProductsPage /></Lazy> },
+      { path: 'inventory', element: <Lazy><AdminInventoryPage /></Lazy> },
+      { path: 'users', element: <Lazy><AdminAccountsPage /></Lazy> },
+      { path: 'tax', element: <Lazy><AdminTaxPage /></Lazy> },
+      { path: 'payments', element: <Lazy><AdminPaymentsPage /></Lazy> },
+      { path: 'branding', element: <Lazy><AdminBrandingPage /></Lazy> },
     ],
   },
 ]);

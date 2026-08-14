@@ -192,6 +192,143 @@ ACCOUNT_ACTIVATED = register(
 
 
 # ═══════════════════════════════════════════════════════════
+#  الطلبات — القوالب المعاملاتية
+# ═══════════════════════════════════════════════════════════
+#
+#  ⚠️  **رقم الطلب في كل رسالة، ومرة في السطر الأول.**
+#
+#      العميل الذي يبحث في بريده عن طلب بعينه يبحث برقمه؛ ودفنه في
+#      منتصف فقرة يجعل البحث يفشل ويصير السؤال مكالمةً للدعم.
+#
+#  ⚠️  ولا مبالغ محسوبة هنا.
+#
+#      كل رقم يأتي جاهزًا من الطلب المخزَّن — لقطة وقت البيع
+#      (ADR-30). إعادة حسابه في القالب تنتج فاتورة تخالف السجل.
+
+ORDER_PLACED = register(
+    MailTemplate(
+        key="order_placed",
+        subject_ar="استلمنا طلبك {number}",
+        subject_en="We received your order {number}",
+        body_ar=(
+            "مرحبًا {name}،\n\n"
+            "استلمنا طلبك رقم {number} بإجمالي {total}.\n\n"
+            "سنراجعه ونبلغك فور تأكيده.\n\n"
+            "تتبّع طلبك:\n{link}"
+        ),
+        body_en=(
+            "Hello {name},\n\n"
+            "We received your order {number} totalling {total}.\n\n"
+            "We will review it and let you know once it is confirmed.\n\n"
+            "Track your order:\n{link}"
+        ),
+    )
+)
+
+ORDER_CONFIRMED = register(
+    MailTemplate(
+        key="order_confirmed",
+        subject_ar="تأكد طلبك {number}",
+        subject_en="Your order {number} is confirmed",
+        body_ar=(
+            "مرحبًا {name}،\n\n" "تأكد طلبك رقم {number} وجارٍ تجهيزه للشحن.\n\n" "تتبّع طلبك:\n{link}"
+        ),
+        body_en=(
+            "Hello {name},\n\n"
+            "Your order {number} is confirmed and is being prepared for shipping.\n\n"
+            "Track your order:\n{link}"
+        ),
+    )
+)
+
+ORDER_SHIPPED = register(
+    MailTemplate(
+        key="order_shipped",
+        subject_ar="شُحن طلبك {number}",
+        subject_en="Your order {number} has shipped",
+        body_ar=(
+            "مرحبًا {name}،\n\n"
+            "طلبك رقم {number} في الطريق إليك.\n\n"
+            "عنوان التوصيل: {address}\n\n"
+            "تتبّع طلبك:\n{link}"
+        ),
+        body_en=(
+            "Hello {name},\n\n"
+            "Your order {number} is on its way.\n\n"
+            "Delivery address: {address}\n\n"
+            "Track your order:\n{link}"
+        ),
+    )
+)
+
+ORDER_DELIVERED = register(
+    MailTemplate(
+        key="order_delivered",
+        subject_ar="سُلّم طلبك {number}",
+        subject_en="Your order {number} was delivered",
+        body_ar=(
+            "مرحبًا {name}،\n\n"
+            "سُلّم طلبك رقم {number}. نتمنى أن ينال رضاك.\n\n"
+            "إن كان هناك أي مشكلة، تواصل معنا خلال ١٤ يومًا.\n\n"
+            "{link}"
+        ),
+        body_en=(
+            "Hello {name},\n\n"
+            "Your order {number} was delivered. We hope you are happy with it.\n\n"
+            "If there is any issue, contact us within 14 days.\n\n"
+            "{link}"
+        ),
+    )
+)
+
+ORDER_CANCELLED = register(
+    MailTemplate(
+        key="order_cancelled",
+        subject_ar="أُلغي طلبك {number}",
+        subject_en="Your order {number} was cancelled",
+        body_ar=(
+            "مرحبًا {name}،\n\n"
+            "أُلغي طلبك رقم {number}.\n\n"
+            "السبب: {reason}\n\n"
+            # ⚠️  ذكر الاسترداد صراحةً: أول سؤال بعد الإلغاء هو
+            #     «وأين مالي؟»، والصمت عنه يجعله مكالمة دعم.
+            "إن كنت قد دفعت، يُعاد المبلغ خلال ٥-١٠ أيام عمل.\n\n"
+            "{link}"
+        ),
+        body_en=(
+            "Hello {name},\n\n"
+            "Your order {number} was cancelled.\n\n"
+            "Reason: {reason}\n\n"
+            "If you have paid, the amount is refunded within 5-10 business days.\n\n"
+            "{link}"
+        ),
+    )
+)
+
+PAYMENT_RECEIVED = register(
+    MailTemplate(
+        key="payment_received",
+        subject_ar="تأكيد استلام الدفع — طلب {number}",
+        subject_en="Payment received — order {number}",
+        body_ar=(
+            "مرحبًا {name}،\n\n"
+            "استلمنا دفعة بقيمة {total} لطلبك رقم {number}.\n\n"
+            "طريقة الدفع: {method}\n"
+            "المرجع: {reference}\n\n"
+            "{link}"
+        ),
+        body_en=(
+            "Hello {name},\n\n"
+            "We received a payment of {total} for your order {number}.\n\n"
+            "Payment method: {method}\n"
+            "Reference: {reference}\n\n"
+            "{link}"
+        ),
+    )
+)
+
+
+# ═══════════════════════════════════════════════════════════
 #  الإرسال
 # ═══════════════════════════════════════════════════════════
 

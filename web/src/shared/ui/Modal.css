@@ -1,0 +1,67 @@
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+
+.modal__backdrop {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  background: rgb(0 0 0 / 50%);
+}
+
+.modal__panel {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+
+  inline-size: min(100%, 34rem);
+  max-block-size: min(90dvh, 48rem);
+
+  box-shadow: var(--shadow-lg);
+  animation: modal-in 160ms ease;
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+.modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.modal__title {
+  font-size: 1.0625rem;
+  font-weight: 700;
+}
+
+.modal__head button {
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+  border-radius: var(--radius);
+}
+
+.modal__body {
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+.modal__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-block-start: 1px solid var(--color-border);
+}

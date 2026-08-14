@@ -1,0 +1,42 @@
+.status-tabs {
+  border-block-end: 1px solid var(--color-border);
+}
+
+.status-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-4);
+
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+
+  border-block-end: 2px solid transparent;
+  transition: color var(--transition), border-color var(--transition);
+}
+
+.status-tab:hover {
+  color: var(--color-text);
+}
+
+.status-tab.is-active {
+  color: var(--color-primary);
+  border-block-end-color: var(--color-primary);
+}
+
+.status-tab__count {
+  padding-inline: var(--space-2);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  background: color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-radius: var(--radius-pill);
+}
+
+.status-tab.is-active .status-tab__count {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
