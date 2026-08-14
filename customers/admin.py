@@ -1,0 +1,115 @@
+"""لوحة ملفات العملاء."""
+
+from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
+
+from core.admin import DeletedListFilter, DomainModelAdmin
+from customers.models import CustomerAddress, CustomerDocument, CustomerProfile
+
+
+class CustomerDocumentInline(admin.TabularInline):
+    model = CustomerDocument
+    extra = 0
+    fields = ("document_type", "file", "status", "expires_at", "reviewed_by", "reviewed_at")
+    readonly_fields = ("reviewed_by", "reviewed_at")
+    autocomplete_fields = ("reviewed_by",)
+    show_change_link = True
+
+
+class CustomerAddressInline(admin.TabularInline):
+    model = CustomerAddress
+    extra = 0
+    fields = ("label", "recipient_name", "phone", "governorate", "city", "is_default")
+    show_change_link = True
+
+
+@admin.register(CustomerProfile)
+class CustomerProfileAdmin(DomainModelAdmin):
+    list_display = (
+        "customer_number",
+        "display_name_ar",
+        "user",
+        "segment",
+        "total_orders",
+        "total_spent",
+        "last_order_at",
+        "is_deleted",
+    )
+    list_filter = ("segment", "tax_exempt", "accepts_marketing", "created_at", DeletedListFilter)
+    list_select_related = ("user",)
+    search_fields = (
+        "customer_number",
+        "display_name_ar",
+        "display_name_en",
+        "user__email",
+        "user__phone",
+        "tax_number",
+    )
+    autocomplete_fields = ("user",)
+    date_hierarchy = "created_at"
+    inlines = (CustomerAddressInline, CustomerDocumentInline)
+
+    # ⚠️  الإجماليات مشتقة — تكتبها خدمة الطلبات. تعديلها هنا يكذب التقارير.
+    #     ورقم العميل يولّده النطاق عند الإنشاء ولا يُمسّ.
+    readonly_fields = (
+        "id",
+        "created_at",
+        "updated_at",
+        "deleted_at",
+        "customer_number",
+        "total_orders",
+        "total_spent",
+        "first_order_at",
+        "last_order_at",
+    )
+
+    fieldsets = (
+        (None, {"fields": ("id", "user", "customer_number", "segment")}),
+        (_("الاسم"), {"fields": ("display_name_ar", "display_name_en")}),
+        (
+            _("البيانات التجارية"),
+            {"fields": ("tax_number", "tax_exempt", "commercial_register")},
+        ),
+        (_("التسويق والملاحظات"), {"fields": ("accepts_marketing", "notes")}),
+        (
+            _("إحصاءات مشتقة"),
+            {"fields": ("total_orders", "total_spent", "first_order_at", "last_order_at")},
+        ),
+        (_("تواريخ"), {"fields": ("created_at", "updated_at", "deleted_at")}),
+    )
+
+
+@admin.register(CustomerDocument)
+class CustomerDocumentAdmin(DomainModelAdmin):
+    list_display = (
+        "customer",
+        "document_type",
+        "status",
+        "expires_at",
+        "reviewed_by",
+        "reviewed_at",
+        "is_deleted",
+    )
+    list_filter = ("document_type", "status", "created_at", DeletedListFilter)
+    list_select_related = ("customer", "reviewed_by")
+    search_fields = ("customer__customer_number", "customer__user__email")
+    autocomplete_fields = ("customer", "reviewed_by")
+    date_hierarchy = "created_at"
+
+
+@admin.register(CustomerAddress)
+class CustomerAddressAdmin(DomainModelAdmin):
+    list_display = (
+        "customer",
+        "label",
+        "recipient_name",
+        "phone",
+        "governorate",
+        "city",
+        "is_default",
+        "is_deleted",
+    )
+    list_filter = ("governorate", "is_default", DeletedListFilter)
+    list_select_related = ("customer",)
+    search_fields = ("recipient_name", "phone", "city", "customer__customer_number")
+    autocomplete_fields = ("customer",)
