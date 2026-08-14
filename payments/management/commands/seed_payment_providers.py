@@ -59,7 +59,46 @@ PROVIDERS = [
         "is_sandbox": False,
         "is_active": True,
     },
+    # ── البوابات الخارجية — **موقوفة حتى تُضاف المفاتيح** ──
+    #
+    # ⚠️  تُبذر موقوفة وفي وضع التجريب عمدًا.
+    #
+    #     تفعيلها بلا مفاتيح يجعل العميل يختارها ثم يفشل دفعه؛
+    #     ووضع الإنتاج بلا اختبار يحصّل مالًا حقيقيًا في أول تجربة.
+    #     الأدمن يضيف المفاتيح من اللوحة ثم يفعّلها.
+    {
+        "code": "paymob",
+        "adapter_key": "paymob",
+        "name_ar": "Paymob — بطاقة ومحفظة",
+        "name_en": "Paymob — card and wallet",
+        "supported_methods": [
+            PaymentMethodKind.CARD,
+            PaymentMethodKind.WALLET,
+            PaymentMethodKind.INSTALLMENT,
+        ],
+        "supported_channels": [ONLINE],
+        "priority": 80,
+        "is_sandbox": True,
+        "is_active": False,
+    },
+    {
+        "code": "fawry",
+        "adapter_key": "fawry",
+        "name_ar": "فوري",
+        "name_en": "Fawry",
+        "supported_methods": [PaymentMethodKind.CARD, PaymentMethodKind.WALLET],
+        "supported_channels": [ONLINE],
+        "priority": 70,
+        "is_sandbox": True,
+        "is_active": False,
+    },
 ]
+
+#: المفاتيح المطلوبة لكل بوابة خارجية — تُعرض في تعليمات التشغيل
+REQUIRED_CREDENTIALS = {
+    "paymob": ["api_key", "integration_id", "iframe_id", "hmac_secret"],
+    "fawry": ["merchant_code", "secure_key"],
+}
 
 
 class Command(BaseCommand):
@@ -73,17 +112,43 @@ class Command(BaseCommand):
             payload = dict(spec)
             code = payload.pop("code")
 
+            existing = PaymentProvider.objects.filter(code=code).first()
+
+            # ⚠️  **التشغيل والإيقاف قرار الأدمن لا قرار البذرة.**
+            #
+            #     الشكل السابق كان يفرض `is_active` من هذا الملف في
+            #     كل تشغيل — أي أن إعادة بذر بعد أن يضيف الأدمن
+            #     مفاتيح Paymob ويفعّلها تُوقفها ثانيةً بصمت،
+            #     فيتوقّف الدفع بالبطاقة بلا سبب ظاهر.
+            #
+            #     القيمة المبذورة تسري على **الإنشاء الأول** فقط.
+            if existing is not None:
+                payload.pop("is_active", None)
+                payload.pop("is_sandbox", None)
+
             _, was_created = PaymentProvider.objects.update_or_create(code=code, defaults=payload)
             created += was_created
             updated += not was_created
 
         self.stdout.write(self.style.SUCCESS(f"بوابات الدفع: {created} جديدة · {updated} محدَّثة"))
-        self.stdout.write(
-            "\nلإضافة بوابة خارجية (Paymob · Fawry · Stripe):\n"
-            "  ١. أضف محوّلًا في payments/adapters.py يرث PaymentAdapter\n"
-            "  ٢. سجّله بـ register()\n"
-            "  ٣. أنشئ البوابة من لوحة الأدمن واختر المحوّل\n"
-            "  ٤. أضف بيانات الاعتماد\n"
-            "  ٥. فعّلها\n"
-            "\nالخطوة ١ وحدها تحتاج مطوّرًا — الباقي من اللوحة."
-        )
+
+        pending = PaymentProvider.objects.filter(
+            code__in=REQUIRED_CREDENTIALS, is_active=False
+        ).values_list("code", flat=True)
+
+        if pending:
+            self.stdout.write("\nبوابات خارجية موقوفة بانتظار المفاتيح:")
+            for code in pending:
+                keys = " · ".join(REQUIRED_CREDENTIALS[code])
+                self.stdout.write(f"  {code:8} ← {keys}")
+
+            self.stdout.write(
+                "\n  التشغيل:\n"
+                "    ١. افتح حساب البيئة التجريبية لدى المزوّد\n"
+                "    ٢. أضف المفاتيح من لوحة الأدمن (وضع تجريبي)\n"
+                "    ٣. نفّذ عملية كاملة: دفع · ويب‌هوك · استرداد\n"
+                "    ٤. حوّلها إلى وضع الإنتاج ثم فعّلها\n"
+                "\n  ⚠️  المحوّلان مكتوبان ولم يُختبرا مقابل حساب حقيقي.\n"
+                "     الاستجابة الخام تُحفَظ كاملة، فأي اسم حقل مختلف\n"
+                "     يظهر في أول عملية تجريبية."
+            )

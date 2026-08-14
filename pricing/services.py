@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -22,6 +23,8 @@ from django.utils import timezone
 from core.models.tax import TaxClass, TaxSettings
 from core.money import ZERO, apply_rate, quantize
 from pricing.models import DiscountKind, PriceList, PriceOverride, PriceRule
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -192,15 +195,46 @@ def _tax_rate_for(product) -> tuple[Decimal, str]:
 
     ⚠️  تُقرأ **الآن** وتُنسخ إلى السطر. تغيّرها لاحقًا لا يمس
         الفواتير الصادرة. (ADR-30)
+
+    ⚠️  **الصفر ينتج عن قرار صريح لا عن غياب.**
+
+        الشكل السابق كان: فئة انتهت صلاحيتها ⟵ صفر. وهذا فخّ
+        صامت — الأدمن يضبط `valid_to` عند تغيير النسبة وينسى
+        إعادة تصنيف المنتجات، فتصير كلها معفاة بلا أي تنبيه،
+        ولا يُكتشف إلا في مراجعة ضريبية. ونقص التحصيل مسؤولية
+        قانونية بخلاف زيادته.
+
+        الصفر الآن ثلاث حالات **فقط**:
+          ١. النظام الضريبي موقوف كليًا  (`tax.enabled = false`)
+          ٢. فئة المنتج نسبتها صفر فعلًا (معفى · صفري)
+          ٣. لا فئة افتراضية سارية في النظام إطلاقًا
+
+        أما الفئة المنتهية فتسقط إلى الافتراضية السارية ويُسجَّل
+        تحذير — أعلى فاتورةً وأقل خطرًا من الصمت.
     """
     if not TaxSettings.is_enabled():
         return ZERO, ""
 
-    tax_class = getattr(product, "tax_class", None) or TaxClass.get_default()
-    if tax_class is None or not tax_class.is_currently_valid:
+    assigned = getattr(product, "tax_class", None)
+
+    if assigned is not None and assigned.is_currently_valid:
+        return assigned.rate, assigned.code
+
+    if assigned is not None:
+        logger.warning(
+            "الفئة الضريبية %s للمنتج %s خارج فترة سريانها — سقوط إلى الافتراضية",
+            assigned.code,
+            getattr(product, "sku", product.pk),
+        )
+
+    fallback = TaxClass.get_default()
+    if fallback is None or not fallback.is_currently_valid:
+        # ⚠️  نظام بلا فئة افتراضية سارية: الصفر هو السلوك الوحيد
+        #     الممكن، والتحذير هو ما يجعله مرئيًا.
+        logger.warning("لا فئة ضريبية افتراضية سارية — التسعير بلا ضريبة")
         return ZERO, ""
 
-    return tax_class.rate, tax_class.code
+    return fallback.rate, fallback.code
 
 
 # ═══════════════════════════════════════════════════════════

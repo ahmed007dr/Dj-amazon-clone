@@ -53,9 +53,45 @@ def admin_client(db):
 
 @pytest.mark.django_db
 class TestMultipleProviders:
-    def test_seed_creates_three_working_providers(self, providers):
-        assert set(providers) == {"cod", "cash", "bank"}
-        assert all(p.is_active for p in providers.values())
+    def test_seed_activates_only_what_can_actually_work(self, providers):
+        """
+        ⚠️  البوابات الخارجية تُبذر **موقوفة**.
+
+            تفعيل Paymob أو Fawry بلا مفاتيح يجعل العميل يختارها
+            ثم يفشل دفعه بعد أن أدخل بياناته. الجاهز فورًا هو ما
+            لا يحتاج حسابًا خارجيًا.
+        """
+        working = {code for code, p in providers.items() if p.is_active}
+        awaiting = {code for code, p in providers.items() if not p.is_active}
+
+        assert working == {"cod", "cash", "bank"}
+        assert awaiting == {"paymob", "fawry"}
+
+    def test_external_gateways_start_in_sandbox(self, providers):
+        """وضع الإنتاج بلا اختبار يحصّل مالًا حقيقيًا في أول تجربة."""
+        assert providers["paymob"].is_sandbox
+        assert providers["fawry"].is_sandbox
+
+    def test_reseeding_does_not_disable_a_gateway_the_admin_enabled(self, providers, db):
+        """
+        ⚠️  **الفخّ الذي أُصلح.**
+
+            كانت البذرة تفرض `is_active` في كل تشغيل — أي أن إعادة
+            بذر بعد أن يضيف الأدمن مفاتيح Paymob ويفعّلها تُوقفها
+            ثانيةً بصمت، فيتوقّف الدفع بالبطاقة بلا سبب ظاهر.
+        """
+        from django.core.management import call_command
+
+        paymob = providers["paymob"]
+        paymob.is_active = True
+        paymob.is_sandbox = False
+        paymob.save()
+
+        call_command("seed_payment_providers", verbosity=0)
+
+        paymob.refresh_from_db()
+        assert paymob.is_active, "البذرة أوقفت بوابة فعّلها الأدمن"
+        assert not paymob.is_sandbox, "البذرة أعادتها إلى وضع التجريب"
 
     def test_customer_sees_only_channel_appropriate_methods(self, providers):
         """

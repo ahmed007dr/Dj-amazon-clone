@@ -183,7 +183,9 @@ class OrderAdmin(DomainModelAdmin):
             try:
                 action(order)
                 done += 1
-            except Exception as exc:  # noqa: BLE001 — نعرض سبب الرفض كما هو
+            # ⚠️  الالتقاط العام مقصود: نعرض سبب الرفض كما هو بدل
+            #     إسقاط الإجراء الجماعي كله على أول طلب يرفضه.
+            except Exception as exc:
                 failed.append(f"{order.number}: {exc}")
 
         if done:

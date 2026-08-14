@@ -2,7 +2,7 @@
 
 from django.urls import path
 
-from administration import api
+from administration import api, tax_api
 
 app_name = "administration"
 
@@ -38,4 +38,17 @@ urlpatterns = [
         name="account-activity",
     ),
     path("audit-log/", api.AuditLogListAPI.as_view(), name="audit-log"),
+    # ── الضريبة — نسبة متغيّرة · فئات معفاة · إيقاف كلي ────
+    path("tax/settings/", tax_api.TaxSettingsAPI.as_view(), name="tax-settings"),
+    path("tax/classes/", tax_api.TaxClassListCreateAPI.as_view(), name="tax-classes"),
+    path(
+        "tax/classes/<uuid:pk>/",
+        tax_api.TaxClassDetailAPI.as_view(),
+        name="tax-class-detail",
+    ),
+    path(
+        "tax/classes/<uuid:pk>/set-default/",
+        tax_api.SetDefaultTaxClassAPI.as_view(),
+        name="tax-class-set-default",
+    ),
 ]
