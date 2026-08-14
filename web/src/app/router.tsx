@@ -5,8 +5,12 @@ import { RequireAuth } from '@/features/auth/components/RequireAuth';
 import { isAdmin } from '@/features/auth/permissions';
 import { NotFoundPage } from '@/portals/store/pages/NotFoundPage';
 import { StoreShell } from '@/portals/store/StoreShell';
+import { CartPage } from '@/portals/store/pages/CartPage';
+import { CheckoutPage } from '@/portals/store/pages/CheckoutPage';
 import { HomePage } from '@/portals/store/pages/HomePage';
 import { LoginPage } from '@/portals/store/pages/LoginPage';
+import { OrderDetailPage } from '@/portals/store/pages/OrderDetailPage';
+import { OrdersPage } from '@/portals/store/pages/OrdersPage';
 import { ProductsPage } from '@/portals/store/pages/ProductsPage';
 import { Spinner } from '@/shared/ui/Spinner';
 
@@ -44,6 +48,37 @@ const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: 'products', element: <ProductsPage /> },
       { path: 'login', element: <LoginPage /> },
+
+      // ⚠️  السلة **عامة**: الزائر يتسوّق قبل أن يسجّل، وإجباره على
+      //     التسجيل ليضيف صنفًا يفقد المبيعة عند أعلى نقطة نية شراء.
+      { path: 'cart', element: <CartPage /> },
+
+      // إتمام الشراء وحده يحتاج حسابًا — الطلب يلزمه مالك
+      {
+        path: 'checkout',
+        element: (
+          <RequireAuth>
+            <CheckoutPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: 'orders',
+        element: (
+          <RequireAuth>
+            <OrdersPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: 'orders/:id',
+        element: (
+          <RequireAuth>
+            <OrderDetailPage />
+          </RequireAuth>
+        ),
+      },
+
       { path: '*', element: <NotFoundPage /> },
     ],
   },

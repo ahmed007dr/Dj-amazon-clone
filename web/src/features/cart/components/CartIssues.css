@@ -1,0 +1,11 @@
+.cart-issues__title {
+  margin-block-end: var(--space-2);
+  font-weight: 700;
+}
+
+.cart-issues__list {
+  display: grid;
+  gap: var(--space-1);
+  padding-inline-start: var(--space-5);
+  font-size: 0.9375rem;
+}

@@ -1,0 +1,31 @@
+.cart-page {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+  margin-block-start: var(--space-4);
+}
+
+.cart-page__lines {
+  min-inline-size: 0;
+}
+
+.cart-page__coupon {
+  padding-block-start: var(--space-5);
+}
+
+.cart-page__blocked {
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.cart-page__link {
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (min-width: 992px) {
+  .cart-page {
+    grid-template-columns: 1fr 20rem;
+    gap: var(--space-8);
+  }
+}

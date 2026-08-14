@@ -1,0 +1,123 @@
+.order-detail {
+  display: grid;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.order-detail__lines {
+  padding: var(--space-2) var(--space-4);
+  min-inline-size: 0;
+}
+
+.order-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'info total'
+    'qty  qty';
+  gap: var(--space-1) var(--space-3);
+  align-items: center;
+
+  padding-block: var(--space-3);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.order-line:last-child {
+  border-block-end: none;
+}
+
+.order-line__info {
+  grid-area: info;
+  display: grid;
+  gap: 0.1rem;
+  min-inline-size: 0;
+}
+
+.order-line__info span {
+  font-size: 0.8125rem;
+}
+
+.order-line__qty {
+  grid-area: qty;
+  font-size: 0.875rem;
+}
+
+.order-line__total {
+  grid-area: total;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.order-detail__side {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.order-detail__box {
+  padding: var(--space-4);
+}
+
+.order-detail__heading {
+  margin-block-end: var(--space-3);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.order-detail__rows {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.order-detail__rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.order-detail__rows dd {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.order-detail__total {
+  padding-block-start: var(--space-3);
+  border-block-start: 1px solid var(--color-border);
+  font-size: 1.0625rem;
+}
+
+.order-detail__total dt,
+.order-detail__total dd {
+  font-weight: 700;
+}
+
+.order-detail__address {
+  display: grid;
+  gap: 0.15rem;
+  font-style: normal;
+  font-size: 0.9375rem;
+}
+
+.order-detail__timeline {
+  display: grid;
+  gap: var(--space-2);
+  list-style: none;
+  font-size: 0.875rem;
+}
+
+.order-detail__timeline li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+@media (min-width: 992px) {
+  .order-detail {
+    grid-template-columns: 1fr 20rem;
+    gap: var(--space-6);
+  }
+
+  .order-line {
+    grid-template-columns: 1fr auto auto;
+    grid-template-areas: 'info qty total';
+  }
+}

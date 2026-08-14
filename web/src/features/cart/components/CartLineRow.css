@@ -1,0 +1,104 @@
+/*
+  ⚠️  شبكة تتحوّل لا جدول مضغوط.
+
+      الجدول على ٣٦٠px إما يتمرّر أفقيًا أو يضغط الاسم إلى حرفين.
+      البطاقة تُبقي التسلسل المعلوماتي واضحًا: صورة · اسم · تحكّم.
+*/
+.cart-line {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  grid-template-areas:
+    'media info'
+    'controls total';
+  gap: var(--space-3);
+  align-items: start;
+
+  padding-block: var(--space-4);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.cart-line.is-pending {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.cart-line__media {
+  grid-area: media;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  overflow: hidden;
+
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+  border-radius: var(--radius);
+}
+
+.cart-line__media img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+}
+
+.cart-line__info {
+  grid-area: info;
+  display: grid;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.cart-line__name {
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.cart-line__name:hover {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.cart-line__sku {
+  font-size: 0.8125rem;
+}
+
+.cart-line__unit {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+}
+
+.cart-line__controls {
+  grid-area: controls;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.cart-line__remove {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-danger);
+  text-decoration: underline;
+}
+
+.cart-line__total {
+  grid-area: total;
+  font-weight: 700;
+  text-align: end;
+  align-self: center;
+}
+
+@media (min-width: 768px) {
+  .cart-line {
+    grid-template-columns: 5rem 1fr auto auto;
+    grid-template-areas: 'media info controls total';
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .cart-line__total {
+    min-inline-size: 7rem;
+  }
+}

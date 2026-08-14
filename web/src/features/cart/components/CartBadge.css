@@ -1,0 +1,40 @@
+.cart-badge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+
+  color: var(--color-text);
+  text-decoration: none;
+  border-radius: var(--radius);
+}
+
+.cart-badge:hover {
+  text-decoration: none;
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+
+.cart-badge__icon {
+  font-size: 1.25rem;
+}
+
+.cart-badge__count {
+  position: absolute;
+  inset-block-start: 0.25rem;
+  /* منطقي — ينتقل إلى الزاوية الصحيحة عند تبديل اللغة */
+  inset-inline-end: 0.15rem;
+
+  min-inline-size: 1.15rem;
+  padding-inline: 0.25rem;
+
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.15rem;
+  text-align: center;
+  direction: ltr;
+
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-radius: var(--radius-pill);
+}

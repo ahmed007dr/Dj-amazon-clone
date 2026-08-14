@@ -110,6 +110,14 @@ MIDDLEWARE = [
 # ═══════════════════════════════════════════════════════════
 
 CORS_ALLOW_CREDENTIALS = True
+# ⚠️  كل ترويسة مخصّصة يقرأها الخادم **يجب** أن تُدرَج هنا.
+#
+#     الترويسة غير المدرَجة تجعل المتصفح يرفض الطلب في مرحلة
+#     الفحص المبدئي (preflight) — فلا يصل النداء إلى Django أصلًا،
+#     ولا يظهر شيء في سجلّه. المطوّر يبحث عن الخطأ في الخادم بينما
+#     هو في المتصفح.
+#
+#     المدرَجة أدناه يقرؤها: cart/api.py · access/preview.py
 CORS_ALLOW_HEADERS = [
     "accept",
     "accept-language",
@@ -117,6 +125,11 @@ CORS_ALLOW_HEADERS = [
     "content-type",
     "idempotency-key",
     "x-requested-with",
+    # سلة الزائر — قبل التسجيل
+    "x-cart-session",
+    # وضع معاينة الأدمن (قراءة فقط · مُدقَّق)
+    "x-preview-as",
+    "x-preview-verified",
 ]
 
 ROOT_URLCONF = "config.urls"

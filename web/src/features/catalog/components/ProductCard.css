@@ -70,3 +70,7 @@
   font-weight: 700;
   color: var(--color-primary);
 }
+
+.product-card__action {
+  margin-block-start: var(--space-2);
+}

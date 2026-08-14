@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
+import { AddToCartButton } from '@/features/cart/components/AddToCartButton';
 import { mediaUrl } from '@/shared/http';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { formatMoney } from '@/shared/utils/format';
@@ -60,6 +61,10 @@ export function ProductCard({ product }: { product: ProductListItem }) {
         <p className="product-card__sku muted">
           {t('catalog.sku')}: {product.sku}
         </p>
+
+        <div className="product-card__action">
+          <AddToCartButton productId={product.id} block />
+        </div>
       </div>
     </article>
   );

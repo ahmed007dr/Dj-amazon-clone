@@ -1,0 +1,63 @@
+.orders-list {
+  display: grid;
+  gap: var(--space-3);
+  list-style: none;
+}
+
+.order-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'number total'
+    'badges badges'
+    'meta   meta';
+  gap: var(--space-2);
+  align-items: center;
+
+  padding: var(--space-4);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: border-color var(--transition);
+}
+
+.order-row:hover {
+  text-decoration: none;
+  border-color: var(--color-primary);
+}
+
+.order-row__number {
+  grid-area: number;
+  font-weight: 700;
+  direction: ltr;
+  text-align: start;
+}
+
+.order-row__badges {
+  grid-area: badges;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.order-row__meta {
+  grid-area: meta;
+  font-size: 0.8125rem;
+}
+
+.order-row__total {
+  grid-area: total;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .order-row {
+    grid-template-columns: auto 1fr auto auto;
+    grid-template-areas: 'number badges meta total';
+    gap: var(--space-4);
+  }
+
+  .order-row__meta {
+    text-align: end;
+  }
+}

@@ -1,7 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
+import { mergeGuestCart } from '@/features/cart/api';
+import { CART_KEY } from '@/features/cart/hooks';
 import { registerRefreshHandler, setAccessToken } from '@/shared/http';
+import { getGuestCartSession } from '@/shared/http/guestSession';
 
 import * as api from './api';
 import { AuthContext, type AuthContextValue } from './AuthContext';
@@ -104,9 +107,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await api.login(payload);
       applyTokens(response.access, response.refresh);
       setUser(response.user);
+
+      // ⚠️  دمج سلة الزائر **فور** الدخول.
+      //
+      //     الزائر ملأ سلته ثم سجّل ليشتري؛ فقدانها هنا يحدث في
+      //     أسوأ لحظة ممكنة — بعد أن أثبت نيّته وقبل أن يدفع.
+      //
+      //     والفشل لا يُوقف الدخول: حساب لا يُفتح لأن دمج سلة فشل
+      //     خسارة أكبر من سلة ضائعة.
+      try {
+        const merged = await mergeGuestCart(getGuestCartSession());
+        queryClient.setQueriesData({ queryKey: CART_KEY }, merged);
+      } catch {
+        void queryClient.invalidateQueries({ queryKey: CART_KEY });
+      }
+
       return response.user;
     },
-    [applyTokens],
+    [applyTokens, queryClient],
   );
 
   const signOut = useCallback(async () => {

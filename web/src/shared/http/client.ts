@@ -11,6 +11,7 @@
 
 import { BASE_URL } from './config';
 import { ApiError } from './errors';
+import { getGuestCartSession } from './guestSession';
 import { getAccessToken, onUnauthorized } from './session';
 
 type Query = Record<string, string | number | boolean | undefined | null>;
@@ -73,6 +74,14 @@ async function request<T>(
   if (token && !options.skipAuthRefresh) {
     headers.Authorization = `Bearer ${token}`;
   }
+
+  // ⚠️  ترويسة سلة الزائر تُرسَل **دائمًا**، حتى للمسجَّل.
+  //
+  //     الخادم يتجاهلها حين يجد توكنًا؛ ووجودها هو ما يسمح بدمج
+  //     سلة الزائر مع سلة الحساب لحظة الدخول. إرسالها للزائر وحده
+  //     يعني أن السلة تُفقد عند تسجيل الدخول — وهي أسوأ لحظة
+  //     ممكنة لفقدها.
+  headers['X-Cart-Session'] = getGuestCartSession();
 
   const isFormData = options.body instanceof FormData;
   if (options.body !== undefined && !isFormData) {
