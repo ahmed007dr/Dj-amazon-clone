@@ -1,0 +1,30 @@
+.cancel-order {
+  display: grid;
+  gap: var(--space-2);
+  inline-size: min(100%, 24rem);
+}
+
+.cancel-order__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.cancel-order__input {
+  inline-size: 100%;
+  padding: var(--space-2) var(--space-3);
+  resize: vertical;
+
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.cancel-order__input:focus {
+  border-color: var(--color-primary);
+}
+
+.cancel-order__actions {
+  display: flex;
+  gap: var(--space-2);
+}

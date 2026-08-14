@@ -68,7 +68,24 @@ export const useRemoveCoupon = () => useCartMutation<void>(() => api.removeCoupo
 
 export const useClearCart = () => useCartMutation<void>(() => api.clearCart());
 
-export const useAddBundle = () =>
-  useCartMutation((args: { bundle: string; essentialsOnly?: boolean }) =>
-    api.addBundle(args.bundle, args.essentialsOnly ?? false),
-  );
+/**
+ * إضافة حزمة.
+ *
+ * ⚠️  **لا تمرّ بـ `useCartMutation`** لأن استجابتها مختلفة الشكل:
+ *     `{ bundle_result, cart }` لا لقطة سلة.
+ *
+ *     كتابة الاستجابة كاملةً في الكاش تُفسده — الشاشة تقرأ `lines`
+ *     فتجدها غير موجودة. هنا تُكتب `cart` وحدها، وتبقى
+ *     `bundle_result` للمستدعي ليعرض ما تُخطّي ولماذا.
+ */
+export function useAddBundle() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (args: { bundle: string; essentialsOnly?: boolean }) =>
+      api.addBundle(args.bundle, args.essentialsOnly ?? false),
+    onSuccess: (response) => {
+      queryClient.setQueriesData<CartSnapshot>({ queryKey: CART_KEY }, response.cart);
+    },
+  });
+}

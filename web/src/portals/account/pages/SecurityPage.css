@@ -1,0 +1,15 @@
+.security {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  max-inline-size: 30rem;
+  justify-items: start;
+}
+
+.security > * {
+  inline-size: 100%;
+}
+
+.security > button {
+  inline-size: auto;
+}

@@ -1,0 +1,64 @@
+.gallery {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.gallery__main {
+  display: grid;
+  place-items: center;
+  /* يحجز المساحة قبل التحميل فلا يقفز التخطيط */
+  aspect-ratio: 1;
+  overflow: hidden;
+
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.gallery__main img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+}
+
+.gallery--empty {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  font-size: 4rem;
+  color: var(--color-text-muted);
+  opacity: 0.35;
+
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.gallery__thumbs {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.gallery__thumb {
+  flex: 0 0 auto;
+  inline-size: 4rem;
+  block-size: 4rem;
+  padding: 2px;
+  overflow: hidden;
+
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.gallery__thumb.is-active {
+  border-color: var(--color-primary);
+}
+
+.gallery__thumb img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+}

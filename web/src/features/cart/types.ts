@@ -86,3 +86,38 @@ export interface CartQuery {
   governorate?: string;
   shipping_method?: string;
 }
+
+/**
+ * نتيجة إضافة حزمة.
+ *
+ * ⚠️  **الاستجابة ليست لقطة سلة** بخلاف بقية نقاط السلة — إنها
+ *     `{ bundle_result, cart }`.
+ *
+ *     ولهذا سبب وجيه: الحزمة قد تُضاف **جزئيًا**. صنف نفد مخزونه
+ *     يُتخطّى مع سببه، والطالب يحتاج أن يعرف أن بالطو المعمل لم
+ *     يدخل سلته — لا أن يكتشفه في المحاضرة الأولى.
+ */
+export interface BundleAddedItem {
+  sku: string;
+  name: string;
+  quantity: number;
+}
+
+export interface BundleSkippedItem {
+  sku: string;
+  name: string;
+  code: string;
+  reason: string;
+}
+
+export interface BundleResult {
+  bundle: string;
+  added: BundleAddedItem[];
+  skipped: BundleSkippedItem[];
+  is_complete: boolean;
+}
+
+export interface AddBundleResponse {
+  bundle_result: BundleResult;
+  cart: CartSnapshot;
+}

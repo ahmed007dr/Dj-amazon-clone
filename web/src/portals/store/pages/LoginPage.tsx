@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 import { LoginForm } from '@/features/auth/components/LoginForm';
 import { useAuth } from '@/features/auth/useAuth';
@@ -33,6 +33,13 @@ export function LoginPage() {
             void navigate(from ?? '/', { replace: true });
           }}
         />
+
+        <div className="login-page__links">
+          <Link to="/auth/forgot-password">{t('auth.forgotPassword')}</Link>
+          <span className="muted">
+            {t('auth.noAccount')} <Link to="/register">{t('auth.createAccount')}</Link>
+          </span>
+        </div>
       </div>
     </div>
   );

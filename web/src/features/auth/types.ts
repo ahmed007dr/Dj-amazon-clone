@@ -56,3 +56,27 @@ export interface RefreshResponse {
   access: string;
   refresh?: string;
 }
+
+/**
+ * ⚠️  أنواع الحسابات المسموح **بالتسجيل الذاتي** بها فقط.
+ *
+ *     الخادم يقصرها على هذه الثلاثة: لا أحد يسجّل نفسه موظفًا ولا
+ *     أدمن ولا صيدلية. الحسابات التجارية والداخلية يُنشئها الأدمن.
+ */
+export const SELF_SIGNUP_TYPES = ['STUDENT', 'DOCTOR', 'PHARMACIST'] as const;
+export type SelfSignupType = (typeof SELF_SIGNUP_TYPES)[number];
+
+export interface RegisterPayload {
+  email: string;
+  password: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  account_type: SelfSignupType;
+  preferred_language: 'ar' | 'en';
+}
+
+export interface RegisterResponse {
+  message: string;
+  user: User;
+}

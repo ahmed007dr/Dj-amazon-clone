@@ -22,11 +22,13 @@ export function AddToCartButton({
   variantId,
   quantity = 1,
   block = false,
+  disabled = false,
 }: {
   productId: string;
   variantId?: string;
   quantity?: number;
   block?: boolean;
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   const addToCart = useAddToCart();
@@ -57,7 +59,12 @@ export function AddToCartButton({
 
   return (
     <div className="add-to-cart">
-      <Button block={block} loading={addToCart.isPending} onClick={handleClick}>
+      <Button
+        block={block}
+        disabled={disabled}
+        loading={addToCart.isPending}
+        onClick={handleClick}
+      >
         {added ? t('cart.added') : t('catalog.addToCart')}
       </Button>
 

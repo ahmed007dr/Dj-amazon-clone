@@ -1,0 +1,39 @@
+.review-list {
+  display: grid;
+  gap: var(--space-4);
+  list-style: none;
+}
+
+.review {
+  display: grid;
+  gap: var(--space-1);
+  padding-block-end: var(--space-4);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.review:last-child {
+  border-block-end: none;
+}
+
+.review__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.review__author {
+  font-size: 0.9375rem;
+}
+
+.review__title {
+  font-weight: 600;
+}
+
+.review__body {
+  color: var(--color-text);
+}
+
+.review__date {
+  font-size: 0.8125rem;
+}

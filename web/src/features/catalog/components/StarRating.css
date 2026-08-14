@@ -1,0 +1,20 @@
+.stars {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.stars__glyphs {
+  color: var(--color-accent);
+  letter-spacing: 0.05em;
+  /* النجوم تُقرأ يسارًا في الاتجاهين — قلبها يعكس ترتيب الامتلاء */
+  direction: ltr;
+}
+
+.stars__empty {
+  opacity: 0.25;
+}
+
+.stars__count {
+  font-size: 0.8125rem;
+}

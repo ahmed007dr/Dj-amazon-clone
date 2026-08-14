@@ -1,0 +1,36 @@
+.bundle-card {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-4);
+  transition: border-color var(--transition);
+}
+
+.bundle-card:hover {
+  border-color: var(--color-primary);
+}
+
+.bundle-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+}
+
+.bundle-card__name {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.bundle-card__name:hover {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.bundle-card__desc,
+.bundle-card__count {
+  font-size: 0.875rem;
+}

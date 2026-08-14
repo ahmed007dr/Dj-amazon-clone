@@ -10,8 +10,14 @@
 
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
-import { getProduct, listCategories, listProducts } from './api';
-import type { CategoryBrief, ProductQuery } from './types';
+import {
+  getAvailability,
+  getProduct,
+  listCategories,
+  listProductReviews,
+  listProducts,
+} from './api';
+import type { CategoryBrief, ProductQuery, Review } from './types';
 
 /** المؤشر الخام من رابط الصفحة التالية. */
 function cursorFrom(next: string | null): string | undefined {
@@ -48,7 +54,36 @@ export function useCategories() {
     queryFn: listCategories,
     // شجرة الفئات تتغيّر نادرًا جدًا
     staleTime: 30 * 60 * 1000,
-    select: (data): CategoryBrief[] =>
-      Array.isArray(data) ? data : (data).results,
+    select: (data): CategoryBrief[] => (Array.isArray(data) ? data : data.results),
+  });
+}
+
+/**
+ * توفر منتج واحد.
+ *
+ * ⚠️  مهلة قصيرة (٣٠ ثانية) بخلاف بقية بيانات الكتالوج.
+ *
+ *     السعر والاسم يتغيّران بفعل الأدمن؛ أما المخزون فيتغيّر بفعل
+ *     **مشترين آخرين** في نفس اللحظة. عرض «متوفر» لصنف نفد قبل
+ *     دقيقتين يُنتج سلة تُرفض عند إتمام الشراء.
+ */
+export function useAvailability(productIds: string[]) {
+  const key = [...productIds].sort().join(',');
+
+  return useQuery({
+    queryKey: ['inventory', 'availability', key],
+    queryFn: () => getAvailability(productIds),
+    enabled: productIds.length > 0,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useProductReviews(slug: string | undefined) {
+  return useQuery({
+    queryKey: ['reviews', 'product', slug],
+    queryFn: () => listProductReviews(slug as string),
+    enabled: Boolean(slug),
+    staleTime: 5 * 60 * 1000,
+    select: (data): Review[] => (Array.isArray(data) ? data : data.results),
   });
 }

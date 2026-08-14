@@ -24,13 +24,19 @@ export function ProductCard({ product }: { product: ProductListItem }) {
   const localized = useLocalized();
 
   const name = localized(product, 'name');
-  const image = mediaUrl(product.primary_image);
+
+  // ⚠️  الخادم يرسل كائن الصورة كاملًا لا مسارها — والنص البديل منه
+  //     أدقّ من اسم المنتج، فهو يصف الصورة لا الصنف.
+  const image = mediaUrl(product.primary_image?.image);
+  const imageAlt = product.primary_image
+    ? localized(product.primary_image, 'alt_text') || name
+    : name;
 
   return (
     <article className="product-card surface">
       <Link to={`/products/${product.slug}`} className="product-card__media">
         {image ? (
-          <img src={image} alt={name} loading="lazy" decoding="async" />
+          <img src={image} alt={imageAlt} loading="lazy" decoding="async" />
         ) : (
           <span className="product-card__placeholder" aria-hidden>
             ⚕

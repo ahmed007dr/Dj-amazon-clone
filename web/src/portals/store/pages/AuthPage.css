@@ -1,0 +1,40 @@
+.auth-page {
+  display: grid;
+  place-items: center;
+  padding-block: var(--space-8);
+}
+
+.auth-page__card {
+  display: grid;
+  gap: var(--space-4);
+  inline-size: min(100%, 30rem);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-md);
+}
+
+.auth-page__icon {
+  font-size: 2.5rem;
+  text-align: center;
+  color: var(--color-primary);
+}
+
+.auth-page__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.auth-page__body {
+  text-align: center;
+}
+
+.auth-page__foot,
+.auth-page__link {
+  font-size: 0.9375rem;
+  text-align: center;
+}
+
+.auth-page__link {
+  display: block;
+}

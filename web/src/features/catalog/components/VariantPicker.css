@@ -1,0 +1,47 @@
+.variant-picker {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.variant-picker__title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.variant-picker__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.variant-chip {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-4);
+  cursor: pointer;
+
+  font-weight: 600;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  transition: border-color var(--transition), color var(--transition);
+}
+
+.variant-chip:hover {
+  border-color: var(--color-primary);
+}
+
+.variant-chip.is-selected {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* ⚠️  زر الراديو مخفي بصريًا لا محذوفًا — التصفّح بلوحة المفاتيح
+   يعتمد عليه، و`display:none` يخرجه من ترتيب التاب */
+.variant-chip:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}

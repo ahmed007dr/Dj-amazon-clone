@@ -11,7 +11,7 @@
 
 import { http } from '@/shared/http';
 
-import type { CartQuery, CartSnapshot } from './types';
+import type { AddBundleResponse, CartQuery, CartSnapshot } from './types';
 
 export const getCart = (params: CartQuery = {}) =>
   http.get<CartSnapshot>('/cart/', { params: { ...params } });
@@ -30,8 +30,15 @@ export const applyCoupon = (code: string) => http.post<CartSnapshot>('/cart/coup
 
 export const removeCoupon = () => http.delete<CartSnapshot>('/cart/coupon/');
 
+/**
+ * ⚠️  تعيد `{ bundle_result, cart }` لا لقطة سلة.
+ *
+ *     كتابة الاستجابة كاملةً في كاش السلة تُفسده: الشاشة تقرأ
+ *     `lines` فتجدها غير موجودة وتنهار — وهو ما كان يقع فعلًا قبل
+ *     أن يكشفه أول نداء حقيقي.
+ */
 export const addBundle = (bundle: string, essentialsOnly = false) =>
-  http.post<CartSnapshot>('/cart/bundle/', { bundle, essentials_only: essentialsOnly });
+  http.post<AddBundleResponse>('/cart/bundle/', { bundle, essentials_only: essentialsOnly });
 
 /**
  * دمج سلة الزائر بعد الدخول — يُستدعى مرة واحدة عقب نجاح المصادقة.

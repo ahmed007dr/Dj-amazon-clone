@@ -1,0 +1,58 @@
+.account-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-nav__link {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  text-decoration: none;
+  border-radius: var(--radius);
+  /* شريط التحديد على حافة البداية — ينتقل مع تبديل اللغة */
+  border-inline-start: 3px solid transparent;
+}
+
+.account-nav__link:hover {
+  text-decoration: none;
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+
+.account-nav__link.is-active {
+  font-weight: 700;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  border-inline-start-color: var(--color-primary);
+}
+
+/* ⚠️  على الهاتف شريط يتمرّر أفقيًا لا قائمة رأسية تدفع المحتوى
+   تحت الطيّة */
+@media (max-width: 991px) {
+  .account-nav {
+    flex-direction: row;
+    gap: var(--space-1);
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-block-end: var(--space-2);
+  }
+
+  .account-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .account-nav__link {
+    flex: 0 0 auto;
+    border-inline-start: none;
+    border-block-end: 3px solid transparent;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+
+  .account-nav__link.is-active {
+    border-block-end-color: var(--color-primary);
+  }
+}

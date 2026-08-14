@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
+import { CancelOrderButton } from '@/features/orders/components/CancelOrderButton';
 import {
   OrderStatusBadge,
   PaymentStatusBadge,
@@ -107,6 +108,22 @@ export function OrderDetailPage() {
               <span className="muted">{order.street}</span>
             </address>
           </section>
+
+          {/* ⚠️  `can_cancel` من الخادم — يُحسب من آلة الحالة نفسها
+              لا من قائمة حالات موازية هنا */}
+          {order.can_cancel ? (
+            <section className="surface order-detail__box">
+              <h2 className="order-detail__heading">{t('orders.cancel')}</h2>
+              <CancelOrderButton orderId={order.id} />
+            </section>
+          ) : null}
+
+          {order.cancellation_reason ? (
+            <section className="surface order-detail__box">
+              <h2 className="order-detail__heading">{t('orders.cancelled')}</h2>
+              <p className="muted">{order.cancellation_reason}</p>
+            </section>
+          ) : null}
 
           {order.status_history.length > 0 ? (
             <section className="surface order-detail__box">

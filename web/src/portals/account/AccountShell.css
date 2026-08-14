@@ -1,0 +1,24 @@
+.account-shell {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.account-shell__content {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  min-inline-size: 0;
+}
+
+@media (min-width: 992px) {
+  .account-shell {
+    grid-template-columns: 14rem 1fr;
+    gap: var(--space-8);
+  }
+
+  .account-shell__side {
+    position: sticky;
+    inset-block-start: calc(var(--header-height) + var(--space-4));
+  }
+}

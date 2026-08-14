@@ -1,0 +1,59 @@
+.address-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.address-form__grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.address-form__field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.address-form__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.address-form__select {
+  inline-size: 100%;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.address-form__select:focus {
+  border-color: var(--color-primary);
+}
+
+.address-form__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--touch-target);
+  cursor: pointer;
+}
+
+.address-form__check input {
+  inline-size: 1.1rem;
+  block-size: 1.1rem;
+  accent-color: var(--color-primary);
+}
+
+.address-form__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+@media (min-width: 576px) {
+  .address-form__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

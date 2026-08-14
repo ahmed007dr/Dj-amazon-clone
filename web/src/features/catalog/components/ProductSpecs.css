@@ -1,0 +1,27 @@
+.specs {
+  display: grid;
+  gap: 0;
+}
+
+.specs__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 35%) 1fr;
+  gap: var(--space-3);
+
+  padding-block: var(--space-2);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.specs__row:last-child {
+  border-block-end: none;
+}
+
+.specs__row dt {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.specs__row dd {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}

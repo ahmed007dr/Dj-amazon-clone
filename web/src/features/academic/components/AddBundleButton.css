@@ -1,0 +1,28 @@
+.add-bundle {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.add-bundle__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.add-bundle__error {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-danger);
+}
+
+.add-bundle__summary {
+  margin-block-end: var(--space-2);
+  font-weight: 700;
+}
+
+.add-bundle__skipped {
+  display: grid;
+  gap: var(--space-1);
+  padding-inline-start: var(--space-5);
+  font-size: 0.875rem;
+}

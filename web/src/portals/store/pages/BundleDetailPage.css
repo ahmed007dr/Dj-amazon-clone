@@ -1,0 +1,19 @@
+.bundle-groups {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.bundle-group {
+  padding: var(--space-2) var(--space-4);
+}
+
+.bundle-group__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+
+  padding-block: var(--space-3);
+  font-size: 1rem;
+  font-weight: 700;
+  border-block-end: 1px solid var(--color-border);
+}

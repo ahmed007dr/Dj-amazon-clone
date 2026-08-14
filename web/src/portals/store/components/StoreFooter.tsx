@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 import { useBrand } from '@/shared/branding/useBrand';
 
@@ -39,6 +40,21 @@ export function StoreFooter() {
                 <a href={`mailto:${contact.email}`}>{contact.email}</a>
               </li>
             ) : null}
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="store-footer__title">{t('nav.account')}</h2>
+          <ul className="store-footer__list">
+            <li>
+              <Link to="/account">{t('account.profile')}</Link>
+            </li>
+            <li>
+              <Link to="/account/orders">{t('nav.orders')}</Link>
+            </li>
+            <li>
+              <Link to="/bundles">{t('nav.bundles')}</Link>
+            </li>
           </ul>
         </section>
 

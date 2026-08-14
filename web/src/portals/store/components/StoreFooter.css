@@ -35,8 +35,14 @@
   text-align: center;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 576px) {
   .store-footer__grid {
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 992px) {
+  .store-footer__grid {
+    grid-template-columns: 2fr 1fr 1fr 1fr;
   }
 }

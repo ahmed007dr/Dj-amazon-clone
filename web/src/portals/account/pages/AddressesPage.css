@@ -1,0 +1,36 @@
+.addresses {
+  display: grid;
+  gap: var(--space-3);
+  list-style: none;
+}
+
+.addresses__form {
+  padding: var(--space-4);
+}
+
+.address {
+  display: grid;
+  gap: 0.15rem;
+  padding: var(--space-4);
+  font-size: 0.9375rem;
+}
+
+.address__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-end: var(--space-1);
+}
+
+.address__phone {
+  direction: ltr;
+  text-align: start;
+  font-size: 0.875rem;
+}
+
+@media (min-width: 768px) {
+  .addresses {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  }
+}
