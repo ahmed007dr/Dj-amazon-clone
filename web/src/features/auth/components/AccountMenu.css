@@ -1,0 +1,107 @@
+.account-menu {
+  position: relative;
+}
+
+.account-menu__placeholder {
+  display: inline-block;
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+}
+
+.account-menu__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-2);
+  border-radius: var(--radius);
+}
+
+.account-menu__trigger:hover {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+
+.account-menu__avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  inline-size: 2rem;
+  block-size: 2rem;
+
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-radius: 50%;
+}
+
+.account-menu__name {
+  max-inline-size: 9rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+/* ⚠️  طبقة تلتقط النقر خارج القائمة فتغلقها — بدونها تبقى مفتوحة
+   على الهاتف حتى يعيد المستخدم النقر على الزر نفسه */
+.account-menu__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-drawer) - 1);
+  inline-size: 100%;
+  cursor: default;
+}
+
+.account-menu__panel {
+  position: absolute;
+  z-index: var(--z-drawer);
+  inset-block-start: calc(100% + var(--space-2));
+  /* منطقي: ينفتح تحت الزر على حافة النهاية في الاتجاهين */
+  inset-inline-end: 0;
+
+  display: grid;
+  gap: var(--space-3);
+  inline-size: min(16rem, calc(100vw - var(--space-8)));
+  padding: var(--space-3);
+  box-shadow: var(--shadow-lg);
+}
+
+.account-menu__identity {
+  display: grid;
+  padding-block-end: var(--space-3);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.account-menu__email {
+  font-size: 0.8125rem;
+  direction: ltr;
+  text-align: start;
+}
+
+.account-menu__suspended {
+  padding: var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  border-radius: var(--radius-sm);
+}
+
+.account-menu__links {
+  display: grid;
+  gap: 2px;
+}
+
+.account-menu__links a {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-2);
+  color: var(--color-text);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+
+.account-menu__links a:hover {
+  text-decoration: none;
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}

@@ -1,0 +1,59 @@
+.field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.field__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.field__input {
+  inline-size: 100%;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  transition: border-color var(--transition);
+}
+
+.field__input:focus {
+  border-color: var(--color-primary);
+}
+
+.field__input.has-error {
+  border-color: var(--color-danger);
+}
+
+.field__input::placeholder {
+  color: var(--color-text-muted);
+}
+
+/*
+  ⚠️  البريد وكلمة المرور لاتينيان دائمًا.
+
+      تركهما يرثان اتجاه الصفحة العربي يضع المؤشّر يمينًا ويعرض
+      `user@mail.com` مقلوبًا بصريًا — وهو ما يجعل المستخدم يظن
+      أنه أخطأ الكتابة.
+*/
+.field__input[type='email'],
+.field__input[type='password'],
+.field__input[type='tel'],
+.field__input[type='url'] {
+  direction: ltr;
+  text-align: start;
+}
+
+.field__hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.field__error {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-danger);
+}

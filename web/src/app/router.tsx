@@ -1,9 +1,12 @@
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
+import { RequireAuth } from '@/features/auth/components/RequireAuth';
+import { isAdmin } from '@/features/auth/permissions';
 import { NotFoundPage } from '@/portals/store/pages/NotFoundPage';
 import { StoreShell } from '@/portals/store/StoreShell';
 import { HomePage } from '@/portals/store/pages/HomePage';
+import { LoginPage } from '@/portals/store/pages/LoginPage';
 import { ProductsPage } from '@/portals/store/pages/ProductsPage';
 import { Spinner } from '@/shared/ui/Spinner';
 
@@ -40,16 +43,23 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: 'products', element: <ProductsPage /> },
+      { path: 'login', element: <LoginPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
   {
     // ── بوابة الأدمن ──────────────────────────────────────
+    // ⚠️  الحارس **حول القشرة** لا داخل كل صفحة.
+    //
+    //     وضعه في كل صفحة يجعل صفحة واحدة منسيّة بابًا مفتوحًا —
+    //     ولا شيء ينبّه إليها لأن الشاشة تعمل.
     path: '/admin',
     element: (
-      <Lazy>
-        <AdminShell />
-      </Lazy>
+      <RequireAuth allow={isAdmin}>
+        <Lazy>
+          <AdminShell />
+        </Lazy>
+      </RequireAuth>
     ),
     children: [
       {

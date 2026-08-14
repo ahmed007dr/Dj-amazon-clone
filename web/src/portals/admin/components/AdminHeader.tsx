@@ -1,3 +1,4 @@
+import { AccountMenu } from '@/features/auth/components/AccountMenu';
 import { LanguageSwitch } from '@/shared/ui/LanguageSwitch';
 import { ThemeSwitch } from '@/shared/ui/ThemeSwitch';
 
@@ -19,6 +20,7 @@ export function AdminHeader({ title }: { title?: string }) {
       <div className="admin-header__actions">
         <LanguageSwitch compact />
         <ThemeSwitch />
+        <AccountMenu />
       </div>
     </div>
   );

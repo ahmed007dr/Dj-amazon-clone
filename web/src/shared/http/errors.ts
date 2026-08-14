@@ -1,31 +1,48 @@
 /**
  * أخطاء الـ API.
  *
- * ⚠️  الخادم يعيد شكل خطأ موحّدًا (`core/api/exception_handler`):
+ * ⚠️  الشكل مأخوذ من `core/api/exception_handler.py` حرفيًا:
  *
- *         { "code": "OUT_OF_STOCK", "detail": "...", "fields": {...} }
+ *         {
+ *           "code":    "VALIDATION_ERROR",
+ *           "message": "بيانات غير صالحة",     ← مترجَمة، للعرض
+ *           "detail":  "…" | null,             ← تفصيل اختياري
+ *           "fields":  { "email": [{ "code": "REQUIRED",
+ *                                    "message": "هذا الحقل مطلوب." }] }
+ *         }
  *
- *     ترجمة هذا الشكل إلى صنف واحد هنا تعني أن كل شاشة تتعامل مع
- *     كائن واحد معروف — بدل أن يفحص كل مكوّن `response.data?.detail`
- *     ثم يسقط إلى «حدث خطأ ما» عند أول شكل غير متوقّع.
+ *     `fields` **قائمة كائنات لا قائمة نصوص**. افتراض الأبسط يجعل
+ *     الواجهة تعرض `[object Object]` تحت الحقل — وهو خطأ يمرّ في
+ *     المراجعة لأنه لا يظهر إلا على مسار فشل.
+ *
+ * ⚠️  والرسالة المعروضة `message` لا `detail`: الثاني `null` في
+ *     معظم أخطاء التحقق.
  */
+
+export interface FieldError {
+  code: string;
+  message: string;
+}
 
 export interface ApiErrorPayload {
   code?: string;
-  detail?: string;
-  fields?: Record<string, string[] | string>;
+  message?: string;
+  detail?: string | null;
+  fields?: Record<string, FieldError[]> | null;
 }
 
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
-  readonly fields: Record<string, string[] | string>;
+  readonly detail: string | null;
+  readonly fields: Record<string, FieldError[]>;
 
   constructor(status: number, payload: ApiErrorPayload) {
-    super(payload.detail ?? `HTTP ${status}`);
+    super(payload.message ?? payload.detail ?? `HTTP ${status}`);
     this.name = 'ApiError';
     this.status = status;
     this.code = payload.code ?? 'UNKNOWN';
+    this.detail = payload.detail ?? null;
     this.fields = payload.fields ?? {};
   }
 
@@ -55,11 +72,23 @@ export class ApiError extends Error {
     return this.status === 409;
   }
 
-  /** أول رسالة خطأ لحقل — للعرض تحت الحقل مباشرة. */
+  get isRateLimited(): boolean {
+    return this.status === 429;
+  }
+
+  /** أول رسالة خطأ لحقل — للعرض تحته مباشرة. */
   fieldError(name: string): string | undefined {
-    const value = this.fields[name];
-    if (!value) return undefined;
-    return Array.isArray(value) ? value[0] : value;
+    return this.fields[name]?.[0]?.message;
+  }
+
+  /**
+   * رسالة للعرض.
+   *
+   * ⚠️  تفضّل خطأ الحقل حين يكون واحدًا فقط: «هذا الحقل مطلوب»
+   *     تحت الحقل أوضح من «بيانات غير صالحة» فوق النموذج.
+   */
+  get displayMessage(): string {
+    return this.detail || this.message;
   }
 }
 

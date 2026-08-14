@@ -1,0 +1,19 @@
+.login-page {
+  display: grid;
+  place-items: center;
+  padding-block: var(--space-8);
+}
+
+.login-page__card {
+  inline-size: min(100%, 26rem);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-md);
+}
+
+.login-page__title {
+  margin-block-end: var(--space-5);
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-align: center;
+  text-wrap: balance;
+}

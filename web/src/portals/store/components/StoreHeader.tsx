@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AccountMenu } from '@/features/auth/components/AccountMenu';
 import { useIsDesktop } from '@/shared/hooks/useMediaQuery';
 import { Drawer } from '@/shared/ui/Drawer';
 import { LanguageSwitch } from '@/shared/ui/LanguageSwitch';
@@ -54,14 +55,20 @@ export function StoreHeader() {
         )}
 
         <div className="store-header__actions">
-          <LanguageSwitch compact={!isDesktop} />
+          {isDesktop && <LanguageSwitch />}
           <ThemeSwitch />
+          <AccountMenu />
         </div>
       </div>
 
       {!isDesktop && (
         <Drawer open={menuOpen} onClose={closeMenu} title={t('common.menu')}>
           <StoreNav onNavigate={closeMenu} />
+          {/* ⚠️  مبدّل اللغة داخل القائمة على الهاتف لا في الهيدر —
+              الهيدر الضيّق يدفع اللوجو خارج الشاشة لولا ذلك */}
+          <div className="store-header__drawer-tools">
+            <LanguageSwitch />
+          </div>
         </Drawer>
       )}
     </header>

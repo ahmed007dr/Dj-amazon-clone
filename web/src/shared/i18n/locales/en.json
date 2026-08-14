@@ -33,6 +33,19 @@
     "system": "System",
     "toggle": "Toggle appearance"
   },
+  "auth": {
+    "signIn": "Sign in",
+    "signInTo": "Sign in to {{name}}",
+    "email": "Email",
+    "identifier": "Email or phone number",
+    "identifierHint": "You can sign in with either",
+    "password": "Password",
+    "forgotPassword": "Forgot your password?",
+    "loginFailed": "Incorrect email or password",
+    "accountSuspended": "This account is suspended — contact support",
+    "awaitingVerification": "Your account is under review",
+    "sessionExpired": "Session expired — please sign in again"
+  },
   "state": {
     "emptyTitle": "No results",
     "emptyBody": "Try adjusting your search or removing some filters.",
