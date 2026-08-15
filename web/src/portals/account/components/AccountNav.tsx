@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
-import { isStudent } from '@/features/auth/permissions';
+import { isStudent, isTrade } from '@/features/auth/permissions';
 import { useAuth } from '@/features/auth/useAuth';
 
 import './AccountNav.css';
@@ -30,6 +30,12 @@ export function AccountNav({ onNavigate }: { onNavigate?: () => void }) {
           { to: '/account/bundles', key: 'nav.bundles' },
         ]
       : []),
+    // ⚠️  «حسابي التجاري» للحسابات التجارية وحدها.
+    //
+    //     الرابط لغير التجاري يقود إلى شاشة تقول «لا ملف تجاري»
+    //     — رسالة صحيحة لكن لا معنى لعرضها لعميل تجزئة لن يملك
+    //     ملفًا أبدًا.
+    ...(isTrade(user) ? [{ to: '/account/trade', key: 'b2b.title' }] : []),
     { to: '/account/notifications', key: 'notifications.title' },
     { to: '/account/security', key: 'account.security' },
   ];

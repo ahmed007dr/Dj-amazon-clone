@@ -47,6 +47,27 @@ PROVIDERS = [
         "is_active": True,
     },
     {
+        # ⚠️  ماكينة البطاقة على الكاونتر — **بوابة قائمة بذاتها.**
+        #
+        #     الدفع المقسّم (نصفه نقدًا ونصفه بالبطاقة) حالة يومية
+        #     على الكاونتر. بلا بوابة تقبل `CARD` على قناة `POS`
+        #     كان نصف البيعة يُرفض بـ«طريقة الدفع غير متاحة» —
+        #     والكاشير يسجّلها بيعتين فينكسر الإيصال والمرتجع معًا.
+        #
+        # ⚠️  و`adapter_key="cash"` مقصود: الماكينة تُشغَّل يدويًا
+        #     وتطبع إيصالها الخاص. النظام يسجّل أن المبلغ حُصّل ولا
+        #     يتصل بشبكة الدفع — ولذلك **لا يدخل الدرج** أيضًا.
+        "code": "pos-card",
+        "adapter_key": "cash",
+        "name_ar": "بطاقة على الطرفية",
+        "name_en": "Card terminal",
+        "supported_methods": [PaymentMethodKind.CARD],
+        "supported_channels": [POS],
+        "priority": 85,
+        "is_sandbox": False,
+        "is_active": True,
+    },
+    {
         "code": "bank",
         "adapter_key": "bank_transfer",
         "name_ar": "تحويل بنكي",

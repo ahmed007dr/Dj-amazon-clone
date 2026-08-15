@@ -7,6 +7,7 @@
     يستطيع كاشير تسجيل بيعة على وردية زميله بتمرير معرّف.
 """
 
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext as _
 from rest_framework import generics, status
@@ -24,6 +25,44 @@ from pos.models import POSSession, Register, SessionStatus
 from pos.permissions import CanOperatePOS, CanRefund
 
 
+def _resolve_lines(entries: list[dict]) -> list[services.SaleLine]:
+    """
+    يحوّل أسطر الطلب إلى كائنات بيع.
+
+    ⚠️  المنتجات تُحمَّل **باستعلام واحد** لا واحد لكل سطر.
+
+        بيعة بعشرين صنفًا كانت ستنتج عشرين استعلامًا بينما العميل
+        واقف — وهو أسوأ مكان لبطء يمكن تفاديه.
+
+    ⚠️  ومشتركة بين `/quote/` و`/checkout/` عمدًا.
+
+        نسختان من نفس التحويل تعنيان أن التسعير المعروض يقرأ السطر
+        بطريقة والتحصيل بأخرى — وهو فرق لا يظهر إلا في فاتورة.
+    """
+    products = Product.objects.in_bulk([entry["product"] for entry in entries])
+
+    variant_ids = [entry.get("variant") for entry in entries if entry.get("variant")]
+    variants = ProductVariant.objects.in_bulk(variant_ids) if variant_ids else {}
+
+    lines = []
+    for entry in entries:
+        product = products.get(entry["product"])
+        if product is None:
+            raise BusinessError(
+                ErrorCode.NOT_FOUND,
+                detail=_("منتج غير موجود: {id}").format(id=entry["product"]),
+                status_code=404,
+            )
+        lines.append(
+            services.SaleLine(
+                product=product,
+                quantity=entry["quantity"],
+                variant=variants.get(entry.get("variant")) if entry.get("variant") else None,
+            )
+        )
+    return lines
+
+
 class SessionMixin:
     """
     ⚠️  الوردية تُستخرج من **المستخدم** لا من مُعامل الطلب.
@@ -33,9 +72,11 @@ class SessionMixin:
     """
 
     def current_session(self) -> POSSession:
-        session = POSSession.objects.filter(
-            cashier=self.request.user, status=SessionStatus.OPEN
-        ).select_related("register", "register__location").first()
+        session = (
+            POSSession.objects.filter(cashier=self.request.user, status=SessionStatus.OPEN)
+            .select_related("register", "register__location")
+            .first()
+        )
 
         if session is None:
             raise BusinessError(
@@ -79,9 +120,11 @@ class MySessionAPI(SessionMixin, APIView):
     serializer_class = s.SessionSerializer
 
     def get(self, request):
-        session = POSSession.objects.filter(
-            cashier=request.user, status=SessionStatus.OPEN
-        ).select_related("register").first()
+        session = (
+            POSSession.objects.filter(cashier=request.user, status=SessionStatus.OPEN)
+            .select_related("register")
+            .first()
+        )
 
         # ⚠️  `null` لا `404`: غياب وردية حالة عادية في بداية اليوم
         if session is None:
@@ -100,9 +143,7 @@ class OpenSessionAPI(APIView):
         data = serializer.validated_data
 
         register = get_object_or_404(Register, pk=data["register"])
-        session = services.open_session(
-            register, request.user, opening_float=data["opening_float"]
-        )
+        session = services.open_session(register, request.user, opening_float=data["opening_float"])
 
         AuditLog.objects.create(
             actor=request.user,
@@ -160,9 +201,7 @@ class SessionCashAPI(SessionMixin, APIView):
 
     def get(self, request):
         session = self.current_session()
-        return Response(
-            s.CashMovementSerializer(session.cash_movements.all(), many=True).data
-        )
+        return Response(s.CashMovementSerializer(session.cash_movements.all(), many=True).data)
 
     def post(self, request):
         serializer = s.CashMovementInputSerializer(data=request.data)
@@ -177,9 +216,7 @@ class SessionCashAPI(SessionMixin, APIView):
             performed_by=request.user,
         )
 
-        return Response(
-            s.CashMovementSerializer(movement).data, status=status.HTTP_201_CREATED
-        )
+        return Response(s.CashMovementSerializer(movement).data, status=status.HTTP_201_CREATED)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -206,29 +243,7 @@ class CheckoutAPI(SessionMixin, APIView):
         data = serializer.validated_data
 
         session = self.current_session()
-
-        products = Product.objects.in_bulk(
-            [entry["product"] for entry in data["lines"]]
-        )
-        variant_ids = [entry.get("variant") for entry in data["lines"] if entry.get("variant")]
-        variants = ProductVariant.objects.in_bulk(variant_ids) if variant_ids else {}
-
-        lines = []
-        for entry in data["lines"]:
-            product = products.get(entry["product"])
-            if product is None:
-                raise BusinessError(
-                    ErrorCode.NOT_FOUND,
-                    detail=_("منتج غير موجود: {id}").format(id=entry["product"]),
-                    status_code=404,
-                )
-            lines.append(
-                services.SaleLine(
-                    product=product,
-                    quantity=entry["quantity"],
-                    variant=variants.get(entry.get("variant")) if entry.get("variant") else None,
-                )
-            )
+        lines = _resolve_lines(data["lines"])
 
         payments = [
             services.SplitPayment(method=entry["method"], amount=entry["amount"])
@@ -261,6 +276,64 @@ class CheckoutAPI(SessionMixin, APIView):
                 ],
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class QuoteAPI(SessionMixin, APIView):
+    """
+    تسعير السلة الحالية بلا إتمام.
+
+    ⚠️  **الإجمالي على الشاشة يأتي من هنا لا من حساب في المتصفح.**
+
+        جمع الأسعار في الواجهة يعني أن الشرائح والخصومات والضريبة
+        المتغيّرة (وقد تكون غائبة أصلًا) تُحاكى في مكانين. أول
+        اختلاف بينهما يظهر كفرق بين ما قاله الجهاز وما طُبع على
+        الإيصال — والعميل واقف.
+    """
+
+    permission_classes = [CanOperatePOS]
+    serializer_class = s.QuoteSerializer
+
+    def post(self, request):
+        serializer = s.QuoteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        session = self.current_session()
+        lines = _resolve_lines(data["lines"])
+
+        customer = None
+        if data.get("customer"):
+            from customers.models import CustomerProfile
+
+            customer = get_object_or_404(CustomerProfile, pk=data["customer"])
+
+        result = services.quote(
+            session,
+            lines,
+            customer=customer,
+            discount_percent=data["discount_percent"],
+        )
+
+        return Response(
+            {
+                "lines": [
+                    {
+                        "product": str(line.product.pk),
+                        "quantity": line.quantity,
+                        "unit_price": str(priced.unit_price),
+                        "tax_rate": str(priced.tax_rate),
+                        "tax_amount": str(priced.tax_amount),
+                        "discount_amount": str(priced.discount_amount),
+                        "subtotal": str(priced.subtotal),
+                    }
+                    for line, priced in result.lines
+                ],
+                "subtotal": str(result.subtotal),
+                "tax_total": str(result.tax_total),
+                "discount_total": str(result.discount_total),
+                "total": str(result.total),
+            }
         )
 
 
@@ -300,6 +373,63 @@ class POSRefundAPI(SessionMixin, APIView):
         from orders.serializers import OrderDetailSerializer
 
         return Response({"order": OrderDetailSerializer(result.order).data})
+
+
+# ═══════════════════════════════════════════════════════════
+#  بحث الأصناف — للكاشير
+# ═══════════════════════════════════════════════════════════
+
+
+class POSProductSearchAPI(generics.ListAPIView):
+    """
+    بحث أصناف الكاونتر.
+
+    ⚠️  **بلا فلترة سياسات — وهذا مقصود.**
+
+        السياسات تحكم مَن يشتري عبر الموقع. أما على الكاونتر فالبائع
+        صيدلي في فرع مرخَّص، والمشتري أمامه بورقته. تمرير البحث
+        بمرشِّح السياسات كان يعني أن الكاشير **لا يجد** الدواء
+        المقيّد في جهازه بينما يبيعه قانونًا — فيسجّله يدويًا أو لا
+        يسجّله، وفي الحالتين ينهار المخزون.
+
+        وهذا يطابق `CheckoutAPI` التي تحمّل المنتجات بلا فلترة
+        أصلًا: بحث أضيق من الإتمام تناقض لا حماية.
+
+    ⚠️  و`CanOperatePOS` هو الحاجز الحقيقي — لا يصلها عميل.
+    """
+
+    permission_classes = [CanOperatePOS]
+    serializer_class = s.POSProductSerializer
+    pagination_class = None
+
+    #: ⚠️  سقف صارم: الكاشير يكتب حرفين فيعود بآلاف الصفوف والعميل
+    #:     واقف. العشرون تكفي للاختيار وتُبقي الاستجابة فورية.
+    LIMIT = 20
+
+    def get_queryset(self):
+        term = (self.request.query_params.get("search") or "").strip()
+
+        queryset = Product.objects.filter(is_active=True).select_related("category")
+
+        if not term:
+            # ⚠️  بلا بحث نعيد المميّزة لا كل شيء — شاشة أولى مفيدة
+            #     بدل قائمة عشوائية بحجم الكتالوج.
+            return queryset.filter(is_featured=True)[: self.LIMIT]
+
+        # ⚠️  الباركود والـ SKU بمطابقة تامة أولًا.
+        #
+        #     الماسح يرسل رقمًا كاملًا؛ ومطابقته جزئيًا تعيد أصنافًا
+        #     يشترك رقمها في مقطع — فيضيف الكاشير الصنف الخطأ بضغطة.
+        exact = queryset.filter(Q(barcode__iexact=term) | Q(sku__iexact=term))
+        if exact.exists():
+            return exact[: self.LIMIT]
+
+        return queryset.filter(
+            Q(name_ar__icontains=term)
+            | Q(name_en__icontains=term)
+            | Q(sku__icontains=term)
+            | Q(active_ingredient_ar__icontains=term)
+        )[: self.LIMIT]
 
 
 # ═══════════════════════════════════════════════════════════

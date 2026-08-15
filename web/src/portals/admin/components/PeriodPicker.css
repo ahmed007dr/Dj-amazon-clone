@@ -1,0 +1,51 @@
+.period-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-4);
+  margin-block-end: var(--space-4);
+}
+
+.period-picker__presets {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.period-picker__preset {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-4);
+  font-size: 0.875rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.period-picker__preset.is-active {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.period-picker__range {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.period-picker__range label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.period-picker__range input {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}

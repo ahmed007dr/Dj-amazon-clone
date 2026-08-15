@@ -1,0 +1,57 @@
+.pos-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface);
+  border-block-end: 1px solid var(--color-border);
+  min-block-size: var(--header-height);
+}
+
+.pos-header__session {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-inline-size: 0;
+  font-size: 0.875rem;
+}
+
+.pos-header__register {
+  padding: 0.15rem var(--space-2);
+  font-weight: 700;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.pos-header__cashier {
+  color: var(--color-text-muted);
+}
+
+.pos-header__number {
+  direction: ltr;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.pos-header__idle {
+  color: var(--color-warning);
+  font-size: 0.875rem;
+}
+
+/* ⚠️  `margin-inline-start: auto` لا `margin-left` — يدفع الأدوات
+   إلى حافة النهاية في الاتجاهين بقاعدة واحدة. */
+.pos-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}
+
+/* ⚠️  على الشاشات الضيّقة يُخفى اسم الكاشير لا رقم الوردية:
+   الرقم هو ما يُكتب في التسوية، والاسم يعرفه صاحبه. */
+@media (max-width: 40rem) {
+  .pos-header__cashier {
+    display: none;
+  }
+}

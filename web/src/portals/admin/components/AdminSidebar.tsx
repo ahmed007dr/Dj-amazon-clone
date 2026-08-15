@@ -35,6 +35,22 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
       { to: '/admin/orders', key: 'nav.orders', permission: 'orders.view_order' },
       { to: '/admin/products', key: 'nav.products', permission: 'catalog.view_product' },
       { to: '/admin/inventory', key: 'nav.inventory', permission: 'inventory.view_stock' },
+      // ⚠️  الورديات تحت «التجارة» لا «النظام»: الفرق النقدي شأن
+      //     تشغيلي يومي يُراجَع مع الطلبات، لا إعداد يُضبط مرة.
+      { to: '/admin/pos-sessions', key: 'pos.sessions', permission: 'pos.view_possession' },
+    ],
+  },
+  {
+    // ⚠️  قسم مستقل لا داخل «النظام».
+    //
+    //     رؤية الأرباح صلاحية صريحة لا يملكها أغلب من يفتح
+    //     اللوحة (قاعدة ١٤). خلطها بإعدادات النظام يجعل الرابط
+    //     يظهر لمن سيُرفض عند الضغط.
+    key: 'finance',
+    links: [
+      { to: '/admin/finance', key: 'finance.title', permission: 'finance.view_revenueentry' },
+      { to: '/admin/expenses', key: 'finance.expensesTitle', permission: 'finance.add_expense' },
+      { to: '/admin/businesses', key: 'b2b.businesses', permission: 'b2b.change_businessprofile' },
     ],
   },
   {

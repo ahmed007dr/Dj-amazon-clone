@@ -1,0 +1,66 @@
+.invoice-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invoice-list li {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+/* ⚠️  حدّ ملوّن على حافة البداية لا خلفية كاملة: الخلفية الحمراء
+   تُضعف تباين النص فوقها، والحدّ يلفت بلا أن يُخفض المقروئية. */
+.invoice-list li.is-overdue {
+  border-inline-start: 3px solid var(--color-danger);
+}
+
+.invoice-list__main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-inline-size: 0;
+}
+
+.invoice-list__number {
+  direction: ltr;
+  font-weight: 700;
+}
+
+.invoice-list__order {
+  direction: ltr;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.invoice-list__dates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.invoice-list__due strong {
+  color: var(--color-danger);
+}
+
+.invoice-list__total {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 40rem) {
+  .invoice-list li {
+    grid-template-columns: 1fr auto;
+  }
+}

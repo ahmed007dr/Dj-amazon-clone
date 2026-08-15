@@ -12,6 +12,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
+from catalog.models import Product
 from pos.models import CashMovement, POSSession, Register
 
 
@@ -127,9 +128,7 @@ class CloseSessionSerializer(serializers.Serializer):
         بالضبط ما تمنعه التسوية.
     """
 
-    counted_cash = serializers.DecimalField(
-        max_digits=12, decimal_places=2, min_value=Decimal("0")
-    )
+    counted_cash = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0"))
     variance_note = serializers.CharField(required=False, allow_blank=True, max_length=1000)
 
 
@@ -141,9 +140,7 @@ class SaleLineSerializer(serializers.Serializer):
 
 class SplitPaymentSerializer(serializers.Serializer):
     method = serializers.CharField(max_length=16)
-    amount = serializers.DecimalField(
-        max_digits=12, decimal_places=2, min_value=Decimal("0.01")
-    )
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
 
 
 class CheckoutSerializer(serializers.Serializer):
@@ -170,11 +167,51 @@ class CheckoutSerializer(serializers.Serializer):
         return value
 
 
+class POSProductSerializer(serializers.ModelSerializer):
+    """
+    الصنف كما تحتاجه شاشة الكاونتر.
+
+    ⚠️  **حمولة أخف من `ProductDetailSerializer` عمدًا.**
+
+        شاشة الكاشير تعرض عشرين نتيجة عند كل حرف يُكتب. جرّ الوصف
+        والصور والتصنيف الكامل في كل منها يجعل البحث يتلعثم على
+        جهاز لوحي — والكاشير يكتب أسرع مما يستجيب.
+
+    ⚠️  و`base_price` **استرشادي لا نهائي.**
+
+        السعر الفعلي يحسبه `pricing` عند التسعير (شرائح · خصومات ·
+        ضريبة قد تكون غائبة). عرضه هنا يساعد على التعرّف على الصنف
+        لا على جمع الفاتورة — ونقطة `/quote/` هي مصدر الإجمالي.
+    """
+
+    base_price = MoneyField(read_only=True)
+
+    class Meta:
+        model = Product
+        fields = ["id", "sku", "barcode", "name_ar", "name_en", "base_price", "kind"]
+        read_only_fields = fields
+
+
+class QuoteSerializer(serializers.Serializer):
+    """
+    ⚠️  بلا `payments` — التسعير لا يحتاج معرفة كيف سيُدفع.
+    """
+
+    lines = SaleLineSerializer(many=True)
+    customer = serializers.UUIDField(required=False, allow_null=True)
+    discount_percent = serializers.DecimalField(
+        max_digits=5, decimal_places=2, min_value=Decimal("0"), default=Decimal("0")
+    )
+
+    def validate_lines(self, value):
+        if not value:
+            raise serializers.ValidationError("لا أصناف في البيعة")
+        return value
+
+
 class CashMovementInputSerializer(serializers.Serializer):
     kind = serializers.ChoiceField(choices=["PAY_IN", "PAY_OUT"])
-    amount = serializers.DecimalField(
-        max_digits=12, decimal_places=2, min_value=Decimal("0.01")
-    )
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
     #: ⚠️  السبب إلزامي: نقد يخرج من الدرج بلا سبب هو بالضبط ما
     #:     يجعل فرق الإغلاق غير قابل للتفسير.
     reason = serializers.CharField(min_length=3, max_length=300)

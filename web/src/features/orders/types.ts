@@ -46,7 +46,20 @@ export interface OrderLine {
   product_name_en: string;
   quantity: number;
   unit_price: string;
-  line_total: string;
+  discount_amount: string;
+  tax_rate: string;
+  tax_amount: string;
+  /** الصافي قبل الضريبة. */
+  net: string;
+  /**
+   * ⚠️  اسم الحقل `total` لا `line_total`.
+   *
+   *     كان معرَّفًا هنا باسم لا يرسله الخادم، فكانت صفحتا تفاصيل
+   *     الطلب (المتجر والأدمن) تطبعان `undefined` مكان كل مبلغ
+   *     سطر — بلا خطأ في الطرفية لأن TypeScript كان يصدّق العقد
+   *     المكتوب هنا لا ما يصل فعلًا.
+   */
+  total: string;
 }
 
 export interface OrderStatusEvent {

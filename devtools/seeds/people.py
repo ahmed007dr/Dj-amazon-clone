@@ -129,6 +129,18 @@ CUSTOMERS = [
         VerificationStatus.VERIFIED,
         "01226667788",
     ),
+    # ⚠️  حساب جملة **بلا ائتمان** — الحالة الافتراضية لأي حساب
+    #     جديد، وهي التي لا تُرى في التطوير إن لم تُبذَر.
+    (
+        "wholesale@dev.local",
+        "مخزن الدلتا",
+        "للأدوية",
+        AccountType.WAREHOUSE,
+        CustomerSegment.WHOLESALE,
+        AccountStatus.ACTIVE,
+        VerificationStatus.VERIFIED,
+        "01004445566",
+    ),
 ]
 
 #: (البريد، الأول، الأخير، رمز الكلية، السنة، رقم الطالب، موثّق؟)

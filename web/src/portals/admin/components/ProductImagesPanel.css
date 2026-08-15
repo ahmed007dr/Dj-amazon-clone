@@ -1,0 +1,23 @@
+.images-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.images-panel__upload {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+}
+
+/* ⚠️  `auto-fill` بحد أدنى لا عدد أعمدة ثابت.
+   الشبكة تُستخدم داخل لوح منزلق عرضه يتغير بعرض الشاشة — عمودان
+   مفروضان يقصّان الصور على هاتف ويتركان فراغًا على شاشة كبيرة. */
+.images-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--space-3);
+}

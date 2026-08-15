@@ -1,0 +1,63 @@
+.pnl {
+  inline-size: min(34rem, 100%);
+  border-collapse: collapse;
+  margin-block: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.pnl th,
+.pnl td {
+  padding: var(--space-3) var(--space-4);
+  text-align: start;
+  font-weight: 400;
+}
+
+.pnl td {
+  text-align: end;
+  /* ⚠️  أرقام جدولية: بلا عرض ثابت للرقم تتذبذب خانات الأعمدة
+     فيصعب مقارنة سطر بآخر بالنظر — وهي كل فائدة القائمة. */
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pnl__minus th,
+.pnl__minus td {
+  color: var(--color-text-muted);
+  /* المسافة البادئة تُظهر أن السطر مطروح من الذي فوقه */
+  padding-inline-start: var(--space-6);
+}
+
+.pnl__subtotal th,
+.pnl__subtotal td {
+  font-weight: 600;
+  border-block-start: 1px solid var(--color-border);
+}
+
+.pnl__total th,
+.pnl__total td {
+  font-size: 1.25rem;
+  font-weight: 700;
+  border-block-start: 2px solid var(--color-text);
+}
+
+/* ⚠️  الخسارة باللون **والإشارة** معًا: الرقم السالب يبقى مقروءًا
+   لمن لا يميّز الألوان. */
+.pnl__total.is-loss td {
+  color: var(--color-danger);
+}
+
+.pnl__margin {
+  margin-inline-start: var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.pnl tfoot th,
+.pnl tfoot td {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  border-block-start: 1px dashed var(--color-border);
+}

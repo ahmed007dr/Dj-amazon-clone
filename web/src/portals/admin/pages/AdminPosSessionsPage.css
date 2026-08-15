@@ -1,0 +1,15 @@
+.pos-variance {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ⚠️  الإبراز بالوزن واللون معًا لا باللون وحده.
+   اللون ينقل «انتبه» لمن يراه؛ والوزن ينقلها لمن لا يميّزه —
+   وهذه بالضبط الحالة التي يجب ألا تفوت أحدًا. */
+.pos-variance.is-notable {
+  font-weight: 700;
+  color: var(--color-warning);
+}
+
+.pos-variance.is-notable.is-short {
+  color: var(--color-danger);
+}

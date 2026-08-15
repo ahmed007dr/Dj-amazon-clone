@@ -38,7 +38,8 @@ known-first-party = [
     "core", "branding", "accounts", "customers", "administration",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
-    "academic", "notifications", "devtools", "ops", "seo", "pos", "config",
+    "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
+    "config",
 ]
 
 # ═══════════════════════════════════════════════════════════
@@ -53,7 +54,7 @@ testpaths = [
     "core", "accounts", "customers", "administration", "branding",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
-    "academic", "notifications", "devtools", "ops", "seo", "pos",
+    "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
 ]
 
 [tool.coverage.run]
@@ -72,7 +73,7 @@ root_packages = [
     "core", "branding", "accounts", "customers", "administration",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
-    "academic", "notifications", "devtools", "ops", "seo", "pos",
+    "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
 ]
 
 [[tool.importlinter.contracts]]
@@ -104,6 +105,13 @@ layers = [
     #     وترشّحهما بـ `access` — وهما شقيقان في الطبقة نفسها لا
     #     يستورد أحدهما الآخر.
     "ops | seo",
+    # ⚠️  `b2b` و`finance` شقيقان فوق `pos` و`orders`.
+    #
+    #     كلاهما يستهلك الطلبات ولا يستورد الآخر: المالية تسأل «كم
+    #     ربحنا؟» وB2B يسأل «كم على هذا العميل؟». خلطهما كان يجعل
+    #     كشف حساب صيدلية يعتمد على قيود الأرباح — وهما دفتران
+    #     مختلفان لجمهورين مختلفين.
+    "b2b | finance",
     # ⚠️  `pos` **فوق** `orders` لا بديلًا عنه.
     #
     #     كل بيعة تُنتج `Order` بـ `channel=POS` عبر

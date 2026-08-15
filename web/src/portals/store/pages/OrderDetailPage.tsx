@@ -63,7 +63,7 @@ export function OrderDetailPage() {
                 {line.quantity} × {money(line.unit_price)}
               </span>
 
-              <span className="order-line__total">{money(line.line_total)}</span>
+              <span className="order-line__total">{money(line.total)}</span>
             </article>
           ))}
         </section>

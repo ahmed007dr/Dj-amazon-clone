@@ -1,0 +1,66 @@
+.sale-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  min-block-size: 0;
+}
+
+.sale-lines__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.sale-lines__name {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.sale-lines__qty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.sale-lines__qty button {
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+  font-size: 1.25rem;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.sale-lines__qty input {
+  inline-size: 3.5rem;
+  block-size: var(--touch-target);
+  /* ⚠️  الأرقام في الوسط ومن اليسار دائمًا: القراءة السريعة لعمود
+     كميات تعتمد على محاذاة ثابتة لا تتبدّل مع لغة الواجهة. */
+  text-align: center;
+  direction: ltr;
+  font-size: 1rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.sale-lines__remove {
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+  color: var(--color-danger);
+  background: transparent;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+}

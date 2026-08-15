@@ -1,0 +1,132 @@
+import { http } from '@/shared/http';
+import type { OrderDetail } from '@/features/orders/types';
+
+/**
+ * عقود نقطة البيع.
+ *
+ * ⚠️  **لا مبلغ يُرسَل من الجهاز إطلاقًا.**
+ *
+ *     الكاشير يرسل المنتج والكمية؛ السعر يحسبه الخادم. قبول سعر
+ *     من الواجهة يعني بيعة يحدّد سعرها من يملك الجهاز — وهو أول
+ *     ما يُستغَل في فرع فعلي.
+ *
+ *     الاستثناء الوحيد `payments[].amount`: وهو **ما دفعه العميل**
+ *     لا سعر البضاعة، والخادم يرفض ما لا يساوي إجماليه بالضبط.
+ */
+
+export interface Register {
+  id: string;
+  code: string;
+  name_ar: string;
+  name_en: string;
+  location: string;
+  location_code: string;
+  is_active: boolean;
+  has_open_session: boolean;
+}
+
+export interface Session {
+  id: string;
+  number: string;
+  register: string;
+  register_code: string;
+  cashier: string;
+  cashier_name: string;
+  status: 'OPEN' | 'CLOSED';
+  opened_at: string;
+  closed_at: string | null;
+  opening_float: string;
+  counted_cash: string | null;
+  /** ⚠️  `null` قبل الإغلاق عمدًا — لئلا يعدّ الكاشير حتى يطابقه. */
+  expected_cash: string | null;
+  variance: string | null;
+  variance_note: string;
+  note: string;
+}
+
+export interface POSProduct {
+  id: string;
+  sku: string;
+  barcode: string;
+  name_ar: string;
+  name_en: string;
+  base_price: string;
+  kind: string;
+}
+
+export interface QuoteLine {
+  product: string;
+  quantity: number;
+  unit_price: string;
+  tax_rate: string;
+  tax_amount: string;
+  discount_amount: string;
+  subtotal: string;
+}
+
+export interface Quote {
+  lines: QuoteLine[];
+  subtotal: string;
+  tax_total: string;
+  discount_total: string;
+  total: string;
+}
+
+export interface SaleLineInput {
+  product: string;
+  variant?: string | null;
+  quantity: number;
+}
+
+export interface PaymentInput {
+  method: string;
+  amount: string;
+}
+
+export interface SaleResult {
+  order: OrderDetail;
+  payments: { reference: string; status: string }[];
+}
+
+export interface CashMovement {
+  id: string;
+  kind: string;
+  amount: string;
+  reason: string;
+  reference_type: string;
+  reference_id: string;
+  created_at: string;
+}
+
+export const listRegisters = () => http.get<Register[]>('/pos/registers/');
+
+/** ⚠️  `null` حين لا وردية — لا خطأ. الحالة عادية في بداية اليوم. */
+export const getMySession = () => http.get<Session | null>('/pos/session/');
+
+export const openSession = (register: string, opening_float: string) =>
+  http.post<Session>('/pos/session/open/', { register, opening_float });
+
+export const closeSession = (counted_cash: string, variance_note: string) =>
+  http.post<Session>('/pos/session/close/', { counted_cash, variance_note });
+
+export const listCashMovements = () => http.get<CashMovement[]>('/pos/session/cash/');
+
+export const recordCash = (kind: 'PAY_IN' | 'PAY_OUT', amount: string, reason: string) =>
+  http.post<CashMovement>('/pos/session/cash/', { kind, amount, reason });
+
+export const searchProducts = (search: string) =>
+  http.get<POSProduct[]>('/pos/products/', { params: { search } });
+
+export const quoteSale = (body: {
+  lines: SaleLineInput[];
+  customer?: string | null;
+  discount_percent?: string;
+}) => http.post<Quote>('/pos/quote/', body);
+
+export const checkout = (body: {
+  lines: SaleLineInput[];
+  payments: PaymentInput[];
+  customer?: string | null;
+  discount_percent?: string;
+  note?: string;
+}) => http.post<SaleResult>('/pos/checkout/', body);

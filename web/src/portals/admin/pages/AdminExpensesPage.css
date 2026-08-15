@@ -1,0 +1,10 @@
+.expense-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: end;
+}
+
+.expense-decided {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}

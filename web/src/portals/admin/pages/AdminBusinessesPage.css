@@ -1,0 +1,18 @@
+.business-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.business-cell code {
+  direction: ltr;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* ⚠️  الترخيص المنتهي بالوزن واللون معًا — أول سبب يمنع الآجل،
+   ولا يصح أن يفوت من لا يميّز الألوان. */
+.licence-expired {
+  color: var(--color-danger);
+  font-weight: 700;
+}

@@ -1,0 +1,98 @@
+.receipt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  inline-size: min(24rem, 100%);
+  margin-inline: auto;
+}
+
+.receipt__paper {
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.receipt__number {
+  margin: 0;
+  font-size: 1.25rem;
+  text-align: center;
+}
+
+.receipt__date {
+  margin: 0 0 var(--space-4);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.receipt__lines {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.receipt__lines td {
+  padding-block: var(--space-1);
+  border-block-end: 1px dashed var(--color-border);
+}
+
+.receipt__lines td:last-child {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.receipt__totals {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-4) 0 0;
+  font-size: 0.875rem;
+}
+
+.receipt__totals dd {
+  margin: 0;
+  text-align: end;
+}
+
+.receipt__grand {
+  font-size: 1.125rem;
+  font-weight: 700;
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.receipt__actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.receipt__actions > * {
+  flex: 1;
+}
+
+/* ⚠️  الطباعة تُخرج الورقة وحدها.
+   بلا هذا يطبع المتصفح الهيدر والقائمة والأزرار على ورق حراري
+   عرضه ٨ سنتيمترات — فيخرج إيصال مقصوص لا يُقرأ. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .receipt__paper,
+  .receipt__paper * {
+    visibility: visible;
+  }
+
+  .receipt__paper {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    inline-size: 100%;
+    border: none;
+  }
+
+  .receipt__actions {
+    display: none;
+  }
+}

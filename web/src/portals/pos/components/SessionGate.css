@@ -1,0 +1,33 @@
+.session-gate {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  inline-size: min(28rem, 100%);
+  margin-inline: auto;
+  margin-block-start: var(--space-8);
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.session-gate__title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.session-gate__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* ⚠️  هدف اللمس الكامل: تُستخدم على تابلت بإصبع لا بفأرة. */
+.session-gate__select {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font-size: 1rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}

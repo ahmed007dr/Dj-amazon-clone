@@ -1,0 +1,23 @@
+.trade-tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-block: var(--space-4) var(--space-3);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.trade-tabs button {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-4);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-block-end: 2px solid transparent;
+  cursor: pointer;
+}
+
+.trade-tabs button.is-active {
+  color: var(--color-primary);
+  border-block-end-color: var(--color-primary);
+  font-weight: 600;
+}

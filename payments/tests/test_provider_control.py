@@ -64,7 +64,9 @@ class TestMultipleProviders:
         working = {code for code, p in providers.items() if p.is_active}
         awaiting = {code for code, p in providers.items() if not p.is_active}
 
-        assert working == {"cod", "cash", "bank"}
+        # ⚠️  `pos-card` من الجاهزين: ماكينة الكاونتر تُشغَّل يدويًا
+        #     ولا تحتاج مفاتيح مزوّد، فتفعيلها لا يَعِد بما لا يعمل.
+        assert working == {"cod", "cash", "bank", "pos-card"}
         assert awaiting == {"paymob", "fawry"}
 
     def test_external_gateways_start_in_sandbox(self, providers):
@@ -193,7 +195,8 @@ class TestToggleControl:
         ⚠️  متجر بلا بوابة واحدة لا يستقبل طلبات — والاكتشاف يكون
             بشكوى عميل لا بتنبيه.
         """
-        for code in ("bank", "cash"):
+        # ⚠️  تُوقَف كل النشطة عدا واحدة، فيقع الرفض على الأخيرة.
+        for code in ("bank", "cash", "pos-card"):
             admin_client.post(
                 reverse("v1:payments:provider-toggle", args=[providers[code].pk]),
                 {"is_active": False},

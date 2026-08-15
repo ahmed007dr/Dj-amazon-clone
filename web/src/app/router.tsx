@@ -2,9 +2,10 @@ import { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
 import { RequireAuth } from '@/features/auth/components/RequireAuth';
-import { isAdmin } from '@/features/auth/permissions';
+import { isAdmin, isStaff } from '@/features/auth/permissions';
 import { AccountShell } from '@/portals/account/AccountShell';
 import { AcademicPage } from '@/portals/account/pages/AcademicPage';
+import { TradeAccountPage } from '@/portals/account/pages/TradeAccountPage';
 import { AddressesPage } from '@/portals/account/pages/AddressesPage';
 import { DocumentsPage } from '@/portals/account/pages/DocumentsPage';
 import { NotificationsPage } from '@/portals/account/pages/NotificationsPage';
@@ -76,6 +77,45 @@ const AdminAccountsPage = lazy(() =>
 const AdminTaxPage = lazy(() =>
   import('@/portals/admin/pages/AdminTaxPage').then((module) => ({
     default: module.AdminTaxPage,
+  })),
+);
+/**
+ * ⚠️  نقطة البيع حزمة مستقلة تمامًا.
+ *
+ *     جهاز الكاونتر يفتح شاشة واحدة طوال اليوم على شبكة الفرع؛
+ *     تحميله كود لوحة الأدمن وصفحات المتجر معه يؤخّر أول بيعة في
+ *     الصباح بلا مقابل.
+ */
+const PosShell = lazy(() =>
+  import('@/portals/pos/PosShell').then((module) => ({ default: module.PosShell })),
+);
+const CashierPage = lazy(() =>
+  import('@/portals/pos/pages/CashierPage').then((module) => ({
+    default: module.CashierPage,
+  })),
+);
+const ShiftPage = lazy(() =>
+  import('@/portals/pos/pages/ShiftPage').then((module) => ({ default: module.ShiftPage })),
+);
+
+const AdminBusinessesPage = lazy(() =>
+  import('@/portals/admin/pages/AdminBusinessesPage').then((module) => ({
+    default: module.AdminBusinessesPage,
+  })),
+);
+const AdminFinancePage = lazy(() =>
+  import('@/portals/admin/pages/AdminFinancePage').then((module) => ({
+    default: module.AdminFinancePage,
+  })),
+);
+const AdminExpensesPage = lazy(() =>
+  import('@/portals/admin/pages/AdminExpensesPage').then((module) => ({
+    default: module.AdminExpensesPage,
+  })),
+);
+const AdminPosSessionsPage = lazy(() =>
+  import('@/portals/admin/pages/AdminPosSessionsPage').then((module) => ({
+    default: module.AdminPosSessionsPage,
   })),
 );
 const AdminPaymentsPage = lazy(() =>
@@ -165,6 +205,10 @@ const router = createBrowserRouter([
           //     سببها ما لم يمرّ بهذه الشاشة أولًا.
           { path: 'academic', element: <AcademicPage /> },
           { path: 'bundles', element: <BundlesPage /> },
+          // ⚠️  المسار موجود لكل حساب؛ والشاشة نفسها تُظهر
+          //     «لا ملف تجاري» لغير التجاري. إخفاء المسار كان
+          //     يجعل رابطًا مُشارَكًا يعطي «غير موجودة».
+          { path: 'trade', element: <TradeAccountPage /> },
           { path: 'notifications', element: <NotificationsPage /> },
           { path: 'security', element: <SecurityPage /> },
         ],
@@ -196,7 +240,29 @@ const router = createBrowserRouter([
       { path: 'users', element: <Lazy><AdminAccountsPage /></Lazy> },
       { path: 'tax', element: <Lazy><AdminTaxPage /></Lazy> },
       { path: 'payments', element: <Lazy><AdminPaymentsPage /></Lazy> },
+      { path: 'pos-sessions', element: <Lazy><AdminPosSessionsPage /></Lazy> },
+      { path: 'finance', element: <Lazy><AdminFinancePage /></Lazy> },
+      { path: 'expenses', element: <Lazy><AdminExpensesPage /></Lazy> },
+      { path: 'businesses', element: <Lazy><AdminBusinessesPage /></Lazy> },
       { path: 'branding', element: <Lazy><AdminBrandingPage /></Lazy> },
+    ],
+  },
+  {
+    // ── بوابة نقطة البيع ──────────────────────────────────
+    // ⚠️  `isStaff` يطابق `CanOperatePOS` على الخادم بالضبط
+    //     (موظف أو أدمن). فحص أوسع هنا يُظهر شاشة ترفضها كل نقطة
+    //     خلفها؛ وأضيق يحجب الكاشير عن أداة عمله.
+    path: '/pos',
+    element: (
+      <RequireAuth allow={isStaff}>
+        <Lazy>
+          <PosShell />
+        </Lazy>
+      </RequireAuth>
+    ),
+    children: [
+      { index: true, element: <Lazy><CashierPage /></Lazy> },
+      { path: 'shift', element: <Lazy><ShiftPage /></Lazy> },
     ],
   },
 ]);

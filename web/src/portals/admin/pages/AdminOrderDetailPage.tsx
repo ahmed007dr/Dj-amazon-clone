@@ -58,7 +58,7 @@ export function AdminOrderDetailPage() {
               <span className="muted">
                 {line.quantity} × {money(line.unit_price)}
               </span>
-              <strong>{money(line.line_total)}</strong>
+              <strong>{money(line.total)}</strong>
             </div>
           ))}
         </section>

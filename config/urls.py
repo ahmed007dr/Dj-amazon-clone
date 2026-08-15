@@ -60,8 +60,11 @@ api_v1 = [
     path("notifications/", include("notifications.urls")),
     # ── نقطة البيع ─────────────────────────────────────────
     path("pos/", include("pos.urls")),
+    # ── المالية ────────────────────────────────────────────
+    path("finance/", include("finance.urls")),
+    # ── B2B ────────────────────────────────────────────────
+    path("b2b/", include("b2b.urls")),
     # ── لاحقًا ─────────────────────────────────────────────
-    # path("finance/",  include("finance.urls")),       المرحلة ٨
     # path("employees/", include("employees.urls")),    المرحلة ١٠
 ]
 

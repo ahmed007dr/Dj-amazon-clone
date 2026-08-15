@@ -84,6 +84,42 @@ def can_cancel(order: Order) -> bool:
 
 
 @transaction.atomic
+def resolve_address(profile, data: dict) -> dict:
+    """
+    عنوان الشحن — محفوظًا أو مُرسَلًا صراحةً.
+
+    ⚠️  **مُصفّى بمالك العنوان.**
+
+        بلا `customer=profile` يشحن أي مستخدم إلى عنوان أي عميل
+        بتخمين معرّف — ويقرأ اسمه وهاتفه في استجابة الطلب.
+
+    ⚠️  ومشتركة بين إتمام المتجر وإتمام الآجل عمدًا.
+
+        نسختان من نفس التصفية تعنيان أن إحداهما تُنسى عند أول
+        تعديل — والمنسيّة هي الثغرة.
+    """
+    if data.get("address"):
+        return dict(data["address"])
+
+    from customers.models import CustomerAddress
+
+    saved = CustomerAddress.objects.filter(pk=data["address_id"], customer=profile).first()
+    if saved is None:
+        # ⚠️  404 لغير الموجود وغير المملوك معًا — الفارق بينهما
+        #     يكشف وجود العنوان لمن لا يملكه.
+        raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
+
+    return {
+        "recipient_name": saved.recipient_name,
+        "phone": saved.phone,
+        "governorate": saved.governorate,
+        "city": saved.city,
+        "street": saved.street,
+        "building": saved.building,
+        "landmark": saved.landmark,
+    }
+
+
 def create_from_cart(
     cart: Cart,
     *,
@@ -468,9 +504,7 @@ def refund_pos_order(order: Order, *, reason: str, actor=None) -> Order:
         )
 
     if order.status == OrderStatus.REFUNDED:
-        raise BusinessError(
-            ErrorCode.CONFLICT, detail="هذا الطلب مسترد بالفعل", status_code=409
-        )
+        raise BusinessError(ErrorCode.CONFLICT, detail="هذا الطلب مسترد بالفعل", status_code=409)
 
     previous = order.status
     order.status = OrderStatus.REFUNDED

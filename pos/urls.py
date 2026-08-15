@@ -13,6 +13,8 @@ urlpatterns = [
     path("session/open/", api.OpenSessionAPI.as_view(), name="session-open"),
     path("session/close/", api.CloseSessionAPI.as_view(), name="session-close"),
     path("session/cash/", api.SessionCashAPI.as_view(), name="session-cash"),
+    path("products/", api.POSProductSearchAPI.as_view(), name="products"),
+    path("quote/", api.QuoteAPI.as_view(), name="quote"),
     path("checkout/", api.CheckoutAPI.as_view(), name="checkout"),
     path("refund/", api.POSRefundAPI.as_view(), name="refund"),
     # ── الأدمن ─────────────────────────────────────────────

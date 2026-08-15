@@ -1,0 +1,58 @@
+.image-tile {
+  position: relative;
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.image-tile__img {
+  display: block;
+  inline-size: 100%;
+  /* ⚠️  نسبة ثابتة: صور بارتفاعات مختلفة تجعل الشبكة تقفز عند كل
+     تحميل، ويصعب على الأدمن الحكم على تناسقها في صفحة المنتج. */
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: var(--color-bg);
+}
+
+/* ⚠️  `inset-inline-start` لا `left` — يقفز إلى الحافة الصحيحة
+   مع تبديل اللغة بلا قاعدة ثانية. */
+.image-tile__flag {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-start: var(--space-2);
+}
+
+.image-tile__bar {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.image-tile__bar button {
+  flex: 1;
+  min-block-size: var(--touch-target);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.image-tile__bar button:hover:not(:disabled) {
+  background: var(--color-bg);
+}
+
+.image-tile__bar button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.image-tile__delete {
+  color: var(--color-danger);
+}

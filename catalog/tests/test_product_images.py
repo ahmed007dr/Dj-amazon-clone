@@ -288,9 +288,7 @@ class TestReorder:
         )
         assert [str(pk) for pk in result] == reversed_ids
 
-    def test_reorder_rejects_images_of_another_product(
-        self, admin_client, product, other_product
-    ):
+    def test_reorder_rejects_images_of_another_product(self, admin_client, product, other_product):
         """
         ⚠️  معرّف غريب في القائمة كان سيعيد ترتيب صور منتج آخر بصمت.
         """

@@ -23,12 +23,11 @@ from catalog.models import Category, Product
 from core.errors import BusinessError
 from core.models.settings import SystemSetting
 from core.models.tax import TaxClass
-from customers.models import CustomerProfile
 from inventory import services as inventory_services
 from inventory.models import LocationKind, StockLocation
 from orders.models import Order, OrderChannel, OrderStatus, PaymentStatus
 from pos import services
-from pos.models import CashMovementKind, POSSession, Register, SessionStatus
+from pos.models import CashMovementKind, Register, SessionStatus
 
 PASSWORD = "Str0ng-Test-Pass!23"
 
@@ -197,9 +196,7 @@ class TestSession:
         services.close_session(session, counted_cash=Decimal("200.00"), closed_by=cashier)
 
         with pytest.raises(BusinessError):
-            services.record_cash(
-                session, kind=CashMovementKind.PAY_IN, amount=Decimal("10.00")
-            )
+            services.record_cash(session, kind=CashMovementKind.PAY_IN, amount=Decimal("10.00"))
 
 
 # ═══════════════════════════════════════════════════════════
@@ -218,9 +215,7 @@ class TestCashReconciliation:
         expected = services.expected_cash_for(session)
         assert expected == Decimal("300.00"), "٢٠٠ افتتاحي + ١٠٠ نقدًا"
 
-        closed = services.close_session(
-            session, counted_cash=Decimal("300.00"), closed_by=cashier
-        )
+        closed = services.close_session(session, counted_cash=Decimal("300.00"), closed_by=cashier)
         assert closed.variance == Decimal("0.00")
 
     def test_card_sales_do_not_count_as_cash(self, session, product, cashier):
@@ -262,9 +257,7 @@ class TestCashReconciliation:
             يتذكّر فيه الكاشير ما جرى.
         """
         with pytest.raises(BusinessError) as failure:
-            services.close_session(
-                session, counted_cash=Decimal("100.00"), closed_by=cashier
-            )
+            services.close_session(session, counted_cash=Decimal("100.00"), closed_by=cashier)
 
         # ⚠️  `error_detail` لا `str(exc)`: الثاني يعيد رسالة الكتالوج
         #     العامة، والتفصيل هو ما يقرأه الكاشير فعلًا.
@@ -283,9 +276,7 @@ class TestCashReconciliation:
 
     def test_small_difference_needs_no_explanation(self, session, cashier):
         """فكّة ناقصة بجنيهات ليست حادثة تستحق تحقيقًا."""
-        closed = services.close_session(
-            session, counted_cash=Decimal("195.00"), closed_by=cashier
-        )
+        closed = services.close_session(session, counted_cash=Decimal("195.00"), closed_by=cashier)
         assert closed.variance == Decimal("-5.00")
 
     def test_variance_is_none_before_closing(self, session):
@@ -303,9 +294,7 @@ class TestCashReconciliation:
             label_en="t",
         )
 
-        closed = services.close_session(
-            session, counted_cash=Decimal("0.00"), closed_by=cashier
-        )
+        closed = services.close_session(session, counted_cash=Decimal("0.00"), closed_by=cashier)
         assert closed.variance == Decimal("-200.00")
 
 
@@ -324,9 +313,7 @@ class TestCheckout:
             النموذج الموازي كان سينتج تقريرَي مبيعات ومخزونين
             ومصدرَي حقيقة.
         """
-        result = services.checkout(
-            session, [services.SaleLine(product, 2)], [cash("100.00")]
-        )
+        result = services.checkout(session, [services.SaleLine(product, 2)], [cash("100.00")])
 
         order = Order.objects.get(pk=result.order.pk)
         assert order.channel == OrderChannel.POS
@@ -349,13 +336,9 @@ class TestCheckout:
     def test_selling_more_than_available_is_rejected(self, session, product):
         """⚠️  **بوابة الخروج الثانية:** لا بيع بمخزون غير متاح."""
         with pytest.raises(BusinessError):
-            services.checkout(
-                session, [services.SaleLine(product, 500)], [cash("25000.00")]
-            )
+            services.checkout(session, [services.SaleLine(product, 500)], [cash("25000.00")])
 
-    def test_a_rejected_sale_leaves_no_order_and_no_stock_change(
-        self, session, product, location
-    ):
+    def test_a_rejected_sale_leaves_no_order_and_no_stock_change(self, session, product, location):
         """
         ⚠️  المعاملة ذرّية: نفاد صنف في منتصف بيعة لا يترك طلبًا
             يتيمًا ولا مخزونًا مخصومًا جزئيًا.
@@ -364,9 +347,7 @@ class TestCheckout:
         orders_before = Order.objects.count()
 
         with pytest.raises(BusinessError):
-            services.checkout(
-                session, [services.SaleLine(product, 500)], [cash("25000.00")]
-            )
+            services.checkout(session, [services.SaleLine(product, 500)], [cash("25000.00")])
 
         assert Order.objects.count() == orders_before
         assert inventory_services.available_quantity(product, location=location) == before
@@ -378,9 +359,7 @@ class TestCheckout:
         """
         for amount in ("90.00", "110.00"):
             with pytest.raises(BusinessError) as failure:
-                services.checkout(
-                    session, [services.SaleLine(product, 2)], [cash(amount)]
-                )
+                services.checkout(session, [services.SaleLine(product, 2)], [cash(amount)])
             assert "لا يساوي الإجمالي" in failure.value.error_detail
 
     def test_discount_above_the_cap_is_rejected(self, session, product):
@@ -426,9 +405,7 @@ class TestCheckout:
         ⚠️  البيع على الكاونتر لا يستلزم حسابًا — الطلب بلا مالك
             هو الحال الطبيعي في متجر فعلي لا نقص في البيانات.
         """
-        result = services.checkout(
-            session, [services.SaleLine(product, 1)], [cash("50.00")]
-        )
+        result = services.checkout(session, [services.SaleLine(product, 1)], [cash("50.00")])
         assert result.order.customer is None
 
 
@@ -439,16 +416,12 @@ class TestCheckout:
 
 @pytest.mark.django_db
 class TestRefund:
-    def test_refund_returns_stock_and_marks_the_order(
-        self, session, product, location, manager
-    ):
+    def test_refund_returns_stock_and_marks_the_order(self, session, product, location, manager):
         """
         ⚠️  **لا حذف.** البيعة وقعت وضريبتها حُصّلت؛ حذفها يمحو
             الاثنين من تقرير اليوم.
         """
-        result = services.checkout(
-            session, [services.SaleLine(product, 2)], [cash("100.00")]
-        )
+        result = services.checkout(session, [services.SaleLine(product, 2)], [cash("100.00")])
         after_sale = inventory_services.available_quantity(product, location=location)
 
         services.refund_sale(
@@ -461,18 +434,14 @@ class TestRefund:
 
         order = Order.objects.get(pk=result.order.pk)
         assert order.status == OrderStatus.REFUNDED
-        assert inventory_services.available_quantity(product, location=location) == (
-            after_sale + 2
-        )
+        assert inventory_services.available_quantity(product, location=location) == (after_sale + 2)
 
     def test_cash_refund_leaves_the_drawer(self, session, product, manager):
         """
         ⚠️  النقد المُعاد يخرج بحركة مسجَّلة — وإلا بدا الفرق عجزًا
             عند الإغلاق.
         """
-        result = services.checkout(
-            session, [services.SaleLine(product, 2)], [cash("100.00")]
-        )
+        result = services.checkout(session, [services.SaleLine(product, 2)], [cash("100.00")])
         assert services.expected_cash_for(session) == Decimal("300.00")
 
         services.refund_sale(
@@ -486,15 +455,11 @@ class TestRefund:
         assert services.expected_cash_for(session) == Decimal("200.00")
 
     def test_double_refund_is_rejected(self, session, product, manager):
-        result = services.checkout(
-            session, [services.SaleLine(product, 1)], [cash("50.00")]
-        )
+        result = services.checkout(session, [services.SaleLine(product, 1)], [cash("50.00")])
         services.refund_sale(session, result.order, reason="مرتجع", performed_by=manager)
 
         with pytest.raises(BusinessError) as failure:
-            services.refund_sale(
-                session, result.order, reason="مرتجع ثانٍ", performed_by=manager
-            )
+            services.refund_sale(session, result.order, reason="مرتجع ثانٍ", performed_by=manager)
         assert "مسترد بالفعل" in failure.value.error_detail
 
 
@@ -522,9 +487,7 @@ class TestPermissions:
         ⚠️  الافتراضي الأشدّ حتى تُحسم قاعدة العمل ١١: توسيعه قرار
             يُتخذ صراحةً لا يُورَث من افتراضي متساهل.
         """
-        result = services.checkout(
-            session, [services.SaleLine(product, 1)], [cash("50.00")]
-        )
+        result = services.checkout(session, [services.SaleLine(product, 1)], [cash("50.00")])
 
         client = APIClient()
         client.force_authenticate(user=cashier)
@@ -606,6 +569,167 @@ class TestPermissions:
         response = client.get(reverse("v1:pos:session"))
         assert response.data["expected_cash"] is None
         assert response.data["variance"] is None
+
+
+# ═══════════════════════════════════════════════════════════
+#  البحث والتسعير — ما تراه شاشة الكاشير
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.fixture
+def cashier_client(cashier):
+    client = APIClient()
+    client.force_authenticate(user=cashier)
+    return client
+
+
+@pytest.mark.django_db
+class TestProductSearch:
+    def test_barcode_returns_an_exact_match_only(self, cashier_client, product):
+        """
+        ⚠️  الماسح يرسل رقمًا كاملًا.
+
+            مطابقته جزئيًا تعيد أصنافًا يشترك رقمها في مقطع —
+            فيضيف الكاشير الصنف الخطأ بضغطة واحدة ولا يلاحظ.
+        """
+        product.barcode = "6221001"
+        product.save()
+        Product.objects.create(
+            sku="POS-2",
+            name_ar="آخر",
+            name_en="Other",
+            category=product.category,
+            base_price=Decimal("10.00"),
+            barcode="62210019",
+        )
+
+        response = cashier_client.get(reverse("v1:pos:products"), {"search": "6221001"})
+
+        assert response.status_code == 200
+        assert [row["sku"] for row in response.data] == ["POS-1"]
+
+    def test_name_search_is_partial(self, cashier_client, product):
+        response = cashier_client.get(reverse("v1:pos:products"), {"search": "صن"})
+
+        assert [row["sku"] for row in response.data] == ["POS-1"]
+
+    def test_restricted_products_are_visible_to_the_cashier(self, cashier_client, product):
+        """
+        ⚠️  **بلا فلترة سياسات — وهذا مقصود.**
+
+            الصيدلي على الكاونتر يبيع المقيّد قانونًا. إخفاؤه عن
+            جهازه يعني أن يسجّله يدويًا أو لا يسجّله، وفي الحالتين
+            ينهار المخزون. الحاجز هنا `CanOperatePOS` لا السياسة.
+        """
+        from django.core.management import call_command
+
+        from access.models import AccessPolicy
+
+        call_command("seed_access_policies", verbosity=0)
+        restricted = Product.objects.create(
+            sku="POS-RX",
+            name_ar="دواء مقيّد",
+            name_en="Restricted",
+            category=product.category,
+            base_price=Decimal("80.00"),
+            access_policy=AccessPolicy.objects.get(code="pharmacy_only"),
+        )
+
+        response = cashier_client.get(reverse("v1:pos:products"), {"search": "مقيّد"})
+
+        assert [row["sku"] for row in response.data] == [restricted.sku]
+
+    def test_customer_cannot_search(self, db, product):
+        customer = User.objects.create_user(email="c-search@test.local", password=PASSWORD)
+        customer.is_active = True
+        customer.save()
+
+        client = APIClient()
+        client.force_authenticate(user=customer)
+
+        assert client.get(reverse("v1:pos:products")).status_code == 403
+
+
+@pytest.mark.django_db
+class TestQuote:
+    def test_quote_total_equals_what_checkout_charges(self, cashier_client, session, product):
+        """
+        ⚠️  **هذا هو الاختبار الذي يبرّر وجود النقطة.**
+
+            الرقم المعروض والرقم المحصَّل يخرجان من نفس الدالة.
+            انفصالهما يظهر أولًا كفرق بين الشاشة والإيصال — والعميل
+            هو من يكتشفه.
+        """
+        payload = {"lines": [{"product": str(product.pk), "quantity": 3}]}
+
+        quoted = cashier_client.post(reverse("v1:pos:quote"), payload, format="json")
+        assert quoted.status_code == 200
+
+        total = quoted.data["total"]
+        sale = cashier_client.post(
+            reverse("v1:pos:checkout"),
+            {**payload, "payments": [{"method": "CASH", "amount": total}]},
+            format="json",
+        )
+
+        assert sale.status_code == 201, sale.data
+        assert sale.data["order"]["grand_total"] == total
+
+    def test_quote_changes_nothing(self, cashier_client, session, product):
+        """لا مخزون يُخصم ولا طلب يُنشأ — التسعير بلا أثر."""
+        before = Order.objects.count()
+
+        cashier_client.post(
+            reverse("v1:pos:quote"),
+            {"lines": [{"product": str(product.pk), "quantity": 2}]},
+            format="json",
+        )
+
+        assert Order.objects.count() == before
+        assert session.cash_movements.count() == 0
+
+    def test_discount_above_the_cap_is_rejected_at_quote_time(
+        self, cashier_client, session, product
+    ):
+        """
+        ⚠️  الرفض عند الإدخال لا عند آخر ضغطة.
+
+            تركه للإتمام وحده يجعل الكاشير يبني بيعة كاملة أمام
+            العميل ثم يُرفض — والأصل أن يُمنع الخصم لحظة إدخاله.
+        """
+        response = cashier_client.post(
+            reverse("v1:pos:quote"),
+            {
+                "lines": [{"product": str(product.pk), "quantity": 1}],
+                "discount_percent": "50.00",
+            },
+            format="json",
+        )
+
+        assert response.status_code == 403
+
+    def test_quote_needs_an_open_session(self, db, product, cashier):
+        client = APIClient()
+        client.force_authenticate(user=cashier)
+
+        response = client.post(
+            reverse("v1:pos:quote"),
+            {"lines": [{"product": str(product.pk), "quantity": 1}]},
+            format="json",
+        )
+
+        assert response.status_code == 409
+
+    def test_unknown_product_is_a_clear_404(self, cashier_client, session):
+        import uuid
+
+        response = cashier_client.post(
+            reverse("v1:pos:quote"),
+            {"lines": [{"product": str(uuid.uuid4()), "quantity": 1}]},
+            format="json",
+        )
+
+        assert response.status_code == 404
 
 
 @pytest.mark.django_db

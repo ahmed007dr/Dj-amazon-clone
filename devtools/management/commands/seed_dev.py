@@ -28,10 +28,12 @@ from devtools.seeds import (
     branding,
     catalog,
     configuration,
+    counter,
     logistics,
     people,
     pricing,
     stock,
+    trade,
     transactions,
 )
 
@@ -90,9 +92,24 @@ class Command(BaseCommand):
         self._step("بوابات الدفع")
         call_command("seed_payment_providers", verbosity=0, stdout=StringIO())
 
+        # ⚠️  بنود المصروفات بنية تحتية لا بيانات تجريبية.
+        #
+        #     شاشة المصروفات بلا بند واحد لا تقبل إدخالًا إطلاقًا،
+        #     والقائمة الفارغة تبدو عطلًا لا «لم تُضبَط بعد».
+        self._step("بنود المصروفات")
+        call_command("seed_expense_categories", verbosity=0, stdout=StringIO())
+
         self._step("المواقع والشحن")
         logistics_data = logistics.seed()
         report["logistics"] = logistics_data["counts"]
+
+        # ⚠️  الأجهزة تُبذر حتى في الوضع المختصر.
+        #
+        #     نقطة البيع بلا جهاز واحد لا تُفتح إطلاقًا: البوابة
+        #     تعرض «لا جهاز متاح» ولا سبيل لتجاوزها من الواجهة.
+        #     وهي بنية تحتية كالمواقع لا بيانات تجريبية كالمنتجات.
+        self._step("أجهزة نقطة البيع")
+        report["counter"] = counter.seed(logistics_data["locations"])["counts"]
 
         if minimal:
             return report
@@ -117,6 +134,11 @@ class Command(BaseCommand):
         self._step("المستخدمون والملفات")
         people_data = people.seed(academia_data["faculties"])
         report["people"] = people_data["counts"]
+
+        # ⚠️  الحسابات التجارية بعد المستخدمين وقبل الطلبات:
+        #     تحتاج المستخدمين، والطلبات الآجلة تحتاجها.
+        self._step("الحسابات التجارية")
+        report["trade"] = trade.seed(people_data["users"])["counts"]
 
         self._step("الطلبات والتقييمات")
         report["transactions"] = transactions.seed(

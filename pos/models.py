@@ -235,9 +235,7 @@ class CashMovement(TimeStampedModel):
     مفتاح BigInt — سجل داخلي عالي الحجم لا يظهر في رابط.
     """
 
-    session = models.ForeignKey(
-        POSSession, on_delete=models.CASCADE, related_name="cash_movements"
-    )
+    session = models.ForeignKey(POSSession, on_delete=models.CASCADE, related_name="cash_movements")
 
     kind = models.CharField(_("النوع"), max_length=8, choices=CashMovementKind.choices)
     amount = MoneyField(_("المبلغ"), validators=[MinValueValidator(Decimal("0"))])

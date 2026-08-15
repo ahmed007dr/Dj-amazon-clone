@@ -4,11 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { listAdminProducts, type AdminProduct } from '@/features/catalog/adminApi';
+import { ProductImagesPanel } from '@/portals/admin/components/ProductImagesPanel';
 import { useDebounced } from '@/shared/hooks/useDebounced';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
 import { Badge } from '@/shared/ui/Badge';
+import { Button } from '@/shared/ui/Button';
+import { Drawer } from '@/shared/ui/Drawer';
 import { FilterBar, FilterSearch, FilterSelect } from '@/shared/ui/FilterBar';
 import { Pagination } from '@/shared/ui/Pagination';
 import { formatMoney } from '@/shared/utils/format';
@@ -20,6 +23,13 @@ export function AdminProductsPage() {
   const [search, setSearch] = useState('');
   const [active, setActive] = useState('');
   const [page, setPage] = useState(1);
+
+  // ⚠️  لوح لا مسار.
+  //
+  //     صفحة صور بمسار خاص تعني مغادرة القائمة وفقدان البحث
+  //     والصفحة والفلاتر — والأدمن يرفع صور عشرة منتجات متتالية
+  //     فيعود إلى الصفحة الأولى في كل مرة.
+  const [imagesFor, setImagesFor] = useState<AdminProduct | null>(null);
 
   const debouncedSearch = useDebounced(search);
 
@@ -76,6 +86,16 @@ export function AdminProductsPage() {
           <Badge tone="warning">{t('admin.inactive')}</Badge>
         ),
     },
+    {
+      key: 'images',
+      header: t('images.title'),
+      align: 'end',
+      render: (product) => (
+        <Button size="sm" variant="ghost" onClick={() => setImagesFor(product)}>
+          {t('images.manage')}
+        </Button>
+      ),
+    },
   ];
 
   const hasFilters = Boolean(search || active);
@@ -130,6 +150,19 @@ export function AdminProductsPage() {
       {query.data ? (
         <Pagination page={query.data.page} pages={query.data.pages} onChange={setPage} />
       ) : null}
+
+      <Drawer
+        open={imagesFor !== null}
+        onClose={() => setImagesFor(null)}
+        {...(imagesFor ? { title: localized(imagesFor, 'name') } : {})}
+      >
+        {/* ⚠️  اللوح يُركَّب عند الفتح فقط — `imagesFor` هو المفتاح.
+            إبقاؤه مركّبًا يجعل استعلام الصور يعمل لمنتج مغلق،
+            ويعرض صور المنتج السابق للحظة عند فتح التالي. */}
+        {imagesFor ? (
+          <ProductImagesPanel key={imagesFor.id} productId={imagesFor.id} />
+        ) : null}
+      </Drawer>
     </>
   );
 }

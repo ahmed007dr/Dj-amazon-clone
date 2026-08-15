@@ -1,0 +1,36 @@
+.expense-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.expense-form__select,
+.expense-form__file,
+.expense-form__note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.expense-form__select select,
+.expense-form__note textarea {
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.expense-form__note textarea {
+  resize: vertical;
+}
+
+.expense-form__file input {
+  font-size: 0.875rem;
+  font-weight: 400;
+}

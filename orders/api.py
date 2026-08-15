@@ -93,25 +93,9 @@ class CheckoutAPI(APIView):
         )
 
     def _resolve_address(self, profile, data) -> dict:
-        if data.get("address"):
-            return dict(data["address"])
-
-        from customers.models import CustomerAddress
-
-        saved = CustomerAddress.objects.filter(pk=data["address_id"], customer=profile).first()
-        if saved is None:
-            # ⚠️  404 لغير الموجود وغير المملوك معًا
-            raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
-
-        return {
-            "recipient_name": saved.recipient_name,
-            "phone": saved.phone,
-            "governorate": saved.governorate,
-            "city": saved.city,
-            "street": saved.street,
-            "building": saved.building,
-            "landmark": saved.landmark,
-        }
+        # ⚠️  في `services` لا هنا: إتمام الآجل يستخدم نفس التصفية،
+        #     ونسختان منها تعنيان أن إحداهما تُنسى عند أول تعديل.
+        return services.resolve_address(profile, data)
 
     def _charge(self, request, order, method):
         """

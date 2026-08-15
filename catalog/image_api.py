@@ -51,9 +51,7 @@ class ProductImageListCreateAPI(generics.ListCreateAPIView):
         if existing >= MAX_IMAGES_PER_PRODUCT:
             raise BusinessError(
                 ErrorCode.CONFLICT,
-                detail=_("الحد الأقصى {count} صور لكل منتج").format(
-                    count=MAX_IMAGES_PER_PRODUCT
-                ),
+                detail=_("الحد الأقصى {count} صور لكل منتج").format(count=MAX_IMAGES_PER_PRODUCT),
                 status_code=409,
             )
 
@@ -100,9 +98,7 @@ class ProductImageDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
         if was_primary:
             replacement = (
-                ProductImage.objects.filter(product_id=product_id)
-                .order_by("display_order")
-                .first()
+                ProductImage.objects.filter(product_id=product_id).order_by("display_order").first()
             )
             if replacement is not None:
                 replacement.is_primary = True
@@ -125,9 +121,9 @@ class SetPrimaryImageAPI(APIView):
     def post(self, request, pk, image_pk):
         image = get_object_or_404(ProductImage, pk=image_pk, product_id=pk)
 
-        ProductImage.objects.filter(product_id=pk, is_primary=True).exclude(
-            pk=image.pk
-        ).update(is_primary=False)
+        ProductImage.objects.filter(product_id=pk, is_primary=True).exclude(pk=image.pk).update(
+            is_primary=False
+        )
 
         image.is_primary = True
         image.save(update_fields=["is_primary"])
@@ -150,27 +146,29 @@ class ReorderImagesAPI(APIView):
         order = request.data.get("order")
 
         if not isinstance(order, list) or not order:
-            raise BusinessError(
-                ErrorCode.VALIDATION_ERROR, detail=_("أرسل `order` كقائمة معرّفات")
-            )
+            raise BusinessError(ErrorCode.VALIDATION_ERROR, detail=_("أرسل `order` كقائمة معرّفات"))
 
-        owned = set(
-            ProductImage.objects.filter(product_id=pk).values_list("id", flat=True)
-        )
+        owned = {
+            str(image_id)
+            for image_id in ProductImage.objects.filter(product_id=pk).values_list("id", flat=True)
+        }
 
-        for index, image_id in enumerate(order):
-            # ⚠️  التصفية بالمنتج داخل الحلقة: معرّف صورة منتج آخر
-            #     كان سيعيد ترتيبها من هنا.
-            ProductImage.objects.filter(pk=image_id, product_id=pk).update(
-                display_order=index * 10
-            )
-
-        unknown = [str(image_id) for image_id in order if str(image_id) not in map(str, owned)]
+        # ⚠️  **الفحص قبل التعديل لا بعده.**
+        #
+        #     الترتيب المعكوس كان يكتب ثم يرفع، معتمدًا على المعاملة
+        #     في التراجع. يعمل اليوم — ويتحوّل إلى كتابة جزئية صامتة
+        #     في اليوم الذي يُنزع فيه `@transaction.atomic` لسبب آخر.
+        unknown = [str(image_id) for image_id in order if str(image_id) not in owned]
         if unknown:
             raise BusinessError(
                 ErrorCode.VALIDATION_ERROR,
                 detail=_("معرّفات لا تخصّ هذا المنتج: {ids}").format(ids=", ".join(unknown)),
             )
+
+        for index, image_id in enumerate(order):
+            # ⚠️  التصفية بالمنتج باقية رغم الفحص أعلاه — حاجز ثانٍ
+            #     رخيص عند نقطة الكتابة نفسها.
+            ProductImage.objects.filter(pk=image_id, product_id=pk).update(display_order=index * 10)
 
         return Response(
             ProductImageSerializer(

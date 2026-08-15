@@ -30,6 +30,7 @@ from core.errors import BusinessError, ErrorCode
 from core.models.settings import SystemSetting
 from core.money import ZERO, quantize
 from inventory import services as inventory_services
+from inventory.models import StockMovement
 from payments import services as payment_services
 from pos.events import pos_sale_completed, pos_session_closed
 from pos.models import (
@@ -86,9 +87,7 @@ def open_session(register: Register, cashier, *, opening_float: Decimal = ZERO) 
         الفحص يعطي رسالة مفهومة بدل خطأ تكامل.
     """
     if not register.is_active:
-        raise BusinessError(
-            ErrorCode.CONFLICT, detail="هذا الجهاز موقوف", status_code=409
-        )
+        raise BusinessError(ErrorCode.CONFLICT, detail="هذا الجهاز موقوف", status_code=409)
 
     existing = register.open_session
     if existing is not None:
@@ -160,9 +159,7 @@ def close_session(
         مُعتمدة بأثر رجعي.
     """
     if not session.is_open:
-        raise BusinessError(
-            ErrorCode.CONFLICT, detail="هذه الوردية مغلقة بالفعل", status_code=409
-        )
+        raise BusinessError(ErrorCode.CONFLICT, detail="هذه الوردية مغلقة بالفعل", status_code=409)
 
     expected = expected_cash_for(session)
     counted = quantize(counted_cash)
@@ -273,6 +270,75 @@ class SaleResult:
     cash_movement: CashMovement | None = None
 
 
+@dataclass(frozen=True)
+class Quote:
+    """
+    تسعير بيعة قبل إتمامها.
+
+    ⚠️  **نفس الحساب الذي سيُحصَّل — لا نسخة منه.**
+
+        شاشة الكاشير تعرض إجماليًا، والخادم يحصّل إجماليًا. حسابهما
+        في مكانين يعني أنهما يتباعدان عند أول تغيير في التسعير،
+        فيقول الجهاز رقمًا ويطبع الإيصال آخر — والعميل هو من يكتشف.
+    """
+
+    lines: list
+    subtotal: Decimal
+    tax_total: Decimal
+    discount_total: Decimal
+    total: Decimal
+
+
+def quote(
+    session: POSSession,
+    lines: list[SaleLine],
+    *,
+    customer=None,
+    discount_percent: Decimal = ZERO,
+) -> Quote:
+    """
+    يسعّر السلة بلا أي أثر: لا مخزون يُخصم ولا طلب يُنشأ.
+
+    ⚠️  سقف الخصم يُفحَص هنا أيضًا.
+
+        تركه للإتمام وحده يجعل الكاشير يبني بيعة كاملة أمام العميل
+        ثم يُرفض في آخر ضغطة — والأصل أن يُمنع الخصم لحظة إدخاله.
+    """
+    cap = max_discount_percent()
+    if discount_percent > cap:
+        raise BusinessError(
+            ErrorCode.PERMISSION_DENIED,
+            detail=f"الخصم {discount_percent}% يتجاوز السقف المسموح ({cap}%)",
+            status_code=403,
+        )
+
+    user = customer.user if customer is not None else None
+
+    priced_lines = [
+        (
+            line,
+            pricing_services.price_for(
+                line.product, line.quantity, user=user, variant=line.variant
+            ),
+        )
+        for line in lines
+    ]
+
+    subtotal = quantize(sum((priced.subtotal for _line, priced in priced_lines), ZERO))
+    tax_total = quantize(sum((priced.tax_amount for _line, priced in priced_lines), ZERO))
+    line_discount = quantize(sum((priced.discount_amount for _line, priced in priced_lines), ZERO))
+
+    manual_discount = quantize(subtotal * discount_percent / Decimal("100"))
+
+    return Quote(
+        lines=priced_lines,
+        subtotal=subtotal,
+        tax_total=tax_total,
+        discount_total=quantize(line_discount + manual_discount),
+        total=quantize(subtotal + tax_total - manual_discount),
+    )
+
+
 def _assert_payments_cover(total: Decimal, payments: list[SplitPayment]) -> None:
     """
     ⚠️  مجموع الدفعات **يساوي** الإجمالي بالضبط.
@@ -324,47 +390,40 @@ def checkout(
     if not lines:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="لا أصناف في البيعة")
 
-    cap = max_discount_percent()
-    if discount_percent > cap:
-        raise BusinessError(
-            ErrorCode.PERMISSION_DENIED,
-            detail=f"الخصم {discount_percent}% يتجاوز السقف المسموح ({cap}%)",
-            status_code=403,
-        )
-
     location = session.register.location
-    user = customer.user if customer is not None else None
 
     # ── ١. التسعير ─────────────────────────────────────────
-    priced_lines = []
-    for line in lines:
-        priced = pricing_services.price_for(
-            line.product,
-            line.quantity,
-            user=user,
-            variant=line.variant,
-        )
-        priced_lines.append((line, priced))
-
-    subtotal = quantize(sum((priced.subtotal for _line, priced in priced_lines), ZERO))
-    tax_total = quantize(sum((priced.tax_amount for _line, priced in priced_lines), ZERO))
-    line_discount = quantize(sum((priced.discount_amount for _line, priced in priced_lines), ZERO))
-
-    manual_discount = quantize(subtotal * discount_percent / Decimal("100"))
-    total = quantize(subtotal + tax_total - manual_discount)
+    # ⚠️  **نفس الدالة التي تغذّي شاشة الكاشير.**
+    #
+    #     تكرار الحساب هنا كان يعني إجماليين ينفصلان عند أول تعديل
+    #     في التسعير — أحدهما على الشاشة والآخر على الإيصال.
+    priced = quote(session, lines, customer=customer, discount_percent=discount_percent)
+    priced_lines = priced.lines
+    subtotal = priced.subtotal
+    tax_total = priced.tax_total
+    total = priced.total
 
     _assert_payments_cover(total, payments)
 
     # ── ٢. خصم المخزون فورًا ───────────────────────────────
+    #
+    # ⚠️  المرجع هنا **الوردية** لأن الطلب لم يُنشأ بعد.
+    #
+    #     الترتيب مقصود: لو نفد صنف تُلغى المعاملة بلا طلب يتيم.
+    #     لكنه يترك الحركات مربوطة بالوردية لا بالبيعة — ويُعاد
+    #     توجيهها إلى الطلب بعد إنشائه مباشرةً (الخطوة ٣ب).
+    movements = []
     for line, _priced in priced_lines:
-        inventory_services.sell_immediately(
-            line.product,
-            line.quantity,
-            location=location,
-            variant=line.variant,
-            reference_type="pos_session",
-            reference_id=str(session.pk),
-            performed_by=session.cashier,
+        movements.extend(
+            inventory_services.sell_immediately(
+                line.product,
+                line.quantity,
+                location=location,
+                variant=line.variant,
+                reference_type="pos_session",
+                reference_id=str(session.pk),
+                performed_by=session.cashier,
+            )
         )
 
     # ── ٣. الطلب ───────────────────────────────────────────
@@ -388,12 +447,39 @@ def checkout(
         ],
         totals={
             "subtotal": subtotal,
-            "discount_total": quantize(line_discount + manual_discount),
+            "discount_total": priced.discount_total,
             "tax_total": tax_total,
             "grand_total": total,
         },
         note=note,
     )
+
+    # ── ٣ب. إعادة توجيه حركات المخزون إلى الطلب ────────────
+    #
+    # ⚠️  **بدونها تغيب تكلفة كل بيعة كاونتر عن قائمة الأرباح.**
+    #
+    #     المالية تحسب تكلفة البضاعة المباعة من حركات المخزون
+    #     المرتبطة بالطلب (`reference_type="order"`). حركات نقطة
+    #     البيع كانت مربوطة بالوردية، فكانت مبيعات الفرع تُقيَّد
+    #     إيرادًا **بتكلفة صفر** — أي بربح يساوي ثمن البيع كاملًا.
+    #     وهو خطأ في الاتجاه الأسوأ: يجعل التقرير يبدو ممتازًا.
+    #
+    # ⚠️  والوردية تبقى في `note` لا تضيع.
+    #
+    #     لا مفتاح أجنبي من `Order` إلى `POSSession`: `orders`
+    #     **تحت** `pos` في ترتيب الطبقات، والمفتاح كان سيقلب
+    #     الاتجاه ويكسر العقد. النص يكفي للتتبع اليدوي، والربط
+    #     التحليلي يمرّ عبر `CashMovement` التي تحمل معرّف الطلب.
+    if movements:
+        touched = StockMovement.objects.filter(pk__in=[m.pk for m in movements])
+        touched.update(reference_type="order", reference_id=str(order.pk))
+
+        # ⚠️  الملاحظة الفارغة وحدها تُكتب.
+        #
+        #     الحركة بلا دفعة تحمل «بلا دفعة مرتبطة» — وهي أثر
+        #     بضاعة مجهولة التكلفة. الكتابة فوقها تمحو التفسير
+        #     الوحيد لبند سيظهر في التقرير بتكلفة ناقصة.
+        touched.filter(note="").update(note=f"وردية {session.number}")
 
     # ── ٤. الدفعات ─────────────────────────────────────────
     transactions = []
@@ -413,9 +499,7 @@ def checkout(
         )
 
     # ── ٥. النقد في الدرج ──────────────────────────────────
-    cash_total = quantize(
-        sum((entry.amount for entry in payments if entry.method == "CASH"), ZERO)
-    )
+    cash_total = quantize(sum((entry.amount for entry in payments if entry.method == "CASH"), ZERO))
 
     movement = None
     if cash_total > ZERO:
@@ -459,9 +543,7 @@ def refund_sale(
         الفرق عجزًا عند الإغلاق.
     """
     if not session.is_open:
-        raise BusinessError(
-            ErrorCode.CONFLICT, detail="لا مرتجع على وردية مغلقة", status_code=409
-        )
+        raise BusinessError(ErrorCode.CONFLICT, detail="لا مرتجع على وردية مغلقة", status_code=409)
 
     from orders import services as order_services
 
