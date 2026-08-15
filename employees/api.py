@@ -80,11 +80,15 @@ class MyDashboardAPI(EmployeeMixin, APIView):
     """
     لوحة أداء المندوب.
 
-    ⚠️  **الهدف والعمولة غائبان صراحةً — لا صفرًا.**
+    ⚠️  **الأداء وحده — بلا هدف ولا عمولة.**
 
-        كلاهما في المرحلة ١١. وضع صفر مكانهما كان يجعل المندوب
-        يقرأ «تحقيقك ٠٪» ويظنه أداءً سيئًا لا نظامًا لم يُضبَط.
-        الحقل `target` يعود `null` ومعه سبب مقروء.
+        `targets` و`commissions` **فوق** هذا النطاق في ترتيب
+        الطبقات، فلا يجوز أن يستوردهما. وضع حقول فارغة لهما هنا
+        كان حلًّا مؤقتًا صار كذبًا بعد بنائهما: حقل اسمه `target`
+        يعود `null` دائمًا يُقرأ «لا هدف» لا «اسأل مكانًا آخر».
+
+        الشاشة تركّب من ثلاث نقاط: هذه و`/targets/me/`
+        و`/commissions/me/` — ثلاثة استعلامات متوازية صغيرة.
     """
 
     permission_classes = [HasEmployeeProfile]
@@ -109,11 +113,6 @@ class MyDashboardAPI(EmployeeMixin, APIView):
                 "average_order": str(result.average_order),
                 "customers_count": result.customers_count,
                 "new_customers": result.new_customers,
-                # ⚠️  `null` لا صفر — والواجهة تعرض «لم يُضبَط بعد».
-                "target": None,
-                "achievement_percent": None,
-                "estimated_commission": None,
-                "pending_reason": "targets_and_commissions_phase_11",
                 "history": services.monthly_history(employee),
             }
         )

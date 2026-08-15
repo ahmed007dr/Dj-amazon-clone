@@ -97,6 +97,16 @@ LOCAL_APPS = [
     # ⚠️  `employees` فوق `customers`: الإسناد يملكه الطرف الأعلى
     #     (ADR-12)، و`customers` لا يعرف بوجود الموظفين إطلاقًا.
     "employees",
+    # ⚠️  الأهداف فوق `employees`، والعمولات فوق الأهداف و`finance`
+    #     معًا: العمولة على الربح تحتاج تكلفة البضاعة المباعة.
+    "targets",
+    "commissions",
+    # ⚠️  `suppliers` فوق `inventory` و`catalog`: الاستلام يُنشئ
+    #     دفعة عبر `inventory.services.receive` لا بكتابة مباشرة.
+    "suppliers",
+    # ⚠️  `reporting` **يقرأ ولا يكتب** — بلا موديل ولا migrations.
+    #     الطبقة العليا: يعرف الجميع ولا يعرفه أحد.
+    "reporting",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

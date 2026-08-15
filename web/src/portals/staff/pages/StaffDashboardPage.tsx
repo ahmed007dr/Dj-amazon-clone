@@ -1,44 +1,58 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useDashboard } from '@/features/employees/api';
+import { useMyCommissions, useMyTarget } from '@/features/targets/api';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { Alert } from '@/shared/ui/Alert';
 import { Spinner } from '@/shared/ui/Spinner';
 import { StatCard } from '@/shared/ui/StatCard';
 
+import { CommissionCard } from '../components/CommissionCard';
 import { MonthlyHistory } from '../components/MonthlyHistory';
+import { TargetGauge } from '../components/TargetGauge';
 
 import './StaffDashboardPage.css';
 
 /**
  * لوحة أداء المندوب.
  *
- * ⚠️  **الهدف والعمولة يُعلَن غيابهما — لا يُعرَضان صفرًا.**
+ * ⚠️  **تُركَّب من ثلاث نقاط لا واحدة.**
  *
- *     المندوب يفتح هذه الشاشة أول كل صباح ليقيس نفسه. «تحقيقك
- *     ٠٪» يُقرأ أداءً سيئًا لا نظامًا لم يُضبَط بعد — وهو فرق بين
- *     موظف محبَط وموظف ينتظر. الخادم يرسل `null` ومعه سبب،
- *     والشاشة تقول السبب صراحةً.
+ *     `employees` تحت `targets` و`commissions` في ترتيب الطبقات
+ *     على الخادم، فلا نقطة واحدة تجمعها. والتركيب هنا ثلاثة
+ *     استعلامات متوازية صغيرة — أرخص من كسر حدود النطاقات.
+ *
+ * ⚠️  و**الهدف أعلى الشاشة قبل الأرقام**.
+ *
+ *     المندوب يفتحها ليعرف موقفه من هدفه؛ ودفنه تحت ستّ بطاقات
+ *     إحصائية يجعله يبحث عمّا جاء من أجله.
  */
 export function StaffDashboardPage() {
   const { t } = useTranslation();
-  const [period] = useState<{ start?: string; end?: string }>({});
 
-  const query = useDashboard(period);
+  const performance = useDashboard({});
+  const target = useMyTarget();
+  const commissions = useMyCommissions();
 
-  if (query.isPending) return <Spinner />;
-  if (!query.data) return null;
+  if (performance.isPending) return <Spinner />;
+  if (!performance.data) return null;
 
-  const data = query.data;
+  const data = performance.data;
+  const records = commissions.data?.results ?? [];
 
   return (
     <>
       <PageHeader title={t('staff.dashboard')} description={data.full_name} />
 
-      {data.target === null ? (
-        <Alert tone="info">{t('staff.targetsPending')}</Alert>
-      ) : null}
+      {/* ⚠️  «لا هدف» رسالة صريحة لا شاشة فارغة: غيابه أول الشهر
+          حالة عادية تنتظر الإدارة، لا عطل ولا أداء سيئ. */}
+      {target.isPending ? (
+        <Spinner />
+      ) : target.data ? (
+        <TargetGauge data={target.data} />
+      ) : (
+        <Alert tone="info">{t('targets.noTarget')}</Alert>
+      )}
 
       <div className="staff-stats">
         <StatCard label={t('staff.netSales')} value={data.net_sales} />
@@ -50,6 +64,17 @@ export function StaffDashboardPage() {
             يجعل ظهورها لاحقًا يبدو حقلًا جديدًا لا رقمًا تغيّر. */}
         <StatCard label={t('staff.returns')} value={data.returns_total} />
       </div>
+
+      {records.length > 0 ? (
+        <section className="staff-commissions">
+          <h2>{t('targets.myCommissions')}</h2>
+          <div className="staff-commissions__grid">
+            {records.map((record) => (
+              <CommissionCard key={record.id} record={record} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <MonthlyHistory rows={data.history} />
     </>

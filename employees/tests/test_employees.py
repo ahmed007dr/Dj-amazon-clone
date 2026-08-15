@@ -362,19 +362,20 @@ class TestPerformance:
 
 @pytest.mark.django_db
 class TestDashboardAndSelling:
-    def test_the_dashboard_declares_targets_are_not_configured(self, rep, mine):
+    def test_the_dashboard_carries_performance_only(self, rep, mine):
         """
-        ⚠️  **`null` لا صفر.**
+        ⚠️  **بلا حقول هدف أو عمولة — والغياب مقصود.**
 
-            صفر يجعل المندوب يقرأ «تحقيقك ٠٪» ويظنه أداءً سيئًا
-            لا نظامًا لم يُضبَط بعد.
+            `targets` و`commissions` فوق هذا النطاق في الطبقات.
+            حقل `target` هنا يعود `null` دائمًا ويُقرأ «لا هدف»
+            بدل «اسأل `/targets/me/`» — وهو كذب أسوأ من الغياب.
         """
         response = client_for(rep.user).get(reverse("v1:employees:dashboard"))
 
         assert response.status_code == 200
-        assert response.data["target"] is None
-        assert response.data["achievement_percent"] is None
-        assert response.data["pending_reason"] == "targets_and_commissions_phase_11"
+        assert "net_sales" in response.data
+        assert "target" not in response.data
+        assert "estimated_commission" not in response.data
 
     def test_creating_an_order_attributes_it_to_the_rep(self, rep, mine, db):
         """

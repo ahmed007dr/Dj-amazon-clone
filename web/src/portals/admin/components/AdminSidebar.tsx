@@ -48,12 +48,16 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
     //     يظهر لمن سيُرفض عند الضغط.
     key: 'finance',
     links: [
+      // ⚠️  التقارير أول القسم المالي: هي ما يُفتح يوميًا،
+      //     وقائمة الأرباح تُقرأ عند الإقفال.
+      { to: '/admin/reports', key: 'reports.title', permission: 'finance.view_revenueentry' },
       { to: '/admin/finance', key: 'finance.title', permission: 'finance.view_revenueentry' },
       { to: '/admin/expenses', key: 'finance.expensesTitle', permission: 'finance.add_expense' },
       { to: '/admin/businesses', key: 'b2b.businesses', permission: 'b2b.change_businessprofile' },
       // ⚠️  الموظفون هنا لا في «النظام»: الإسناد شأن تجاري
       //     يومي — عميل بلا مسؤول مبيعة ضائعة لا إعداد.
       { to: '/admin/staff', key: 'staff.staffTitle', permission: 'employees.change_customerassignment' },
+      { to: '/admin/targets', key: 'targets.title', permission: 'commissions.change_commissionrecord' },
     ],
   },
   {

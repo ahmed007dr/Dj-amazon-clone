@@ -122,6 +122,16 @@ const AdminStaffPage = lazy(() =>
     default: module.AdminStaffPage,
   })),
 );
+const AdminReportsPage = lazy(() =>
+  import('@/portals/admin/pages/AdminReportsPage').then((module) => ({
+    default: module.AdminReportsPage,
+  })),
+);
+const AdminTargetsPage = lazy(() =>
+  import('@/portals/admin/pages/AdminTargetsPage').then((module) => ({
+    default: module.AdminTargetsPage,
+  })),
+);
 const AdminBusinessesPage = lazy(() =>
   import('@/portals/admin/pages/AdminBusinessesPage').then((module) => ({
     default: module.AdminBusinessesPage,
@@ -269,6 +279,8 @@ const router = createBrowserRouter([
       { path: 'expenses', element: <Lazy><AdminExpensesPage /></Lazy> },
       { path: 'businesses', element: <Lazy><AdminBusinessesPage /></Lazy> },
       { path: 'staff', element: <Lazy><AdminStaffPage /></Lazy> },
+      { path: 'targets', element: <Lazy><AdminTargetsPage /></Lazy> },
+      { path: 'reports', element: <Lazy><AdminReportsPage /></Lazy> },
       { path: 'branding', element: <Lazy><AdminBrandingPage /></Lazy> },
     ],
   },

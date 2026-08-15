@@ -66,6 +66,11 @@ api_v1 = [
     path("b2b/", include("b2b.urls")),
     # ── بوابة الموظفين ─────────────────────────────────────
     path("employees/", include("employees.urls")),
+    path("targets/", include("targets.urls")),
+    path("commissions/", include("commissions.urls")),
+    # ── الموردون والتقارير ─────────────────────────────────
+    path("suppliers/", include("suppliers.urls")),
+    path("reports/", include("reporting.urls")),
     # ── لاحقًا ─────────────────────────────────────────────
 ]
 

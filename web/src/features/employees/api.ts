@@ -51,11 +51,13 @@ export interface Dashboard {
   average_order: string;
   customers_count: number;
   new_customers: number;
-  /** ⚠️  `null` لا صفر — الهدف والعمولة في المرحلة ١١. */
-  target: string | null;
-  achievement_percent: string | null;
-  estimated_commission: string | null;
-  pending_reason: string | null;
+  /**
+   * ⚠️  **بلا هدف ولا عمولة — والغياب مقصود.**
+   *
+   *     `targets` و`commissions` فوق `employees` في طبقات الخادم.
+   *     حقل `target` هنا كان يعود `null` دائمًا فيُقرأ «لا هدف»
+   *     بدل «اسأل `/targets/me/`». اللوحة تُركَّب من ثلاث نقاط.
+   */
   history: MonthRow[];
 }
 

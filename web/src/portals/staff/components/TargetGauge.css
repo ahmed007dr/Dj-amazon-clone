@@ -1,0 +1,107 @@
+.gauge {
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  margin-block-end: var(--space-4);
+}
+
+.gauge__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-block-end: var(--space-3);
+}
+
+.gauge__label {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.gauge__percent {
+  font-size: 2rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.gauge.is-behind .gauge__percent {
+  color: var(--color-danger);
+}
+
+.gauge.is-on-track .gauge__percent {
+  color: var(--color-warning);
+}
+
+.gauge.is-complete .gauge__percent {
+  color: var(--color-primary);
+}
+
+.gauge__bar {
+  position: relative;
+  display: flex;
+  block-size: 0.75rem;
+  background: var(--color-bg);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.gauge__fill {
+  display: block;
+  block-size: 100%;
+  background: var(--color-primary);
+  transition: inline-size var(--transition);
+}
+
+/* ⚠️  الزائد فوق المئة بلون مختلف: من حقّق ٢٠٠٪ يجب ألا يبدو
+   كمن حقّق ١٠٠٪ بالضبط — وهي أهم لحظة في شهره. */
+.gauge__overflow {
+  display: block;
+  block-size: 100%;
+  background: var(--color-success);
+  opacity: 0.55;
+}
+
+.gauge.is-behind .gauge__fill {
+  background: var(--color-danger);
+}
+
+.gauge.is-on-track .gauge__fill {
+  background: var(--color-warning);
+}
+
+/* علامة الحد الأدنى — الخط الذي دونه لا عمولة */
+.gauge__minimum {
+  position: absolute;
+  inset-block: 0;
+  inline-size: 2px;
+  background: var(--color-text);
+  opacity: 0.55;
+}
+
+.gauge__figures {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-3) 0 0;
+  font-size: 0.875rem;
+}
+
+.gauge__figures dt {
+  color: var(--color-text-muted);
+}
+
+.gauge__figures dd {
+  margin: 0;
+  text-align: end;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.gauge__warning {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.8125rem;
+  color: var(--color-danger);
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+}

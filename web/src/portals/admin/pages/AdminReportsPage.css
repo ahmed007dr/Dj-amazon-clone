@@ -1,0 +1,85 @@
+.reports-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.reports-tabs button {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-4);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-block-end: 2px solid transparent;
+  cursor: pointer;
+}
+
+.reports-tabs button.is-active {
+  color: var(--color-primary);
+  border-block-end-color: var(--color-primary);
+  font-weight: 600;
+}
+
+.reports-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-3);
+  margin-block-end: var(--space-4);
+}
+
+.reports-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.reports-heading {
+  margin: var(--space-4) 0 var(--space-3);
+  font-size: 1rem;
+  color: var(--color-text-muted);
+}
+
+.reports-expiry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reports-expiry li {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.8125rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ⚠️  حدّ على حافة البداية لا خلفية: الخلفية تُضعف تباين النص. */
+.reports-expiry li.is-expired {
+  border-inline-start: 3px solid var(--color-danger);
+}
+
+.reports-expiry code {
+  direction: ltr;
+  color: var(--color-text-muted);
+}
+
+.is-expired-flag {
+  color: var(--color-danger);
+}
+
+@media (max-width: 48rem) {
+  .reports-expiry li {
+    grid-template-columns: 1fr auto;
+  }
+}

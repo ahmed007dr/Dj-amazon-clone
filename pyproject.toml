@@ -39,7 +39,7 @@ known-first-party = [
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
     "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
-    "employees",
+    "employees", "targets", "commissions", "suppliers", "reporting",
     "config",
 ]
 
@@ -56,7 +56,7 @@ testpaths = [
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
     "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
-    "employees",
+    "employees", "targets", "commissions", "suppliers", "reporting",
 ]
 
 [tool.coverage.run]
@@ -76,7 +76,7 @@ root_packages = [
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
     "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
-    "employees",
+    "employees", "targets", "commissions", "suppliers", "reporting",
 ]
 
 [[tool.importlinter.contracts]]
@@ -95,6 +95,12 @@ layers = [
     #     على نطاقات لا علاقة له بها فيكذب المخطط. وهي غير مثبّتة
     #     خارج بيئة التطوير أصلًا (config/settings/dev.py).
     "devtools",
+    # ⚠️  `reporting` تحت `devtools` وفوق الجميع.
+    #
+    #     يقرأ كل نطاق ولا يكتب في أيٍّ منها، ولا نطاق يستورده.
+    #     وضعه أدنى كان يمنعه من قراءة ما فوقه — وهو تقرير يجب أن
+    #     يرى كل شيء بحكم تعريفه.
+    "reporting",
     # ⚠️  `ops` فوق نطاقات العمل وتحت `devtools`.
     #
     #     أوامر التشغيل تمسّ `inventory` و`cart` معًا؛ وضعها في
@@ -108,6 +114,14 @@ layers = [
     #     وترشّحهما بـ `access` — وهما شقيقان في الطبقة نفسها لا
     #     يستورد أحدهما الآخر.
     "ops | seo",
+    # ⚠️  `commissions` **فوق `targets` و`finance` معًا**.
+    #
+    #     العمولة على الربح تحتاج `finance.COGSEntry` — وهي التكلفة
+    #     المحسوبة من الدفعة التي خرجت فعلًا. حسابها هنا من جديد
+    #     يُنتج رقم ربح يخالف قائمة الأرباح، ولا أحد يعرف أيّهما
+    #     يُصدَّق حين تُصرَف عمولة على أحدهما.
+    "commissions",
+    "targets",
     # ⚠️  `b2b` و`finance` شقيقان فوق `pos` و`orders`.
     #
     #     كلاهما يستهلك الطلبات ولا يستورد الآخر: المالية تسأل «كم
@@ -122,6 +136,11 @@ layers = [
     #     و`customers` لا يستورده أبدًا: الحقل المعاكس كان ينشئ
     #     دائرة `customers ↔ employees`.
     "employees",
+    # ⚠️  `suppliers` فوق `inventory` و`catalog` وتحت `employees`.
+    #
+    #     يستلم البضاعة عبر `inventory.services.receive`، ولا يعرف
+    #     بوجود الطلبات ولا الموظفين إطلاقًا: الشراء واردٌ لا صادر.
+    "suppliers",
     # ⚠️  `pos` **فوق** `orders` لا بديلًا عنه.
     #
     #     كل بيعة تُنتج `Order` بـ `channel=POS` عبر
