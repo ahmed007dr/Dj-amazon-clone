@@ -79,6 +79,15 @@ def _register_order_listeners():
     @receiver(order_completed, weak=False)
     @_safe
     def on_order_completed(sender, order, **kwargs):
+        # ⚠️  بيعة الكاونتر بلا عميل مسجَّل — لا أحد يُشعَر.
+        #
+        #     المشتري أخذ بضاعته وإيصاله ومضى؛ ولا بريد نرسل إليه
+        #     ولا حساب يرى الإشعار. تجاهل ذلك كان يرفع `AttributeError`
+        #     في كل بيعة نقطة بيع — يبتلعه `_safe` فيبدو النظام سليمًا
+        #     بينما السجل يمتلئ بأخطاء.
+        if order.customer is None:
+            return
+
         user = order.customer.user
         services.notify(
             user,
@@ -100,7 +109,12 @@ def _register_order_listeners():
 
             إشعار عند كل حفظ يغرق العميل برسائل لا تخصّه —
             «قيد التجهيز» تعنيه، أما تعديل ملاحظة داخلية فلا.
+
+        ⚠️  وبيعة الكاونتر بلا عميل: لا مستقبِل للإشعار أصلًا.
         """
+        if instance.customer is None:
+            return
+
         user = instance.customer.user
 
         if created:

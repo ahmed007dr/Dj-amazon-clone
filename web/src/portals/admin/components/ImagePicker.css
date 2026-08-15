@@ -1,0 +1,22 @@
+.image-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* ⚠️  مخفي بصريًا لا `display: none` — الأخير يُخرجه من ترتيب
+   التنقل بلوحة المفاتيح، فيصير الزر غير قابل للتفعيل بها. */
+.image-picker__input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.image-picker__hint {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}

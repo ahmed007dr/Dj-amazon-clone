@@ -5,6 +5,7 @@
     الاثنتين، وإرسال المترجم فقط يجبر على نداء ثانٍ.
 """
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from catalog.models import (
@@ -15,6 +16,7 @@ from catalog.models import (
     ProductImage,
     ProductVariant,
 )
+from core.files import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE, validate_upload
 
 
 class CategoryBriefSerializer(serializers.ModelSerializer):
@@ -46,6 +48,32 @@ class ProductImageSerializer(serializers.ModelSerializer):
             "display_order",
             "is_primary",
         ]
+        # ⚠️  الترتيب و«الرئيسية» تُحدَّدان من نقاط مخصّصة لا من الرفع.
+        #
+        #     السماح بإرسال `is_primary=True` مع الرفع يكسر القيد
+        #     الفريد بدل أن ينقل الرئيسية، ويخرج للأدمن كخطأ ٥٠٠.
+        read_only_fields = ["display_order", "is_primary"]
+
+    def validate_image(self, value):
+        """
+        ⚠️  **الفحص هنا لا في الواجهة.**
+
+            حدّ الحجم في `<input accept>` تلميح للمتصفح لا حاجز؛
+            ورافع بـ curl لا يمرّ بالواجهة أصلًا.
+        """
+        # ⚠️  `ValidationError` من Django ليست نظيرتها من DRF.
+        #
+        #     تركها تصعد يجعل الرفض يخرج ٥٠٠ بدل ٤٠٠ برسالة —
+        #     فيبدو الملف المرفوض عطلًا في الخادم.
+        try:
+            validate_upload(
+                value,
+                allowed_types=ALLOWED_IMAGE_TYPES,
+                max_size=MAX_IMAGE_SIZE,
+            )
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
+        return value
 
 
 class ProductVariantSerializer(serializers.ModelSerializer):

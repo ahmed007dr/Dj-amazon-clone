@@ -24,7 +24,13 @@ export function AccountNav({ onNavigate }: { onNavigate?: () => void }) {
     { to: '/account/orders', key: 'nav.orders' },
     { to: '/account/addresses', key: 'account.addresses' },
     { to: '/account/documents', key: 'account.documents' },
-    ...(isStudent(user) ? [{ to: '/account/bundles', key: 'nav.bundles' }] : []),
+    ...(isStudent(user)
+      ? [
+          { to: '/account/academic', key: 'academic.profile' },
+          { to: '/account/bundles', key: 'nav.bundles' },
+        ]
+      : []),
+    { to: '/account/notifications', key: 'notifications.title' },
     { to: '/account/security', key: 'account.security' },
   ];
 

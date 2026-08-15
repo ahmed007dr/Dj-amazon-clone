@@ -14,6 +14,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from accounts.models import User
+from conftest import PDF_BYTES
 from customers.models import CustomerAddress, CustomerProfile
 
 PASSWORD = "Str0ng-Test-Pass!23"
@@ -184,7 +185,7 @@ class TestDocumentSecurity:
             reverse("v1:customers:documents"),
             {
                 "document_type": "MEDICAL_LICENSE",
-                "file": SimpleUploadedFile(name, b"fake-pdf", content_type="application/pdf"),
+                "file": SimpleUploadedFile(name, PDF_BYTES, content_type="application/pdf"),
             },
             format="multipart",
         )
@@ -260,7 +261,9 @@ class TestDocumentSecurity:
             {
                 "document_type": "MEDICAL_LICENSE",
                 "file": SimpleUploadedFile(
-                    "huge.pdf", b"x" * (11 * 1024 * 1024), content_type="application/pdf"
+                    "huge.pdf",
+                    PDF_BYTES + b"x" * (11 * 1024 * 1024),
+                    content_type="application/pdf",
                 ),
             },
             format="multipart",
@@ -301,7 +304,7 @@ class TestDocumentSecurity:
         document = CustomerDocument.objects.create(
             customer=profile,
             document_type="MEDICAL_LICENSE",
-            file=SimpleUploadedFile("secret.pdf", b"private", content_type="application/pdf"),
+            file=SimpleUploadedFile("secret.pdf", PDF_BYTES, content_type="application/pdf"),
         )
 
         response = alice_client.get(reverse("v1:customers:document-signed-url", args=[document.pk]))

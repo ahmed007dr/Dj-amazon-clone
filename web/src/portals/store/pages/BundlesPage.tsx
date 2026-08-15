@@ -61,7 +61,33 @@ export function BundlesPage() {
     );
   }
 
-  if (bundles.isPending) return <Spinner />;
+  if (profile.isPending || bundles.isPending) return <Spinner />;
+
+  // ── طالب بلا ملف أكاديمي ─────────────────────────────────
+  // ⚠️  ليست حالة «لا حزم».
+  //
+  //     الخادم يختار الحزم بالكلية والسنة، فبلا ملف يعيد قائمة
+  //     فارغة — نفس شكل «لا حزم لسنتك». عرض الرسالتين متطابقتين
+  //     يجعل الطالب ينتظر حزمًا لن تصل أبدًا، والسبب بيده هو.
+  if (profile.data === null) {
+    return (
+      <div className="container">
+        <PageHeader title={t('nav.bundles')} />
+        <StateMessage
+          icon="🎓"
+          title={t('academic.profileNeeded')}
+          body={t('academic.setupHint')}
+          action={
+            <Button>
+              <Link to="/account/academic" className="bundles__link">
+                {t('academic.completeProfile')}
+              </Link>
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="container">

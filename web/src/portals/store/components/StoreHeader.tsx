@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AccountMenu } from '@/features/auth/components/AccountMenu';
 import { CartBadge } from '@/features/cart/components/CartBadge';
+import { NotificationBell } from '@/features/notifications/components/NotificationBell';
 import { useIsDesktop } from '@/shared/hooks/useMediaQuery';
 import { Drawer } from '@/shared/ui/Drawer';
 import { LanguageSwitch } from '@/shared/ui/LanguageSwitch';
@@ -58,6 +59,7 @@ export function StoreHeader() {
         <div className="store-header__actions">
           {isDesktop && <LanguageSwitch />}
           <ThemeSwitch />
+          <NotificationBell />
           <CartBadge />
           <AccountMenu />
         </div>

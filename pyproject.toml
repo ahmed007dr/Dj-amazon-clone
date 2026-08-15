@@ -38,7 +38,7 @@ known-first-party = [
     "core", "branding", "accounts", "customers", "administration",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
-    "academic", "notifications", "devtools", "ops", "config",
+    "academic", "notifications", "devtools", "ops", "seo", "pos", "config",
 ]
 
 # ═══════════════════════════════════════════════════════════
@@ -53,7 +53,7 @@ testpaths = [
     "core", "accounts", "customers", "administration", "branding",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
-    "academic", "notifications", "devtools", "ops",
+    "academic", "notifications", "devtools", "ops", "seo", "pos",
 ]
 
 [tool.coverage.run]
@@ -72,7 +72,7 @@ root_packages = [
     "core", "branding", "accounts", "customers", "administration",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
-    "academic", "notifications", "devtools", "ops",
+    "academic", "notifications", "devtools", "ops", "seo", "pos",
 ]
 
 [[tool.importlinter.contracts]]
@@ -97,7 +97,23 @@ layers = [
     #     أحدهما يجعله يستورد الآخر، وفي `core` يجعل البنية التحتية
     #     تعرف نطاقات العمل. ولا تصلح `devtools` لأنه غير مثبّت في
     #     الإنتاج — والمهام الدورية تعمل هناك قبل أي مكان آخر.
-    "ops",
+    #
+    # ⚠️  و`seo` بجواره لا داخل `catalog`.
+    #
+    #     خريطة الموقع تجمع منتجات `catalog` وحزم `academic`
+    #     وترشّحهما بـ `access` — وهما شقيقان في الطبقة نفسها لا
+    #     يستورد أحدهما الآخر.
+    "ops | seo",
+    # ⚠️  `pos` **فوق** `orders` لا بديلًا عنه.
+    #
+    #     كل بيعة تُنتج `Order` بـ `channel=POS` عبر
+    #     `orders.services.create_pos_order`. و`orders` لا يعرف
+    #     بوجود نقطة البيع إطلاقًا: مدخلاته أصناف وأرقام.
+    #
+    #     النموذج الموازي (`POSOrder`) كان سينتج تقريرَي مبيعات
+    #     ومخزونين ومصدرَي حقيقة — وأول سؤال محاسبي يكشف الفجوة
+    #     بينهما بلا طريقة لحسمها.
+    "pos",
     "orders",
     "cart",
     # ⚠️  `payments` **تحت** `orders` لا فوقه.

@@ -24,6 +24,7 @@ from django.utils import timezone
 from cart import services as cart_services
 from cart.models import Cart, CartStatus
 from core.errors import BusinessError, ErrorCode
+from core.money import ZERO
 from inventory import services as inventory_services
 from orders.models import (
     Order,
@@ -367,3 +368,116 @@ def orders_for(customer):
         .select_related("customer", "location")
         .prefetch_related("lines")
     )
+
+
+# ═══════════════════════════════════════════════════════════
+#  نقطة البيع
+# ═══════════════════════════════════════════════════════════
+#
+#  ⚠️  **الطلب واحد لكل القنوات.**
+#
+#      الدالتان أدناه هما مدخل نقطة البيع إلى نفس نموذج الطلب —
+#      لا نموذج موازٍ. `pos` يستدعيهما ولا يعرف `Order` مباشرةً،
+#      و`orders` لا يعرف بوجود `pos` إطلاقًا: مدخلاته أصناف وأرقام.
+#
+#      البديل (`POSOrder` منفصل) يعني تقريرَي مبيعات ومخزونين
+#      ومصدرَي حقيقة — وأول سؤال محاسبي يكشف الفجوة بلا طريقة
+#      لحسمها.
+
+
+@transaction.atomic
+def create_pos_order(
+    *,
+    customer,
+    location,
+    cashier,
+    lines: list[dict],
+    totals: dict,
+    note: str = "",
+) -> Order:
+    """
+    طلب نقطة بيع — **مؤكَّد ومدفوع ومُسلَّم فورًا**.
+
+    ⚠️  يبدأ من `DELIVERED` لا من `PENDING`.
+
+        البضاعة سُلّمت على الكاونتر والمال قُبض. تمريره بآلة الحالة
+        من «قيد الانتظار» إلى «مُسلَّم» ينتج خمسة أحداث وهمية في
+        السجل لعملية استغرقت ثانية، ويغرق العميل بخمسة إشعارات
+        عن طلب يحمله في يده.
+
+    ⚠️  و`customer` قد يكون `None`: البيع على الكاونتر لا يستلزم
+        حسابًا. الطلب حينها بلا مالك — وهو الحال الطبيعي في متجر
+        فعلي، لا نقص في البيانات.
+    """
+    order = Order.objects.create(
+        customer=customer,
+        channel=OrderChannel.POS,
+        location=location,
+        created_by=cashier,
+        status=OrderStatus.DELIVERED,
+        payment_status=PaymentStatus.PAID,
+        subtotal=totals["subtotal"],
+        discount_total=totals.get("discount_total", ZERO),
+        tax_total=totals.get("tax_total", ZERO),
+        shipping_total=ZERO,
+        grand_total=totals["grand_total"],
+        internal_note=note,
+        confirmed_at=timezone.now(),
+    )
+
+    for entry in lines:
+        product = entry["product"]
+        OrderLine.objects.create(
+            order=order,
+            product=product,
+            variant=entry.get("variant"),
+            # ⚠️  لقطات وقت البيع (ADR-30) — الفاتورة لا تتغيّر
+            #     بتغيّر اسم المنتج أو سعره غدًا.
+            product_sku=product.sku,
+            product_name_ar=product.name_ar,
+            product_name_en=product.name_en,
+            quantity=entry["quantity"],
+            unit_price=entry["unit_price"],
+            discount_amount=entry.get("discount_amount", ZERO),
+            tax_rate=entry.get("tax_rate", ZERO),
+            tax_amount=entry.get("tax_amount", ZERO),
+            # ⚠️  لا `line_total`: إجمالي السطر **خاصية محسوبة**
+            #     (`net + tax_amount`) لا عمودًا. تخزينه يعني رقمين
+            #     قد يتباعدان — وأيّهما الصحيح سؤال بلا إجابة.
+        )
+
+    _record_status(order, "", OrderStatus.DELIVERED, note="بيع نقطة بيع", actor=cashier)
+
+    return order
+
+
+@transaction.atomic
+def refund_pos_order(order: Order, *, reason: str, actor=None) -> Order:
+    """
+    استرداد بيعة نقطة بيع.
+
+    ⚠️  **لا حذف.** البيعة وقعت وضريبتها حُصّلت؛ حذفها يمحو
+        الاثنين من تقرير اليوم. الطلب يبقى ويُعلَّم `REFUNDED`،
+        وإعادة المخزون تقع في `pos` لأنها تخصّ موقع الجهاز.
+    """
+    if order.channel != OrderChannel.POS:
+        raise BusinessError(
+            ErrorCode.CONFLICT,
+            detail="هذه الدالة لطلبات نقطة البيع وحدها",
+            status_code=409,
+        )
+
+    if order.status == OrderStatus.REFUNDED:
+        raise BusinessError(
+            ErrorCode.CONFLICT, detail="هذا الطلب مسترد بالفعل", status_code=409
+        )
+
+    previous = order.status
+    order.status = OrderStatus.REFUNDED
+    order.payment_status = PaymentStatus.REFUNDED
+    order.cancellation_reason = reason
+    order.save(update_fields=["status", "payment_status", "cancellation_reason"])
+
+    _record_status(order, previous, OrderStatus.REFUNDED, note=reason, actor=actor)
+
+    return order

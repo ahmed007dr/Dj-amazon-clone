@@ -4,8 +4,10 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { RequireAuth } from '@/features/auth/components/RequireAuth';
 import { isAdmin } from '@/features/auth/permissions';
 import { AccountShell } from '@/portals/account/AccountShell';
+import { AcademicPage } from '@/portals/account/pages/AcademicPage';
 import { AddressesPage } from '@/portals/account/pages/AddressesPage';
 import { DocumentsPage } from '@/portals/account/pages/DocumentsPage';
+import { NotificationsPage } from '@/portals/account/pages/NotificationsPage';
 import { ProfilePage } from '@/portals/account/pages/ProfilePage';
 import { SecurityPage } from '@/portals/account/pages/SecurityPage';
 import { NotFoundPage } from '@/portals/store/pages/NotFoundPage';
@@ -158,7 +160,12 @@ const router = createBrowserRouter([
           { path: 'orders', element: <OrdersPage /> },
           { path: 'addresses', element: <AddressesPage /> },
           { path: 'documents', element: <DocumentsPage /> },
+          // ⚠️  الملف الأكاديمي قبل الحزم في الترتيب عمدًا: الحزم
+          //     تُشتق منه، وطالب بلا ملف يرى قائمة فارغة لا يعرف
+          //     سببها ما لم يمرّ بهذه الشاشة أولًا.
+          { path: 'academic', element: <AcademicPage /> },
           { path: 'bundles', element: <BundlesPage /> },
+          { path: 'notifications', element: <NotificationsPage /> },
           { path: 'security', element: <SecurityPage /> },
         ],
       },

@@ -81,6 +81,12 @@ LOCAL_APPS = [
     # ⚠️  أوامر التشغيل عابرة النطاقات — **مثبّت في الإنتاج**.
     #     بخلاف `devtools` الذي يبقى في بيئة التطوير وحدها.
     "ops",
+    # ⚠️  الأرشفة تجمع `catalog` و`academic` وترشّحهما بـ `access` —
+    #     ولا نطاق منها يجوز أن يستورد الآخر.
+    "seo",
+    # ⚠️  نقطة البيع **قناة** لا نظام موازٍ: كل بيعة تُنتج `Order`
+    #     بـ `channel=POS`. فوق `orders` لأنها تستدعيه.
+    "pos",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -332,6 +338,18 @@ TAX_PRICES_INCLUDE_TAX = env.bool("TAX_PRICES_INCLUDE_TAX", default=False)
 
 FRONTEND_BASE_URL = env("FRONTEND_BASE_URL", default="http://localhost:3000")
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
+
+
+# ═══════════════════════════════════════════════════════════
+#  الأرشفة
+# ═══════════════════════════════════════════════════════════
+# ⚠️  الافتراضي **مغلق**.
+#
+#     بيئة تجريبية مفهرسة تنافس الموقع الحقيقي على نفس الكلمات
+#     وتعرض بيانات اختبار كأنها منتجات. والافتراضي المغلق يجعل
+#     نسيان الضبط خطأً آمنًا؛ العكس يجعله كارثة تسويقية صامتة.
+
+SEO_INDEXING_ENABLED = env.bool("SEO_INDEXING_ENABLED", default=False)
 
 
 # ═══════════════════════════════════════════════════════════

@@ -58,8 +58,9 @@ api_v1 = [
     path("payments/", include("payments.urls")),
     # ── الإشعارات ──────────────────────────────────────────
     path("notifications/", include("notifications.urls")),
+    # ── نقطة البيع ─────────────────────────────────────────
+    path("pos/", include("pos.urls")),
     # ── لاحقًا ─────────────────────────────────────────────
-    # path("pos/",      include("pos.urls")),           المرحلة ٧
     # path("finance/",  include("finance.urls")),       المرحلة ٨
     # path("employees/", include("employees.urls")),    المرحلة ١٠
 ]
@@ -68,6 +69,9 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/", include((api_v1, "api"), namespace="v1")),
     path("i18n/", include("django.conf.urls.i18n")),
+    # ⚠️  الأرشفة **على الجذر بلا بادئة** — المزحف يطلب
+    #     `/robots.txt` و`/sitemap.xml` حرفيًا. انظر seo/README.md
+    path("", include("seo.urls")),
 ]
 
 if settings.DEBUG:

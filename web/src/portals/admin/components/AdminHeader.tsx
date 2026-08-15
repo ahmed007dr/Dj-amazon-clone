@@ -1,4 +1,5 @@
 import { AccountMenu } from '@/features/auth/components/AccountMenu';
+import { NotificationBell } from '@/features/notifications/components/NotificationBell';
 import { LanguageSwitch } from '@/shared/ui/LanguageSwitch';
 import { ThemeSwitch } from '@/shared/ui/ThemeSwitch';
 
@@ -20,6 +21,10 @@ export function AdminHeader({ title }: { title?: string }) {
       <div className="admin-header__actions">
         <LanguageSwitch compact />
         <ThemeSwitch />
+        {/* ⚠️  تنبيهات النفاد وقرب الصلاحية تصل كإشعارات `INVENTORY`
+            — بلا جرس هنا لا يراها الأدمن إلا بفتح شاشة المخزون
+            قاصدًا، وهو ما يفعله بعد نفاد الصنف لا قبله. */}
+        <NotificationBell />
         <AccountMenu />
       </div>
     </div>

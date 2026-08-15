@@ -68,13 +68,70 @@ def verify_file_access(signature: str, resource: str, user_id) -> str | None:
     return payload.get("id")
 
 
+#: أنواع صور المنتجات — أضيق من الوثائق: لا PDF على صفحة منتج
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+}
+
+#: توقيع الملف (magic bytes) → نوعه الحقيقي.
+#
+# ⚠️  **`content_type` يأتي من العميل ويمكن تزويره.**
+#
+#     رفع `shell.php` بترويسة `image/png` يمرّ الفحص السطحي بالكامل.
+#     التوقيع يُقرأ من أول بايتات الملف نفسه، ولا يملك الرافع تغييره
+#     بلا تغيير الملف فعلًا.
+#
+#     المفتاح: (الإزاحة، البايتات) — WebP يحتاج فحصين لأن توقيعه
+#     مقسوم: `RIFF` ثم `WEBP` بعد أربعة بايتات لحجم الملف.
+_MAGIC_SIGNATURES: list[tuple[str, list[tuple[int, bytes]]]] = [
+    ("image/jpeg", [(0, b"\xff\xd8\xff")]),
+    ("image/png", [(0, b"\x89PNG\r\n\x1a\n")]),
+    ("image/webp", [(0, b"RIFF"), (8, b"WEBP")]),
+    ("application/pdf", [(0, b"%PDF-")]),
+]
+
+#: أطول توقيع نحتاج قراءته
+_MAGIC_READ_SIZE = 16
+
+
+def detect_file_type(uploaded_file) -> str | None:
+    """
+    النوع الحقيقي من توقيع الملف — أو `None` لغير المعروف.
+
+    ⚠️  المؤشّر يُعاد إلى الصفر بعد القراءة.
+
+        تركه متقدّمًا يجعل Django يخزّن ملفًا ناقص أول ستة عشر
+        بايتًا — أي صورة مكسورة تُرفع «بنجاح» ولا تُعرض أبدًا.
+    """
+    try:
+        uploaded_file.seek(0)
+        header = uploaded_file.read(_MAGIC_READ_SIZE)
+    finally:
+        uploaded_file.seek(0)
+
+    for content_type, parts in _MAGIC_SIGNATURES:
+        if all(header[offset : offset + len(magic)] == magic for offset, magic in parts):
+            return content_type
+
+    return None
+
+
 def validate_upload(uploaded_file, *, allowed_types=None, max_size=None) -> None:
     """
     فحص الملف المرفوع قبل تخزينه.
 
-    ⚠️  `content_type` يأتي من العميل ويمكن تزويره — فهو فحص أولي
-        لا نهائي. الفحص العميق بقراءة توقيع الملف (magic bytes)
-        يُضاف مع رفع صور المنتجات في المرحلة ٣.
+    ⚠️  **الفحص على توقيع الملف لا على ترويسته.**
+
+        `content_type` يأتي من العميل ويمكن تزويره بسطر واحد؛
+        والقائمة البيضاء المبنية عليه وحدها حماية شكلية. التوقيع
+        يُقرأ من الملف نفسه.
+
+    ⚠️  والملف مجهول التوقيع **يُرفض** لا يُقبل بحذر.
+
+        القبول الافتراضي يجعل كل صيغة لم نفكّر فيها بابًا مفتوحًا،
+        والقائمة البيضاء تعني أن الجديد يُضاف بقرار لا بسهو.
     """
     allowed_types = allowed_types or ALLOWED_DOCUMENT_TYPES
     max_size = max_size or MAX_DOCUMENT_SIZE
@@ -84,6 +141,20 @@ def validate_upload(uploaded_file, *, allowed_types=None, max_size=None) -> None
             f"حجم الملف يتجاوز الحد المسموح ({max_size // (1024 * 1024)} ميجابايت)"
         )
 
-    content_type = getattr(uploaded_file, "content_type", None)
-    if content_type and content_type not in allowed_types:
+    # ⚠️  الحجم صفر يمرّ كل فحص محتوى — ويُخزَّن كملف فارغ يبدو سليمًا
+    if uploaded_file.size == 0:
+        raise ValidationError("الملف فارغ")
+
+    detected = detect_file_type(uploaded_file)
+
+    if detected is None:
+        raise ValidationError("تعذّر التعرّف على نوع الملف")
+
+    if detected not in allowed_types:
+        raise ValidationError("نوع الملف غير مسموح")
+
+    # ⚠️  التناقض بين الترويسة والتوقيع مؤشّر تزوير لا خطأ عابر —
+    #     يُرفض ويُسجَّل بدل أن يُصحَّح بصمت.
+    declared = getattr(uploaded_file, "content_type", None)
+    if declared and declared not in allowed_types:
         raise ValidationError("نوع الملف غير مسموح")

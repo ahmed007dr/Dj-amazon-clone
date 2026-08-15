@@ -2,7 +2,7 @@
 
 from django.urls import path
 
-from catalog import api
+from catalog import api, image_api
 
 app_name = "catalog"
 
@@ -28,5 +28,26 @@ urlpatterns = [
         "admin/products/<uuid:pk>/",
         api.AdminProductDetailAPI.as_view(),
         name="admin-product-detail",
+    ),
+    # صور المنتج — الرفع والترتيب والحذف
+    path(
+        "admin/products/<uuid:pk>/images/",
+        image_api.ProductImageListCreateAPI.as_view(),
+        name="admin-product-images",
+    ),
+    path(
+        "admin/products/<uuid:pk>/images/reorder/",
+        image_api.ReorderImagesAPI.as_view(),
+        name="admin-product-images-reorder",
+    ),
+    path(
+        "admin/products/<uuid:pk>/images/<uuid:image_pk>/",
+        image_api.ProductImageDetailAPI.as_view(),
+        name="admin-product-image-detail",
+    ),
+    path(
+        "admin/products/<uuid:pk>/images/<uuid:image_pk>/primary/",
+        image_api.SetPrimaryImageAPI.as_view(),
+        name="admin-product-image-primary",
     ),
 ]
