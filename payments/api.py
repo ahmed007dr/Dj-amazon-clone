@@ -13,6 +13,7 @@ from django.db import transaction
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from core.api.pagination import AdminPageNumberPagination
@@ -313,6 +314,84 @@ class ProviderCredentialDetailAPI(generics.DestroyAPIView):
     def get_queryset(self):
         # ⚠️  مُصفّى بالبوابة — لا يُحذف مفتاح بوابة أخرى بتخمين معرّفه
         return ProviderCredential.objects.filter(provider_id=self.kwargs["pk"])
+
+
+# ═══════════════════════════════════════════════════════════
+#  الأحداث الواردة من البوابات
+# ═══════════════════════════════════════════════════════════
+
+
+class WebhookThrottle(AnonRateThrottle):
+    """
+    ⚠️  حدّ **مرتفع عمدًا**.
+
+        الحارس الحقيقي هنا هو التوقيع لا العدّاد: حدث بلا توقيع
+        صحيح يُرفض مهما تكرر. أما الحدّ المنخفض فيُسقط ذروة حقيقية
+        من البوابة — وكل حدث مفقود هو طلب مدفوع لا يعرف أحد أنه
+        دُفع.
+
+        وهي تشترك في عدّاد الزوّار الافتراضي لولا نطاقها الخاص:
+        بوابة واحدة تتحدث من عناوين قليلة، فكانت تستهلك حصة
+        الزوّار كلها وتُسقط تصفّح المتجر.
+    """
+
+    scope = "webhook"
+
+
+class ProviderWebhookAPI(APIView):
+    """
+    نقطة استقبال أحداث بوابة.
+
+        POST /api/v1/payments/webhooks/<رمز البوابة>/
+
+    ⚠️  **بلا مصادقة — والتوقيع هو الهوية.**
+
+        البوابة لا تملك حسابًا ولا توكنًا. `authentication_classes`
+        فارغة عمدًا: تركها على الافتراضي يجعل DRF يحاول قراءة
+        ترويسة `Authorization` غير الموجودة، ويردّ ٤٠١ على أحداث
+        صحيحة تمامًا.
+
+    ⚠️  **و`is_active` شرط**: بوابة أوقفها الأدمن لا تُعلّم طلبات
+        كمدفوعة. إيقافها يجب أن يكون إيقافًا كاملًا لا لواجهة
+        العميل وحدها.
+
+    ⚠️  والرد **٢٠٠ على كل ما لا تصلحه إعادة المحاولة.**
+
+        البوابة تعيد الإرسال على أي رد غير ناجح. حدث بمرجع لا
+        نعرفه سيبقى يصل كل بضع دقائق إلى الأبد إن رددنا بخطأ —
+        وهو ضجيج يغطّي على الفشل الحقيقي. الفشل المؤقت وحده يستحق
+        ٥٠٠ ليُعاد.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [WebhookThrottle]
+
+    #: نتيجة الخدمة ← رمز HTTP
+    STATUS_CODES = {
+        services.WEBHOOK_REJECTED: status.HTTP_403_FORBIDDEN,
+        services.WEBHOOK_UNREADABLE: status.HTTP_400_BAD_REQUEST,
+    }
+
+    def post(self, request, provider_code):
+        provider = PaymentProvider.objects.filter(code=provider_code, is_active=True).first()
+        if provider is None:
+            raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
+
+        payload = request.data if isinstance(request.data, dict) else {}
+
+        result = services.handle_webhook(
+            provider,
+            payload=payload,
+            params=request.query_params.dict(),
+        )
+
+        return Response(
+            # ⚠️  لا تفاصيل في الرد: المرسل قد يكون مهاجمًا يستكشف.
+            #     التفصيل كامل في `WebhookEvent` وفي السجل.
+            {"status": result.status},
+            status=self.STATUS_CODES.get(result.status, status.HTTP_200_OK),
+        )
 
 
 # ═══════════════════════════════════════════════════════════

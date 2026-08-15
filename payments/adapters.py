@@ -41,6 +41,52 @@ class RefundResult:
     raw_response: dict = field(default_factory=dict)
 
 
+# ═══════════════════════════════════════════════════════════
+#  الأحداث الواردة
+# ═══════════════════════════════════════════════════════════
+
+#: النتائج التي يترجم إليها المحوّل حدثَ بوابته.
+#:
+#: ⚠️  نصوص مجرّدة لا `TransactionStatus`: الطبقة هنا **لا تستورد
+#:     النماذج**. المحوّل يعرف عقد بوابته ولا يعرف كيف نخزّن الحالة،
+#:     والترجمة تقع في `payments.services` وحدها.
+AUTHORIZED = "AUTHORIZED"
+CAPTURED = "CAPTURED"
+FAILED = "FAILED"
+PENDING = "PENDING"
+REFUNDED = "REFUNDED"
+
+OUTCOMES = frozenset({AUTHORIZED, CAPTURED, FAILED, PENDING, REFUNDED})
+
+
+@dataclass(frozen=True)
+class WebhookEnvelope:
+    """
+    حدث وارد بعد ترجمته من لهجة البوابة إلى لغتنا.
+
+    ⚠️  `event_id` **يجب أن يكون فريدًا لكل تغيّر حالة** لا لكل
+        معاملة.
+
+        بوابة ترسل «صدر الرقم» ثم «دُفع» بنفس المعرّف تجعل الحدث
+        الثاني يبدو تكرارًا للأول — فيُهمَل، ويبقى الطلب غير مدفوع
+        بينما المال في الحساب.
+
+    ⚠️  و`amount` ليس للعرض: يُقارَن بمبلغ معاملتنا قبل تعليمها
+        مدفوعة. توقيع صحيح على مبلغ مختلف يعني بوابة حصّلت غير ما
+        طلبناه — وهو ما لا يكشفه التحقّق من التوقيع وحده.
+    """
+
+    event_id: str
+    event_type: str
+    outcome: str
+    signature: str = ""
+    #: مرجعنا نحن — `PaymentTransaction.reference`
+    merchant_reference: str = ""
+    #: مرجع البوابة — يُستخدم حين يغيب مرجعنا
+    provider_reference: str = ""
+    amount: Decimal | None = None
+
+
 class PaymentAdapter(ABC):
     """
     عقد المحوّل.
@@ -77,6 +123,21 @@ class PaymentAdapter(ABC):
             بنداء واحد.
         """
         return False
+
+    def parse_webhook(self, *, payload: dict, params: dict) -> WebhookEnvelope | None:
+        """
+        حمولة البوابة ← ظرف موحّد. `None` = لا يفهمها هذا المحوّل.
+
+        ⚠️  `params` معاملات الرابط لا الجسم — وليست ترفًا:
+
+            Paymob ترسل التوقيع في **معامل رابط** (`?hmac=…`) بينما
+            Fawry ترسله داخل الجسم. محوّل يقرأ الجسم وحده يرفض كل
+            حدث من الأولى وهو صحيح.
+
+        ⚠️  والافتراضي `None` كنظيره في `verify_webhook`: محوّل لم
+            ينفّذ القراءة لا يستقبل شيئًا.
+        """
+        return None
 
 
 # ═══════════════════════════════════════════════════════════

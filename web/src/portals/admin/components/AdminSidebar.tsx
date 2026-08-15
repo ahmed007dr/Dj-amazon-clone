@@ -51,6 +51,9 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
       { to: '/admin/finance', key: 'finance.title', permission: 'finance.view_revenueentry' },
       { to: '/admin/expenses', key: 'finance.expensesTitle', permission: 'finance.add_expense' },
       { to: '/admin/businesses', key: 'b2b.businesses', permission: 'b2b.change_businessprofile' },
+      // ⚠️  الموظفون هنا لا في «النظام»: الإسناد شأن تجاري
+      //     يومي — عميل بلا مسؤول مبيعة ضائعة لا إعداد.
+      { to: '/admin/staff', key: 'staff.staffTitle', permission: 'employees.change_customerassignment' },
     ],
   },
   {

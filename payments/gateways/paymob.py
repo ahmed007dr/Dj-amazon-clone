@@ -31,7 +31,18 @@ import hmac
 import logging
 from decimal import Decimal
 
-from payments.adapters import ChargeResult, PaymentAdapter, RefundResult, register
+from payments.adapters import (
+    AUTHORIZED,
+    CAPTURED,
+    FAILED,
+    PENDING,
+    REFUNDED,
+    ChargeResult,
+    PaymentAdapter,
+    RefundResult,
+    WebhookEnvelope,
+    register,
+)
 
 from .transport import post_json
 
@@ -259,6 +270,66 @@ class PaymobAdapter(PaymentAdapter):
         expected = hmac.new(secret.encode(), message.encode(), hashlib.sha512).hexdigest()
 
         return hmac.compare_digest(expected, (signature or "").lower())
+
+    def parse_webhook(self, *, payload: dict, params: dict):
+        """
+        ⚠️  التوقيع في **معامل الرابط** `hmac` لا في الجسم.
+
+            قراءته من الجسم ترفض كل حدث صحيح، فيبقى كل طلب بطاقة
+            «قيد المعالجة» بينما المال محصَّل.
+
+        ⚠️  و`merchant_order_id` هو مرجعنا نحن — أُرسل في `charge`
+            وتُعيده البوابة كما هو. المطابقة به أوثق من المطابقة
+            بمعرّف الطلب لدى Paymob.
+        """
+        obj = payload.get("obj")
+        if not isinstance(obj, dict) or not obj.get("id"):
+            return None
+
+        order = obj.get("order") if isinstance(obj.get("order"), dict) else {}
+
+        return WebhookEnvelope(
+            # ⚠️  معرّف المعاملة لا معرّف الطلب: محاولة الدفع الفاشلة
+            #     ثم الناجحة على نفس الطلب حدثان مختلفان، ودمجهما
+            #     تحت معرّف واحد يجعل الثاني يبدو تكرارًا فيُهمَل.
+            event_id=str(obj["id"]),
+            event_type=str(payload.get("type") or "TRANSACTION"),
+            outcome=self._outcome(obj),
+            signature=str(params.get("hmac") or ""),
+            merchant_reference=str(order.get("merchant_order_id") or ""),
+            provider_reference=str(order.get("id") or ""),
+            amount=_piastres_to_pounds(obj.get("amount_cents")),
+        )
+
+    @staticmethod
+    def _outcome(obj: dict) -> str:
+        """
+        ⚠️  الترتيب مقصود: الاسترداد والإلغاء يسبقان `success`.
+
+            المعاملة المستردة تصل بـ `success=true` أيضًا — فقراءة
+            `success` أولًا تعيد تعليمها مدفوعة بعد ردّ المال.
+        """
+        if obj.get("is_refunded"):
+            return REFUNDED
+        if obj.get("is_voided") or obj.get("error_occured") or not obj.get("success"):
+            return FAILED
+        if obj.get("pending"):
+            return PENDING
+        # ⚠️  التصريح بلا تحصيل ليس قبضًا: الرصيد محجوز والمال لم
+        #     ينتقل بعد. تعليمه محصَّلًا ينتج إيرادًا وهميًا.
+        if obj.get("is_auth") and not obj.get("is_capture"):
+            return AUTHORIZED
+        return CAPTURED
+
+
+def _piastres_to_pounds(amount_cents) -> Decimal | None:
+    """⚠️  قسمة `Decimal` لا `float` — نفس قاعدة `core.money`."""
+    if amount_cents in (None, ""):
+        return None
+    try:
+        return Decimal(str(amount_cents)) / Decimal("100")
+    except (ArithmeticError, ValueError):
+        return None
 
 
 def _lookup(payload: dict, path: str) -> str:

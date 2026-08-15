@@ -93,7 +93,7 @@ L8   finance                           ← إيراد · COGS · مصروف · P
 | `orders ↔ promotions` | `orders` يستهلك **نتيجة** التحقق من الكوبون، ولا ينفّذ محرك الكوبونات |
 | `orders ↔ commissions` | `orders` لا يعرف بوجود العمولات. `commissions` يستمع لإشارة `order_completed` |
 | `accounts ↔ orders` | ⛔ **الدائرة القائمة حاليًا (H1).** تُحَل بنقل `Address` ← `shipping` و `dashbord()` ← `reporting` |
-| `customers ↔ employees` | **`CustomerAssignment` يسكن في `employees/`.** `Customer` بلا حقل `assigned_employee` |
+| `customers ↔ employees` | **`CustomerAssignment` يسكن في `employees/`.** `Customer` بلا حقل `assigned_employee`. ✅ **مفروضة بعقد `import-linter` منذ 2026-08-15** — كانت موثَّقة وغير مفروضة |
 | `pos ↔ orders` | `pos` يستدعي `orders.services.create(channel=POS)`. `orders` لا يعرف بوجود POS |
 | `finance ↔ orders` | `finance` يستمع لـ `order_completed` و `pos_session_closed`. لا نطاق يستورد `finance` |
 | `payments ↔ orders` | `orders` يعرف واجهة الدفع المجرّدة فقط، لا أي بوابة بعينها |

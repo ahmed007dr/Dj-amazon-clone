@@ -32,6 +32,7 @@ from devtools.seeds import (
     logistics,
     people,
     pricing,
+    staffing,
     stock,
     trade,
     transactions,
@@ -92,6 +93,11 @@ class Command(BaseCommand):
         self._step("بوابات الدفع")
         call_command("seed_payment_providers", verbosity=0, stdout=StringIO())
 
+        # ⚠️  الأدوار بنية تحتية: بوابة الموظفين بلا دور واحد لا
+        #     تُفتح، و`EmployeeProfile.role` مفتاح إلزامي.
+        self._step("الأدوار الوظيفية")
+        call_command("seed_employee_roles", verbosity=0, stdout=StringIO())
+
         # ⚠️  بنود المصروفات بنية تحتية لا بيانات تجريبية.
         #
         #     شاشة المصروفات بلا بند واحد لا تقبل إدخالًا إطلاقًا،
@@ -139,6 +145,9 @@ class Command(BaseCommand):
         #     تحتاج المستخدمين، والطلبات الآجلة تحتاجها.
         self._step("الحسابات التجارية")
         report["trade"] = trade.seed(people_data["users"])["counts"]
+
+        self._step("الموظفون والإسناد")
+        report["staffing"] = staffing.seed(people_data["users"], people_data["customers"])["counts"]
 
         self._step("الطلبات والتقييمات")
         report["transactions"] = transactions.seed(

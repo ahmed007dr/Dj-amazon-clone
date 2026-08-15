@@ -1,0 +1,67 @@
+.staff-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.staff-cell code {
+  direction: ltr;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.staff-tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.staff-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-4);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-block-end: 2px solid transparent;
+  cursor: pointer;
+}
+
+.staff-tabs button.is-active {
+  color: var(--color-primary);
+  border-block-end-color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* ⚠️  العدّاد يجعل «عملاء بلا مسؤول» مهمة مرئية لا تبويبًا خاملًا. */
+.staff-tabs__count {
+  padding: 0.05rem var(--space-2);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-on-primary);
+  background: var(--color-warning);
+  border-radius: var(--radius-pill);
+}
+
+.staff-assign-picker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-block-end: var(--space-3);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.staff-assign-picker select {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}

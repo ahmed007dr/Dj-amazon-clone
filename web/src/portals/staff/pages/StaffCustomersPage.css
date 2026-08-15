@@ -1,0 +1,17 @@
+.staff-customer-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.staff-customer-cell code {
+  direction: ltr;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* ⚠️  «لم يطلب بعد» مُبرَز: هو من يجب أن يتصل به المندوب. */
+.staff-never {
+  color: var(--color-warning);
+  font-weight: 600;
+}

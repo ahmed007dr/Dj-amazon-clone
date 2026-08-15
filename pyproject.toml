@@ -39,6 +39,7 @@ known-first-party = [
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
     "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
+    "employees",
     "config",
 ]
 
@@ -55,6 +56,7 @@ testpaths = [
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
     "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
+    "employees",
 ]
 
 [tool.coverage.run]
@@ -74,6 +76,7 @@ root_packages = [
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
     "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
+    "employees",
 ]
 
 [[tool.importlinter.contracts]]
@@ -112,6 +115,13 @@ layers = [
     #     كشف حساب صيدلية يعتمد على قيود الأرباح — وهما دفتران
     #     مختلفان لجمهورين مختلفين.
     "b2b | finance",
+    # ⚠️  `employees` فوق `orders` وتحت `b2b | finance`.
+    #
+    #     يقرأ الطلبات لحساب الأداء وينشئها نيابةً عن العميل،
+    #     ويستورد `customers` للإسناد — اتجاه نازل مسموح (ADR-12).
+    #     و`customers` لا يستورده أبدًا: الحقل المعاكس كان ينشئ
+    #     دائرة `customers ↔ employees`.
+    "employees",
     # ⚠️  `pos` **فوق** `orders` لا بديلًا عنه.
     #
     #     كل بيعة تُنتج `Order` بـ `channel=POS` عبر
@@ -165,6 +175,21 @@ forbidden_modules = [
 name = "Identity domains expand independently"
 type = "independence"
 modules = ["customers", "administration"]
+
+[[tool.importlinter.contracts]]
+# ⚠️  الدائرة التي وُجد ADR-12 ليمنعها — **مفروضة الآن لا موثَّقة فقط**.
+#
+#     حقل `assigned_employee` على `CustomerProfile` يبدو أبسط طريق
+#     لسؤال «من المسؤول عن هذا العميل؟»، وهو بالضبط ما ينشئ
+#     `customers ↔ employees`. الإسناد يملكه الطرف الأعلى
+#     (`employees.CustomerAssignment`) فيبقى الاتجاه نازلًا.
+#
+#     العقد أعلاه لا يغطيها: `employees` لم يكن موجودًا حين كُتب،
+#     وإضافته إلى `independence` كانت ستمنع الاتجاه المسموح أيضًا.
+name = "Customers must never know about employees (ADR-12)"
+type = "forbidden"
+source_modules = ["customers"]
+forbidden_modules = ["employees"]
 
 [[tool.importlinter.contracts]]
 name = "Domains never import each other models directly"

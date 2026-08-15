@@ -64,8 +64,9 @@ api_v1 = [
     path("finance/", include("finance.urls")),
     # ── B2B ────────────────────────────────────────────────
     path("b2b/", include("b2b.urls")),
+    # ── بوابة الموظفين ─────────────────────────────────────
+    path("employees/", include("employees.urls")),
     # ── لاحقًا ─────────────────────────────────────────────
-    # path("employees/", include("employees.urls")),    المرحلة ١٠
 ]
 
 urlpatterns = [

@@ -26,7 +26,17 @@ import hmac
 import logging
 from decimal import ROUND_HALF_UP, Decimal
 
-from payments.adapters import ChargeResult, PaymentAdapter, RefundResult, register
+from payments.adapters import (
+    CAPTURED,
+    FAILED,
+    PENDING,
+    REFUNDED,
+    ChargeResult,
+    PaymentAdapter,
+    RefundResult,
+    WebhookEnvelope,
+    register,
+)
 
 from .transport import post_json
 
@@ -201,3 +211,61 @@ class FawryAdapter(PaymentAdapter):
 
         # مقارنة ثابتة الزمن — انظر نظيرتها في محوّل Paymob
         return hmac.compare_digest(expected, (signature or "").lower())
+
+    def parse_webhook(self, *, payload: dict, params: dict):
+        """
+        ⚠️  **Fawry لا ترسل معرّف حدث.**
+
+            ترسل رقم المرجع وحالته فقط، والرقم ثابت عبر عمر الطلب:
+            «صدر الرقم» ثم «دُفع» ثم «استُرد» تصل كلها بنفس
+            `fawryRefNumber`. اتخاذه معرّفًا يجعل كل حدث بعد الأول
+            يبدو تكرارًا فيُهمَل — ويبقى الطلب غير مدفوع بينما
+            المال قُبض في المنفذ.
+
+            ولذلك المعرّف هو **الرقم مع الحالة**: كل انتقال يُسجَّل
+            مرة، وإعادة إرسال نفس الانتقال تُهمَل. وهذا بالضبط ما
+            نريده من جدول المنع التكراري.
+
+        ⚠️  والتوقيع في الجسم لا في الرابط — بخلاف Paymob.
+        """
+        reference = str(payload.get("fawryRefNumber") or "")
+        status = str(payload.get("orderStatus") or "")
+
+        if not reference or not status:
+            return None
+
+        return WebhookEnvelope(
+            event_id=f"{reference}:{status}",
+            event_type=f"ORDER_{status}",
+            outcome=_STATUS_OUTCOMES.get(status, PENDING),
+            signature=str(payload.get("messageSignature") or ""),
+            merchant_reference=str(payload.get("merchantRefNumber") or ""),
+            provider_reference=reference,
+            amount=_amount_or_none(payload.get("paymentAmount")),
+        )
+
+
+#: حالات Fawry ← نتائجنا.
+#:
+#: ⚠️  `NEW` ليس فشلًا: الرقم صدر والعميل أمامه مهلة ليدفع في المنفذ.
+#:     معاملته يجب أن تبقى معلّقة لا أن تُغلق — إغلاقها يرفض دفعة
+#:     ستصل بعد ساعة.
+_STATUS_OUTCOMES = {
+    "PAID": CAPTURED,
+    "DELIVERED": CAPTURED,
+    "NEW": PENDING,
+    "UNPAID": PENDING,
+    "CANCELED": FAILED,
+    "EXPIRED": FAILED,
+    "FAILED": FAILED,
+    "REFUNDED": REFUNDED,
+}
+
+
+def _amount_or_none(value) -> Decimal | None:
+    if value in (None, ""):
+        return None
+    try:
+        return Decimal(str(value))
+    except ArithmeticError:
+        return None

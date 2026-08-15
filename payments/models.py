@@ -21,6 +21,7 @@ from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from core.encryption import EncryptedTextField
 from core.identifiers import business_number
 from core.models.base import BaseModel
 from core.models.translatable import BilingualNameMixin
@@ -113,7 +114,12 @@ class ProviderCredential(BaseModel):
     ⚠️  **القيمة لا تُرجَع في أي API إطلاقًا — حتى للأدمن.** (ADR-15)
 
         الحقل للكتابة فقط، والعرض يظهر آخر أربعة محارف مقنّعة.
-        التشفير عند التخزين يُضاف مع `FIELD_ENCRYPTION_KEY`.
+
+    ⚠️  **ومشفّرة في قاعدة البيانات** بـ `FIELD_ENCRYPTION_KEY`.
+
+        حجب القيمة عن الـ API وحده كان يحمي من مسار واحد ويترك
+        الآخر مفتوحًا: نسخة احتياطية أو تسريب SQL يعطي المفاتيح
+        كاملة. انظر `core.encryption`.
     """
 
     provider = models.ForeignKey(
@@ -123,7 +129,7 @@ class ProviderCredential(BaseModel):
         verbose_name=_("البوابة"),
     )
     key = models.CharField(_("المفتاح"), max_length=100)
-    value = models.TextField(_("القيمة"), help_text=_("مشفّرة — لا تُقرأ عبر الـ API"))
+    value = EncryptedTextField(_("القيمة"), help_text=_("مشفّرة — لا تُقرأ عبر الـ API"))
     is_sandbox = models.BooleanField(_("للوضع التجريبي"), default=True)
 
     class Meta:

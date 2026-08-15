@@ -1,0 +1,135 @@
+.new-order {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.new-order__search {
+  min-block-size: 2.75rem;
+  padding-inline: var(--space-3);
+  font-size: 1rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.new-order__search:focus {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+.new-order__results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-block-size: 14rem;
+  overflow-y: auto;
+}
+
+.new-order__results button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  inline-size: 100%;
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  text-align: start;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.new-order__results button:hover {
+  border-color: var(--color-primary);
+}
+
+.new-order__results code {
+  direction: ltr;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.new-order__lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.new-order__lines li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  font-size: 0.875rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.new-order__lines input {
+  inline-size: 4rem;
+  min-block-size: var(--touch-target);
+  text-align: center;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.new-order__lines button {
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+  color: var(--color-danger);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+/* ⚠️  ملاحظة التسعير ليست تفصيلًا صغيرًا: هي ما يمنع المندوب من
+   قول رقم للعميل في الهاتف قبل أن يُسعّر الخادم. */
+.new-order__pricing-note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+}
+
+.new-order__select {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.new-order__select select {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.new-order__actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.new-order__actions > * {
+  flex: 1;
+}

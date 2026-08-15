@@ -98,6 +98,30 @@ const ShiftPage = lazy(() =>
   import('@/portals/pos/pages/ShiftPage').then((module) => ({ default: module.ShiftPage })),
 );
 
+/**
+ * ⚠️  بوابة الموظفين حزمة مستقلة.
+ *
+ *     المندوب يفتح شاشتين ولا يحتاج كود لوحة الأدمن ولا نقطة
+ *     البيع — وكثير منهم يعمل من الطريق على شبكة هاتف.
+ */
+const StaffShell = lazy(() =>
+  import('@/portals/staff/StaffShell').then((module) => ({ default: module.StaffShell })),
+);
+const StaffDashboardPage = lazy(() =>
+  import('@/portals/staff/pages/StaffDashboardPage').then((module) => ({
+    default: module.StaffDashboardPage,
+  })),
+);
+const StaffCustomersPage = lazy(() =>
+  import('@/portals/staff/pages/StaffCustomersPage').then((module) => ({
+    default: module.StaffCustomersPage,
+  })),
+);
+const AdminStaffPage = lazy(() =>
+  import('@/portals/admin/pages/AdminStaffPage').then((module) => ({
+    default: module.AdminStaffPage,
+  })),
+);
 const AdminBusinessesPage = lazy(() =>
   import('@/portals/admin/pages/AdminBusinessesPage').then((module) => ({
     default: module.AdminBusinessesPage,
@@ -244,7 +268,25 @@ const router = createBrowserRouter([
       { path: 'finance', element: <Lazy><AdminFinancePage /></Lazy> },
       { path: 'expenses', element: <Lazy><AdminExpensesPage /></Lazy> },
       { path: 'businesses', element: <Lazy><AdminBusinessesPage /></Lazy> },
+      { path: 'staff', element: <Lazy><AdminStaffPage /></Lazy> },
       { path: 'branding', element: <Lazy><AdminBrandingPage /></Lazy> },
+    ],
+  },
+  {
+    // ── بوابة الموظفين ────────────────────────────────────
+    // ⚠️  `isStaff` يطابق `IsEmployee` على الخادم (موظف أو أدمن).
+    //     والقشرة نفسها تصدّ من لا ملف موظف نشط له.
+    path: '/staff',
+    element: (
+      <RequireAuth allow={isStaff}>
+        <Lazy>
+          <StaffShell />
+        </Lazy>
+      </RequireAuth>
+    ),
+    children: [
+      { index: true, element: <Lazy><StaffDashboardPage /></Lazy> },
+      { path: 'customers', element: <Lazy><StaffCustomersPage /></Lazy> },
     ],
   },
   {

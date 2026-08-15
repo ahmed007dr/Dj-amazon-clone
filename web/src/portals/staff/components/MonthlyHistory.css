@@ -1,0 +1,42 @@
+.month-history h2 {
+  margin: 0 0 var(--space-3);
+  font-size: 1rem;
+  color: var(--color-text-muted);
+}
+
+.month-history__scroll {
+  overflow-x: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.month-history table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  min-inline-size: 30rem;
+}
+
+.month-history th,
+.month-history td {
+  padding: var(--space-2) var(--space-3);
+  text-align: start;
+  border-block-end: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.month-history th {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.month-history td:not(:first-child) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.month-history tbody tr:last-child td {
+  border-block-end: none;
+}
