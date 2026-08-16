@@ -82,7 +82,13 @@ def record_order_revenue(order) -> RevenueEntry | None:
         channel=order.channel,
         # ⚠️  تاريخ اكتمال الطلب لا تاريخ اليوم: إعادة تشغيل
         #     الالتقاط لطلبات قديمة كانت ستكدّسها في شهر واحد.
-        occurred_on=(order.completed_at or timezone.now()).date(),
+        # ⚠️  `localdate(...)` لا `.date()` المجرّدة.
+        #
+        #     `completed_at` مخزَّن بـ UTC، واستخراج تاريخه مباشرةً
+        #     يُقيّد بيعة الواحدة صباحًا بالقاهرة في **يوم أمس**
+        #     المحاسبي. النتيجة: إقفال يومي لا يطابق درج الكاشير،
+        #     والفارق يظهر كل ليلة في آخر ثلاث ساعات من الوردية.
+        occurred_on=timezone.localdate(order.completed_at or timezone.now()),
     )
 
     record_cogs(entry)
@@ -118,7 +124,9 @@ def record_refund(order, amount: Decimal | None = None) -> RevenueEntry | None:
         tax=-original.tax,
         net=-refunded,
         channel=original.channel,
-        occurred_on=timezone.now().date(),
+        # ⚠️  `localdate()` لا `now().date()`: القيد بتاريخ UTC
+        #     يقع في يوم الأمس المحاسبي، فيغيب عن تقرير اليوم.
+        occurred_on=timezone.localdate(),
     )
 
 

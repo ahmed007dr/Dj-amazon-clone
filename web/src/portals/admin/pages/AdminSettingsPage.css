@@ -1,0 +1,6 @@
+.settings-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  justify-content: flex-end;
+}

@@ -123,10 +123,16 @@ class BusinessProfile(BaseModel):
 
             اعتبار الغياب انتهاءً كان يمنع كل عميل قديم لم يُسجَّل
             تاريخ ترخيصه — وهو نقص بيانات لا مخالفة.
+
+        ⚠️  و`localdate()` لا `now().date()`.
+
+            الثانية تُرجع تاريخ **UTC**، وهو متأخر بيوم عن القاهرة
+            بين منتصف الليل والثالثة فجرًا. فترخيص انتهى أمس يُقرأ
+            ساريًا في تلك الساعات — والآجل يُمنَح على أساسه.
         """
         if self.license_expires_on is None:
             return True
-        return self.license_expires_on >= timezone.now().date()
+        return self.license_expires_on >= timezone.localdate()
 
     @property
     def allows_credit(self) -> bool:

@@ -56,6 +56,11 @@ api_v1 = [
     path("orders/", include("orders.urls")),
     path("shipping/", include("shipping.urls")),
     path("payments/", include("payments.urls")),
+    # ── التسعير والعروض — الأدمن حصرًا ─────────────────────
+    # ⚠️  السعر يصل العميل محسوبًا داخل المنتج والسلة والطلب،
+    #     والكوبون يُتحقَّق منه في السلة. لا نقطة عامة في النطاقين.
+    path("pricing/", include("pricing.urls")),
+    path("promotions/", include("promotions.urls")),
     # ── الإشعارات ──────────────────────────────────────────
     path("notifications/", include("notifications.urls")),
     # ── نقطة البيع ─────────────────────────────────────────
@@ -68,6 +73,8 @@ api_v1 = [
     path("employees/", include("employees.urls")),
     path("targets/", include("targets.urls")),
     path("commissions/", include("commissions.urls")),
+    # ── الولاء والإحالة ────────────────────────────────────
+    path("loyalty/", include("loyalty.urls")),
     # ── الموردون والتقارير ─────────────────────────────────
     path("suppliers/", include("suppliers.urls")),
     path("reports/", include("reporting.urls")),

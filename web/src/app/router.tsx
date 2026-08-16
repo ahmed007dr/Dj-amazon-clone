@@ -74,6 +74,21 @@ const AdminAccountsPage = lazy(() =>
     default: module.AdminAccountsPage,
   })),
 );
+const AdminReferencePage = lazy(() =>
+  import('@/portals/admin/pages/AdminReferencePage').then((module) => ({
+    default: module.AdminReferencePage,
+  })),
+);
+const AdminPricingPage = lazy(() =>
+  import('@/portals/admin/pages/AdminPricingPage').then((module) => ({
+    default: module.AdminPricingPage,
+  })),
+);
+const AdminSettingsPage = lazy(() =>
+  import('@/portals/admin/pages/AdminSettingsPage').then((module) => ({
+    default: module.AdminSettingsPage,
+  })),
+);
 const AdminTaxPage = lazy(() =>
   import('@/portals/admin/pages/AdminTaxPage').then((module) => ({
     default: module.AdminTaxPage,
@@ -277,6 +292,9 @@ const router = createBrowserRouter([
       { path: 'products', element: <Lazy><AdminProductsPage /></Lazy> },
       { path: 'inventory', element: <Lazy><AdminInventoryPage /></Lazy> },
       { path: 'users', element: <Lazy><AdminAccountsPage /></Lazy> },
+      { path: 'reference', element: <Lazy><AdminReferencePage /></Lazy> },
+      { path: 'pricing', element: <Lazy><AdminPricingPage /></Lazy> },
+      { path: 'settings', element: <Lazy><AdminSettingsPage /></Lazy> },
       { path: 'tax', element: <Lazy><AdminTaxPage /></Lazy> },
       { path: 'payments', element: <Lazy><AdminPaymentsPage /></Lazy> },
       { path: 'pos-sessions', element: <Lazy><AdminPosSessionsPage /></Lazy> },

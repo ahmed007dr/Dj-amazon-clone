@@ -34,6 +34,12 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
     links: [
       { to: '/admin/orders', key: 'nav.orders', permission: 'orders.view_order' },
       { to: '/admin/products', key: 'nav.products', permission: 'catalog.view_product' },
+      // ⚠️  تحت المنتجات لا في «النظام»: الفئة إلزامية على المنتج،
+      //     فهي خطوة في إضافة صنف لا إعدادًا يُضبط مرة.
+      { to: '/admin/reference', key: 'nav.reference', permission: 'catalog.change_category' },
+      // ⚠️  التسعير تحت الكتالوج لا في «النظام»: السعر قرار تجاري
+      //     يومي يتغيّر مع كل حملة، لا إعداد يُضبط مرة.
+      { to: '/admin/pricing', key: 'nav.pricing', permission: 'pricing.change_pricelist' },
       { to: '/admin/inventory', key: 'nav.inventory', permission: 'inventory.view_stock' },
       // ⚠️  الموردون بجوار المخزون: الشراء يغذّيه، ومن
       //     يتابع النقص هو من يُنشئ أمر الشراء.
@@ -68,6 +74,7 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
     links: [
       { to: '/admin/users', key: 'nav.users', permission: 'accounts.view_user' },
       { to: '/admin/tax', key: 'admin.tax', permission: 'core.change_taxclass' },
+      { to: '/admin/settings', key: 'nav.settings', permission: 'inventory.change_stocklocation' },
       { to: '/admin/payments', key: 'nav.payments', permission: 'payments.view_paymentprovider' },
       { to: '/admin/branding', key: 'nav.branding', permission: 'branding.change_brandprofile' },
     ],

@@ -100,7 +100,7 @@ class TestAdminRoles:
 
         assert assignment.is_current
 
-        assignment.to_date = timezone.now().date() - timedelta(days=1)
+        assignment.to_date = timezone.localdate() - timedelta(days=1)
         assignment.save()
         assert not assignment.is_current
 

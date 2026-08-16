@@ -424,3 +424,160 @@ def _flat_categories() -> list[dict]:
         }
         for category in categories
     ]
+
+
+# ═══════════════════════════════════════════════════════════
+#  الأدمن — التصنيف المرجعي
+# ═══════════════════════════════════════════════════════════
+#
+#  ⚠️  الحذف في الثلاثة **يُرفض عند الاستعمال** لا يُنفَّذ بصمت.
+#
+#      العلاقات `PROTECT` تمنعه في قاعدة البيانات أصلًا، لكن الخطأ
+#      يصل عندها كانهيار ٥٠٠ لا كرسالة. الفحص هنا يحوّله إلى «هذه
+#      الفئة بها ١٢ منتجًا» — وهو ما يحتاجه الأدمن ليقرّر.
+
+
+class _ReferenceAdmin:
+    """الأساس المشترك: صلاحية الأدمن، وبلا ترقيم، وتسجيل تدقيق."""
+
+    permission_classes = [IsAdminAccount]
+    pagination_class = None
+
+    #: يظهر في سجل التدقيق
+    label = ""
+
+    def _audit(self, instance, action):
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=action,
+            object_repr=f"{self.label} {instance.name_ar}",
+            ip_address=self.request.META.get("REMOTE_ADDR"),
+        )
+
+
+class AdminCategoryListCreateAPI(_ReferenceAdmin, generics.ListCreateAPIView):
+    """
+    ⚠️  مسطّحة لا شجرة — والترتيب بالمسار يجعلها تُقرأ كشجرة.
+
+        الشجرة المتداخلة تحتاج تسطيحًا في الواجهة لكل قائمة اختيار،
+        والمسار (`path`) يعطي الترتيب الشجري مجانًا.
+
+    ⚠️  وتشمل غير الظاهرة في القائمة العامة: `show_in_menu` تصنيف
+        **عرضي** لا صلاحية.
+    """
+
+    serializer_class = s.AdminCategorySerializer
+    label = "فئة"
+
+    def get_queryset(self):
+        queryset = Category.objects.select_related("parent").order_by("path", "display_order")
+
+        if (active := self.request.query_params.get("is_active")) in ("true", "false"):
+            queryset = queryset.filter(is_active=active == "true")
+        if search := self.request.query_params.get("search"):
+            queryset = queryset.filter(Q(name_ar__icontains=search) | Q(name_en__icontains=search))
+        return queryset
+
+    def perform_create(self, serializer):
+        self._audit(serializer.save(), AuditAction.CREATE)
+
+
+class AdminCategoryDetailAPI(_ReferenceAdmin, generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = s.AdminCategorySerializer
+    queryset = Category.objects.select_related("parent")
+    label = "فئة"
+
+    def perform_update(self, serializer):
+        self._audit(serializer.save(), AuditAction.SETTING_CHANGE)
+
+    def perform_destroy(self, instance):
+        """
+        ⚠️  الفئة المستعمَلة لا تُحذف — والرسالة **تعدّ** ما يمنعها.
+
+            «لا يمكن الحذف» وحدها تجعل الأدمن يبحث عن السبب بالتجربة.
+        """
+        products = instance.products.count()
+        children = instance.children.count()
+
+        if products or children:
+            raise BusinessError(
+                ErrorCode.CONFLICT,
+                detail=(
+                    f"لهذه الفئة {products} منتجًا و{children} فئة فرعية — "
+                    "انقلها أو أوقف الفئة بدل حذفها"
+                ),
+                status_code=409,
+            )
+
+        self._audit(instance, AuditAction.DELETE)
+        instance.delete()
+
+
+class AdminManufacturerListCreateAPI(_ReferenceAdmin, generics.ListCreateAPIView):
+    serializer_class = s.AdminManufacturerSerializer
+    label = "شركة مصنّعة"
+
+    def get_queryset(self):
+        queryset = Manufacturer.objects.order_by("name_ar")
+        if search := self.request.query_params.get("search"):
+            queryset = queryset.filter(Q(name_ar__icontains=search) | Q(name_en__icontains=search))
+        return queryset
+
+    def perform_create(self, serializer):
+        self._audit(serializer.save(), AuditAction.CREATE)
+
+
+class AdminManufacturerDetailAPI(_ReferenceAdmin, generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = s.AdminManufacturerSerializer
+    queryset = Manufacturer.objects.all()
+    label = "شركة مصنّعة"
+
+    def perform_update(self, serializer):
+        self._audit(serializer.save(), AuditAction.SETTING_CHANGE)
+
+    def perform_destroy(self, instance):
+        brands = instance.brands.count()
+        if brands:
+            raise BusinessError(
+                ErrorCode.CONFLICT,
+                detail=f"لهذه الشركة {brands} براند — أوقفها بدل حذفها",
+                status_code=409,
+            )
+
+        self._audit(instance, AuditAction.DELETE)
+        instance.delete()
+
+
+class AdminBrandListCreateAPI(_ReferenceAdmin, generics.ListCreateAPIView):
+    serializer_class = s.AdminBrandSerializer
+    label = "براند"
+
+    def get_queryset(self):
+        queryset = Brand.objects.select_related("manufacturer").order_by("display_order", "name_ar")
+        if search := self.request.query_params.get("search"):
+            queryset = queryset.filter(Q(name_ar__icontains=search) | Q(name_en__icontains=search))
+        return queryset
+
+    def perform_create(self, serializer):
+        self._audit(serializer.save(), AuditAction.CREATE)
+
+
+class AdminBrandDetailAPI(_ReferenceAdmin, generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = s.AdminBrandSerializer
+    queryset = Brand.objects.select_related("manufacturer")
+    label = "براند"
+
+    def perform_update(self, serializer):
+        self._audit(serializer.save(), AuditAction.SETTING_CHANGE)
+
+    def perform_destroy(self, instance):
+        products = instance.products.count()
+        if products:
+            raise BusinessError(
+                ErrorCode.CONFLICT,
+                detail=f"لهذا البراند {products} منتجًا — أوقفه بدل حذفه",
+                status_code=409,
+            )
+
+        self._audit(instance, AuditAction.DELETE)
+        instance.delete()

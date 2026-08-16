@@ -23,6 +23,31 @@ urlpatterns = [
     path("brands/<slug:slug>/", api.BrandDetailAPI.as_view(), name="brand-detail"),
     path("manufacturers/", api.ManufacturerListAPI.as_view(), name="manufacturers"),
     # الأدمن — بلا فلترة سياسات
+    # ── التصنيف المرجعي — شرط إضافة أي منتج ────────────────
+    # ⚠️  الفئة إلزامية على `Product`؛ فمتجر بلا شاشة فئات لا
+    #     يستطيع إضافة صنفه الأول من لوحته.
+    path("admin/categories/", api.AdminCategoryListCreateAPI.as_view(), name="admin-categories"),
+    path(
+        "admin/categories/<uuid:pk>/",
+        api.AdminCategoryDetailAPI.as_view(),
+        name="admin-category-detail",
+    ),
+    path("admin/brands/", api.AdminBrandListCreateAPI.as_view(), name="admin-brands"),
+    path(
+        "admin/brands/<uuid:pk>/",
+        api.AdminBrandDetailAPI.as_view(),
+        name="admin-brand-detail",
+    ),
+    path(
+        "admin/manufacturers/",
+        api.AdminManufacturerListCreateAPI.as_view(),
+        name="admin-manufacturers",
+    ),
+    path(
+        "admin/manufacturers/<uuid:pk>/",
+        api.AdminManufacturerDetailAPI.as_view(),
+        name="admin-manufacturer-detail",
+    ),
     # خيارات نموذج الإنشاء — نداء واحد يملأ كل القوائم المنسدلة
     path(
         "admin/products/options/",

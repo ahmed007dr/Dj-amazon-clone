@@ -1,0 +1,143 @@
+.pricing-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pricing-form__row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 40rem) {
+  .pricing-form__row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.pricing-form__select {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.pricing-form__select select {
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.pricing-form__error {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-danger);
+}
+
+.pricing-form__check {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  min-block-size: var(--touch-target);
+  padding: var(--space-2);
+  margin-inline-start: calc(var(--space-2) * -1);
+  font-size: 0.9375rem;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.pricing-form__check input {
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
+  margin-block-start: 0.2rem;
+  flex: none;
+  accent-color: var(--color-primary);
+}
+
+.pricing-form__check em {
+  display: block;
+  font-size: 0.8125rem;
+  font-style: normal;
+  color: var(--color-text-muted);
+}
+
+.pricing-form__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-block-start: var(--space-4);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--color-border);
+}
+
+/* ⚠️  الأنواع المسموحة صناديق اختيار لا قائمة متعددة: الأخيرة
+       تحتاج Ctrl+نقر على الحاسوب ولا تعمل باللمس أصلًا. */
+.pricing-form__types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.pricing-form__types legend {
+  padding-inline: var(--space-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.pricing-form__types label {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font-size: 0.9375rem;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+}
+
+.pricing-form__types label:has(input:checked) {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.pricing-form__types input {
+  accent-color: var(--color-primary);
+}
+
+.pricing-form__hint {
+  inline-size: 100%;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.pricing-form__legend {
+  margin: var(--space-4) 0 0;
+  padding-block-end: var(--space-2);
+  border-block-end: 1px solid var(--color-border);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+/* المنتج المثبَّت في التعديل — لا يُغيَّر */
+.pricing-form__fixed {
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}

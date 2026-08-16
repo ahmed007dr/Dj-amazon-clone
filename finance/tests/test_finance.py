@@ -188,7 +188,9 @@ class TestRevenueCapture:
 
         entry = services.record_order_revenue(order)
 
-        assert entry.occurred_on == order.completed_at.date()
+        # ⚠️  `localdate(...)` لا `.date()`: الثانية تاريخ UTC، وهو
+        #     يوم الأمس المحاسبي في أولى ساعات اليوم بالقاهرة.
+        assert entry.occurred_on == timezone.localdate(order.completed_at)
 
 
 # ═══════════════════════════════════════════════════════════

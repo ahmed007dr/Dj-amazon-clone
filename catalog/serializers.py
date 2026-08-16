@@ -313,3 +313,131 @@ class AdminProductSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+
+# ═══════════════════════════════════════════════════════════
+#  الأدمن — التصنيف المرجعي
+# ═══════════════════════════════════════════════════════════
+#
+#  ⚠️  هذه الثلاثة كانت تُدار من لوحة Django وحدها. وهي **شرط**
+#      لإضافة أي منتج: الفئة إلزامية على `Product`، فمتجر بلا
+#      شاشة فئات لا يستطيع إضافة صنفه الأول من لوحته.
+
+
+class AdminCategorySerializer(serializers.ModelSerializer):
+    """
+    ⚠️  `path` و`depth` و`slug` **محسوبة لا مُدخَلة**.
+
+        المسار يُبنى من الأب وسلسلة الأسماء، ويُعاد بناؤه لكل
+        الأحفاد عند النقل. قبوله من العميل يعني شجرةً يكتبها من
+        لا يعرف قواعدها — وأول مسار خاطئ يُخفي فرعًا كاملًا من كل
+        استعلام شجري.
+    """
+
+    product_count = serializers.SerializerMethodField()
+    path_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = [
+            "id",
+            "slug",
+            "parent",
+            "name_ar",
+            "name_en",
+            "description_ar",
+            "description_en",
+            "image",
+            "icon",
+            "path",
+            "path_label",
+            "depth",
+            "display_order",
+            "is_active",
+            "show_in_menu",
+            "product_count",
+        ]
+        read_only_fields = ["id", "slug", "path", "depth"]
+
+    def get_product_count(self, obj) -> int:
+        return obj.products.count()
+
+    def get_path_label(self, obj) -> str:
+        """«أدوية ← مسكّنات» — لعرضها في قائمة اختيار مسطّحة."""
+        parts, node, guard = [], obj, 0
+        while node is not None and guard < 8:
+            parts.append(node.name_ar)
+            node = node.parent
+            guard += 1
+        return " ← ".join(reversed(parts))
+
+    def validate_parent(self, value):
+        """
+        ⚠️  فئة لا تكون أبًا لنفسها ولا لأحد أجدادها.
+
+            الدورة تجعل `_rebuild_path` تستدعي نفسها بلا نهاية،
+            فيعلّق الطلب إلى الأبد بلا أثر في أي سجل.
+        """
+        instance = self.instance
+        if value is None or instance is None:
+            return value
+
+        if value.pk == instance.pk:
+            raise serializers.ValidationError("الفئة لا تكون أبًا لنفسها")
+
+        if instance.path and value.path.startswith(f"{instance.path}/"):
+            raise serializers.ValidationError("لا يمكن نقل فئة إلى داخل أحد فروعها")
+
+        return value
+
+
+class AdminManufacturerSerializer(serializers.ModelSerializer):
+    brand_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Manufacturer
+        fields = [
+            "id",
+            "slug",
+            "name_ar",
+            "name_en",
+            "country",
+            "registration_number",
+            "website",
+            "logo",
+            "is_active",
+            "brand_count",
+        ]
+        read_only_fields = ["id", "slug"]
+
+    def get_brand_count(self, obj) -> int:
+        return obj.brands.count()
+
+
+class AdminBrandSerializer(serializers.ModelSerializer):
+    manufacturer_name = serializers.CharField(
+        source="manufacturer.name_ar", read_only=True, default=""
+    )
+    product_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Brand
+        fields = [
+            "id",
+            "slug",
+            "manufacturer",
+            "manufacturer_name",
+            "name_ar",
+            "name_en",
+            "description_ar",
+            "description_en",
+            "logo",
+            "display_order",
+            "is_featured",
+            "is_active",
+            "product_count",
+        ]
+        read_only_fields = ["id", "slug"]
+
+    def get_product_count(self, obj) -> int:
+        return obj.products.count()

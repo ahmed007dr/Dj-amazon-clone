@@ -75,6 +75,23 @@ class Coupon(BilingualNameMixin, BaseModel):
     )
     first_order_only = models.BooleanField(_("للطلب الأول فقط"), default=False)
 
+    #: ⚠️  كوبون **مملوك لشخص بعينه** — فارغ = حملة عامة.
+    #:
+    #:     كوبون استبدال النقاط ثمنُه رصيدٌ استُهلك فعلًا من دفتر
+    #:     العميل. بلا مالك يكفي أن يُصوَّر الكود ويُرسَل لأي أحد
+    #:     ليصرفه — فيخسر صاحبه نقاطه ويأخذ الخصمَ غيرُه.
+    #:
+    #:     و`usage_limit=1` لا يكفي: هو يحدّ العدد لا الشخص.
+    owner = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="personal_coupons",
+        verbose_name=_("مالك الكوبون"),
+        help_text=_("فارغ = حملة عامة"),
+    )
+
     products = models.ManyToManyField(
         "catalog.Product",
         blank=True,

@@ -1,0 +1,17 @@
+.pricing-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  justify-content: flex-end;
+}
+
+/* ⚠️  فتات الخبز يعيد المسار: القواعد تُفتح داخل قائمة، والخروج
+       منها بلا رابط صريح يجعل الأدمن يستخدم زر الرجوع فيغادر
+       الشاشة كلها. */
+.pricing-crumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-block-end: var(--space-3);
+}

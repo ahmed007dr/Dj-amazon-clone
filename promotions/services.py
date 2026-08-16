@@ -121,6 +121,14 @@ def validate(code: str, user, items, *, subtotal: Decimal | None = None) -> Coup
         return _reject(RejectionReason.EXHAUSTED, "تم استنفاد هذا الكوبون")
 
     # ── الأهلية ────────────────────────────────────────────
+    # ⚠️  الكوبون المملوك يُرفض بـ«غير موجود» لا بـ«ليس لك».
+    #
+    #     التمييز بين الردّين يحوّل الحقل إلى أداة استكشاف: من
+    #     يجرّب أكوادًا يعرف أيّها حقيقي. والمالك الحقيقي لا يرى
+    #     هذا الردّ أصلًا.
+    if coupon.owner_id is not None and coupon.owner_id != getattr(user, "pk", None):
+        return _reject(RejectionReason.NOT_FOUND, "الكوبون غير موجود")
+
     if coupon.account_types:
         account_type = getattr(user, "account_type", None)
         if account_type not in coupon.account_types:
@@ -266,6 +274,12 @@ def active_coupons_for(user):
         .filter(Q(ends_at__isnull=True) | Q(ends_at__gt=now))
         .filter(Q(usage_limit__isnull=True) | Q(usage_count__lt=F("usage_limit")))
     )
+
+    # ⚠️  الكوبونات المملوكة لغير هذا المستخدم لا تُعرَض له إطلاقًا
+    if user is not None and getattr(user, "is_authenticated", False):
+        queryset = queryset.filter(Q(owner__isnull=True) | Q(owner=user))
+    else:
+        queryset = queryset.filter(owner__isnull=True)
 
     account_type = getattr(user, "account_type", None)
     if account_type:

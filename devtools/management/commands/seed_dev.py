@@ -30,6 +30,7 @@ from devtools.seeds import (
     configuration,
     counter,
     logistics,
+    loyalty,
     people,
     pricing,
     staffing,
@@ -114,6 +115,14 @@ class Command(BaseCommand):
         #     نقطة البيع بلا جهاز واحد لا تُفتح إطلاقًا: البوابة
         #     تعرض «لا جهاز متاح» ولا سبيل لتجاوزها من الواجهة.
         #     وهي بنية تحتية كالمواقع لا بيانات تجريبية كالمنتجات.
+        # ⚠️  برامج الولاء بنية تحتية لا بيانات تجريبية.
+        #
+        #     شاشة الولاء بلا برنامج واحد لا تقبل ضبطًا، والقائمة
+        #     الفارغة تبدو عطلًا لا «لم يُضبَط بعد». وواحد منها
+        #     موقوف عمدًا ليُرى المفتاح وهو مُطفأ.
+        self._step("برامج الولاء والإحالة")
+        report["loyalty"] = loyalty.seed()["counts"]
+
         self._step("أجهزة نقطة البيع")
         report["counter"] = counter.seed(logistics_data["locations"])["counts"]
 

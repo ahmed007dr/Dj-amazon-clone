@@ -1,0 +1,210 @@
+.loyalty-program {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius);
+}
+
+/* ⚠️  الحالة تُقرأ من حافة ملوّنة لا من لون المفتاح وحده.
+   المفتاح صغير وقد يقع خارج مجال النظر على شاشة عريضة، والحافة
+   تُميّز البرنامج الموقوف من صفّ بطاقات بلمحة واحدة. */
+.loyalty-program.is-on {
+  border-inline-start: 4px solid var(--color-success);
+}
+
+.loyalty-program.is-off {
+  border-inline-start: 4px solid var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-surface) 92%, var(--color-text-muted));
+}
+
+.loyalty-program__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.loyalty-program__head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.loyalty-program__head code {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* ── المفتاح ─────────────────────────────────────────────── */
+
+.loyalty-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  /* ⚠️  مساحة لمس كاملة: المفتاح يُضغط على تابلت في المتجر لا
+     بفأرة على مكتب. */
+  min-block-size: var(--touch-target);
+}
+
+.loyalty-switch input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.loyalty-switch__track {
+  position: relative;
+  display: inline-block;
+  inline-size: 2.75rem;
+  block-size: 1.5rem;
+  background: var(--color-border);
+  border-radius: var(--radius-pill);
+  transition: background var(--transition);
+}
+
+.loyalty-switch__track::after {
+  position: absolute;
+  inset-block-start: 0.1875rem;
+  inset-inline-start: 0.1875rem;
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
+  content: '';
+  background: var(--color-surface);
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  transition: inset-inline-start var(--transition);
+}
+
+.loyalty-switch input:checked + .loyalty-switch__track {
+  background: var(--color-success);
+}
+
+.loyalty-switch input:checked + .loyalty-switch__track::after {
+  inset-inline-start: 1.4375rem;
+}
+
+.loyalty-switch input:focus-visible + .loyalty-switch__track {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.loyalty-switch__text {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* ── الحقائق ─────────────────────────────────────────────── */
+
+.loyalty-program__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.loyalty-program__facts dt {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.loyalty-program__facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ── الاستهداف ───────────────────────────────────────────── */
+
+.loyalty-program__targeting h4 {
+  margin: 0 0 var(--space-2);
+  font-size: 0.875rem;
+}
+
+.loyalty-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.loyalty-note {
+  margin: var(--space-2) 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-warning);
+}
+
+/* ── النموذج ─────────────────────────────────────────────── */
+
+.loyalty-program__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.loyalty-program__form fieldset {
+  padding: var(--space-3);
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.loyalty-program__form legend {
+  padding-inline: var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.loyalty-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
+
+.loyalty-options label,
+.loyalty-toggles label {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-block-size: var(--touch-target);
+  font-size: 0.875rem;
+}
+
+.loyalty-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-3);
+}
+
+.loyalty-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.loyalty-grid input {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.loyalty-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.loyalty-program__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

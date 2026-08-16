@@ -140,4 +140,7 @@ class AdminRoleAssignment(BaseModel):
     def is_current(self) -> bool:
         from django.utils import timezone
 
-        return self.to_date is None or self.to_date >= timezone.now().date()
+        # ⚠️  `localdate()` لا `now().date()`: الثانية تاريخ UTC،
+        #     فتنتهي صلاحية التكليف قبل موعدها بيوم في ساعات
+        #     الليل الأولى بتوقيت القاهرة.
+        return self.to_date is None or self.to_date >= timezone.localdate()

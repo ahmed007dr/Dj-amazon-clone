@@ -39,7 +39,7 @@ known-first-party = [
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
     "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
-    "employees", "targets", "commissions", "suppliers", "reporting",
+    "employees", "targets", "commissions", "suppliers", "reporting", "loyalty",
     "config",
 ]
 
@@ -56,7 +56,7 @@ testpaths = [
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
     "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
-    "employees", "targets", "commissions", "suppliers", "reporting",
+    "employees", "targets", "commissions", "suppliers", "reporting", "loyalty",
 ]
 
 [tool.coverage.run]
@@ -76,7 +76,7 @@ root_packages = [
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
     "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
-    "employees", "targets", "commissions", "suppliers", "reporting",
+    "employees", "targets", "commissions", "suppliers", "reporting", "loyalty",
 ]
 
 [[tool.importlinter.contracts]]
@@ -128,6 +128,12 @@ layers = [
     #     ربحنا؟» وB2B يسأل «كم على هذا العميل؟». خلطهما كان يجعل
     #     كشف حساب صيدلية يعتمد على قيود الأرباح — وهما دفتران
     #     مختلفان لجمهورين مختلفين.
+    # ⚠️  `loyalty` فوق `b2b | finance` وتحت `employees`.
+    #
+    #     يستمع لاكتمال الطلب ويقرأ `customers`؛ والاستبدال يُنتج
+    #     `promotions.Coupon` بدل أن يلمس السلة أو الطلب — فالسلة
+    #     والطلب **تحته**، ومسّهما كان يقلب الاتجاه.
+    "loyalty",
     "b2b | finance",
     # ⚠️  `employees` فوق `orders` وتحت `b2b | finance`.
     #

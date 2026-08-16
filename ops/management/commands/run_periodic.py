@@ -36,8 +36,14 @@ from django.core.management.base import BaseCommand
 
 from cart import services as cart_services
 from inventory import services as inventory_services
+from loyalty import services as loyalty_services
 
 logger = logging.getLogger(__name__)
+
+def _expire_points() -> int:
+    """⚠️  المهام تُرجع عددًا؛ خدمة الولاء تُرجع تفصيلًا."""
+    return loyalty_services.expire_points()["batches"]
+
 
 #: المهمة → (المجموعة، الوصف، الدالة)
 #
@@ -67,6 +73,16 @@ JOBS: dict[str, tuple[str, str, Callable[[], int]]] = {
         "إهمال السلال الراكدة",
         cart_services.abandon_stale_carts,
     ),
+    # ⚠️  إسقاط النقاط المنتهية **مهمة دورية لا حساب لحظي**.
+    #
+    #     بدونها يبقى الالتزام في الدفتر منتفخًا بنقاط لا تُصرَف،
+    #     ويرى العميل رصيدًا يُرفض عند أول محاولة استبدال — وهو
+    #     أسوأ من رصيد أقل يراه صحيحًا.
+    "expire_points": (
+        "loyalty",
+        "إسقاط نقاط الولاء المنتهية",
+        _expire_points,
+    ),
 }
 
 
@@ -74,7 +90,7 @@ class Command(BaseCommand):
     help = "تشغيل المهام الدورية (الجدولة من cron أو Task Scheduler)"
 
     def add_arguments(self, parser):
-        parser.add_argument("--job", help="اسم مهمة واحدة أو مجموعة (inventory · cart)")
+        parser.add_argument("--job", help="اسم مهمة واحدة أو مجموعة (inventory · cart · loyalty)")
         parser.add_argument("--dry-run", action="store_true", help="عرض ما سيُنفَّذ بلا تنفيذ")
 
     def handle(self, *args, **options):
@@ -82,7 +98,7 @@ class Command(BaseCommand):
 
         if not selected:
             self.stderr.write(self.style.ERROR(f"لا مهمة بهذا الاسم: {options.get('job')}"))
-            self.stderr.write(f"المتاح: {' · '.join(JOBS)} — أو مجموعة: inventory · cart")
+            self.stderr.write(f"المتاح: {' · '.join(JOBS)} — أو مجموعة: inventory · cart · loyalty")
             raise SystemExit(2)
 
         if options["dry_run"]:

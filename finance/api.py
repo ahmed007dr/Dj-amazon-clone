@@ -36,7 +36,9 @@ def _period_from(request) -> tuple[date, date]:
         تمريرها تُنتج تقريرًا بأصفار يبدو **حقيقيًا**: لا خطأ، ولا
         صفوف، فيُقرأ كشهر بلا مبيعات بدل مدى مقلوب.
     """
-    today = timezone.now().date()
+    # ⚠️  `localdate()` لا `now().date()`: تقرير «اليوم» بتاريخ UTC
+    #     يعرض مبيعات أمس في أولى ساعات اليوم بتوقيت القاهرة.
+    today = timezone.localdate()
 
     raw_start = request.query_params.get("start")
     raw_end = request.query_params.get("end")

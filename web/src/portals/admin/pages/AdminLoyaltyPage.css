@@ -1,0 +1,91 @@
+.loyalty-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-4);
+  margin-block-end: var(--space-5);
+}
+
+.loyalty-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-end: var(--space-4);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.loyalty-tabs button {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-4);
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  border-block-end: 2px solid transparent;
+  cursor: pointer;
+}
+
+.loyalty-tabs button.is-active {
+  color: var(--color-primary);
+  border-block-end-color: var(--color-primary);
+}
+
+/* ⚠️  عمود واحد حتى الشاشات المتوسطة.
+   بطاقة البرنامج تحمل نموذج ضبط كاملًا؛ عمودان على تابلت يضغطان
+   قوائم الاستهداف حتى تصير خانات الاختيار متلاصقة على اللمس. */
+.loyalty-programs {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 60rem) {
+  .loyalty-programs {
+    grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));
+  }
+}
+
+.loyalty-referral {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.loyalty-referral__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius);
+}
+
+.loyalty-referral__card header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.loyalty-referral__card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.points-up {
+  color: var(--color-success);
+}
+
+.points-down {
+  color: var(--color-danger);
+}
+
+.loyalty-note-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.8125rem;
+}
+
+.loyalty-note-cell em {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
