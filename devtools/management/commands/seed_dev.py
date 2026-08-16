@@ -133,7 +133,7 @@ class Command(BaseCommand):
             products, catalog_data["variants"], logistics_data["locations"]
         )["counts"]
 
-        self._step("الجامعات وحزم الطلاب")
+        self._step("الجامعات فئات الطلاب")
         academia_data = academia.seed(products)
         report["academia"] = academia_data["counts"]
 
