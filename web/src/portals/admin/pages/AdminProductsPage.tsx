@@ -3,9 +3,17 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { listAdminProducts, type AdminProduct } from '@/features/catalog/adminApi';
+import {
+  listAdminProducts,
+  useDeleteProduct,
+  useProductFormOptions,
+  useRestoreProduct,
+  type AdminProduct,
+} from '@/features/catalog/adminApi';
+import { ProductForm } from '@/portals/admin/components/ProductForm';
 import { ProductImagesPanel } from '@/portals/admin/components/ProductImagesPanel';
 import { useDebounced } from '@/shared/hooks/useDebounced';
+import { isApiError } from '@/shared/http/errors';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
@@ -13,44 +21,89 @@ import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Drawer } from '@/shared/ui/Drawer';
 import { FilterBar, FilterSearch, FilterSelect } from '@/shared/ui/FilterBar';
+import { Modal } from '@/shared/ui/Modal';
 import { Pagination } from '@/shared/ui/Pagination';
+import { useToast } from '@/shared/ui/useToast';
 import { formatMoney } from '@/shared/utils/format';
+
+import './AdminProductsPage.css';
+
+/** اللوح المفتوح — نموذج أو صور. */
+type Panel =
+  | { mode: 'create' }
+  | { mode: 'edit'; product: AdminProduct }
+  | { mode: 'images'; product: AdminProduct };
 
 export function AdminProductsPage() {
   const { t, i18n } = useTranslation();
   const localized = useLocalized();
+  const { notify } = useToast();
 
   const [search, setSearch] = useState('');
   const [active, setActive] = useState('');
+  const [showDeleted, setShowDeleted] = useState('');
   const [page, setPage] = useState(1);
 
   // ⚠️  لوح لا مسار.
   //
-  //     صفحة صور بمسار خاص تعني مغادرة القائمة وفقدان البحث
-  //     والصفحة والفلاتر — والأدمن يرفع صور عشرة منتجات متتالية
-  //     فيعود إلى الصفحة الأولى في كل مرة.
-  const [imagesFor, setImagesFor] = useState<AdminProduct | null>(null);
+  //     صفحة بمسار خاص تعني مغادرة القائمة وفقدان البحث والصفحة
+  //     والفلاتر — والأدمن يحرّر عشرة منتجات متتالية فيعود إلى
+  //     الصفحة الأولى في كل مرة.
+  const [panel, setPanel] = useState<Panel | null>(null);
+
+  // ⚠️  الحذف يمرّ بتأكيد يذكر **اسم المنتج**.
+  //
+  //     «هل أنت متأكد؟» المجرّدة تُضغط بلا قراءة؛ والاسم في الرسالة
+  //     هو ما يجعل الأدمن يلاحظ أنه ضغط على الصف الخطأ.
+  const [pendingDelete, setPendingDelete] = useState<AdminProduct | null>(null);
 
   const debouncedSearch = useDebounced(search);
 
   const query = useQuery({
-    queryKey: ['admin', 'products', debouncedSearch, active, page],
+    queryKey: ['admin', 'products', debouncedSearch, active, showDeleted, page],
     queryFn: () =>
       listAdminProducts({
         ...(debouncedSearch ? { search: debouncedSearch } : {}),
         ...(active ? { is_active: active } : {}),
+        ...(showDeleted ? { include_deleted: showDeleted } : {}),
         page,
       }),
     staleTime: 60 * 1000,
   });
 
+  // ⚠️  يُجلب هنا أيضًا لحلّ **أسماء الفئات** في الجدول.
+  //
+  //     الخادم يرسل `category` معرّفًا لا كائنًا، فكان العمود يعرض
+  //     فراغًا في كل صف بلا خطأ. والاستعلام نفسه يخدم النموذج
+  //     فلا نداء إضافي.
+  const options = useProductFormOptions();
+
+  const categoryNames = new Map(
+    (options.data?.categories ?? []).map((row) => [row.id, localized(row, 'name')]),
+  );
+
+  const remove = useDeleteProduct();
+  const restore = useRestoreProduct();
+
+  const fail = (error: unknown) =>
+    notify(isApiError(error) ? error.displayMessage : t('state.errorTitle'), 'danger');
+
+  const confirmDelete = () => {
+    if (!pendingDelete) return;
+    remove.mutate(pendingDelete.id, {
+      onSuccess: () => {
+        notify(t('products.deleted'), 'success');
+        setPendingDelete(null);
+      },
+      onError: fail,
+    });
+  };
+
   const columns: Column<AdminProduct>[] = [
     {
       key: 'sku',
       header: t('catalog.sku'),
-      render: (product) => (
-        <code style={{ direction: 'ltr' }}>{product.sku}</code>
-      ),
+      render: (product) => <code style={{ direction: 'ltr' }}>{product.sku}</code>,
     },
     {
       key: 'name',
@@ -66,7 +119,9 @@ export function AdminProductsPage() {
     {
       key: 'category',
       header: t('catalog.category'),
-      render: (product) => (product.category ? localized(product.category, 'name') : '—'),
+      secondary: true,
+      render: (product) =>
+        (product.category ? categoryNames.get(product.category) : null) ?? '—',
     },
     {
       key: 'price',
@@ -87,24 +142,65 @@ export function AdminProductsPage() {
         ),
     },
     {
-      key: 'images',
-      header: t('images.title'),
+      key: 'actions',
+      header: t('admin.actions'),
       align: 'end',
-      render: (product) => (
-        <Button size="sm" variant="ghost" onClick={() => setImagesFor(product)}>
-          {t('images.manage')}
-        </Button>
-      ),
+      render: (product) =>
+        // ⚠️  المحذوف يعرض **الاسترجاع وحده**.
+        //
+        //     تعديل منتج محذوف أو رفع صوره عمل يضيع: لا يراه أحد
+        //     ما دام محذوفًا. الخطوة الأولى إرجاعه.
+        product.deleted_at ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            loading={restore.isPending}
+            onClick={() =>
+              restore.mutate(product.id, {
+                onSuccess: () => notify(t('products.restored'), 'success'),
+                onError: fail,
+              })
+            }
+          >
+            {t('products.restore')}
+          </Button>
+        ) : (
+          <span className="admin-products__actions">
+            <Button size="sm" variant="ghost" onClick={() => setPanel({ mode: 'edit', product })}>
+              {t('common.edit')}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setPanel({ mode: 'images', product })}
+            >
+              {t('images.manage')}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setPendingDelete(product)}>
+              {t('common.delete')}
+            </Button>
+          </span>
+        ),
     },
   ];
 
-  const hasFilters = Boolean(search || active);
+  const hasFilters = Boolean(search || active || showDeleted);
+
+  const panelTitle =
+    panel?.mode === 'create'
+      ? t('products.create')
+      : panel
+        ? localized(panel.product, 'name')
+        : '';
 
   return (
     <>
       <PageHeader
         title={t('nav.products')}
         {...(query.data ? { description: t('admin.total', { count: query.data.count }) } : {})}
+        actions={
+          <Button onClick={() => setPanel({ mode: 'create' })}>{t('products.create')}</Button>
+        }
       />
 
       <FilterBar
@@ -112,6 +208,7 @@ export function AdminProductsPage() {
         onClear={() => {
           setSearch('');
           setActive('');
+          setShowDeleted('');
           setPage(1);
         }}
       >
@@ -136,6 +233,16 @@ export function AdminProductsPage() {
             setPage(1);
           }}
         />
+
+        <FilterSelect
+          value={showDeleted}
+          label={t('products.deletedFilter')}
+          options={[{ value: 'true', label: t('products.includeDeleted') }]}
+          onChange={(next) => {
+            setShowDeleted(next);
+            setPage(1);
+          }}
+        />
       </FilterBar>
 
       <DataTable
@@ -151,18 +258,49 @@ export function AdminProductsPage() {
         <Pagination page={query.data.page} pages={query.data.pages} onChange={setPage} />
       ) : null}
 
-      <Drawer
-        open={imagesFor !== null}
-        onClose={() => setImagesFor(null)}
-        {...(imagesFor ? { title: localized(imagesFor, 'name') } : {})}
-      >
-        {/* ⚠️  اللوح يُركَّب عند الفتح فقط — `imagesFor` هو المفتاح.
-            إبقاؤه مركّبًا يجعل استعلام الصور يعمل لمنتج مغلق،
+      <Drawer open={panel !== null} onClose={() => setPanel(null)} title={panelTitle}>
+        {/* ⚠️  اللوح يُركَّب عند الفتح فقط، ومفتاحه يتغيّر مع المنتج.
+            إبقاؤه مركّبًا يجعل النموذج يحتفظ بمسوّدة منتج سابق،
             ويعرض صور المنتج السابق للحظة عند فتح التالي. */}
-        {imagesFor ? (
-          <ProductImagesPanel key={imagesFor.id} productId={imagesFor.id} />
+        {panel?.mode === 'images' ? (
+          <ProductImagesPanel key={panel.product.id} productId={panel.product.id} />
+        ) : null}
+
+        {panel?.mode === 'create' ? (
+          <ProductForm key="create" onDone={() => setPanel(null)} />
+        ) : null}
+
+        {panel?.mode === 'edit' ? (
+          <ProductForm
+            key={panel.product.id}
+            product={panel.product}
+            onDone={() => setPanel(null)}
+          />
         ) : null}
       </Drawer>
+
+      <Modal
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        title={t('products.confirmDeleteTitle')}
+        footer={
+          <>
+            <Button variant="danger" loading={remove.isPending} onClick={confirmDelete}>
+              {t('common.delete')}
+            </Button>
+            <Button variant="ghost" onClick={() => setPendingDelete(null)}>
+              {t('common.cancel')}
+            </Button>
+          </>
+        }
+      >
+        <p>
+          {t('products.confirmDeleteBody', {
+            name: pendingDelete ? localized(pendingDelete, 'name') : '',
+          })}
+        </p>
+        <p className="admin-products__soft-note">{t('products.softDeleteNote')}</p>
+      </Modal>
     </>
   );
 }

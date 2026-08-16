@@ -1,0 +1,14 @@
+/* ⚠️  الأزرار تلتفّ ولا تُضغط: ثلاثة إجراءات في خلية ضيّقة على
+       شاشة متوسطة كانت تخرج من الجدول أفقيًا. */
+.admin-products__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  justify-content: flex-end;
+}
+
+.admin-products__soft-note {
+  margin-block-start: var(--space-2);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}

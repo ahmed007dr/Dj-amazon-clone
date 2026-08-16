@@ -23,11 +23,22 @@ urlpatterns = [
     path("brands/<slug:slug>/", api.BrandDetailAPI.as_view(), name="brand-detail"),
     path("manufacturers/", api.ManufacturerListAPI.as_view(), name="manufacturers"),
     # الأدمن — بلا فلترة سياسات
+    # خيارات نموذج الإنشاء — نداء واحد يملأ كل القوائم المنسدلة
+    path(
+        "admin/products/options/",
+        api.ProductFormOptionsAPI.as_view(),
+        name="admin-product-options",
+    ),
     path("admin/products/", api.AdminProductListCreateAPI.as_view(), name="admin-products"),
     path(
         "admin/products/<uuid:pk>/",
         api.AdminProductDetailAPI.as_view(),
         name="admin-product-detail",
+    ),
+    path(
+        "admin/products/<uuid:pk>/restore/",
+        api.RestoreProductAPI.as_view(),
+        name="admin-product-restore",
     ),
     # صور المنتج — الرفع والترتيب والحذف
     path(

@@ -17,8 +17,19 @@ from access.preview import PreviewAwareMixin
 from access.services import PolicyAwareQuerySetMixin
 from catalog import selectors
 from catalog import serializers as s
-from catalog.models import Brand, Category, Manufacturer, Product
+from catalog.models import (
+    Brand,
+    Category,
+    DosageForm,
+    Manufacturer,
+    Product,
+    ProductKind,
+    RegulatoryClass,
+    StorageCondition,
+)
 from core.api.pagination import AdminPageNumberPagination
+from core.errors import BusinessError, ErrorCode
+from core.models.audit import AuditAction, AuditLog
 from core.permissions import IsAdminAccount
 
 
@@ -213,11 +224,28 @@ class AdminProductListCreateAPI(generics.ListCreateAPIView):
                 Q(name_ar__icontains=search)
                 | Q(name_en__icontains=search)
                 | Q(sku__icontains=search)
+                | Q(barcode__iexact=search)
             )
-        if params.get("inactive") == "true":
-            queryset = queryset.filter(is_active=False)
+
+        # ⚠️  `is_active` هو ما ترسله الواجهة.
+        #
+        #     كان الخادم يقرأ `inactive` وحده، فيمرّ فلتر الحالة
+        #     بلا أثر: الشاشة تعرض «مفعّل» والنتائج تشمل الموقوف.
+        #     الفلتر الذي لا يفلتر أسوأ من غيابه — لأنه يُصدَّق.
+        if (is_active := params.get("is_active")) in ("true", "false"):
+            queryset = queryset.filter(is_active=is_active == "true")
 
         return queryset.order_by("-created_at")
+
+    def perform_create(self, serializer):
+        product = serializer.save()
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditAction.CREATE,
+            object_repr=f"منتج {product.sku}",
+            changes={"name_ar": product.name_ar, "sku": product.sku},
+            ip_address=self.request.META.get("REMOTE_ADDR"),
+        )
 
 
 class AdminProductDetailAPI(generics.RetrieveUpdateDestroyAPIView):
@@ -233,3 +261,126 @@ class AdminProductDetailAPI(generics.RetrieveUpdateDestroyAPIView):
             حذفه فعليًا يكسر كل تقرير ماضٍ.
         """
         instance.delete()
+
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditAction.DELETE,
+            object_repr=f"منتج {instance.sku}",
+            changes={"name_ar": instance.name_ar, "soft": True},
+            ip_address=self.request.META.get("REMOTE_ADDR"),
+        )
+
+
+class RestoreProductAPI(APIView):
+    """
+    إرجاع منتج محذوف ناعمًا.
+
+    ⚠️  الحذف الناعم بلا استرجاع حذفٌ نهائي من منظور المستخدم.
+
+        الصف باقٍ في قاعدة البيانات، لكن إعادته كانت تحتاج مطوّرًا
+        أو لوحة Django — وأول سؤال بعد حذف بالخطأ هو «كيف أرجعه؟».
+    """
+
+    permission_classes = [IsAdminAccount]
+
+    def post(self, request, pk):
+        product = Product.all_objects.filter(pk=pk).first()
+        if product is None:
+            raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
+
+        if product.deleted_at is None:
+            raise BusinessError(
+                ErrorCode.CONFLICT,
+                detail="هذا المنتج غير محذوف",
+                status_code=409,
+            )
+
+        product.restore()
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditAction.RESTORE,
+            object_repr=f"منتج {product.sku}",
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        return Response(s.AdminProductSerializer(product).data)
+
+
+class ProductFormOptionsAPI(APIView):
+    """
+    كل ما تحتاجه شاشة إنشاء منتج — في نداء واحد.
+
+    ⚠️  **القوائم من الخادم لا مكرّرة في الواجهة.**
+
+        تثبيت الأشكال الدوائية أو التصنيفات التنظيمية في كود
+        الواجهة يجعل إضافة قيمة في الخادم لا تظهر للأدمن، وحذفها
+        يترك خيارًا يفشل عند الحفظ. المصدر واحد.
+
+    ⚠️  و**الفئات مسطّحة بمسارها الكامل** لا شجرة.
+
+        قائمة اختيار لا تعرض شجرة؛ و«أقراص» وحدها غامضة حين توجد
+        تحت «أدوية» و«مكمّلات» معًا. المسار يحسم أيّهما.
+
+    ⚠️  وتشمل الفئات غير الظاهرة في القائمة العامة.
+
+        نقطة الفئات العامة تُصفّي بـ `show_in_menu`، وهو تصنيف
+        **عرضي** لا تصنيف صلاحية: فئة مخفية عن قائمة المتجر تبقى
+        فئة صالحة لمنتج. الاعتماد عليها هنا كان يمنع الأدمن من
+        اختيار فئات موجودة.
+    """
+
+    permission_classes = [IsAdminAccount]
+
+    def get(self, request):
+        return Response(
+            {
+                "kinds": _choices(ProductKind),
+                "regulatory_classes": _choices(RegulatoryClass),
+                "dosage_forms": _choices(DosageForm),
+                "storage_conditions": _choices(StorageCondition),
+                "categories": _flat_categories(),
+                "brands": [
+                    {"id": str(brand.id), "name_ar": brand.name_ar, "name_en": brand.name_en}
+                    for brand in Brand.objects.filter(is_active=True).order_by("name_ar")
+                ],
+                "manufacturers": [
+                    {"id": str(maker.id), "name_ar": maker.name_ar, "name_en": maker.name_en}
+                    for maker in Manufacturer.objects.filter(is_active=True).order_by("name_ar")
+                ],
+            }
+        )
+
+
+def _choices(choices_class) -> list[dict]:
+    """
+    ⚠️  التسمية العربية من `TextChoices` لا من قاموس في الواجهة —
+        فلا يوجد موضعان يختلفان في تسمية نفس القيمة.
+    """
+    return [{"value": value, "label": str(label)} for value, label in choices_class.choices]
+
+
+def _flat_categories() -> list[dict]:
+    """الفئات النشطة مسطّحة، ولكل واحدة مسارها المقروء."""
+    categories = list(Category.objects.filter(is_active=True).order_by("path", "display_order"))
+    names = {category.pk: category for category in categories}
+
+    def label(category) -> str:
+        parts, node, guard = [], category, 0
+        # ⚠️  حارس العمق: مسار تالف بأب يشير إلى نفسه يعلّق الطلب
+        #     إلى الأبد بلا أثر في أي سجل.
+        while node is not None and guard < 8:
+            parts.append(node.name_ar)
+            node = names.get(node.parent_id)
+            guard += 1
+        return " ← ".join(reversed(parts))
+
+    return [
+        {
+            "id": str(category.id),
+            "name_ar": category.name_ar,
+            "name_en": category.name_en,
+            "path_label": label(category),
+        }
+        for category in categories
+    ]

@@ -1,0 +1,117 @@
+.stock-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.stock-form__intro {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+.stock-form__row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 40rem) {
+  .stock-form__row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.stock-form__select {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.stock-form__select select,
+.stock-form__reason textarea {
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.stock-form__select select[aria-invalid='true'],
+.stock-form__reason textarea[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.stock-form__reason {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.stock-form__reason textarea {
+  resize: vertical;
+}
+
+.stock-form__reason em {
+  color: var(--color-danger);
+  font-style: normal;
+}
+
+/* ⚠️  الاتجاه زرّان لا إشارة تُكتب: السالب المكتوب يدويًا يُنسى،
+       فتُسجَّل زيادة مكان نقص — وهو خطأ لا يُكتشف إلا عند الجرد. */
+.stock-form__direction {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.stock-form__direction legend {
+  padding-inline: var(--space-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.stock-form__direction label {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font-size: 0.9375rem;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.stock-form__direction input {
+  accent-color: var(--color-primary);
+}
+
+.stock-form__direction label:has(input:checked) {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.stock-form__error {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-danger);
+}
+
+.stock-form__actions {
+  display: flex;
+  gap: var(--space-2);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--color-border);
+}
