@@ -5,6 +5,7 @@ import {
   useCreateProduct,
   useProductFormOptions,
   useUpdateProduct,
+  type AccessPolicyOption,
   type AdminProduct,
   type ProductDraft,
 } from '@/features/catalog/adminApi';
@@ -76,6 +77,8 @@ export function ProductForm({
     pack_size: product?.pack_size ?? '',
     storage_condition: product?.storage_condition ?? 'ROOM',
     weight_grams: product?.weight_grams === null ? '' : String(product?.weight_grams ?? ''),
+    access_policy: product?.access_policy ?? '',
+    tax_class: product?.tax_class ?? '',
     is_active: product?.is_active ?? true,
     is_featured: product?.is_featured ?? false,
   }));
@@ -125,6 +128,10 @@ export function ProductForm({
       pack_size: form.pack_size,
       storage_condition: form.storage_condition,
       weight_grams: form.weight_grams === '' ? null : Number(form.weight_grams),
+      // ⚠️  فارغ = `null` = السياسة الافتراضية على الخادم. وهذا
+      //     صريح في الواجهة: الخيار الأول يقول «الافتراضية» باسمها.
+      access_policy: form.access_policy || null,
+      tax_class: form.tax_class || null,
       is_active: form.is_active,
       is_featured: form.is_featured,
     };
@@ -163,6 +170,32 @@ export function ProductForm({
 
   const busy = create.isPending || update.isPending;
   const ready = form.name_ar !== '' && form.category !== '' && (isEdit || form.sku !== '');
+
+  // السياسة المختارة — أو الافتراضية حين يُترك الحقل فارغًا
+  const chosenPolicy =
+    data.access_policies.find((row) => row.id === form.access_policy) ??
+    data.access_policies.find((row) => row.is_default);
+
+  /**
+   * ⚠️  أثر السياسة **مكتوب** لا مستنتَج من اسمها.
+   *
+   *     «مهنيون موثّقون» لا تقول إن الطبيب المسجَّل غير الموثّق
+   *     ممنوع، ولا تسمّي الأنواع المسموحة. والأدمن يكتشف الفارق
+   *     بشكوى عميل لا يرى الصنف.
+   */
+  const policyEffect = (() => {
+    if (!chosenPolicy) return t('products.policyNoneConfigured');
+
+    const audience =
+      chosenPolicy.allowed_account_types.length > 0
+        ? chosenPolicy.allowed_account_types.map((type) => t(`accountType.${type}`)).join(' · ')
+        : t(`accessLevel.${chosenPolicy.level}`);
+
+    const effect = t('products.policyEffect', { audience });
+    return chosenPolicy.requires_verification
+      ? `${effect} ${t('products.policyVerifiedOnly')}`
+      : effect;
+  })();
 
   return (
     <div className="product-form">
@@ -362,6 +395,37 @@ export function ProductForm({
         </>
       ) : null}
 
+      {/* ── مَن يرى هذا المنتج ────────────────────── */}
+      <h4 className="product-form__legend">{t('products.sectionAudience')}</h4>
+
+      <Select
+        label={t('products.accessPolicy')}
+        value={form.access_policy}
+        onChange={set('access_policy')}
+        placeholder={defaultPolicyLabel(data.access_policies, t('products.policyDefault'))}
+        options={data.access_policies
+          .filter((row) => !row.is_default)
+          .map((row) => ({ value: row.id, label: localized(row, 'name') }))}
+        {...(fieldErrors.access_policy ? { error: fieldErrors.access_policy } : {})}
+      />
+
+      {/* ⚠️  أثر الاختيار مكتوب تحته لا مخبوء في اسم السياسة.
+          «مهنيون موثّقون» وحدها لا تقول إن الطبيب المسجَّل غير
+          الموثّق ممنوع — والأدمن يكتشف ذلك بشكوى عميل. */}
+      <p className="product-form__policy-effect">{policyEffect}</p>
+
+      <Select
+        label={t('admin.taxClass')}
+        value={form.tax_class}
+        onChange={set('tax_class')}
+        placeholder={t('products.taxDefault')}
+        options={data.tax_classes.map((row) => ({
+          value: row.id,
+          label: `${localized(row, 'name')} — ${row.rate}%`,
+        }))}
+        {...(fieldErrors.tax_class ? { error: fieldErrors.tax_class } : {})}
+      />
+
       {/* ── النشر ─────────────────────────────────── */}
       <h4 className="product-form__legend">{t('products.sectionPublishing')}</h4>
 
@@ -389,6 +453,18 @@ export function ProductForm({
       </div>
     </div>
   );
+}
+
+/**
+ * ⚠️  الافتراضية تُعرض **باسمها** لا كـ«بلا اختيار».
+ *
+ *     «فارغ» يوحي بأن المنتج بلا سياسة، والحقيقة أنه يرث الافتراضية
+ *     — وهي «عام للجميع» عادةً. الفرق بين الإيحاءين هو الفرق بين
+ *     أدمن يعرف أنه نشر للجميع وأدمن يظن أنه لم يقرّر بعد.
+ */
+function defaultPolicyLabel(policies: AccessPolicyOption[], fallback: string): string {
+  const fallbackPolicy = policies.find((row) => row.is_default);
+  return fallbackPolicy ? `${fallback} — ${fallbackPolicy.name_ar}` : fallback;
 }
 
 /* ═══════════════════════════════════════════════════════════

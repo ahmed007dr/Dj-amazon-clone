@@ -17,6 +17,7 @@ from django.apps import apps
 from django.urls import reverse
 from rest_framework.test import APIClient
 
+from access.models import AccessPolicy
 from accounts.models import AccountType, User
 from catalog.models import Category, Product, ProductKind
 
@@ -28,6 +29,14 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def category(db):
     return Category.objects.create(name_ar="مستلزمات", name_en="Supplies")
+
+
+@pytest.fixture
+def policies(db):
+    from django.core.management import call_command
+
+    call_command("seed_access_policies", verbosity=0)
+    return {policy.code: policy for policy in AccessPolicy.objects.all()}
 
 
 @pytest.fixture
@@ -269,6 +278,34 @@ class TestFormOptions:
 
         assert labels[str(child.pk)] == "مستلزمات ← شاش"
 
+    def test_options_carry_the_access_policies(self, admin_client, policies):
+        """
+        ⚠️  «مَن يرى هذا المنتج؟» جزء من نموذج الإنشاء لا إعداد
+            متقدّم. غيابه يجعل كل منتج جديد يرث الافتراضية بصمت —
+            فيُنشر دواء مقيّد للجميع ولا يُكتشف إلا حين يشتريه من
+            لا يحقّ له.
+        """
+        response = admin_client.get(reverse("v1:catalog:admin-product-options"))
+        codes = {row["code"] for row in response.data["access_policies"]}
+
+        assert {"public", "students", "professionals", "pharmacy_only"} <= codes
+
+    def test_the_default_policy_comes_first(self, admin_client, policies):
+        """«للجميع» هو الاختيار الصحيح لمعظم المنتجات — ودفنه وسط
+        القائمة يجعل الأدمن يقيّد منتجًا عامًا بلا قصد."""
+        response = admin_client.get(reverse("v1:catalog:admin-product-options"))
+        assert response.data["access_policies"][0]["is_default"] is True
+
+    def test_each_policy_carries_its_conditions_not_just_a_name(self, admin_client, policies):
+        """«مهنيون موثّقون» وحدها لا تقول إن الطبيب غير الموثّق ممنوع."""
+        response = admin_client.get(reverse("v1:catalog:admin-product-options"))
+        professionals = next(
+            row for row in response.data["access_policies"] if row["code"] == "professionals"
+        )
+
+        assert professionals["requires_verification"] is True
+        assert "DOCTOR" in professionals["allowed_account_types"]
+
     def test_customer_cannot_read_options(self, category):
         customer = User.objects.create_user(email="c2@test.local", password=PASSWORD)
         customer.is_active = True
@@ -283,6 +320,97 @@ class TestFormOptions:
 # ═══════════════════════════════════════════════════════════
 #  التعديل
 # ═══════════════════════════════════════════════════════════
+
+
+class TestAudience:
+    """
+    ⚠️  **«مَن يرى هذا المنتج؟» ليس حقلًا شكليًا.**
+
+        السياسة المختارة عند الإنشاء هي ما يفصل دواءً مقيّدًا عن
+        منتج عام. الاختبارات هنا تتبع الأثر من النموذج حتى ما يراه
+        الزائر فعلًا في الكتالوج.
+    """
+
+    def test_the_chosen_policy_is_saved(self, admin_client, category, policies):
+        response = admin_client.post(
+            reverse("v1:catalog:admin-products"),
+            draft(category, access_policy=str(policies["pharmacy_only"].pk)),
+            format="json",
+        )
+
+        assert response.status_code == 201
+        assert Product.objects.get(sku="NEW-001").access_policy_id == policies["pharmacy_only"].pk
+
+    def test_a_restricted_product_is_invisible_to_guests(self, admin_client, category, policies):
+        """
+        ⚠️  الفلترة في الـ queryset لا في العرض: المنتج المقيّد لا
+            يظهر في النتائج ولا في العدد ولا يُفتح بالرابط المباشر.
+        """
+        admin_client.post(
+            reverse("v1:catalog:admin-products"),
+            draft(category, sku="RX-1", access_policy=str(policies["professionals"].pk)),
+            format="json",
+        )
+        admin_client.post(
+            reverse("v1:catalog:admin-products"),
+            draft(category, sku="OPEN-1", access_policy=str(policies["public"].pk)),
+            format="json",
+        )
+
+        public = APIClient().get(reverse("v1:catalog:products"))
+        skus = {row["sku"] for row in public.data["results"]}
+
+        assert skus == {"OPEN-1"}
+
+    def test_a_verified_pharmacy_sees_what_a_guest_cannot(self, admin_client, category, policies):
+        from accounts.models import VerificationStatus
+
+        admin_client.post(
+            reverse("v1:catalog:admin-products"),
+            draft(category, sku="PH-1", access_policy=str(policies["pharmacy_only"].pk)),
+            format="json",
+        )
+
+        pharmacy = User.objects.create_user(
+            email="ph@test.local", password=PASSWORD, account_type=AccountType.PHARMACY
+        )
+        pharmacy.is_active = True
+        pharmacy.verification_status = VerificationStatus.VERIFIED
+        pharmacy.save()
+
+        client = APIClient()
+        client.force_authenticate(user=pharmacy)
+
+        response = client.get(reverse("v1:catalog:products"))
+        assert {row["sku"] for row in response.data["results"]} == {"PH-1"}
+
+    def test_omitting_the_policy_falls_back_to_the_default(self, admin_client, category, policies):
+        """
+        ⚠️  المنتج بلا سياسة صريحة يرث الافتراضية — ولذلك تُعرض
+            الافتراضية **باسمها** في النموذج لا كـ«بلا اختيار».
+        """
+        admin_client.post(reverse("v1:catalog:admin-products"), draft(category), format="json")
+
+        product = Product.objects.get(sku="NEW-001")
+        assert product.access_policy_id is None
+
+        # والزائر يراه لأن الافتراضية «عام»
+        public = APIClient().get(reverse("v1:catalog:products"))
+        assert {row["sku"] for row in public.data["results"]} == {"NEW-001"}
+
+    def test_the_policy_can_be_tightened_after_creation(self, admin_client, category, policies):
+        """اكتشاف أن منتجًا مقيّدًا نُشر للجميع يجب أن يُصحَّح بضغطة."""
+        admin_client.post(reverse("v1:catalog:admin-products"), draft(category), format="json")
+        product = Product.objects.get(sku="NEW-001")
+
+        admin_client.patch(
+            reverse("v1:catalog:admin-product-detail", args=[product.pk]),
+            {"access_policy": str(policies["professionals"].pk)},
+            format="json",
+        )
+
+        public = APIClient().get(reverse("v1:catalog:products"))
+        assert [row["sku"] for row in public.data["results"]] == []
 
 
 class TestUpdate:

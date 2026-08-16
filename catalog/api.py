@@ -13,6 +13,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from access import services as access_services
 from access.preview import PreviewAwareMixin
 from access.services import PolicyAwareQuerySetMixin
 from catalog import selectors
@@ -30,6 +31,7 @@ from catalog.models import (
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
+from core.models.tax import TaxClass
 from core.permissions import IsAdminAccount
 
 
@@ -328,6 +330,13 @@ class ProductFormOptionsAPI(APIView):
         **عرضي** لا تصنيف صلاحية: فئة مخفية عن قائمة المتجر تبقى
         فئة صالحة لمنتج. الاعتماد عليها هنا كان يمنع الأدمن من
         اختيار فئات موجودة.
+
+    ⚠️  و`access_policies` **جزء من النموذج لا إعداد متقدّم**.
+
+        هي جواب السؤال «مَن يرى هذا المنتج؟» — عام أم طلاب أم
+        مهنيون موثّقون أم صيدليات. حذفها من شاشة الإنشاء يجعل كل
+        منتج جديد يرث الافتراضية بصمت: دواء مقيّد يُنشر للجميع،
+        ولا يُكتشف إلا حين يشتريه من لا يحقّ له.
     """
 
     permission_classes = [IsAdminAccount]
@@ -347,6 +356,37 @@ class ProductFormOptionsAPI(APIView):
                 "manufacturers": [
                     {"id": str(maker.id), "name_ar": maker.name_ar, "name_en": maker.name_en}
                     for maker in Manufacturer.objects.filter(is_active=True).order_by("name_ar")
+                ],
+                # ⚠️  عبر `access.services` لا `access.models` — الواجهة
+                #     العامة لكل نطاق هي خدماته.
+                "access_policies": [
+                    {
+                        "id": str(policy.id),
+                        "code": policy.code,
+                        "name_ar": policy.name_ar,
+                        "name_en": policy.name_en,
+                        "level": policy.level,
+                        "is_default": policy.is_default,
+                        # ⚠️  الشرطان يُعرضان مع الاسم: «مهنيون موثّقون»
+                        #     وحدها لا تقول إن الطبيب غير الموثّق ممنوع.
+                        "requires_verification": policy.requires_verification,
+                        "allowed_account_types": policy.allowed_account_types,
+                        "description_ar": policy.description_ar,
+                        "description_en": policy.description_en,
+                    }
+                    for policy in access_services.selectable_policies()
+                ],
+                "tax_classes": [
+                    {
+                        "id": str(tax_class.id),
+                        "name_ar": tax_class.name_ar,
+                        "name_en": tax_class.name_en,
+                        "rate": str(tax_class.rate),
+                        "is_default": tax_class.is_default,
+                    }
+                    for tax_class in TaxClass.objects.filter(is_active=True).order_by(
+                        "-is_default", "code"
+                    )
                 ],
             }
         )

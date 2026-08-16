@@ -44,13 +44,29 @@ class SupplierListCreateAPI(generics.ListCreateAPIView):
         #     التجميع يُسقط ترتيب `Meta`، فيصير الترقيم غير مستقر:
         #     نفس الصف يظهر في صفحتين أو يسقط بينهما — وقاعدة
         #     البيانات لا تَعِد بترتيب ثابت بلا `ORDER BY`.
-        queryset = Supplier.objects.annotate(
-            offer_count=Count("offers", filter=Q(offers__is_active=True))
-        ).order_by("name_ar")
+        queryset = (
+            services.annotated_suppliers()
+            .annotate(offer_count=Count("offers", filter=Q(offers__is_active=True)))
+            .order_by("name_ar")
+        )
         params = self.request.query_params
 
-        if params.get("active") == "true":
+        # ⚠️  `status` صريحة لا `active=true` وحدها.
+        #
+        #     الشرط القديم كان `== "true"` فقط، فكان `active=false`
+        #     **لا يفعل شيئًا**: يطلب الأدمن الموقوفين فيرى الجميع
+        #     ولا خطأ يظهر.
+        status_filter = params.get("status")
+        if status_filter == "active":
             queryset = queryset.filter(is_active=True)
+        elif status_filter == "inactive":
+            queryset = queryset.filter(is_active=False)
+
+        if params.get("has_debt") == "true":
+            queryset = queryset.filter(payable__gt=0)
+        if params.get("overdue") == "true":
+            queryset = queryset.filter(has_overdue=True)
+
         if value := params.get("search"):
             queryset = queryset.filter(
                 Q(name_ar__icontains=value) | Q(name_en__icontains=value) | Q(code__icontains=value)
@@ -61,7 +77,12 @@ class SupplierListCreateAPI(generics.ListCreateAPIView):
 class SupplierDetailAPI(generics.RetrieveUpdateAPIView):
     permission_classes = [CanManagePurchasing]
     serializer_class = s.SupplierSerializer
-    queryset = Supplier.objects.all()
+
+    def get_queryset(self):
+        # ⚠️  نفس التجميع: شاشة التفاصيل تعرض الرصيد وإجمالي
+        #     المشتريات، وحسابها بدالة منفصلة يجعل الرقمين يختلفان
+        #     بين القائمة والتفاصيل عند أول تعديل في أحدهما.
+        return services.annotated_suppliers()
 
 
 class SupplierOfferListCreateAPI(generics.ListCreateAPIView):
@@ -192,11 +213,17 @@ class SendPurchaseOrderAPI(APIView):
         order = get_object_or_404(PurchaseOrder, pk=pk)
         services.send_order(order, actor=request.user)
 
+        # ⚠️  فوارق الأسعار تُسجَّل عند الإرسال.
+        #
+        #     تعديل سعر بلا أثر يجعل «من خفّض/رفع وكم؟» سؤالًا بلا
+        #     جواب بعد أول تحديث للعرض.
+        variances = services.price_variances(order)
+
         AuditLog.objects.create(
             actor=request.user,
             action=AuditAction.SETTING_CHANGE,
             object_repr=f"إرسال أمر شراء {order.number}",
-            changes={"subtotal": str(order.subtotal)},
+            changes={"subtotal": str(order.subtotal), "price_variances": variances},
             ip_address=request.META.get("REMOTE_ADDR"),
         )
 
@@ -245,6 +272,48 @@ class ReceivePurchaseOrderAPI(APIView):
         return Response(s.PurchaseOrderSerializer(order).data)
 
 
+class ReturnToSupplierAPI(APIView):
+    """
+    إرجاع بضاعة **استُلمت فعلًا** إلى المورّد.
+
+    ⚠️  يخصم من المخزون بحركة `RETURN_OUT` ويُنشئ إشعارًا دائنًا —
+        فيظهر تحت «المرتجعات» في كشف الحساب.
+    """
+
+    permission_classes = [CanManagePurchasing]
+    serializer_class = s.ReturnToSupplierSerializer
+
+    def post(self, request, pk):
+        serializer = s.ReturnToSupplierSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        order = get_object_or_404(PurchaseOrder, pk=pk)
+        line = PurchaseOrderLine.objects.filter(pk=data["line"], order=order).first()
+        if line is None:
+            # ⚠️  مُصفّى بالأمر — كما في الاستلام
+            raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
+
+        entry = services.return_to_supplier(
+            line, data["quantity"], reason=data["reason"], actor=request.user
+        )
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditAction.CREATE,
+            object_repr=f"مرتجع لمورّد {order.number} · {line.product.sku}",
+            changes={
+                "quantity": data["quantity"],
+                "amount": str(entry.amount),
+                "reason": data["reason"],
+            },
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        order.refresh_from_db()
+        return Response(s.PurchaseOrderSerializer(order).data)
+
+
 class CancelPurchaseOrderAPI(APIView):
     permission_classes = [CanManagePurchasing]
     serializer_class = s.CancelOrderSerializer
@@ -286,6 +355,12 @@ class SupplierStatementAPI(APIView):
                 "end": str(result.end),
                 "opening_balance": str(result.opening_balance),
                 "closing_balance": str(result.closing_balance),
+                # ⚠️  التجميعات بنود مستقلة: الكشف بالحركات وحدها
+                #     يجبر المحاسب على فرزها وجمعها ليعرف الأربعة.
+                "invoiced": str(result.invoiced),
+                "paid": str(result.paid),
+                "returned": str(result.returned),
+                "adjusted": str(result.adjusted),
                 "entries": s.SupplierLedgerEntrySerializer(result.entries, many=True).data,
             }
         )

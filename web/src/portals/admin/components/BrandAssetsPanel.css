@@ -1,0 +1,98 @@
+.brand-assets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.brand-assets__intro {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  max-inline-size: 60ch;
+}
+
+.brand-assets__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--space-4);
+}
+
+.asset-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.asset-tile__label {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+/* ⚠️  رقعة الشطرنج تُظهر الشفافية: لوجو بخلفية بيضاء مصمتة يبدو
+       مطابقًا للشفاف على خلفية بيضاء — والفرق يظهر أول مرة على
+       الوضع الداكن بعد النشر. */
+.asset-tile__preview {
+  display: grid;
+  place-items: center;
+  block-size: 7rem;
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface);
+  background-image:
+    linear-gradient(45deg, var(--color-bg) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--color-bg) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--color-bg) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--color-bg) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+/* لوجو الوضع الداكن أبيض غالبًا — عرضه على فاتح يجعله يبدو مفقودًا */
+.asset-tile__preview.is-dark {
+  background-color: #1b1f23;
+  background-image: none;
+  border-style: solid;
+}
+
+.asset-tile__preview img {
+  max-inline-size: 100%;
+  max-block-size: 100%;
+  object-fit: contain;
+}
+
+.asset-tile__empty {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.asset-tile__hint {
+  flex: 1;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.asset-tile__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ⚠️  مخفي بصريًا لا `display: none` — الأخير يُخرجه من ترتيب
+       التركيز فلا يصله مستخدم لوحة المفاتيح إطلاقًا. */
+.asset-tile__input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

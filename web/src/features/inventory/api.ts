@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { PagedResponse } from '@/features/orders/adminApi';
 import { http } from '@/shared/http';
@@ -71,6 +71,20 @@ export const listAlerts = (params: { type?: string; resolved?: string; page?: nu
   http.get<PagedResponse<StockAlert>>('/inventory/alerts/', { params: { ...params } });
 
 export const listLocations = () => http.get<StockLocation[]>('/inventory/locations/');
+
+/**
+ * المواقع المخزنية — تُستهلك من أكثر من شاشة.
+ *
+ * ⚠️  `staleTime` طويل عمدًا: المواقع بنية تحتية تتغيّر مرة كل
+ *     أشهر، وإعادة جلبها مع كل فتح لوح شراء نداء بلا فائدة.
+ */
+export function useInventoryLocations() {
+  return useQuery({
+    queryKey: ['inventory', 'locations'],
+    queryFn: listLocations,
+    staleTime: 30 * 60 * 1000,
+  });
+}
 
 /**
  * ⚠️  الصيانة تُشغّل الأعمال الدورية يدويًا: إفراج الحجوزات المنتهية ·

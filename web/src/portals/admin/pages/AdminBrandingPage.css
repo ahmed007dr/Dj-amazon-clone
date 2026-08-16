@@ -93,3 +93,33 @@
     gap: var(--space-6);
   }
 }
+
+/* ── ترويسة: مبدّل الملفات والتفعيل ─────────────── */
+.branding-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.branding-header__switch {
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ⚠️  زر الحفظ بجوار مبدّل الوضع لا في ترويسة الصفحة: الترويسة
+       صارت تحمل التفعيل، وزرّان متجاوران بأثرين مختلفين جدًا
+       (حفظ لون · قلب هوية الموقع) خطأٌ ينتظر وقوعه. */
+.branding-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: var(--space-4);
+}

@@ -1,0 +1,112 @@
+.new-po {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.new-po h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.new-po__picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.new-po__picker select,
+.new-po__picker input {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.new-po__lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.new-po__lines li {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: end;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  font-size: 0.8125rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.new-po__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+}
+
+.new-po__field input {
+  inline-size: 5.5rem;
+  min-block-size: var(--touch-target);
+  text-align: center;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ⚠️  سعر العرض تحت الحقل: بدونه لا يعرف المشتري أنه غيّره. */
+.new-po__was {
+  color: var(--color-warning);
+  font-size: 0.625rem;
+}
+
+.new-po__remove {
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+  color: var(--color-danger);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.new-po__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+}
+
+.new-po__total strong {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.new-po__actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.new-po__actions > * {
+  flex: 1;
+}
+
+@media (max-width: 30rem) {
+  .new-po__lines li {
+    grid-template-columns: 1fr auto;
+  }
+}

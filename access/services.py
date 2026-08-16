@@ -128,6 +128,24 @@ def accessible_policy_ids(user) -> list:
     ]
 
 
+def selectable_policies() -> list[AccessPolicy]:
+    """
+    السياسات التي يجوز إسنادها إلى مورد — لشاشات الأدمن.
+
+    ⚠️  الواجهة العامة لهذا النطاق هي `services` وحدها؛ والنطاقات
+        الأخرى تستدعيها ولا تلمس `models`.
+
+    ⚠️  والافتراضية **أولًا** لا مرتّبة أبجديًا.
+
+        هي جواب «للجميع» وهو الاختيار الصحيح لمعظم المنتجات. دفنها
+        وسط القائمة يجعل الأدمن يختار من أعلى الظاهر — فيقيّد منتجًا
+        عامًا بلا قصد، ولا يكتشف ذلك إلا بشكوى عميل لا يرى الصنف.
+    """
+    return list(
+        AccessPolicy.objects.filter(is_active=True).order_by("-is_default", "level", "code")
+    )
+
+
 def accessible_filter(user, field: str = "access_policy") -> Q:
     """
     مرشِّح جاهز للدمج في أي queryset.

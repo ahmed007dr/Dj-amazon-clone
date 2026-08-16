@@ -1,0 +1,135 @@
+.supplier-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.supplier-panel__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.supplier-panel__tabs button {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-block-end: 2px solid transparent;
+  cursor: pointer;
+}
+
+.supplier-panel__tabs button.is-active {
+  color: var(--color-primary);
+  border-block-end-color: var(--color-primary);
+  font-weight: 600;
+}
+
+.supplier-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.supplier-panel__body section h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.supplier-panel__body dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.supplier-panel__body dt {
+  color: var(--color-text-muted);
+}
+
+.supplier-panel__body dd {
+  margin: 0;
+  text-align: end;
+}
+
+.supplier-panel__address {
+  margin: 0;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+}
+
+.supplier-panel__figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--space-2);
+}
+
+.supplier-panel__figures div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: var(--space-3);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+}
+
+.supplier-panel__figures strong {
+  font-size: 1.0625rem;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ⚠️  «ما علينا» أبرز رقم في اللوح — أول سؤال يُفتح لأجله. */
+.supplier-panel__figures .is-primary strong {
+  font-size: 1.5rem;
+  color: var(--color-primary);
+}
+
+.supplier-panel__scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.supplier-panel__ledger {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  min-inline-size: 26rem;
+}
+
+.supplier-panel__ledger th,
+.supplier-panel__ledger td {
+  padding: var(--space-2);
+  text-align: start;
+  border-block-end: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.supplier-panel__ledger th {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.supplier-panel__ledger td:nth-child(n + 3) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.supplier-panel__ledger .is-opening td,
+.supplier-panel__ledger tfoot td {
+  font-weight: 700;
+  background: var(--color-bg);
+}
+
+.supplier-panel__ledger code {
+  direction: ltr;
+  color: var(--color-text-muted);
+}

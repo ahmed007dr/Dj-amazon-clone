@@ -25,6 +25,11 @@ urlpatterns = [
         api.ReceivePurchaseOrderAPI.as_view(),
         name="order-receive",
     ),
+    path(
+        "orders/<uuid:pk>/return/",
+        api.ReturnToSupplierAPI.as_view(),
+        name="order-return",
+    ),
     path("orders/<uuid:pk>/cancel/", api.CancelPurchaseOrderAPI.as_view(), name="order-cancel"),
     # ── المورّد المفرد ─────────────────────────────────────
     path("<uuid:pk>/", api.SupplierDetailAPI.as_view(), name="detail"),

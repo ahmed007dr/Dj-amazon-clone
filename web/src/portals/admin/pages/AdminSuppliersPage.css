@@ -1,0 +1,43 @@
+.supplier-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.supplier-cell code {
+  direction: ltr;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.supplier-muted {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* ⚠️  ما علينا يُبرَز: هو ما تُفتح الشاشة لأجله. */
+.supplier-owed {
+  color: var(--color-warning);
+}
+
+.supplier-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.supplier-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-block-end: var(--space-3);
+  font-size: 0.875rem;
+}
+
+.supplier-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--touch-target);
+  cursor: pointer;
+}

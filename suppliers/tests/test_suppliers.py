@@ -324,6 +324,339 @@ class TestCancellationAndLedger:
 
 
 # ═══════════════════════════════════════════════════════════
+#  السعر المتفاوَض عليه
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.django_db
+class TestNegotiatedPrice:
+    def test_price_defaults_to_the_offer(self, supplier, location, offer, product):
+        order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
+
+        line = order.lines.first()
+        assert line.unit_cost == Decimal("60.00")
+        assert line.list_cost == Decimal("60.00")
+        assert line.cost_variance == Decimal("0.00")
+
+    def test_a_negotiated_price_is_accepted_and_the_offer_is_kept(
+        self, supplier, location, offer, product
+    ):
+        """
+        ⚠️  الشراء يُتفاوَض فيه؛ ورفض التعديل كان يجبر المشتري على
+            تعديل العرض نفسه — فيتغيّر السعر الافتراضي لكل أمر قادم.
+        """
+        order = services.create_order(
+            supplier,
+            location,
+            [{"product": product.pk, "quantity": 10, "unit_cost": Decimal("54.00")}],
+        )
+
+        line = order.lines.first()
+        assert line.unit_cost == Decimal("54.00")
+        assert line.list_cost == Decimal("60.00"), "سعر العرض محفوظ للمقارنة"
+        assert line.cost_variance == Decimal("-6.00")
+        assert order.subtotal == Decimal("540.00")
+
+        # ⚠️  العرض نفسه لم يتغيّر — الأمر القادم يبدأ من ٦٠ ثانيةً
+        offer.refresh_from_db()
+        assert offer.unit_cost == Decimal("60.00")
+
+    def test_variances_are_reported_for_the_audit_log(self, supplier, location, offer, product):
+        order = services.create_order(
+            supplier,
+            location,
+            [{"product": product.pk, "quantity": 10, "unit_cost": Decimal("70.00")}],
+        )
+
+        rows = services.price_variances(order)
+
+        assert len(rows) == 1
+        assert rows[0]["variance"] == "10.00"
+        assert rows[0]["list_cost"] == "60.00"
+
+    def test_matching_prices_produce_no_variance_noise(self, supplier, location, offer, product):
+        """سطر بسعر العرض لا يُسجَّل — السجل للاستثناء لا للروتين."""
+        order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
+
+        assert services.price_variances(order) == []
+
+    def test_a_negative_price_is_refused(self, supplier, location, offer, product):
+        with pytest.raises(BusinessError):
+            services.create_order(
+                supplier,
+                location,
+                [{"product": product.pk, "quantity": 10, "unit_cost": Decimal("-5.00")}],
+            )
+
+    def test_the_negotiated_price_flows_into_the_batch(self, supplier, location, offer, product):
+        """
+        ⚠️  تكلفة الدفعة هي ما دفعناه فعلًا — لا سعر العرض.
+
+            أخذ سعر العرض يجعل كل ربح يُحسب على هذه البضاعة
+            خاطئًا بمقدار الفارق المتفاوَض عليه.
+        """
+        order = services.create_order(
+            supplier,
+            location,
+            [{"product": product.pk, "quantity": 10, "unit_cost": Decimal("54.00")}],
+        )
+        services.send_order(order)
+
+        batch = services.receive_line(order.lines.first(), 10)
+
+        assert batch.unit_cost == Decimal("54.00")
+
+
+# ═══════════════════════════════════════════════════════════
+#  المرتجعات إلى المورّد
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.django_db
+class TestSupplierReturns:
+    def _received(self, supplier, location, product, quantity=10):
+        order = services.create_order(
+            supplier, location, [{"product": product.pk, "quantity": quantity}]
+        )
+        services.send_order(order)
+        services.receive_line(order.lines.first(), quantity)
+        line = order.lines.first()
+        line.refresh_from_db()
+        return order, line
+
+    def test_a_return_reduces_stock_and_credits_the_account(
+        self, supplier, location, offer, product
+    ):
+        """
+        ⚠️  **بوابة البند الناقص:** بدون هذا المسار يبقى «المرتجعات»
+            في كشف الحساب صفرًا دائمًا.
+        """
+        order, line = self._received(supplier, location, product)
+        assert Stock.objects.get(product=product, location=location).quantity_physical == 10
+        assert services.payable_balance(supplier) == Decimal("600.00")
+
+        entry = services.return_to_supplier(line, 4, reason="تالفة عند الاستلام")
+
+        assert Stock.objects.get(product=product, location=location).quantity_physical == 6
+        assert entry.kind == SupplierLedgerKind.CREDIT_NOTE
+        assert entry.amount == Decimal("240.00")
+        assert services.payable_balance(supplier) == Decimal("360.00")
+
+    def test_a_return_records_a_return_out_movement_not_an_adjustment(
+        self, supplier, location, offer, product
+    ):
+        """
+        ⚠️  التسوية تعني «الرصيد كان خاطئًا»؛ والمرتجع يعني «خرجت
+            إلى جهة معلومة بمقابل». خلطهما يجعل تقرير الفروق يعُدّ
+            كل مرتجع خطأ جرد.
+        """
+        from inventory.models import MovementType
+
+        order, line = self._received(supplier, location, product)
+        services.return_to_supplier(line, 3, reason="خطأ في الصنف")
+
+        movement = StockMovement.objects.filter(
+            product=product, movement_type=MovementType.RETURN_OUT
+        ).first()
+
+        assert movement is not None
+        assert movement.quantity == 3
+        assert movement.reference_type == "purchase_order"
+        assert movement.reference_id == str(order.pk)
+
+    def test_returning_more_than_received_is_refused(self, supplier, location, offer, product):
+        order, line = self._received(supplier, location, product)
+
+        with pytest.raises(BusinessError):
+            services.return_to_supplier(line, 11, reason="زائد")
+
+    def test_returning_twice_respects_the_remaining_quantity(
+        self, supplier, location, offer, product
+    ):
+        """
+        ⚠️  الإرجاع مرتين لنفس الكمية يُنشئ إشعارَي دائن على بضاعة
+            واحدة — فيصير المورّد مدينًا لنا بما لم نُعده.
+        """
+        order, line = self._received(supplier, location, product)
+
+        services.return_to_supplier(line, 6, reason="تالفة")
+        line.refresh_from_db()
+        assert line.quantity_on_hand == 4
+
+        with pytest.raises(BusinessError):
+            services.return_to_supplier(line, 5, reason="أكثر من الباقي")
+
+        services.return_to_supplier(line, 4, reason="الباقي")
+        line.refresh_from_db()
+        assert line.quantity_on_hand == 0
+
+    def test_a_reason_is_required(self, supplier, location, offer, product):
+        """بلا سبب يصير تقييم المورّد مستحيلًا: تالفة؟ خاطئة؟ زائدة؟"""
+        order, line = self._received(supplier, location, product)
+
+        with pytest.raises(BusinessError):
+            services.return_to_supplier(line, 1, reason="   ")
+
+    def test_the_original_invoice_is_never_deleted(self, supplier, location, offer, product):
+        """⚠️  الفاتورة صدرت وسجّلها المورّد — التصحيح بإشعار لا بممحاة."""
+        order, line = self._received(supplier, location, product)
+        services.return_to_supplier(line, 10, reason="الشحنة كلها خاطئة")
+
+        assert SupplierLedgerEntry.objects.filter(
+            purchase_order=order, kind=SupplierLedgerKind.INVOICE
+        ).exists()
+        assert services.payable_balance(supplier) == Decimal("0.00")
+
+    def test_returns_appear_in_the_statement_totals(self, supplier, location, offer, product):
+        order, line = self._received(supplier, location, product)
+        services.return_to_supplier(line, 5, reason="تالفة")
+        services.record_payment(supplier, Decimal("100.00"))
+
+        today = timezone.localdate()
+        result = services.statement(supplier, today, today)
+
+        assert result.invoiced == Decimal("600.00")
+        assert result.paid == Decimal("100.00")
+        assert result.returned == Decimal("300.00")
+        assert result.closing_balance == Decimal("200.00")
+
+
+# ═══════════════════════════════════════════════════════════
+#  القائمة — الرصيد والمشتريات والفلاتر
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.django_db
+class TestSupplierList:
+    def test_balance_and_purchases_come_from_one_query(
+        self, supplier, location, offer, product, django_assert_num_queries
+    ):
+        """
+        ⚠️  **الفرق بين شاشة تعمل وشاشة تتعطّل.**
+
+            استدعاء `payable_balance()` لكل صف يعني استعلامًا لكل
+            مورّد في أكثر شاشة تُفتح.
+        """
+        order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
+        services.send_order(order)
+
+        other = Supplier.objects.create(code="beta2", name_ar="بيتا", name_en="Beta")
+        second = services.create_order(
+            supplier, location, [{"product": product.pk, "quantity": 20}]
+        )
+        services.send_order(second)
+
+        # استعلام واحد مهما بلغ عدد الموردين
+        with django_assert_num_queries(1):
+            rows = list(services.annotated_suppliers().order_by("name_ar"))
+
+        by_code = {row.code: row for row in rows}
+        assert by_code["acme"].payable == Decimal("1800.00")
+        assert by_code["acme"].total_purchases == Decimal("1800.00")
+        assert by_code[other.code].payable == Decimal("0.00")
+
+    def test_totals_are_not_inflated_by_joining(self, supplier, location, offer, product):
+        """
+        ⚠️  ضمّ جدولين في استعلام واحد يضاعف الصفوف: كل حركة حساب
+            تتكرّر بعدد أوامر الشراء والعكس — فيخرج رصيد ومشتريات
+            منفوخان بلا أن يبدو شيء خاطئًا.
+        """
+        for _ in range(3):
+            order = services.create_order(
+                supplier, location, [{"product": product.pk, "quantity": 10}]
+            )
+            services.send_order(order)
+
+        services.record_payment(supplier, Decimal("100.00"))
+
+        row = services.annotated_suppliers().get(pk=supplier.pk)
+
+        assert row.total_purchases == Decimal("1800.00"), "٣ × ٦٠٠ لا مضروبة في الحركات"
+        assert row.payable == Decimal("1700.00")
+
+    def test_draft_orders_are_not_counted_as_purchases(self, supplier, location, offer, product):
+        """المسوّدة لم تُرسَل — لا التزام ولا شراء."""
+        services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
+
+        row = services.annotated_suppliers().get(pk=supplier.pk)
+        assert row.total_purchases == Decimal("0.00")
+
+    def test_the_inactive_filter_actually_filters(self, manager, supplier):
+        """
+        ⚠️  الشرط القديم كان `== "true"` فقط، فكان `status=inactive`
+            **لا يفعل شيئًا**: يطلب الأدمن الموقوفين فيرى الجميع.
+        """
+        Supplier.objects.create(code="off", name_ar="موقوف", name_en="Off", is_active=False)
+
+        client = client_for(manager)
+        active = client.get(reverse("v1:suppliers:list"), {"status": "active"})
+        inactive = client.get(reverse("v1:suppliers:list"), {"status": "inactive"})
+
+        assert [row["code"] for row in inactive.data["results"]] == ["off"]
+        assert "off" not in [row["code"] for row in active.data["results"]]
+
+    def test_the_debt_filter_selects_only_indebted_suppliers(
+        self, manager, supplier, location, offer, product
+    ):
+        Supplier.objects.create(code="clear", name_ar="بلا مديونية", name_en="Clear")
+        order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
+        services.send_order(order)
+
+        response = client_for(manager).get(reverse("v1:suppliers:list"), {"has_debt": "true"})
+
+        assert [row["code"] for row in response.data["results"]] == ["acme"]
+
+    def test_the_overdue_filter_finds_late_invoices(
+        self, manager, supplier, location, offer, product
+    ):
+        order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
+        services.send_order(order)
+        SupplierLedgerEntry.objects.filter(purchase_order=order).update(
+            due_on=timezone.localdate() - timedelta(days=5)
+        )
+
+        response = client_for(manager).get(reverse("v1:suppliers:list"), {"overdue": "true"})
+
+        assert [row["code"] for row in response.data["results"]] == ["acme"]
+
+    def test_the_order_payload_carries_the_return_ceiling_and_variance(
+        self, manager, supplier, location, offer, product
+    ):
+        """
+        ⚠️  الحقل المُصرَّح في الـserializer لا يخرج ما لم يُدرَج في
+            `fields` — يسقط بصمت بلا خطأ، فتبني الشاشة على `undefined`.
+        """
+        order = services.create_order(
+            supplier,
+            location,
+            [{"product": product.pk, "quantity": 10, "unit_cost": Decimal("54.00")}],
+        )
+        services.send_order(order)
+        services.receive_line(order.lines.first(), 10)
+
+        response = client_for(manager).get(reverse("v1:suppliers:order-detail", args=[order.pk]))
+        line = response.data["lines"][0]
+
+        assert line["quantity_on_hand"] == 10
+        assert line["quantity_returned"] == 0
+        assert line["list_cost"] == "60.00"
+        assert line["cost_variance"] == "-6.00"
+
+    def test_the_list_carries_balance_and_purchases(
+        self, manager, supplier, location, offer, product
+    ):
+        order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
+        services.send_order(order)
+
+        response = client_for(manager).get(reverse("v1:suppliers:list"))
+        row = next(r for r in response.data["results"] if r["code"] == "acme")
+
+        assert row["payable"] == "600.00"
+        assert row["total_purchases"] == "600.00"
+        assert row["has_overdue"] is False
+
+
+# ═══════════════════════════════════════════════════════════
 #  عروض الموردين — أساس Marketplace
 # ═══════════════════════════════════════════════════════════
 

@@ -1,0 +1,79 @@
+.identity-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-inline-size: 60rem;
+}
+
+.identity-form__legend {
+  margin: var(--space-5) 0 0;
+  padding-block-end: var(--space-2);
+  border-block-end: 1px solid var(--color-border);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.identity-form__legend:first-child {
+  margin-block-start: 0;
+}
+
+.identity-form__row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 40rem) {
+  .identity-form__row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.identity-form__select {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.identity-form__select select {
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.identity-form__select em {
+  font-size: 0.8125rem;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.identity-form__error {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-danger);
+}
+
+.identity-form__note {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.identity-form__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-block-start: var(--space-5);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--color-border);
+}

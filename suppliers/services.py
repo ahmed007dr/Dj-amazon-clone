@@ -16,7 +16,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Case, DecimalField, F, Sum, Value, When
+from django.db.models import Case, DecimalField, F, Subquery, Sum, Value, When
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -99,17 +99,57 @@ def create_order(
                 ),
             )
 
+        # ⚠️  السعر من العرض، **ويقبل تعديلًا مقصودًا**.
+        #
+        #     الشراء يُتفاوَض فيه: مورّد يمنح سعرًا لطلبية بعينها
+        #     دون تغيير عرضه الدائم. رفض التعديل كان يجبر المشتري
+        #     على تعديل العرض نفسه — فيتغيّر السعر الافتراضي لكل
+        #     أمر قادم بلا أن يقصد ذلك.
+        #
+        #     والأصل يُحفَظ في `list_cost` ليبقى الفارق مقروءًا:
+        #     «بكم كان معروضًا وكم دفعنا؟» سؤال يُقيَّم به المشتري.
+        unit_cost = quantize(Decimal(str(line["unit_cost"]))) if line.get("unit_cost") else None
+
+        if unit_cost is not None and unit_cost < ZERO:
+            raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="السعر لا يكون سالبًا")
+
         created = PurchaseOrderLine.objects.create(
             order=order,
             product=offer.product,
             quantity_ordered=quantity,
-            unit_cost=offer.unit_cost,
+            unit_cost=unit_cost if unit_cost is not None else offer.unit_cost,
+            list_cost=offer.unit_cost,
         )
         subtotal += created.total
 
     order.subtotal = quantize(subtotal)
     order.save(update_fields=["subtotal", "updated_at"])
     return order
+
+
+def price_variances(order: PurchaseOrder) -> list[dict]:
+    """
+    أسطر خالف سعرها العرض — **للتدقيق**.
+
+    ⚠️  تُقرأ عند الإرسال وتُكتب في سجل التدقيق.
+
+        تعديل سعر بلا أثر يجعل «من خفّض/رفع وكم؟» سؤالًا بلا جواب
+        بعد أول تحديث للعرض.
+    """
+    rows = []
+    for line in order.lines.select_related("product"):
+        variance = line.cost_variance
+        if variance is None or variance == ZERO:
+            continue
+        rows.append(
+            {
+                "sku": line.product.sku,
+                "list_cost": str(line.list_cost),
+                "unit_cost": str(line.unit_cost),
+                "variance": str(variance),
+            }
+        )
+    return rows
 
 
 @transaction.atomic
@@ -263,6 +303,87 @@ def cancel_order(order: PurchaseOrder, *, reason: str, actor=None) -> PurchaseOr
 
 
 # ═══════════════════════════════════════════════════════════
+#  المرتجعات إلى المورّد
+# ═══════════════════════════════════════════════════════════
+
+
+@transaction.atomic
+def return_to_supplier(
+    line: PurchaseOrderLine,
+    quantity: int,
+    *,
+    reason: str,
+    actor=None,
+) -> SupplierLedgerEntry:
+    """
+    إرجاع بضاعة **استُلمت فعلًا** إلى المورّد.
+
+    ⚠️  الترتيب مقصود: **المخزون أولًا ثم القيد**.
+
+        القيد قبل الخصم يجعل المورّد دائنًا لنا ببضاعة ما زالت
+        عندنا لو فشل الخصم. والعكس — خصم بلا قيد — يفقد البضاعة
+        بلا مقابل مالي.
+
+    ⚠️  والسقف هو **المستلَم ناقص المرتجع سلفًا**.
+
+        الإرجاع مرتين لنفس الكمية يُنشئ إشعارَي دائن على بضاعة
+        واحدة، فيصير المورّد مدينًا لنا بما لم نُعده — وهو خطأ
+        يظهر في كشف حسابه لا في مخزوننا.
+
+    ⚠️  ولا يُحذف قيد الفاتورة الأصلي.
+
+        الفاتورة صدرت وسجّلها المورّد عنده؛ التصحيح بإشعار دائن
+        لا بممحاة.
+    """
+    from inventory import services as inventory_services
+
+    if not reason.strip():
+        raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="سبب الإرجاع إلزامي")
+
+    if quantity <= 0:
+        raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="الكمية يجب أن تكون موجبة")
+
+    available = line.quantity_on_hand
+    if quantity > available:
+        raise BusinessError(
+            ErrorCode.VALIDATION_ERROR,
+            detail=f"المستلَم غير المرتجع {available} — لا يُرجَع أكثر",
+        )
+
+    order = line.order
+
+    # ── ١. المخزون ─────────────────────────────────────────
+    inventory_services.return_to_supplier(
+        line.product,
+        quantity,
+        location=order.location,
+        reason=reason,
+        reference_type="purchase_order",
+        reference_id=str(order.pk),
+        performed_by=actor,
+    )
+
+    line.quantity_returned = F("quantity_returned") + quantity
+    line.save(update_fields=["quantity_returned", "updated_at"])
+    line.refresh_from_db()
+
+    # ── ٢. القيد ───────────────────────────────────────────
+    # ⚠️  بلا `purchase_order` في القيد: القيد الفريد يسمح بإشعار
+    #     دائن واحد لكل أمر، وأوامر الشراء تُرجَع منها دفعات
+    #     متعددة على فترات. المرجع نصي في `reference`.
+    amount = quantize(line.unit_cost * quantity)
+
+    return SupplierLedgerEntry.objects.create(
+        supplier=order.supplier,
+        kind=SupplierLedgerKind.CREDIT_NOTE,
+        amount=amount,
+        reference=f"{order.number} · {line.product.sku}",
+        note=f"إرجاع {quantity} — {reason}",
+        recorded_by=actor,
+    )
+
+
+# ═══════════════════════════════════════════════════════════
 #  حساب المورّد
 # ═══════════════════════════════════════════════════════════
 
@@ -313,12 +434,40 @@ def record_payment(
 
 @dataclass(frozen=True)
 class SupplierStatement:
+    """
+    كشف حساب مورّد.
+
+    ⚠️  **التجميعات بنود مستقلة لا يستنتجها القارئ.**
+
+        كشف بالحركات وحدها يجبر المحاسب على فرزها وجمعها ليعرف
+        «كم فوترنا وكم دفعنا وكم أرجعنا» — وهي الأرقام الأربعة
+        التي يُبنى عليها أي نقاش مع المورّد.
+    """
+
     supplier: Supplier
     start: date
     end: date
+
     opening_balance: Decimal
     entries: list
     closing_balance: Decimal
+
+    invoiced: Decimal
+    paid: Decimal
+    returned: Decimal
+    adjusted: Decimal
+
+
+def _kind_total(queryset, kind: str) -> Decimal:
+    return quantize(
+        queryset.filter(kind=kind).aggregate(
+            total=Coalesce(
+                Sum("amount"),
+                Value(ZERO),
+                output_field=DecimalField(max_digits=16, decimal_places=2),
+            )
+        )["total"]
+    )
 
 
 def statement(supplier: Supplier, start: date, end: date) -> SupplierStatement:
@@ -339,6 +488,73 @@ def statement(supplier: Supplier, start: date, end: date) -> SupplierStatement:
         opening_balance=opening,
         entries=list(window.select_related("purchase_order").order_by("occurred_on", "created_at")),
         closing_balance=quantize(opening + _signed_sum(window)),
+        invoiced=_kind_total(window, SupplierLedgerKind.INVOICE),
+        paid=_kind_total(window, SupplierLedgerKind.PAYMENT),
+        returned=_kind_total(window, SupplierLedgerKind.CREDIT_NOTE),
+        adjusted=_kind_total(window, SupplierLedgerKind.ADJUSTMENT),
+    )
+
+
+def annotated_suppliers():
+    """
+    قائمة الموردين بالرصيد وإجمالي المشتريات — **استعلام واحد**.
+
+    ⚠️  **هذا هو الفرق بين شاشة تعمل وشاشة تتعطّل.**
+
+        استدعاء `payable_balance()` لكل صف يعني استعلامًا لكل
+        مورّد (N+1) في أكثر شاشة تُفتح. والتجميع هنا يجعلها
+        استعلامًا واحدًا مهما بلغ العدد.
+
+    ⚠️  والتجميعان **منفصلان بـ`distinct=True`**.
+
+        ضمّ جدولين في استعلام واحد يضاعف الصفوف: كل حركة حساب
+        تتكرّر بعدد أوامر الشراء والعكس — فيخرج رصيد ومشتريات
+        منفوخان بلا أن يبدو شيء خاطئًا.
+    """
+    from django.db.models import Exists, OuterRef
+
+    money = DecimalField(max_digits=16, decimal_places=2)
+
+    # ⚠️  استعلامات فرعية لا `annotate` مباشرة: الضمّ المتعدد
+    #     يضاعف الصفوف كما في التعليق أعلاه.
+    ledger = (
+        SupplierLedgerEntry.objects.filter(supplier=OuterRef("pk")).order_by().values("supplier")
+    )
+
+    balance = ledger.annotate(
+        total=Sum(
+            Case(
+                When(kind__in=list(CREDIT_KINDS), then=F("amount")),
+                default=-F("amount"),
+                output_field=money,
+            )
+        )
+    ).values("total")
+
+    purchases = (
+        PurchaseOrder.objects.filter(supplier=OuterRef("pk"))
+        .exclude(status__in=[PurchaseOrderStatus.DRAFT, PurchaseOrderStatus.CANCELLED])
+        .order_by()
+        .values("supplier")
+        .annotate(total=Sum("subtotal"))
+        .values("total")
+    )
+
+    overdue = SupplierLedgerEntry.objects.filter(
+        supplier=OuterRef("pk"),
+        kind=SupplierLedgerKind.INVOICE,
+        due_on__lt=timezone.localdate(),
+    )
+
+    return Supplier.objects.annotate(
+        payable=Coalesce(Subquery(balance, output_field=money), Value(ZERO), output_field=money),
+        total_purchases=Coalesce(
+            Subquery(purchases, output_field=money), Value(ZERO), output_field=money
+        ),
+        # ⚠️  «له فواتير متأخرة» **تقريبية عمدًا**: تحسب الفواتير
+        #     المستحقة لا المسدَّدة منها، لأن الدفتر لا يخصّص
+        #     السداد لفاتورة بعينها. تكفي للتنبيه لا للمطالبة.
+        has_overdue=Exists(overdue),
     )
 
 

@@ -261,9 +261,19 @@ class PurchaseOrderLine(BaseModel):
         _("الكمية المطلوبة"), validators=[MinValueValidator(1)]
     )
     quantity_received = models.PositiveIntegerField(_("الكمية المستلمة"), default=0)
+    quantity_returned = models.PositiveIntegerField(_("الكمية المرتجعة"), default=0)
 
     #: ⚠️  لقطة سعر وقت الإرسال — لا تُقرأ من عرض المورّد اليوم
     unit_cost = MoneyField(_("سعر الوحدة"), validators=[MinValueValidator(ZERO)])
+
+    #: ⚠️  سعر العرض وقت الإنشاء — **للمقارنة لا للحساب**.
+    #:
+    #:     المشتري يفاوض فيدخل سعرًا يخالف العرض. بلا حفظ الأصل
+    #:     يصير سؤال «بكم كان معروضًا وكم دفعنا؟» بلا جواب بعد
+    #:     أول تحديث للعرض — وهو السؤال الذي يُقيَّم به المشتري.
+    list_cost = MoneyField(
+        _("سعر العرض وقت الإنشاء"), null=True, blank=True, validators=[MinValueValidator(ZERO)]
+    )
 
     class Meta:
         verbose_name = _("سطر أمر شراء")
@@ -285,6 +295,28 @@ class PurchaseOrderLine(BaseModel):
     @property
     def is_complete(self) -> bool:
         return self.quantity_received >= self.quantity_ordered
+
+    @property
+    def quantity_on_hand(self) -> int:
+        """
+        المستلَم بعد خصم المرتجع — **سقف ما يُمكن إرجاعه**.
+
+        ⚠️  الإرجاع مرتين لنفس الكمية يُنشئ إشعارَي دائن على بضاعة
+            واحدة، فيصير المورّد دائنًا لنا بما لم نُعده.
+        """
+        return max(self.quantity_received - self.quantity_returned, 0)
+
+    @property
+    def cost_variance(self):
+        """
+        الفارق بين المدفوع وسعر العرض — **موجب يعني دفعنا أكثر**.
+
+        ⚠️  `None` حين لا لقطة عرض (أوامر أُنشئت قبل هذا الحقل).
+            الصفر يعني «طابق العرض»، والفارق بين الحالتين معنى.
+        """
+        if self.list_cost is None:
+            return None
+        return self.unit_cost - self.list_cost
 
 
 class SupplierLedgerKind(models.TextChoices):

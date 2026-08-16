@@ -1,0 +1,154 @@
+.po-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.po-tab__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.po-tab__head select {
+  flex: 1;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.po-card {
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.po-card header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-end: var(--space-2);
+}
+
+.po-card header code {
+  direction: ltr;
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+
+.po-card header strong {
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.po-card__lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.po-card__lines li {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-1);
+  font-size: 0.8125rem;
+  border-block-end: 1px dashed var(--color-border);
+}
+
+.po-card__qty,
+.po-card__cost {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.po-card__returned {
+  color: var(--color-danger);
+  font-style: normal;
+}
+
+/* ⚠️  الوفر والزيادة بلونين مختلفين **وسهمين**: اللون وحده يختفي
+   على من لا يميّزه، وهو رقم يُقيَّم به المشتري. */
+.po-saving {
+  color: var(--color-success);
+  font-style: normal;
+}
+
+.po-overpaid {
+  color: var(--color-danger);
+  font-style: normal;
+}
+
+.po-card__acts {
+  display: flex;
+  gap: var(--space-1);
+  justify-content: end;
+}
+
+.po-card footer {
+  display: flex;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
+
+.po-action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius);
+}
+
+.po-action h4 {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.po-action label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.po-action input {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.po-action__hint {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.po-action__buttons {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.po-action__buttons > * {
+  flex: 1;
+}
+
+@media (max-width: 30rem) {
+  .po-card__lines li {
+    grid-template-columns: 1fr auto;
+  }
+}

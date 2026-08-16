@@ -96,6 +96,33 @@ export interface NamedOption {
   name_en: string;
 }
 
+/**
+ * سياسة وصول — جواب السؤال «مَن يرى هذا المنتج؟».
+ *
+ * ⚠️  الشرطان يُعرضان مع الاسم لا بعده: «مهنيون موثّقون» وحدها لا
+ *     تقول إن الطبيب المسجَّل غير الموثّق ممنوع.
+ */
+export interface AccessPolicyOption {
+  id: string;
+  code: string;
+  name_ar: string;
+  name_en: string;
+  level: string;
+  is_default: boolean;
+  requires_verification: boolean;
+  allowed_account_types: string[];
+  description_ar: string;
+  description_en: string;
+}
+
+export interface TaxClassOption {
+  id: string;
+  name_ar: string;
+  name_en: string;
+  rate: string;
+  is_default: boolean;
+}
+
 export interface ProductFormOptions {
   kinds: Choice[];
   regulatory_classes: Choice[];
@@ -104,6 +131,8 @@ export interface ProductFormOptions {
   categories: CategoryOption[];
   brands: NamedOption[];
   manufacturers: NamedOption[];
+  access_policies: AccessPolicyOption[];
+  tax_classes: TaxClassOption[];
 }
 
 /**

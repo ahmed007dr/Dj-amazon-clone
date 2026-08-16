@@ -2,13 +2,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { listProfiles, previewPalette, updatePalette } from '@/features/branding/adminApi';
+import {
+  BRANDING_KEY as KEY,
+  previewPalette,
+  updatePalette,
+  useActivateProfile,
+  useBrandProfiles,
+} from '@/features/branding/adminApi';
 import { ColorField } from '@/features/branding/components/ColorField';
 import { ContrastReport } from '@/features/branding/components/ContrastReport';
+import { BrandAssetsPanel } from '@/portals/admin/components/BrandAssetsPanel';
+import { BrandIdentityForm } from '@/portals/admin/components/BrandIdentityForm';
 import { useDebounced } from '@/shared/hooks/useDebounced';
 import { isApiError } from '@/shared/http';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { Alert } from '@/shared/ui/Alert';
+import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Spinner } from '@/shared/ui/Spinner';
 import { StatusTabs } from '@/shared/ui/StatusTabs';
@@ -16,7 +25,7 @@ import { useToast } from '@/shared/ui/useToast';
 
 import './AdminBrandingPage.css';
 
-const KEY = ['admin', 'branding'] as const;
+type Tab = 'colors' | 'identity' | 'assets';
 
 const COLOR_FIELDS = [
   'primary',
@@ -53,11 +62,22 @@ export function AdminBrandingPage() {
   const queryClient = useQueryClient();
   const { notify } = useToast();
 
+  const [tab, setTab] = useState<Tab>('colors');
   const [mode, setMode] = useState<'LIGHT' | 'DARK'>('LIGHT');
   const [draft, setDraft] = useState<Record<ColorKey, string> | null>(null);
 
-  const profiles = useQuery({ queryKey: KEY, queryFn: listProfiles });
-  const profile = profiles.data?.find((item) => item.is_active) ?? profiles.data?.[0];
+  // ⚠️  الملف المعروض قد لا يكون المفعّل: الهوية الموسمية تُجهَّز
+  //     كاملة ثم تُفعَّل بضغطة، وتجهيزها يحتاج تحريرها وهي مسوّدة.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const profiles = useBrandProfiles();
+  const activate = useActivateProfile();
+
+  const profile =
+    profiles.data?.find((item) => item.id === selectedId) ??
+    profiles.data?.find((item) => item.is_active) ??
+    profiles.data?.[0];
+
   const palette = profile?.palettes.find((item) => item.mode === mode);
 
   // ⚠️  المسوّدة تُعاد تهيئتها عند تبديل الوضع: خلط ألوان الفاتح
@@ -78,7 +98,8 @@ export function AdminBrandingPage() {
   const preview = useQuery({
     queryKey: [...KEY, 'preview', mode, debouncedDraft],
     queryFn: () => previewPalette({ ...debouncedDraft, mode }),
-    enabled: Boolean(debouncedDraft),
+    // المعاينة تخصّ تبويب الألوان وحده — لا نداء وهو مغلق
+    enabled: Boolean(debouncedDraft) && tab === 'colors',
     staleTime: Infinity,
   });
 
@@ -111,34 +132,101 @@ export function AdminBrandingPage() {
   const contrast = preview.data?.contrast ?? palette.contrast;
   const blocked = preview.data ? !preview.data.passes_aa : false;
 
+  const allProfiles = profiles.data ?? [];
+
   return (
     <>
       <PageHeader
         title={t('nav.branding')}
         description={profile.code}
         actions={
-          <Button
-            loading={save.isPending}
-            disabled={!dirty || blocked}
-            onClick={() => {
-              save.mutate();
-            }}
-          >
-            {t('common.save')}
-          </Button>
+          <div className="branding-header">
+            {/* ⚠️  مبدّل الملفات يظهر حين يوجد أكثر من واحد فقط:
+                قائمة بخيار وحيد ضجيج بصري لا اختيار. */}
+            {allProfiles.length > 1 ? (
+              <select
+                className="branding-header__switch"
+                value={profile.id}
+                aria-label={t('branding.profile')}
+                onChange={(event) => setSelectedId(event.target.value)}
+              >
+                {allProfiles.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name_ar} {item.is_active ? `— ${t('branding.activeProfile')}` : ''}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+
+            {profile.is_active ? (
+              <Badge tone="success">{t('branding.activeProfile')}</Badge>
+            ) : (
+              // ⚠️  التفعيل يمرّ بفحص تباين على **اللوحتين** في
+              //     الخادم — لوحة داكنة مكسورة تُرفض حتى لو كانت
+              //     الفاتحة سليمة، والرسالة تصل من هناك.
+              <Button
+                variant="secondary"
+                loading={activate.isPending}
+                onClick={() =>
+                  activate.mutate(profile.id, {
+                    onSuccess: () => notify(t('branding.activated'), 'success'),
+                    onError: (cause) =>
+                      notify(
+                        isApiError(cause) ? cause.displayMessage : t('state.errorTitle'),
+                        'danger',
+                      ),
+                  })
+                }
+              >
+                {t('branding.activate')}
+              </Button>
+            )}
+          </div>
         }
       />
 
       <StatusTabs
         options={[
-          { value: 'LIGHT', label: t('theme.light') },
-          { value: 'DARK', label: t('theme.dark') },
+          { value: 'colors', label: t('admin.colors') },
+          { value: 'identity', label: t('branding.tabIdentity') },
+          { value: 'assets', label: t('branding.tabAssets') },
         ]}
-        value={mode}
-        onChange={(next) => {
-          setMode(next as 'LIGHT' | 'DARK');
-        }}
+        value={tab}
+        onChange={(next) => setTab(next as Tab)}
       />
+
+      {!profile.is_active ? (
+        <Alert tone="warning">{t('branding.draftNotice')}</Alert>
+      ) : null}
+
+      {tab === 'identity' ? <BrandIdentityForm key={profile.id} profile={profile} /> : null}
+
+      {tab === 'assets' ? <BrandAssetsPanel key={profile.id} profile={profile} /> : null}
+
+      {tab !== 'colors' ? null : (
+      <>
+      <div className="branding-modes">
+        <StatusTabs
+          options={[
+            { value: 'LIGHT', label: t('theme.light') },
+            { value: 'DARK', label: t('theme.dark') },
+          ]}
+          value={mode}
+          onChange={(next) => {
+            setMode(next as 'LIGHT' | 'DARK');
+          }}
+        />
+
+        <Button
+          loading={save.isPending}
+          disabled={!dirty || blocked}
+          onClick={() => {
+            save.mutate();
+          }}
+        >
+          {t('common.save')}
+        </Button>
+      </div>
 
       {blocked ? <Alert tone="danger">{t('admin.contrastBlocksSave')}</Alert> : null}
 
@@ -198,6 +286,8 @@ export function AdminBrandingPage() {
           </section>
         </aside>
       </div>
+      </>
+      )}
     </>
   );
 }

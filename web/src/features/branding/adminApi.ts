@@ -1,3 +1,5 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
 import { http } from '@/shared/http';
 
 export interface ContrastEntry {
@@ -30,6 +32,17 @@ export interface AdminPalette {
   contrast: ContrastEntry[];
 }
 
+/** الأصول الخمسة — كلها صور يرفعها الأدمن. */
+export type AssetField = 'logo_light' | 'logo_dark' | 'icon' | 'favicon' | 'og_image';
+
+export const ASSET_FIELDS: AssetField[] = [
+  'logo_light',
+  'logo_dark',
+  'icon',
+  'favicon',
+  'og_image',
+];
+
 export interface AdminBrandProfile {
   id: string;
   code: string;
@@ -37,6 +50,12 @@ export interface AdminBrandProfile {
   name_en: string;
   tagline_ar: string;
   tagline_en: string;
+  /** مسارات نسبية — تُحوَّل بـ `mediaUrl` قبل العرض */
+  logo_light: string | null;
+  logo_dark: string | null;
+  icon: string | null;
+  favicon: string | null;
+  og_image: string | null;
   font_ar: string;
   font_en: string;
   font_size_base: string;
@@ -87,3 +106,84 @@ export const previewPalette = (body: Partial<AdminPalette>) =>
 
 export const activateProfile = (id: string) =>
   http.post<AdminBrandProfile>(`/branding/admin/profiles/${id}/activate/`);
+
+// ═══════════════════════════════════════════════════════════
+//  الخطّافات
+// ═══════════════════════════════════════════════════════════
+
+export const BRANDING_KEY = ['admin', 'branding'] as const;
+
+/**
+ * ⚠️  إبطال **شجرة الهوية والثيم العام معًا** بعد أي كتابة.
+ *
+ *     الأولى تحدّث شاشة التحرير، والثاني هو ما يجعل الأدمن يرى
+ *     اللوجو الجديد في ترويسة لوحته فورًا بدل إعادة تحميل الصفحة.
+ */
+function useBrandingMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: run,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: BRANDING_KEY });
+      void queryClient.invalidateQueries({ queryKey: ['branding', 'theme'] });
+    },
+  });
+}
+
+export function useBrandProfiles() {
+  return useQuery({ queryKey: BRANDING_KEY, queryFn: listProfiles });
+}
+
+export function useUpdateProfile() {
+  return useBrandingMutation(
+    ({ id, body }: { id: string; body: Partial<AdminBrandProfile> }) => updateProfile(id, body),
+  );
+}
+
+/**
+ * رفع أصل واحد.
+ *
+ * ⚠️  `FormData` لا JSON — الحمولة ملف.
+ *
+ * ⚠️  و**حقل واحد لكل نداء**: إرسال الخمسة معًا يعني أن رفض ملف
+ *     منها يُفشل الأربعة الأخرى، والأدمن يعيد اختيارها كلها.
+ */
+export function useUploadAsset() {
+  return useBrandingMutation(({ id, field, file }: { id: string; field: AssetField; file: File }) => {
+    const body = new FormData();
+    body.append(field, file);
+    return http.patch<AdminBrandProfile>(`/branding/admin/profiles/${id}/`, body);
+  });
+}
+
+/**
+ * المسح — **JSON بقيمة `null` لا نموذجًا بقيمة فارغة**.
+ *
+ * ⚠️  الحقل الفارغ في حمولة `multipart` يتجاهله DRF بصمت: يردّ ٢٠٠
+ *     ويُبقي الصورة مكانها. فيضغط الأدمن «حذف» ويرى نجاحًا واللوجو
+ *     لم يتغيّر — وهو أسوأ أنواع الفشل لأنه يبدو نجاحًا.
+ */
+export function useClearAsset() {
+  return useBrandingMutation(({ id, field }: { id: string; field: AssetField }) =>
+    http.patch<AdminBrandProfile>(`/branding/admin/profiles/${id}/`, { [field]: null }),
+  );
+}
+
+export function useActivateProfile() {
+  return useBrandingMutation((id: string) => activateProfile(id));
+}
+
+export function useUpdatePalette() {
+  return useBrandingMutation(
+    ({
+      profileId,
+      paletteId,
+      body,
+    }: {
+      profileId: string;
+      paletteId: string;
+      body: Partial<AdminPalette>;
+    }) => updatePalette(profileId, paletteId, body),
+  );
+}

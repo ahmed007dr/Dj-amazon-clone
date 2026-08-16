@@ -122,6 +122,11 @@ const AdminStaffPage = lazy(() =>
     default: module.AdminStaffPage,
   })),
 );
+const AdminSuppliersPage = lazy(() =>
+  import('@/portals/admin/pages/AdminSuppliersPage').then((module) => ({
+    default: module.AdminSuppliersPage,
+  })),
+);
 const AdminReportsPage = lazy(() =>
   import('@/portals/admin/pages/AdminReportsPage').then((module) => ({
     default: module.AdminReportsPage,
@@ -281,6 +286,7 @@ const router = createBrowserRouter([
       { path: 'staff', element: <Lazy><AdminStaffPage /></Lazy> },
       { path: 'targets', element: <Lazy><AdminTargetsPage /></Lazy> },
       { path: 'reports', element: <Lazy><AdminReportsPage /></Lazy> },
+      { path: 'suppliers', element: <Lazy><AdminSuppliersPage /></Lazy> },
       { path: 'branding', element: <Lazy><AdminBrandingPage /></Lazy> },
     ],
   },

@@ -536,6 +536,62 @@ def adjust(
 
 
 @transaction.atomic
+def return_to_supplier(
+    product,
+    quantity: int,
+    *,
+    location=None,
+    variant=None,
+    reason: str,
+    reference_type: str = "",
+    reference_id: str = "",
+    performed_by=None,
+) -> StockMovement:
+    """
+    خروج بضاعة **إلى المورّد** — لا تسوية ولا بيع.
+
+    ⚠️  حركة `RETURN_OUT` لا `ADJUSTMENT_DOWN`.
+
+        التسوية تعني «الرصيد كان خاطئًا»؛ والمرتجع يعني «البضاعة
+        خرجت إلى جهة معلومة بمقابل مالي». خلطهما يجعل تقرير
+        الفروق يعُدّ كل مرتجع خطأ جردٍ — ويُخفي أن المخزن يردّ
+        بضاعة لمورّد بعينه بانتظام.
+
+    ⚠️  والمرجع إلزامي عمليًا: بلا `reference_id` لا يُربَط
+        المرتجع بأمر الشراء الذي جاء منه.
+    """
+    if quantity <= 0:
+        raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="الكمية يجب أن تكون موجبة")
+    if not reason:
+        raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="سبب الإرجاع إلزامي")
+
+    location = location or StockLocation.get_default()
+    stock = _locked_stock(product, location, variant)
+
+    if stock.available < quantity:
+        raise BusinessError(
+            ErrorCode.INSUFFICIENT_STOCK,
+            detail=f"المتاح: {stock.available} · المطلوب إرجاعه: {quantity}",
+        )
+
+    Stock.objects.filter(pk=stock.pk).update(quantity_physical=F("quantity_physical") - quantity)
+    stock.refresh_from_db()
+
+    movement = _record_movement(
+        stock=stock,
+        movement_type=MovementType.RETURN_OUT,
+        quantity=quantity,
+        note=reason,
+        reference_type=reference_type,
+        reference_id=reference_id,
+        performed_by=performed_by,
+    )
+
+    check_alerts(product, location)
+    return movement
+
+
+@transaction.atomic
 def transfer(
     product,
     quantity: int,

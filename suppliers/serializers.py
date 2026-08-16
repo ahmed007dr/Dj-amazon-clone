@@ -25,6 +25,12 @@ class MoneySerializerField(serializers.DecimalField):
 class SupplierSerializer(serializers.ModelSerializer):
     offer_count = serializers.IntegerField(read_only=True, default=0)
 
+    # ⚠️  تأتي من التجميع في `services.annotated_suppliers` — لا
+    #     تُحسب لكل صف على حدة (N+1 في أكثر شاشة تُفتح).
+    payable = MoneySerializerField(read_only=True, default=None)
+    total_purchases = MoneySerializerField(read_only=True, default=None)
+    has_overdue = serializers.BooleanField(read_only=True, default=False)
+
     class Meta:
         model = Supplier
         fields = [
@@ -43,8 +49,11 @@ class SupplierSerializer(serializers.ModelSerializer):
             "is_active",
             "note",
             "offer_count",
+            "payable",
+            "total_purchases",
+            "has_overdue",
         ]
-        read_only_fields = ["id", "offer_count"]
+        read_only_fields = ["id", "offer_count", "payable", "total_purchases", "has_overdue"]
 
 
 class SupplierProductSerializer(serializers.ModelSerializer):
@@ -82,7 +91,10 @@ class SupplierProductSerializer(serializers.ModelSerializer):
 
 class PurchaseOrderLineSerializer(serializers.ModelSerializer):
     unit_cost = MoneySerializerField(read_only=True)
+    list_cost = MoneySerializerField(read_only=True)
+    cost_variance = MoneySerializerField(read_only=True)
     total = MoneySerializerField(read_only=True)
+    quantity_on_hand = serializers.IntegerField(read_only=True)
     product_sku = serializers.CharField(source="product.sku", read_only=True)
     product_name_ar = serializers.CharField(source="product.name_ar", read_only=True)
     product_name_en = serializers.CharField(source="product.name_en", read_only=True)
@@ -98,8 +110,15 @@ class PurchaseOrderLineSerializer(serializers.ModelSerializer):
             "product_name_en",
             "quantity_ordered",
             "quantity_received",
+            "quantity_returned",
+            # ⚠️  المستلَم بعد خصم المرتجع — سقف ما يُمكن إرجاعه.
+            #     الشاشة تبني عليه حدّ حقل الإرجاع.
+            "quantity_on_hand",
             "outstanding",
             "unit_cost",
+            # ⚠️  سعر العرض والفارق: «بكم كان معروضًا وكم دفعنا؟»
+            "list_cost",
+            "cost_variance",
             "total",
         ]
         read_only_fields = fields
@@ -146,10 +165,19 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 class PurchaseOrderLineInputSerializer(serializers.Serializer):
     product = serializers.UUIDField()
     quantity = serializers.IntegerField(min_value=1, max_value=999999)
+    #: ⚠️  اختياري: يُملأ من العرض حين يُترك فارغًا، ويُسجَّل فارقه
+    #:     في سجل التدقيق حين يُرسَل. انظر `services.create_order`.
+    unit_cost = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+        min_value=Decimal("0"),
+    )
 
 
 class CreatePurchaseOrderSerializer(serializers.Serializer):
-    """⚠️  **بلا سعر** — يُؤخذ من عرض المورّد لا من الواجهة."""
+    """⚠️  السعر اختياري: من العرض افتراضًا، ويقبل تفاوضًا مُدقَّقًا."""
 
     supplier = serializers.UUIDField()
     location = serializers.UUIDField()
@@ -196,3 +224,14 @@ class SupplierPaymentSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
     reference = serializers.CharField(required=False, allow_blank=True, max_length=64)
     note = serializers.CharField(required=False, allow_blank=True, max_length=1000)
+
+
+class ReturnToSupplierSerializer(serializers.Serializer):
+    """
+    ⚠️  السبب إلزامي: إرجاع بلا سبب مكتوب يجعل تقييم المورّد
+        مستحيلًا — لا نعرف أكانت البضاعة تالفة أم خاطئة أم زائدة.
+    """
+
+    line = serializers.UUIDField()
+    quantity = serializers.IntegerField(min_value=1)
+    reason = serializers.CharField(min_length=3, max_length=500)

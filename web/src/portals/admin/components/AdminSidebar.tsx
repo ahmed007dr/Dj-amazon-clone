@@ -35,6 +35,9 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
       { to: '/admin/orders', key: 'nav.orders', permission: 'orders.view_order' },
       { to: '/admin/products', key: 'nav.products', permission: 'catalog.view_product' },
       { to: '/admin/inventory', key: 'nav.inventory', permission: 'inventory.view_stock' },
+      // ⚠️  الموردون بجوار المخزون: الشراء يغذّيه، ومن
+      //     يتابع النقص هو من يُنشئ أمر الشراء.
+      { to: '/admin/suppliers', key: 'suppliers.title', permission: 'suppliers.add_purchaseorder' },
       // ⚠️  الورديات تحت «التجارة» لا «النظام»: الفرق النقدي شأن
       //     تشغيلي يومي يُراجَع مع الطلبات، لا إعداد يُضبط مرة.
       { to: '/admin/pos-sessions', key: 'pos.sessions', permission: 'pos.view_possession' },
