@@ -1,0 +1,43 @@
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.session {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.session__info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.session__device {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* ⚠️  عنوان IP بخط أحادي واتجاه لاتيني — الأرقام المنقّطة تنقلب
+       ترتيبًا داخل نص عربي بلا هذا. */
+.session__meta {
+  font-family: var(--font-en);
+  font-size: 0.8125rem;
+  direction: ltr;
+  text-align: start;
+}

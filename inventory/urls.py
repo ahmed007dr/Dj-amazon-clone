@@ -26,4 +26,11 @@ urlpatterns = [
     path("transfer/", api.TransferStockAPI.as_view(), name="transfer"),
     path("damage/", api.MarkDamagedAPI.as_view(), name="damage"),
     path("maintenance/", api.RunMaintenanceAPI.as_view(), name="maintenance"),
+    # ── الجرد ──────────────────────────────────────────────
+    path("counts/", api.StockCountListAPI.as_view(), name="counts"),
+    path("counts/open/", api.OpenStockCountAPI.as_view(), name="count-open"),
+    path("counts/<uuid:pk>/", api.StockCountDetailAPI.as_view(), name="count-detail"),
+    path("counts/<uuid:pk>/record/", api.RecordCountedAPI.as_view(), name="count-record"),
+    path("counts/<uuid:pk>/apply/", api.ApplyStockCountAPI.as_view(), name="count-apply"),
+    path("counts/<uuid:pk>/cancel/", api.CancelStockCountAPI.as_view(), name="count-cancel"),
 ]

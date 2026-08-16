@@ -1,0 +1,29 @@
+.batch-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.batch-cell code {
+  direction: ltr;
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+
+.batch-muted {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* ⚠️  المنتهية بالوزن واللون معًا: بضاعة قد تُباع، ولا يصحّ أن
+   تفوت من لا يميّز الألوان. */
+.batch-expired {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+.batch-soon {
+  font-size: 0.75rem;
+  color: var(--color-warning);
+}

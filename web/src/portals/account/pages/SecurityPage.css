@@ -13,3 +13,23 @@
 .security > button {
   inline-size: auto;
 }
+
+.security-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-block-start: var(--space-8);
+  padding-block-start: var(--space-5);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.security-section__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.security-section p {
+  margin: 0;
+  font-size: 0.9375rem;
+}

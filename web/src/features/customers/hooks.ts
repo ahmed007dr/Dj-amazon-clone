@@ -23,3 +23,35 @@ export function useCreateAddress() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ADDRESSES_KEY }),
   });
 }
+
+/**
+ * ⚠️  نفس سبب الإبطال في الإنشاء: تعديل عنوان قد يجعله الافتراضي
+ *     فيُلغي افتراضية غيره — والقائمة كلها تغيّرت لا صفٌّ واحد.
+ */
+function useAddressMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: run,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ADDRESSES_KEY }),
+  });
+}
+
+export function useUpdateAddress() {
+  return useAddressMutation(
+    ({ id, body }: { id: string; body: Parameters<typeof api.updateAddress>[1] }) =>
+      api.updateAddress(id, body),
+  );
+}
+
+/**
+ * ⚠️  الحذف **ناعم على الخادم**: الطلبات السابقة تشير إلى العنوان
+ *     الذي شُحنت إليه، ومحوه يجعل كل فاتورة قديمة بلا وجهة.
+ */
+export function useDeleteAddress() {
+  return useAddressMutation(api.deleteAddress);
+}
+
+export function useSetDefaultAddress() {
+  return useAddressMutation(api.setDefaultAddress);
+}

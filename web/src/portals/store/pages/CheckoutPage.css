@@ -53,3 +53,43 @@
     gap: var(--space-8);
   }
 }
+
+/* ⚠️  الآجل يبدو خيارًا من نفس العائلة بصريًا رغم أنه مسار خادم
+       مختلف — العميل يرى «كيف أدفع؟» لا معمارية الخادم. */
+.checkout__credit {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+  margin-block-start: var(--space-3);
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.checkout__credit.is-selected {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+.checkout__credit input {
+  margin-block-start: 0.25rem;
+  accent-color: var(--color-primary);
+}
+
+.checkout__credit span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.checkout__credit em {
+  font-size: 0.875rem;
+  font-style: normal;
+  color: var(--color-text-muted);
+}
+
+.checkout__credit-note {
+  margin-block-start: var(--space-3);
+  font-size: 0.875rem;
+}

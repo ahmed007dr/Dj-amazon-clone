@@ -9,7 +9,9 @@ import {
 } from '@/features/payments/adminApi';
 import { isApiError } from '@/shared/http';
 import { useLocalized } from '@/shared/i18n/useLocalized';
+import { TransactionsPanel } from '@/portals/admin/components/TransactionsPanel';
 import { PageHeader } from '@/shared/layouts/PageHeader';
+import { StatusTabs } from '@/shared/ui/StatusTabs';
 import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -33,6 +35,8 @@ export function AdminPaymentsPage() {
   const { notify } = useToast();
 
   const [reasons, setReasons] = useState<Record<string, string>>({});
+
+  const [tab, setTab] = useState<'providers' | 'transactions'>('providers');
 
   const providers = useQuery({ queryKey: KEY, queryFn: listProviders });
 
@@ -61,6 +65,19 @@ export function AdminPaymentsPage() {
     <>
       <PageHeader title={t('nav.payments')} description={t('admin.gatewaysHint')} />
 
+      <StatusTabs
+        options={[
+          { value: 'providers', label: t('payments.tabProviders') },
+          { value: 'transactions', label: t('payments.tabTransactions') },
+        ]}
+        value={tab}
+        onChange={(next) => setTab(next as 'providers' | 'transactions')}
+      />
+
+      {tab === 'transactions' ? <TransactionsPanel /> : null}
+
+      {tab !== 'providers' ? null : (
+      <>
       {activeCount === 0 ? (
         <Alert tone="danger">{t('admin.noActiveGateway')}</Alert>
       ) : null}
@@ -86,6 +103,8 @@ export function AdminPaymentsPage() {
           />
         ))}
       </div>
+      </>
+      )}
     </>
   );
 }

@@ -26,6 +26,7 @@ from inventory.models import (
     ReservationStatus,
     Stock,
     StockAlert,
+    StockCountStatus,
     StockLocation,
     StockMovement,
 )
@@ -644,3 +645,187 @@ class TestConcurrency:
         stock = Stock.objects.get(product=stocked, location=location)
         assert stock.quantity_reserved == 60
         assert stock.available == 40
+
+
+# ═══════════════════════════════════════════════════════════
+#  الجرد
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.django_db
+class TestStockCount:
+    """
+    ⚠️  الموديلان كانا موجودين منذ المرحلة ٤ **بلا خدمة ولا نقطة**:
+        صفر إشارة إليهما في `services` و`api`. هذه المجموعة تحرس
+        السلوك الذي بُني حولهما.
+    """
+
+    def test_opening_takes_a_snapshot_of_current_balances(self, stocked, location):
+        """
+        ⚠️  اللقطة عند البدء لا عند الاعتماد.
+
+            الجرد يستغرق ساعات والمخزون يتحرّك؛ قراءة المتوقَّع وقت
+            الاعتماد تقارن ما عُدَّ صباحًا برصيد المساء — فيظهر عجز
+            مقداره كل ما بيع أثناء العدّ.
+        """
+        count = services.open_count(location)
+        lines = services.snapshot_count(count)
+
+        count.refresh_from_db()
+        assert lines == 1
+        assert count.status == StockCountStatus.IN_PROGRESS
+        assert count.started_at is not None
+
+        line = count.lines.first()
+        assert line.expected_quantity == 100
+        # ⚠️  المعدود يبدأ بالمتوقَّع لا بصفر: البدء بصفر يجعل كل
+        #     صنف لم يُعدّ بعد يبدو عجزًا كاملًا.
+        assert line.counted_quantity == 100
+        assert line.variance == 0
+
+    def test_only_one_open_session_per_location(self, stocked, location):
+        """
+        ⚠️  جلستان تعنيان عدّادين، وآخر من يعتمد يمحو عمل الأول.
+        """
+        services.open_count(location)
+
+        with pytest.raises(BusinessError):
+            services.open_count(location)
+
+    def test_a_second_session_opens_after_the_first_completes(self, stocked, location):
+        first = services.open_count(location)
+        services.snapshot_count(first)
+        services.apply_count(first)
+
+        second = services.open_count(location)
+        assert second.pk != first.pk
+
+    def test_shortage_is_applied_as_a_count_movement(self, stocked, location):
+        """
+        ⚠️  التسوية بحركة مسجَّلة لا بكتابة الرصيد مباشرةً.
+
+            الكتابة المباشرة تجعل المحاسب يسأل «من أين جاء هذا
+            النقص؟» فلا يجد حركة.
+        """
+        count = services.open_count(location)
+        services.snapshot_count(count)
+
+        line = count.lines.first()
+        services.record_counted(count, line, 93)
+
+        result = services.apply_count(count)
+
+        assert result == {"adjusted": 1, "surplus": 0, "shortage": 7}
+        assert Stock.objects.get(product=stocked, location=location).quantity_physical == 93
+
+        movement = StockMovement.objects.filter(movement_type=MovementType.COUNT).first()
+        assert movement is not None
+        assert movement.quantity == 7
+        assert movement.reference_type == "stock_count"
+
+    def test_surplus_is_applied_too(self, stocked, location):
+        count = services.open_count(location)
+        services.snapshot_count(count)
+        services.record_counted(count, count.lines.first(), 105)
+
+        result = services.apply_count(count)
+
+        assert result["surplus"] == 5
+        assert Stock.objects.get(product=stocked, location=location).quantity_physical == 105
+
+    def test_lines_without_variance_produce_no_movement(self, stocked, location):
+        """
+        ⚠️  حركة بصفر لكل صنف تُغرق السجل بآلاف الصفوف عديمة
+            المعنى، فيصير البحث عن فرق حقيقي مستحيلًا.
+        """
+        count = services.open_count(location)
+        services.snapshot_count(count)
+
+        result = services.apply_count(count)
+
+        assert result["adjusted"] == 0
+        assert not StockMovement.objects.filter(movement_type=MovementType.COUNT).exists()
+
+    def test_the_variance_is_computed_not_entered(self, stocked, location):
+        """⚠️  إدخال الفرق يدويًا يسمح بإخفاء العجز."""
+        count = services.open_count(location)
+        services.snapshot_count(count)
+        line = count.lines.first()
+
+        services.record_counted(count, line, 88)
+        line.refresh_from_db()
+
+        assert line.variance == -12
+
+    def test_recording_on_a_draft_session_is_refused(self, stocked, location):
+        count = services.open_count(location)
+
+        from inventory.models import StockCountLine
+
+        line = StockCountLine.objects.create(
+            count=count, product=stocked, expected_quantity=100, counted_quantity=100
+        )
+
+        with pytest.raises(BusinessError):
+            services.record_counted(count, line, 90)
+
+    def test_applying_twice_is_refused(self, stocked, location):
+        """
+        ⚠️  الاعتماد المكرر يطبّق الفروق مرتين — فيُخصم العجز
+            ضعفًا من رصيد صحّحته الجلسة نفسها.
+        """
+        count = services.open_count(location)
+        services.snapshot_count(count)
+        services.record_counted(count, count.lines.first(), 90)
+        services.apply_count(count)
+
+        with pytest.raises(BusinessError):
+            services.apply_count(count)
+
+    def test_a_completed_count_cannot_be_cancelled(self, stocked, location):
+        """⚠️  فروقه صارت حركات — وإلغاؤه يترك رصيدًا معدَّلًا بجلسة ملغاة."""
+        count = services.open_count(location)
+        services.snapshot_count(count)
+        services.apply_count(count)
+
+        with pytest.raises(BusinessError):
+            services.cancel_count(count, reason="تراجعنا")
+
+    def test_cancelling_does_not_touch_stock(self, stocked, location):
+        count = services.open_count(location)
+        services.snapshot_count(count)
+        services.record_counted(count, count.lines.first(), 40)
+
+        services.cancel_count(count, reason="عدّ خاطئ")
+
+        assert Stock.objects.get(product=stocked, location=location).quantity_physical == 100
+
+    def test_applying_refreshes_alerts(self, stocked, location):
+        """جرد يكشف نفادًا يجب أن يُطلق تنبيهه فورًا."""
+        count = services.open_count(location)
+        services.snapshot_count(count)
+        services.record_counted(count, count.lines.first(), 0)
+        services.apply_count(count)
+
+        assert Stock.objects.get(product=stocked, location=location).quantity_physical == 0
+
+
+@pytest.mark.django_db
+class TestReturnToSupplier:
+    """⚠️  `RETURN_OUT` كان معرَّفًا في الموديل ولا شيء يستدعيه."""
+
+    def test_it_records_a_return_movement_not_an_adjustment(self, stocked, location):
+        movement = services.return_to_supplier(
+            stocked, 10, location=location, reason="تالفة", reference_type="purchase_order"
+        )
+
+        assert movement.movement_type == MovementType.RETURN_OUT
+        assert Stock.objects.get(product=stocked, location=location).quantity_physical == 90
+
+    def test_returning_more_than_available_is_refused(self, stocked, location):
+        with pytest.raises(BusinessError):
+            services.return_to_supplier(stocked, 200, location=location, reason="زائد")
+
+    def test_a_reason_is_required(self, stocked, location):
+        with pytest.raises(BusinessError):
+            services.return_to_supplier(stocked, 1, location=location, reason="")

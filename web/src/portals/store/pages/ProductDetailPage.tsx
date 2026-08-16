@@ -160,7 +160,9 @@ export function ProductDetailPage() {
           {t('catalog.reviews')}
           {product.rating.count > 0 ? ` (${product.rating.count})` : ''}
         </h2>
-        {slug ? <ReviewList slug={slug} /> : null}
+        {/* ⚠️  المعرّف مطلوب للكتابة: الخادم يربط التقييم بالمنتج
+            بمعرّفه لا بـ `slug` — والأخير قابل للتغيّر نظريًا. */}
+        {slug ? <ReviewList slug={slug} productId={product.id} /> : null}
       </section>
     </div>
   );

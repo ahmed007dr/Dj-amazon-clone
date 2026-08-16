@@ -141,6 +141,45 @@ export function useCreditCheck() {
   });
 }
 
+export interface CreditCheckoutPayload {
+  address_id: string;
+  shipping_method_code?: string;
+  customer_note?: string;
+}
+
+export interface CreditCheckoutResponse {
+  order: { id: string; number: string };
+  invoice: { number: string; due_on: string };
+  available_after: string;
+  due_on: string;
+}
+
+/**
+ * إتمام الشراء **على الحساب**.
+ *
+ * ⚠️  نقطة منفصلة عن `/orders/checkout/` — والفصل مقصود.
+ *
+ *     مسار الآجل **لا يقبل `payment_method` إطلاقًا**: النقطة نفسها
+ *     هي الطريقة. قبول الحقل كان يفتح بابًا لإرسال «بطاقة» إلى
+ *     مسار الائتمان، فيُقيَّد على حساب العميل ما دُفع نقدًا.
+ *
+ * ⚠️  ويُبطَل الرصيد والسلة معًا بعد النجاح: الطلب خرج من السلة
+ *     وقُيِّد على الحد الائتماني في آنٍ واحد.
+ */
+export function useCreditCheckout() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreditCheckoutPayload) =>
+      http.post<CreditCheckoutResponse>('/b2b/checkout/', payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['b2b'] });
+      void queryClient.invalidateQueries({ queryKey: ['cart'] });
+      void queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+  });
+}
+
 // ── الأدمن ─────────────────────────────────────────────────
 
 export interface BusinessFilters {

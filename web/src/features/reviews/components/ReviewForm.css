@@ -1,0 +1,108 @@
+.review-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+/* ⚠️  النجوم أزرار اختيار حقيقية: مخفية بصريًا لا `display:none`
+       — الأخير يُخرجها من ترتيب التركيز فلا يصلها مستخدم لوحة
+       المفاتيح، والتقييم هو الحقل الإلزامي الوحيد. */
+.review-form__stars {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
+.review-form__stars legend {
+  display: block;
+  inline-size: 100%;
+  padding: 0;
+  margin-block-end: var(--space-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.review-form__stars legend em {
+  color: var(--color-danger);
+  font-style: normal;
+}
+
+.review-form__stars label {
+  display: grid;
+  place-items: center;
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+  font-size: 1.75rem;
+  line-height: 1;
+  color: var(--color-border);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition);
+}
+
+.review-form__stars label.is-on {
+  color: var(--color-accent);
+}
+
+.review-form__stars input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.review-form__stars label:has(input:focus-visible) {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.review-form__sr {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.review-form__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.review-form__body textarea {
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}
+
+.review-form__error {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-danger);
+}
+
+.review-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

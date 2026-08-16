@@ -216,3 +216,154 @@ export function useTransferStock() {
 export function useMarkDamaged() {
   return useInventoryMutation((body: DamageBody) => http.post('/inventory/damage/', body));
 }
+
+// ═══════════════════════════════════════════════════════════
+//  الدفعات
+// ═══════════════════════════════════════════════════════════
+
+export interface Batch {
+  id: string;
+  number: string;
+  product: string;
+  product_sku: string;
+  variant: string | null;
+  location: string;
+  location_code: string;
+  supplier_batch_number: string;
+  quantity_received: number;
+  quantity_remaining: number;
+  unit_cost: string;
+  manufactured_at: string | null;
+  expires_at: string | null;
+  received_at: string;
+  is_quarantined: boolean;
+  is_expired: boolean;
+  days_to_expiry: number | null;
+}
+
+/**
+ * ⚠️  `status=expired` **يشمل ما انتهى وما زال في المخزن**.
+ *
+ *     وهو الأخطر: بضاعة قد تُباع. الشاشة تُبرزه بدل أن تخلطه
+ *     بما «يقترب».
+ */
+export function useBatches(params: {
+  product?: string;
+  location?: string;
+  status?: string;
+  page?: number;
+}) {
+  return useQuery({
+    queryKey: ['inventory', 'batches', params],
+    queryFn: () =>
+      http.get<PagedResponse<Batch>>('/inventory/batches/', { params: { ...params } }),
+  });
+}
+
+export function useMovements(params: {
+  product?: string;
+  location?: string;
+  type?: string;
+  page?: number;
+}) {
+  return useQuery({
+    queryKey: ['inventory', 'movements', params],
+    queryFn: () => listMovements(params),
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  الجرد
+// ═══════════════════════════════════════════════════════════
+
+export type CountStatus = 'DRAFT' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+
+export interface StockCountLine {
+  id: number;
+  product: string;
+  product_sku: string;
+  product_name_ar: string;
+  product_name_en: string;
+  variant: string | null;
+  variant_name: string | null;
+  expected_quantity: number;
+  counted_quantity: number;
+  /** ⚠️  محسوب على الخادم — موجب زيادة وسالب عجز. */
+  variance: number;
+  note: string;
+}
+
+export interface StockCount {
+  id: string;
+  reference: string;
+  location: string;
+  location_code: string;
+  status: CountStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  note: string;
+  line_count: number;
+  variance_count: number;
+}
+
+export interface StockCountDetail extends StockCount {
+  lines: StockCountLine[];
+}
+
+export function useStockCounts(params: { location?: string; status?: string; page?: number }) {
+  return useQuery({
+    queryKey: ['inventory', 'counts', params],
+    queryFn: () =>
+      http.get<PagedResponse<StockCount>>('/inventory/counts/', { params: { ...params } }),
+  });
+}
+
+export function useStockCount(id: string | null) {
+  return useQuery({
+    queryKey: ['inventory', 'count', id],
+    queryFn: () => http.get<StockCountDetail>(`/inventory/counts/${id}/`),
+    enabled: id !== null,
+  });
+}
+
+export function useOpenCount() {
+  return useInventoryMutation((body: { location: string; note?: string }) =>
+    http.post<StockCountDetail>('/inventory/counts/open/', body),
+  );
+}
+
+export function useRecordCounted() {
+  return useInventoryMutation(
+    ({
+      count,
+      line,
+      counted_quantity,
+      note,
+    }: {
+      count: string;
+      line: number;
+      counted_quantity: number;
+      note?: string;
+    }) =>
+      http.post<StockCountLine>(`/inventory/counts/${count}/record/`, {
+        line,
+        counted_quantity,
+        note,
+      }),
+  );
+}
+
+export function useApplyCount() {
+  return useInventoryMutation((id: string) =>
+    http.post<{ adjusted: number; surplus: number; shortage: number }>(
+      `/inventory/counts/${id}/apply/`,
+      {},
+    ),
+  );
+}
+
+export function useCancelCount() {
+  return useInventoryMutation(({ id, reason }: { id: string; reason: string }) =>
+    http.post<StockCount>(`/inventory/counts/${id}/cancel/`, { reason }),
+  );
+}

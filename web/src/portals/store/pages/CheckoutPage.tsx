@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 
+import { useCreditCheckout, useMyAccount } from '@/features/b2b/api';
 import { CartIssues } from '@/features/cart/components/CartIssues';
 import { CartSummary } from '@/features/cart/components/CartSummary';
 import { useCart } from '@/features/cart/hooks';
@@ -16,7 +17,17 @@ import { Button } from '@/shared/ui/Button';
 import { Spinner } from '@/shared/ui/Spinner';
 import { StateMessage } from '@/shared/ui/StateMessage';
 
+import { formatMoney } from '@/shared/utils/format';
+
 import './CheckoutPage.css';
+
+/**
+ * ⚠️  قيمة داخلية لا تُرسَل إلى الخادم.
+ *
+ *     مسار الآجل لا يقبل `payment_method` إطلاقًا — هذه علامة
+ *     للواجهة وحدها تميّز «على الحساب» عن بوابات الدفع.
+ */
+const CREDIT_METHOD = '__credit__';
 
 /**
  * إتمام الشراء.
@@ -28,7 +39,7 @@ import './CheckoutPage.css';
  *     على الإجمالي ينتج رقمًا يخالف الفاتورة.
  */
 export function CheckoutPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
 
   const [addressId, setAddressId] = useState<string | null>(null);
@@ -44,6 +55,14 @@ export function CheckoutPage() {
   });
   const checkout = useCheckout();
 
+  // ⚠️  الحساب الآجل يُقرأ بلا إفشال الصفحة لغير التجاري.
+  //
+  //     `useMyAccount` يردّ ٤٠٣ لعميل التجزئة — وهي حالة عادية لا
+  //     خطأ. عرض «تعذّر التحميل» على صفحة إتمام سليمة يوقف بيعة.
+  const tradeAccount = useMyAccount();
+  const creditCheckout = useCreditCheckout();
+
+  const credit = tradeAccount.data;
   const cart = cartQuery.data;
 
   // ⚠️  تغيير المحافظة يُبطل طريقة الشحن المختارة.
@@ -74,11 +93,48 @@ export function CheckoutPage() {
     );
   }
 
+  // ⚠️  الآجل متاح فقط بحساب نشط وحدٍّ يكفي المبلغ.
+  //
+  //     عرضه لحساب معلَّق أو تجاوز حدَّه يعني اختيارًا يُرفض بعد
+  //     ملء النموذج كاملًا — والفحص هنا يقع على نفس الأرقام التي
+  //     يفحصها الخادم، وهو يبقى الحَكَم.
+  const creditAvailable =
+    credit !== undefined &&
+    credit.credit_status === 'ACTIVE' &&
+    Number(credit.available) >= Number(cart.totals.total);
+
+  const payingOnCredit = paymentMethod === CREDIT_METHOD;
+
   const ready = Boolean(addressId && shippingMethod && paymentMethod && cart.is_checkoutable);
 
   function handleSubmit() {
     if (!addressId || !paymentMethod) return;
     setError(null);
+
+    const onError = (cause: unknown) => {
+      // ⚠️  ٤٠٩ = تغيّرت الحقيقة بين عرض السلة والضغط (نفد
+      //     المخزون · أُوقف المنتج). الرسالة من الخادم محدّدة،
+      //     وإعادة جلب السلة تُظهر السطر المتأثر.
+      setError(isApiError(cause) ? cause.displayMessage : t('state.errorTitle'));
+      void cartQuery.refetch();
+    };
+
+    if (payingOnCredit) {
+      creditCheckout.mutate(
+        {
+          address_id: addressId,
+          shipping_method_code: shippingMethod ?? '',
+          customer_note: note,
+        },
+        {
+          onSuccess: (response) => {
+            void navigate(`/orders/${response.order.id}`, { replace: true });
+          },
+          onError,
+        },
+      );
+      return;
+    }
 
     checkout.mutate(
       {
@@ -91,13 +147,7 @@ export function CheckoutPage() {
         onSuccess: (response) => {
           void navigate(`/orders/${response.order.id}`, { replace: true });
         },
-        onError: (cause) => {
-          // ⚠️  ٤٠٩ = تغيّرت الحقيقة بين عرض السلة والضغط (نفد
-          //     المخزون · أُوقف المنتج). الرسالة من الخادم محدّدة،
-          //     وإعادة جلب السلة تُظهر السطر المتأثر.
-          setError(isApiError(cause) ? cause.displayMessage : t('state.errorTitle'));
-          void cartQuery.refetch();
-        },
+        onError,
       },
     );
   }
@@ -139,6 +189,37 @@ export function CheckoutPage() {
               value={paymentMethod}
               onChange={setPaymentMethod}
             />
+
+            {/* ⚠️  الآجل خارج `PaymentPicker` عمدًا.
+                تلك القائمة تأتي من بوابات الدفع المفعّلة، والآجل
+                ليس بوابة: لا مال ينتقل الآن، والقيد يقع على حساب
+                العميل بمسار خادم مختلف تمامًا. */}
+            {creditAvailable ? (
+              <label className={`checkout__credit ${payingOnCredit ? 'is-selected' : ''}`}>
+                <input
+                  type="radio"
+                  name="payment"
+                  checked={payingOnCredit}
+                  onChange={() => setPaymentMethod(CREDIT_METHOD)}
+                />
+                <span>
+                  <strong>{t('checkout.payOnCredit')}</strong>
+                  <em>
+                    {t('checkout.creditAvailable', {
+                      amount: formatMoney(credit.available, i18n.language),
+                      days: credit.payment_terms_days,
+                    })}
+                  </em>
+                </span>
+              </label>
+            ) : credit && credit.credit_status === 'ACTIVE' ? (
+              // الحساب تجاري لكن الحد لا يكفي — يُقال بدل الإخفاء
+              <p className="checkout__credit-note muted">
+                {t('checkout.creditInsufficient', {
+                  amount: formatMoney(credit.available, i18n.language),
+                })}
+              </p>
+            ) : null}
           </section>
 
           <section className="checkout__step surface">
@@ -162,7 +243,7 @@ export function CheckoutPage() {
             block
             size="lg"
             disabled={!ready}
-            loading={checkout.isPending}
+            loading={checkout.isPending || creditCheckout.isPending}
             onClick={handleSubmit}
           >
             {t('checkout.placeOrder')}

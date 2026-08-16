@@ -6,6 +6,8 @@ from inventory.models import (
     Batch,
     Stock,
     StockAlert,
+    StockCount,
+    StockCountLine,
     StockLocation,
     StockMovement,
     StockReservation,
@@ -263,3 +265,99 @@ class AvailabilitySerializer(serializers.Serializer):
 
     def get_available(self, obj) -> int | None:
         return obj.available if obj.available <= 5 else None
+
+
+# ═══════════════════════════════════════════════════════════
+#  الجرد
+# ═══════════════════════════════════════════════════════════
+
+
+class StockCountLineSerializer(serializers.ModelSerializer):
+    product_sku = serializers.CharField(source="product.sku", read_only=True)
+    product_name_ar = serializers.CharField(source="product.name_ar", read_only=True)
+    product_name_en = serializers.CharField(source="product.name_en", read_only=True)
+    variant_name = serializers.CharField(source="variant.name_ar", read_only=True, default=None)
+    #: ⚠️  محسوب لا مُدخَل — إدخاله يدويًا يسمح بإخفاء العجز.
+    variance = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = StockCountLine
+        fields = [
+            "id",
+            "product",
+            "product_sku",
+            "product_name_ar",
+            "product_name_en",
+            "variant",
+            "variant_name",
+            "expected_quantity",
+            "counted_quantity",
+            "variance",
+            "note",
+        ]
+        read_only_fields = [
+            "id",
+            "product",
+            "product_sku",
+            "product_name_ar",
+            "product_name_en",
+            "variant",
+            "variant_name",
+            # ⚠️  المتوقَّع لقطة وقت البدء — قبوله من الواجهة يجعل
+            #     العدّاد يكتب ما يُوازن به فرقه.
+            "expected_quantity",
+            "variance",
+        ]
+
+
+class StockCountSerializer(serializers.ModelSerializer):
+    location_code = serializers.CharField(source="location.code", read_only=True)
+    line_count = serializers.IntegerField(read_only=True, default=0)
+    variance_count = serializers.IntegerField(read_only=True, default=0)
+
+    class Meta:
+        model = StockCount
+        fields = [
+            "id",
+            "reference",
+            "location",
+            "location_code",
+            "status",
+            "started_at",
+            "completed_at",
+            "note",
+            "line_count",
+            "variance_count",
+        ]
+        read_only_fields = [
+            "id",
+            "reference",
+            "location_code",
+            "status",
+            "started_at",
+            "completed_at",
+            "line_count",
+            "variance_count",
+        ]
+
+
+class StockCountDetailSerializer(StockCountSerializer):
+    lines = StockCountLineSerializer(many=True, read_only=True)
+
+    class Meta(StockCountSerializer.Meta):
+        fields = [*StockCountSerializer.Meta.fields, "lines"]
+
+
+class OpenCountSerializer(serializers.Serializer):
+    location = serializers.UUIDField()
+    note = serializers.CharField(required=False, allow_blank=True, max_length=1000)
+
+
+class RecordCountedSerializer(serializers.Serializer):
+    line = serializers.UUIDField()
+    counted_quantity = serializers.IntegerField(min_value=0)
+    note = serializers.CharField(required=False, allow_blank=True, max_length=500)
+
+
+class CancelCountSerializer(serializers.Serializer):
+    reason = serializers.CharField(min_length=3, max_length=500)

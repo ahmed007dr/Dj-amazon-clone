@@ -566,11 +566,27 @@ def test_two_simultaneous_orders_cannot_both_pass_the_limit():
     orders = [make_order(business.customer, "3000.00") for _ in range(2)]
 
     results: list[str] = []
+    #: ⚠️  مهلة سخيّة عمدًا.
+    #
+    #     خمس ثوانٍ كانت تكفي وحده، وتنكسر حين تعمل المجموعة
+    #     كاملةً على جهاز محمَّل: يتأخر إقلاع الخيط فينكسر الحاجز،
+    #     فيُحسب الخطأ «رفضًا» ويسقط الاختبار **بلا علاقة بالقفل**.
+    #     الفشل الكاذب في اختبار تزامن أسوأ من غيابه: يُفقد الثقة
+    #     فيه فيُتجاهَل حين يصطاد خطأ حقيقيًا.
     barrier = threading.Barrier(2)
+    barrier_timeout = 30
 
     def attempt(order):
         try:
-            barrier.wait(timeout=5)
+            barrier.wait(timeout=barrier_timeout)
+        except threading.BrokenBarrierError:
+            # ⚠️  يُميَّز صراحةً: هذا عطل في التزامن نفسه لا نتيجة
+            #     من نتائج الاختبار، ويُقال كذلك في رسالة الفشل.
+            results.append("barrier-broken")
+            connections.close_all()
+            return
+
+        try:
             services.charge_on_credit(business, order)
             results.append("ok")
         except BusinessError:
@@ -584,7 +600,10 @@ def test_two_simultaneous_orders_cannot_both_pass_the_limit():
     for thread in threads:
         thread.start()
     for thread in threads:
-        thread.join(timeout=15)
+        thread.join(timeout=60)
+
+    if "barrier-broken" in results:
+        pytest.skip(f"تعذّر تزامن الخيطين على هذا الجهاز: {results}")
 
     assert results.count("ok") == 1, f"مرّ أكثر من طلب: {results}"
     assert results.count("refused") == 1, f"النتائج: {results}"

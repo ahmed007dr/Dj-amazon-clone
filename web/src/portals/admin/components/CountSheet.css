@@ -1,0 +1,89 @@
+.count-sheet__progress {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+}
+
+.count-sheet__scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.count-sheet table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  min-inline-size: 24rem;
+}
+
+.count-sheet th,
+.count-sheet td {
+  padding: var(--space-2);
+  text-align: start;
+  border-block-end: 1px solid var(--color-border);
+}
+
+.count-sheet th {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.count-sheet td:not(:first-child) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.count-sheet td:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-inline-size: 0;
+}
+
+.count-sheet td code {
+  direction: ltr;
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+}
+
+.count-sheet input {
+  inline-size: 5rem;
+  min-block-size: var(--touch-target);
+  text-align: center;
+  font-size: 1rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.count-sheet input:focus {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+/* ⚠️  المتوقَّع باهت: موجود للمراجعة بعد الإدخال لا للنسخ منه. */
+.count-sheet__expected {
+  color: var(--color-text-muted);
+}
+
+.count-sheet__ok {
+  color: var(--color-success);
+}
+
+.count-surplus {
+  color: var(--color-success);
+}
+
+.count-shortage {
+  color: var(--color-danger);
+}
+
+.count-sheet tr.has-variance {
+  background: var(--color-bg);
+}

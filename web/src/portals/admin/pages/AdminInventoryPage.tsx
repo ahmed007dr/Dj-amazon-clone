@@ -12,6 +12,8 @@ import {
   type StockAlert,
   type StockMovement,
 } from '@/features/inventory/api';
+import { BatchesTab } from '@/portals/admin/components/BatchesTab';
+import { StockCountsTab } from '@/portals/admin/components/StockCountsTab';
 import {
   StockMovementForm,
   type MovementAction,
@@ -55,6 +57,14 @@ const MOVEMENT_TONES: Record<string, 'success' | 'neutral' | 'warning' | 'danger
 
 const MOVEMENT_ACTIONS: MovementAction[] = ['receive', 'adjust', 'transfer', 'damage'];
 
+/**
+ * ⚠️  التبويبات مرتّبة بما يُفتح أولًا لا بترتيب البناء.
+ *
+ *     أمين المخزن يفتح الشاشة على التنبيهات: ما نفد وما قارب
+ *     الانتهاء. أما الجرد فيُفتح مرة كل شهر — وموضعه في الآخر.
+ */
+type Tab = 'alerts' | 'stock' | 'batches' | 'movements' | 'counts';
+
 const ALERT_TONES = {
   LOW_STOCK: 'warning',
   CRITICAL_STOCK: 'danger',
@@ -78,7 +88,7 @@ export function AdminInventoryPage() {
   const queryClient = useQueryClient();
   const { notify } = useToast();
 
-  const [tab, setTab] = useState<'alerts' | 'stock' | 'movements'>('alerts');
+  const [tab, setTab] = useState<Tab>('alerts');
   const [search, setSearch] = useState('');
   const [location, setLocation] = useState('');
   const [status, setStatus] = useState('');
@@ -311,11 +321,13 @@ export function AdminInventoryPage() {
         options={[
           { value: 'alerts', label: t('admin.alerts'), ...(alerts.data ? { count: alerts.data.count } : {}) },
           { value: 'stock', label: t('admin.stockLevels') },
+          { value: 'batches', label: t('inventory.batches') },
           { value: 'movements', label: t('inventory.movements') },
+          { value: 'counts', label: t('inventory.counts') },
         ]}
         value={tab}
         onChange={(next) => {
-          setTab(next as 'alerts' | 'stock' | 'movements');
+          setTab(next as Tab);
           setPage(1);
         }}
       />
@@ -424,6 +436,13 @@ export function AdminInventoryPage() {
             />
           ) : null}
         </>
+      ) : tab === 'batches' ? (
+        // ⚠️  مكوّن مستقل لا فرع هنا: التبويب له فلاتره وترقيمه
+        //     الخاصان، وحشرهما في حالة الصفحة يجعل تغيير فلتر
+        //     الدفعات يُصفّر صفحة الحركات.
+        <BatchesTab />
+      ) : tab === 'counts' ? (
+        <StockCountsTab />
       ) : tab === 'alerts' ? (
         <>
           <DataTable

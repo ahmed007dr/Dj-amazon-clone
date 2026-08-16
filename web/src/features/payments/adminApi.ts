@@ -1,3 +1,6 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+import type { PagedResponse } from '@/features/orders/adminApi';
 import { http } from '@/shared/http';
 
 /**
@@ -65,3 +68,108 @@ export const addCredential = (providerId: string, key: string, value: string, is
     value,
     is_sandbox: isSandbox,
   });
+
+// ═══════════════════════════════════════════════════════════
+//  المعاملات
+// ═══════════════════════════════════════════════════════════
+
+export type TransactionStatus =
+  | 'PENDING'
+  | 'AUTHORIZED'
+  | 'CAPTURED'
+  | 'FAILED'
+  | 'CANCELLED'
+  | 'REFUNDED';
+
+/**
+ * ⚠️  `provider_response` **غير موجود هنا** ولن يكون.
+ *
+ *     قد يحمل بيانات بطاقة جزئية أو رموزًا داخلية من البوابة —
+ *     والخادم يستبعده من كل استجابة.
+ */
+export interface PaymentTransaction {
+  id: string;
+  reference: string;
+  provider: string;
+  provider_code: string;
+  method: string;
+  amount: string;
+  currency: string;
+  status: TransactionStatus;
+  reference_type: string;
+  reference_id: string;
+  provider_reference: string;
+  failure_code: string;
+  failure_message: string;
+  refunded_amount: string;
+  refundable_amount: string;
+  authorized_at: string | null;
+  captured_at: string | null;
+  created_at: string;
+}
+
+export interface Refund {
+  id: string;
+  reference: string;
+  amount: string;
+  reason: string;
+  status: string;
+  created_at: string;
+}
+
+export const listTransactions = (params: {
+  status?: string;
+  provider?: string;
+  reference_id?: string;
+  page?: number;
+}) =>
+  http.get<PagedResponse<PaymentTransaction>>('/payments/admin/transactions/', {
+    params: { ...params },
+  });
+
+/**
+ * ⚠️  إبطال المعاملات **والطلبات معًا**.
+ *
+ *     التحصيل والاسترداد يغيّران حالة الدفع على الطلب عبر إشارة في
+ *     الخادم؛ إبطال قائمة المعاملات وحدها يترك شاشة الطلب تعرض
+ *     «غير مدفوع» بجوار معاملة حُصِّلت للتوّ.
+ */
+function useTransactionMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: run,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'transactions'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+    },
+  });
+}
+
+/**
+ * تحصيل معاملة مُصرَّح بها.
+ *
+ * ⚠️  للدفع عند الاستلام: يُستدعى عند تسليم الطلب **فعلًا**.
+ *     تعليمها محصَّلة قبل ذلك يعني إيرادًا وهميًا في كل تقرير مالي.
+ */
+export function useCaptureTransaction() {
+  return useTransactionMutation((id: string) =>
+    http.post<PaymentTransaction>(`/payments/admin/transactions/${id}/capture/`),
+  );
+}
+
+/**
+ * ⚠️  السبب إلزامي، والمبلغ الفارغ يعني **كامل المتبقي**.
+ *
+ *     الخادم يرفض ما يتجاوز `refundable_amount` — واسترداد أكثر
+ *     مما دُفع خطأ محاسبي لا يُصحَّح بسهولة.
+ */
+export function useRefundTransaction() {
+  return useTransactionMutation(
+    ({ id, amount, reason }: { id: string; amount?: string; reason: string }) =>
+      http.post<Refund>(`/payments/admin/transactions/${id}/refund/`, {
+        ...(amount ? { amount } : {}),
+        reason,
+      }),
+  );
+}

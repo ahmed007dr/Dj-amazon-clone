@@ -6,13 +6,14 @@ import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { Field } from '@/shared/ui/Field';
 
+import type { CustomerAddress } from '../types';
 import { GOVERNORATES } from '../governorates';
-import { useCreateAddress } from '../hooks';
+import { useCreateAddress, useUpdateAddress } from '../hooks';
 
 import './AddressForm.css';
 
 /**
- * إضافة عنوان.
+ * إضافة عنوان أو تعديله.
  *
  * ⚠️  المحافظة **قائمة مغلقة لا حقل نصي حر**.
  *
@@ -21,20 +22,27 @@ import './AddressForm.css';
  *     الافتراضية (٩٠ ج.م) بدل منطقتها الصحيحة (٣٠) — والعميل
  *     يدفع الفرق بلا أن يعرف.
  */
-export function AddressForm({ onDone }: { onDone: () => void }) {
+export function AddressForm({
+  address,
+  onDone,
+}: {
+  address?: CustomerAddress | undefined;
+  onDone: () => void;
+}) {
   const { t } = useTranslation();
   const createAddress = useCreateAddress();
+  const updateAddress = useUpdateAddress();
 
   const [form, setForm] = useState({
-    label: '',
-    recipient_name: '',
-    phone: '',
-    governorate: '',
-    city: '',
-    street: '',
-    building: '',
-    landmark: '',
-    is_default: false,
+    label: address?.label ?? '',
+    recipient_name: address?.recipient_name ?? '',
+    phone: address?.phone ?? '',
+    governorate: address?.governorate ?? '',
+    city: address?.city ?? '',
+    street: address?.street ?? '',
+    building: address?.building ?? '',
+    landmark: address?.landmark ?? '',
+    is_default: address?.is_default ?? false,
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -46,13 +54,19 @@ export function AddressForm({ onDone }: { onDone: () => void }) {
     event.preventDefault();
     setError(null);
 
-    createAddress.mutate(form, {
-      onSuccess: onDone,
-      onError: (cause) => {
-        setError(isApiError(cause) ? cause.displayMessage : t('state.errorTitle'));
-      },
-    });
+    const onError = (cause: unknown) => {
+      setError(isApiError(cause) ? cause.displayMessage : t('state.errorTitle'));
+    };
+
+    if (address) {
+      updateAddress.mutate({ id: address.id, body: form }, { onSuccess: onDone, onError });
+      return;
+    }
+
+    createAddress.mutate(form, { onSuccess: onDone, onError });
   }
+
+  const pending = createAddress.isPending || updateAddress.isPending;
 
   return (
     <form className="address-form" onSubmit={handleSubmit} noValidate>
@@ -161,10 +175,10 @@ export function AddressForm({ onDone }: { onDone: () => void }) {
       </label>
 
       <div className="address-form__actions">
-        <Button type="submit" loading={createAddress.isPending}>
+        <Button type="submit" loading={pending}>
           {t('common.save')}
         </Button>
-        <Button type="button" variant="ghost" onClick={onDone}>
+        <Button type="button" variant="ghost" onClick={onDone} disabled={pending}>
           {t('common.cancel')}
         </Button>
       </div>

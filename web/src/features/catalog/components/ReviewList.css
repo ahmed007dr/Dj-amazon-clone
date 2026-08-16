@@ -37,3 +37,39 @@
 .review__date {
   font-size: 0.8125rem;
 }
+
+/* ⚠️  التاريخ وزر «مفيدة» في سطر واحد: الزر تحت النص وحده يبدو
+       إجراءً على الصفحة لا على هذه المراجعة. */
+.review__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  margin-block-start: var(--space-2);
+}
+
+/* تقييمي — مميّز بحافة لا بخلفية صاخبة */
+.review-mine {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-4);
+  margin-block-end: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-inline-start: 3px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+}
+
+.review-mine__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.review-mine__body {
+  margin: 0;
+  color: var(--color-text);
+}

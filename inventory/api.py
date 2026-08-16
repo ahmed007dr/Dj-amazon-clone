@@ -5,6 +5,7 @@
     الواجهات هنا تحقق المدخلات وتستدعي، لا أكثر.
 """
 
+from django.db.models import Case, Count, F, IntegerField, Q, When
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
@@ -13,6 +14,8 @@ from rest_framework.views import APIView
 
 from catalog.models import Product, ProductVariant
 from core.api.pagination import AdminPageNumberPagination
+from core.errors import BusinessError, ErrorCode
+from core.models.audit import AuditAction, AuditLog
 from core.permissions import IsAdminAccount
 from inventory import serializers as s
 from inventory import services
@@ -20,6 +23,8 @@ from inventory.models import (
     Batch,
     Stock,
     StockAlert,
+    StockCount,
+    StockCountLine,
     StockLocation,
     StockMovement,
     StockReservation,
@@ -321,3 +326,137 @@ class RunMaintenanceAPI(APIView):
                 "expiry_alerts": services.check_expiring_batches(),
             }
         )
+
+
+# ═══════════════════════════════════════════════════════════
+#  الجرد
+# ═══════════════════════════════════════════════════════════
+
+
+class StockCountListAPI(generics.ListAPIView):
+    permission_classes = [IsAdminAccount]
+    serializer_class = s.StockCountSerializer
+    pagination_class = AdminPageNumberPagination
+
+    def get_queryset(self):
+        queryset = StockCount.objects.select_related("location").annotate(
+            line_count=Count("lines", distinct=True),
+            # ⚠️  عدّ الفروق في الاستعلام لا في بايثون.
+            #
+            #     جرّ كل أسطر كل جلسة لعدّها يجعل القائمة تُحمّل
+            #     آلاف الصفوف لتعرض رقمًا واحدًا لكل صف.
+            variance_count=Count(
+                Case(
+                    When(~Q(lines__counted_quantity=F("lines__expected_quantity")), then=1),
+                    output_field=IntegerField(),
+                ),
+                distinct=True,
+            ),
+        )
+
+        params = self.request.query_params
+        if location := params.get("location"):
+            queryset = queryset.filter(location_id=location)
+        if status_filter := params.get("status"):
+            queryset = queryset.filter(status=status_filter)
+
+        return queryset
+
+
+class StockCountDetailAPI(generics.RetrieveAPIView):
+    permission_classes = [IsAdminAccount]
+    serializer_class = s.StockCountDetailSerializer
+    queryset = StockCount.objects.select_related("location").prefetch_related(
+        "lines__product", "lines__variant"
+    )
+
+
+class OpenStockCountAPI(APIView):
+    """
+    فتح جلسة جرد **وأخذ لقطة الأرصدة فورًا**.
+
+    ⚠️  الخطوتان معًا لا منفصلتين.
+
+        جلسة مفتوحة بلا لقطة تبقى فارغة، ويظنّها العدّاد جاهزة
+        فيبدأ العدّ على ورق — واللقطة تُؤخذ لاحقًا برصيد تغيّر.
+    """
+
+    permission_classes = [IsAdminAccount]
+    serializer_class = s.OpenCountSerializer
+
+    def post(self, request):
+        serializer = s.OpenCountSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        location = get_object_or_404(StockLocation, pk=data["location"])
+        count = services.open_count(location, note=data.get("note", ""), actor=request.user)
+        lines = services.snapshot_count(count)
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditAction.CREATE,
+            object_repr=f"جرد {count.reference} @ {location.code}",
+            changes={"lines": lines},
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        count.refresh_from_db()
+        return Response(s.StockCountDetailSerializer(count).data, status=201)
+
+
+class RecordCountedAPI(APIView):
+    permission_classes = [IsAdminAccount]
+    serializer_class = s.RecordCountedSerializer
+
+    def post(self, request, pk):
+        serializer = s.RecordCountedSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        count = get_object_or_404(StockCount, pk=pk)
+        line = StockCountLine.objects.filter(pk=data["line"], count=count).first()
+        if line is None:
+            # ⚠️  مُصفّى بالجلسة: معرّف سطر جلسة أخرى كان يُعدَّل هنا
+            raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
+
+        services.record_counted(count, line, data["counted_quantity"], note=data.get("note", ""))
+        return Response(s.StockCountLineSerializer(line).data)
+
+
+class ApplyStockCountAPI(APIView):
+    """
+    اعتماد الجرد — **يسوّي الفروق بحركات مسجَّلة**.
+
+    ⚠️  لا رجعة فيه: الفروق تصير حركات، والتصحيح بجرد جديد.
+    """
+
+    permission_classes = [IsAdminAccount]
+
+    def post(self, request, pk):
+        count = get_object_or_404(StockCount, pk=pk)
+        result = services.apply_count(count, actor=request.user)
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditAction.SETTING_CHANGE,
+            object_repr=f"اعتماد جرد {count.reference}",
+            changes=result,
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        count.refresh_from_db()
+        return Response({**result, "count": s.StockCountSerializer(count).data})
+
+
+class CancelStockCountAPI(APIView):
+    permission_classes = [IsAdminAccount]
+    serializer_class = s.CancelCountSerializer
+
+    def post(self, request, pk):
+        serializer = s.CancelCountSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        count = get_object_or_404(StockCount, pk=pk)
+        services.cancel_count(count, reason=serializer.validated_data["reason"])
+        return Response(s.StockCountSerializer(count).data)

@@ -1,0 +1,50 @@
+.count-start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  margin-block-end: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.count-start label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.count-start select {
+  min-block-size: var(--touch-target);
+  min-inline-size: 14rem;
+  padding-inline: var(--space-3);
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ⚠️  عدد الفروق هو ما يُقرأ أولًا في القائمة. */
+.count-variance {
+  color: var(--color-warning);
+}
+
+.count-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.count-panel__actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.count-panel__actions > * {
+  flex: 1;
+}

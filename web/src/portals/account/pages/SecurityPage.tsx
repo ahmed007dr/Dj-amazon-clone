@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { changePassword } from '@/features/auth/api';
+import { EmailChangeForm } from '@/portals/account/components/EmailChangeForm';
+import { SessionList } from '@/portals/account/components/SessionList';
 import { useAuth } from '@/features/auth/useAuth';
 import { isApiError } from '@/shared/http';
 import { PageHeader } from '@/shared/layouts/PageHeader';
@@ -123,6 +125,19 @@ export function SecurityPage() {
           {t('auth.changePassword')}
         </Button>
       </form>
+
+      {/* ── تغيير البريد ────────────────────────────── */}
+      <section className="security-section">
+        <h2 className="security-section__title">{t('account.changeEmail')}</h2>
+        <EmailChangeForm />
+      </section>
+
+      {/* ── الأجهزة ─────────────────────────────────── */}
+      <section className="security-section">
+        <h2 className="security-section__title">{t('account.devices')}</h2>
+        <p className="muted">{t('account.devicesHint')}</p>
+        <SessionList />
+      </section>
     </>
   );
 }

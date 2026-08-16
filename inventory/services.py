@@ -31,6 +31,9 @@ from inventory.models import (
     ReservationStatus,
     Stock,
     StockAlert,
+    StockCount,
+    StockCountLine,
+    StockCountStatus,
     StockLocation,
     StockMovement,
     StockReservation,
@@ -533,6 +536,179 @@ def adjust(
 
     check_alerts(product, location)
     return movement
+
+
+# ═══════════════════════════════════════════════════════════
+#  الجرد
+# ═══════════════════════════════════════════════════════════
+
+
+@transaction.atomic
+def open_count(location: StockLocation, *, note: str = "", actor=None) -> StockCount:
+    """
+    يفتح جلسة جرد.
+
+    ⚠️  **جلسة مفتوحة واحدة لكل موقع.**
+
+        جلستان على نفس المخزن تعنيان عدّادين يكتب كلٌّ منهما
+        كميته، وآخر من يعتمد يمحو عمل الأول — بلا أن يظهر تعارض.
+    """
+    existing = StockCount.objects.filter(
+        location=location,
+        status__in=[StockCountStatus.DRAFT, StockCountStatus.IN_PROGRESS],
+    ).first()
+
+    if existing is not None:
+        raise BusinessError(
+            ErrorCode.CONFLICT,
+            detail=f"جلسة جرد مفتوحة سلفًا على {location.code}: {existing.reference}",
+            status_code=409,
+        )
+
+    return StockCount.objects.create(location=location, note=note)
+
+
+@transaction.atomic
+def snapshot_count(count: StockCount) -> int:
+    """
+    يملأ الجلسة بأرصدة الموقع **لحظة البدء**.
+
+    ⚠️  **اللقطة تُؤخذ عند البدء لا عند الاعتماد.**
+
+        الجرد يستغرق ساعات، والمخزون يتحرّك خلالها. قراءة الرصيد
+        المتوقَّع وقت الاعتماد تقارن ما عُدَّ صباحًا برصيد المساء —
+        فيظهر عجز مقداره كل ما بيع أثناء العدّ.
+
+    ⚠️  والكمية المعدودة تبدأ بالمتوقَّع لا بصفر.
+
+        البدء بصفر يجعل كل صنف لم يُعدّ بعد يبدو عجزًا كاملًا؛
+        وفي جرد جزئي يُعتمد قبل إتمامه يُخصم المخزن كله.
+    """
+    if count.status != StockCountStatus.DRAFT:
+        raise BusinessError(
+            ErrorCode.CONFLICT, detail="اللقطة تُؤخذ مرة واحدة عند البدء", status_code=409
+        )
+
+    rows = Stock.objects.filter(location=count.location).select_related("product", "variant")
+
+    created = 0
+    for stock in rows:
+        StockCountLine.objects.update_or_create(
+            count=count,
+            product=stock.product,
+            variant=stock.variant,
+            defaults={
+                "expected_quantity": stock.quantity_physical,
+                "counted_quantity": stock.quantity_physical,
+            },
+        )
+        created += 1
+
+    count.status = StockCountStatus.IN_PROGRESS
+    count.started_at = timezone.now()
+    count.save(update_fields=["status", "started_at", "updated_at"])
+    return created
+
+
+@transaction.atomic
+def record_counted(count: StockCount, line: StockCountLine, counted: int, *, note: str = ""):
+    """
+    ⚠️  الفرق **يُحسب ولا يُدخَل** — إدخاله يسمح بإخفاء العجز.
+    """
+    if count.status != StockCountStatus.IN_PROGRESS:
+        raise BusinessError(ErrorCode.CONFLICT, detail="الجلسة غير جارية", status_code=409)
+
+    if counted < 0:
+        raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="الكمية لا تكون سالبة")
+
+    line.counted_quantity = counted
+    line.note = note
+    line.save(update_fields=["counted_quantity", "note", "updated_at"])
+    return line
+
+
+@transaction.atomic
+def apply_count(count: StockCount, *, actor=None) -> dict:
+    """
+    يعتمد الجرد: **يسوّي الفروق بحركات `COUNT` ويقفل الجلسة**.
+
+    ⚠️  التسوية بحركة مسجَّلة لا بكتابة الرصيد مباشرةً.
+
+        الكتابة المباشرة تجعل الرصيد يتغيّر بلا أثر: يسأل المحاسب
+        «من أين جاء هذا النقص؟» فلا يجد حركة. وحركة `COUNT` تحمل
+        الفرق ومن اعتمده ومتى.
+
+    ⚠️  والأسطر بلا فرق **لا تُنتج حركة**.
+
+        حركة بصفر لكل صنف في المخزن تُغرق السجل بآلاف الصفوف
+        عديمة المعنى، فيصير البحث عن فرق حقيقي مستحيلًا.
+    """
+    if count.status != StockCountStatus.IN_PROGRESS:
+        raise BusinessError(ErrorCode.CONFLICT, detail="لا يُعتمد إلا جرد جارٍ", status_code=409)
+
+    adjusted = 0
+    surplus = 0
+    shortage = 0
+
+    for line in count.lines.select_related("product", "variant"):
+        variance = line.variance
+        if variance == 0:
+            continue
+
+        stock = _locked_stock(line.product, count.location, line.variant)
+
+        Stock.objects.filter(pk=stock.pk).update(
+            quantity_physical=F("quantity_physical") + variance
+        )
+        stock.refresh_from_db()
+
+        _record_movement(
+            stock=stock,
+            movement_type=MovementType.COUNT,
+            quantity=abs(variance),
+            note=(
+                f"جرد {count.reference}: "
+                f"متوقَّع {line.expected_quantity} · معدود {line.counted_quantity}"
+            ),
+            reference_type="stock_count",
+            reference_id=str(count.pk),
+            performed_by=actor,
+        )
+
+        adjusted += 1
+        if variance > 0:
+            surplus += variance
+        else:
+            shortage += abs(variance)
+
+        check_alerts(line.product, count.location)
+
+    count.status = StockCountStatus.COMPLETED
+    count.completed_at = timezone.now()
+    count.save(update_fields=["status", "completed_at", "updated_at"])
+
+    return {"adjusted": adjusted, "surplus": surplus, "shortage": shortage}
+
+
+@transaction.atomic
+def cancel_count(count: StockCount, *, reason: str) -> StockCount:
+    """
+    ⚠️  الإلغاء **لا يمسّ المخزون** — الجلسة لم تُعتمد بعد.
+
+        والمكتمل لا يُلغى: فروقه صارت حركات مسجَّلة، وإلغاؤه يترك
+        رصيدًا معدَّلًا بجلسة تقول إنها ملغاة.
+    """
+    if count.status == StockCountStatus.COMPLETED:
+        raise BusinessError(
+            ErrorCode.CONFLICT,
+            detail="الجرد مكتمل — التصحيح بجرد جديد لا بإلغاء",
+            status_code=409,
+        )
+
+    count.status = StockCountStatus.CANCELLED
+    count.note = f"{count.note}\n— أُلغي: {reason}".strip()
+    count.save(update_fields=["status", "note", "updated_at"])
+    return count
 
 
 @transaction.atomic
