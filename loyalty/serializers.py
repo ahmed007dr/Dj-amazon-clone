@@ -172,7 +172,7 @@ class AdminPointsEntrySerializer(PointsEntrySerializer):
     )
 
     class Meta(PointsEntrySerializer.Meta):
-        fields = PointsEntrySerializer.Meta.fields + ["customer_name", "recorded_by_name"]
+        fields = [*PointsEntrySerializer.Meta.fields, "customer_name", "recorded_by_name"]
         read_only_fields = fields
 
 

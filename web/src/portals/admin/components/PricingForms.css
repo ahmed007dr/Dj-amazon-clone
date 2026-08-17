@@ -141,3 +141,82 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
 }
+
+/* ── أهداف الفريق دفعةً ─────────────────────────── */
+.bulk-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-block-size: 18rem;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.bulk-list li {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.bulk-list input {
+  inline-size: 8rem;
+  min-block-size: var(--touch-target);
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  text-align: end;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ── قواعد العمولة ──────────────────────────────── */
+.schemes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.schemes__head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.schemes__head h3 {
+  margin: 0;
+  font-size: 1.0625rem;
+}
+
+.schemes__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.schemes__list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.schemes__list code {
+  margin-inline-start: var(--space-2);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}

@@ -1,0 +1,78 @@
+.moderation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0;
+  margin: var(--space-4) 0 0;
+  list-style: none;
+}
+
+/* ⚠️  بطاقة لا صف جدول: القرار يُتخذ على نص يُقرأ كاملًا، والجدول
+       يقصّه إلى سطر فيصير الاعتماد ضغطًا بلا قراءة. */
+.moderation__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.moderation__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.moderation__date {
+  margin-inline-start: auto;
+  font-size: 0.8125rem;
+}
+
+.moderation__product {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.moderation__title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.moderation__body {
+  margin: 0;
+  color: var(--color-text);
+  /* النص كاملًا — بلا قصّ ولا ارتفاع أقصى */
+  white-space: pre-wrap;
+}
+
+.moderation__reason {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border-inline-start: 3px solid var(--color-danger);
+  border-radius: var(--radius-sm);
+}
+
+.moderation__actions {
+  display: flex;
+  gap: var(--space-2);
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.moderation__reason-input {
+  inline-size: 100%;
+  margin-block-start: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}

@@ -37,6 +37,10 @@ urlpatterns = [
     ),
     # ── الأدمن: الدفاتر ────────────────────────────────────
     path("admin/points/", api.AdminPointsListAPI.as_view(), name="admin-points"),
+    path("admin/expire/", api.ExpirePointsAPI.as_view(), name="expire"),
+    # ⚠️  قبل `customers/<uuid:pk>/` عمدًا: المسارات الثابتة تسبق
+    #     المتغيّرة وإلا التقط `<uuid:pk>` ما ليس معرّفًا.
+    path("admin/customers/", api.CustomerLookupAPI.as_view(), name="customer-lookup"),
     path(
         "admin/customers/<uuid:pk>/adjust/",
         api.AdjustPointsAPI.as_view(),

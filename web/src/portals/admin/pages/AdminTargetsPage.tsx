@@ -12,7 +12,13 @@ import {
   type MonthlyTarget,
 } from '@/features/targets/api';
 import { isApiError } from '@/shared/http/errors';
+import {
+  BulkTargetsForm,
+  SchemesPanel,
+  TargetEditForm,
+} from '@/portals/admin/components/TargetsAdminPanel';
 import { PageHeader } from '@/shared/layouts/PageHeader';
+import { Drawer } from '@/shared/ui/Drawer';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
 import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
@@ -23,7 +29,7 @@ import { useToast } from '@/shared/ui/useToast';
 
 import './AdminTargetsPage.css';
 
-type Tab = 'targets' | 'commissions';
+type Tab = 'targets' | 'commissions' | 'schemes';
 
 const TARGET_TONE: Record<string, 'info' | 'success' | 'neutral'> = {
   DRAFT: 'info',
@@ -53,6 +59,8 @@ export function AdminTargetsPage() {
 
   const today = new Date();
   const [tab, setTab] = useState<Tab>('targets');
+  const [editingTarget, setEditingTarget] = useState<MonthlyTarget | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [page, setPage] = useState(1);
@@ -245,7 +253,10 @@ export function AdminTargetsPage() {
 
   return (
     <>
-      <PageHeader title={t('targets.title')} />
+      <PageHeader
+        title={t('targets.title')}
+        actions={<Button onClick={() => setBulkOpen(true)}>{t('targets.bulkTitle')}</Button>}
+      />
 
       <div className="target-period">
         <label>
@@ -335,7 +346,18 @@ export function AdminTargetsPage() {
         >
           {t('targets.commissionsTab')}
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'schemes'}
+          className={tab === 'schemes' ? 'is-active' : ''}
+          onClick={() => setTab('schemes')}
+        >
+          {t('targets.schemesTab')}
+        </button>
       </div>
+
+      {tab === 'schemes' ? <SchemesPanel /> : null}
 
       {tab === 'targets' ? (
         <>
@@ -371,6 +393,25 @@ export function AdminTargetsPage() {
           ) : null}
         </>
       )}
+
+      <Drawer
+        open={bulkOpen || editingTarget !== null}
+        onClose={() => {
+          setBulkOpen(false);
+          setEditingTarget(null);
+        }}
+        title={editingTarget ? t('targets.editTarget') : t('targets.bulkTitle')}
+      >
+        {editingTarget ? (
+          <TargetEditForm
+            key={editingTarget.id}
+            target={editingTarget}
+            onDone={() => setEditingTarget(null)}
+          />
+        ) : bulkOpen ? (
+          <BulkTargetsForm year={year} month={month} onDone={() => setBulkOpen(false)} />
+        ) : null}
+      </Drawer>
     </>
   );
 }

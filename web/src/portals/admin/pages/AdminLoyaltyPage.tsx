@@ -4,11 +4,12 @@ import { useTranslation } from 'react-i18next';
 import {
   useAdminPoints,
   useAdminReferrals,
+  useExpirePoints,
   useLoyaltyOverview,
   useLoyaltyPrograms,
   useReferralPrograms,
-  useSaveReferralProgram,
   type AdminPointsEntry,
+  type PointsKind,
   type Referral,
 } from '@/features/loyalty/api';
 import { isApiError } from '@/shared/http/errors';
@@ -21,10 +22,25 @@ import { StatCard } from '@/shared/ui/StatCard';
 import { StateMessage } from '@/shared/ui/StateMessage';
 import { useToast } from '@/shared/ui/useToast';
 import { LoyaltyProgramCard } from '@/portals/admin/components/LoyaltyProgramCard';
+import { NewProgramForm } from '@/portals/admin/components/NewProgramForm';
+import { PointsAdjustPanel } from '@/portals/admin/components/PointsAdjustPanel';
+import { ReferralProgramCard } from '@/portals/admin/components/ReferralProgramCard';
 
 import './AdminLoyaltyPage.css';
 
 type Tab = 'programs' | 'referral' | 'ledger';
+
+const LEDGER_KINDS: PointsKind[] = [
+  'EARN',
+  'REDEEM',
+  'REFERRAL',
+  'EXPIRE',
+  'REVERSE',
+  'ADJUSTMENT',
+  'DEDUCTION',
+];
+
+const REFERRAL_STATUSES = ['PENDING', 'REWARDED', 'REJECTED'] as const;
 
 const KIND_TONE: Record<string, 'success' | 'danger' | 'neutral' | 'info'> = {
   EARN: 'success',
@@ -57,14 +73,17 @@ export function AdminLoyaltyPage() {
 
   const [tab, setTab] = useState<Tab>('programs');
   const [page, setPage] = useState(1);
+  const [creating, setCreating] = useState(false);
+  const [kindFilter, setKindFilter] = useState('');
+  const [referralStatus, setReferralStatus] = useState('');
 
   const overview = useLoyaltyOverview();
   const programs = useLoyaltyPrograms();
   const referralPrograms = useReferralPrograms();
-  const referrals = useAdminReferrals();
-  const entries = useAdminPoints({ page });
+  const referrals = useAdminReferrals(referralStatus || undefined);
+  const entries = useAdminPoints({ page, ...(kindFilter ? { kind: kindFilter } : {}) });
 
-  const saveReferral = useSaveReferralProgram();
+  const expire = useExpirePoints();
 
   const fail = (error: unknown) =>
     notify(isApiError(error) ? error.displayMessage : t('state.errorTitle'), 'danger');
@@ -146,7 +165,7 @@ export function AdminLoyaltyPage() {
 
   return (
     <>
-      <PageHeader title={t('loyalty.title')} subtitle={t('loyalty.subtitle')} />
+      <PageHeader title={t('loyalty.title')} description={t('loyalty.subtitle')} />
 
       <div className="loyalty-stats">
         <StatCard
@@ -193,73 +212,92 @@ export function AdminLoyaltyPage() {
       </div>
 
       {tab === 'programs' ? (
-        programs.isPending ? (
-          <StateMessage icon="⏳" title={t('state.loading')} />
-        ) : programs.data && programs.data.results.length > 0 ? (
-          <div className="loyalty-programs">
-            {programs.data.results.map((program) => (
-              <LoyaltyProgramCard key={program.id} program={program} />
-            ))}
+        <>
+          <div className="loyalty-toolbar">
+            {!creating ? (
+              <Button size="sm" onClick={() => setCreating(true)}>
+                {t('loyalty.newProgram')}
+              </Button>
+            ) : null}
+
+            {/* ⚠️  إسقاط المنتهية زرّ لا مجرّد مهمة ليلية.
+                من يُقفل الشهر يحتاج أن يرى الالتزام بعد الإسقاط
+                لا قبله — وانتظار منتصف الليل ليس خيارًا وقتها. */}
+            <Button
+              size="sm"
+              variant="ghost"
+              loading={expire.isPending}
+              onClick={() => {
+                if (!window.confirm(t('loyalty.confirmExpire'))) return;
+                expire.mutate(undefined, {
+                  onSuccess: (data) =>
+                    notify(
+                      data.batches > 0
+                        ? t('loyalty.expired', { points: data.points, batches: data.batches })
+                        : t('loyalty.nothingExpired'),
+                      'success',
+                    ),
+                  onError: fail,
+                });
+              }}
+            >
+              {t('loyalty.expireNow')}
+            </Button>
           </div>
-        ) : (
-          <StateMessage
-            icon="🎁"
-            title={t('loyalty.noPrograms')}
-            body={t('loyalty.noProgramsBody')}
-          />
-        )
+
+          {creating ? (
+            <div className="loyalty-programs">
+              <NewProgramForm kind="loyalty" onDone={() => setCreating(false)} />
+            </div>
+          ) : null}
+
+          {programs.isPending ? (
+            <StateMessage icon="⏳" title={t('state.loading')} />
+          ) : programs.data && programs.data.results.length > 0 ? (
+            <div className="loyalty-programs">
+              {programs.data.results.map((program) => (
+                <LoyaltyProgramCard key={program.id} program={program} />
+              ))}
+            </div>
+          ) : !creating ? (
+            <StateMessage
+              icon="🎁"
+              title={t('loyalty.noPrograms')}
+              body={t('loyalty.noProgramsBody')}
+            />
+          ) : null}
+        </>
       ) : null}
 
       {tab === 'referral' ? (
         <div className="loyalty-referral">
-          {referralPrograms.data?.results.map((program) => (
-            <article key={program.id} className="surface loyalty-referral__card">
-              <header>
-                <h3>{program.name_ar}</h3>
-                {/* ⚠️  نفس المفتاح ونفس المكان في البطاقتين: مكانان
-                    مختلفان لنفس القرار يجعل الأدمن يبحث في كل مرة. */}
-                <label className="loyalty-switch">
-                  <input
-                    type="checkbox"
-                    checked={program.is_active}
-                    disabled={saveReferral.isPending}
-                    onChange={(event) =>
-                      saveReferral.mutate(
-                        { id: program.id, is_active: event.target.checked },
-                        { onError: fail },
-                      )
-                    }
-                  />
-                  <span className="loyalty-switch__track" aria-hidden />
-                  <span className="loyalty-switch__text">
-                    {program.is_active ? t('loyalty.on') : t('loyalty.off')}
-                  </span>
-                </label>
-              </header>
+          <div className="loyalty-toolbar">
+            {!creating ? (
+              <Button size="sm" onClick={() => setCreating(true)}>
+                {t('loyalty.newReferralProgram')}
+              </Button>
+            ) : null}
 
-              <dl className="loyalty-program__facts">
-                <div>
-                  <dt>{t('loyalty.referrerPoints')}</dt>
-                  <dd dir="ltr">{program.referrer_points}</dd>
-                </div>
-                <div>
-                  <dt>{t('loyalty.refereePoints')}</dt>
-                  <dd dir="ltr">{program.referee_points}</dd>
-                </div>
-                <div>
-                  <dt>{t('loyalty.minOrder')}</dt>
-                  <dd dir="ltr">{program.min_order_amount}</dd>
-                </div>
-                <div>
-                  <dt>{t('loyalty.referralCap')}</dt>
-                  <dd dir="ltr">
-                    {program.max_referrals_per_user > 0
-                      ? program.max_referrals_per_user
-                      : t('loyalty.noCap')}
-                  </dd>
-                </div>
-              </dl>
-            </article>
+            <label className="loyalty-filter">
+              {t('admin.status')}
+              <select
+                value={referralStatus}
+                onChange={(event) => setReferralStatus(event.target.value)}
+              >
+                <option value="">{t('loyalty.allStatuses')}</option>
+                {REFERRAL_STATUSES.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`loyalty.referralStatus.${value}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {creating ? <NewProgramForm kind="referral" onDone={() => setCreating(false)} /> : null}
+
+          {referralPrograms.data?.results.map((program) => (
+            <ReferralProgramCard key={program.id} program={program} />
           ))}
 
           <DataTable
@@ -275,6 +313,31 @@ export function AdminLoyaltyPage() {
 
       {tab === 'ledger' ? (
         <>
+          <PointsAdjustPanel />
+
+          <div className="loyalty-toolbar">
+            <label className="loyalty-filter">
+              {t('loyalty.kind')}
+              <select
+                value={kindFilter}
+                onChange={(event) => {
+                  setKindFilter(event.target.value);
+                  // ⚠️  العودة للصفحة الأولى مع كل ترشيح: البقاء
+                  //     على صفحة ٧ بعد ترشيح يعطي جدولًا فارغًا
+                  //     يُقرأ «لا نتائج» وهي نتائج موجودة.
+                  setPage(1);
+                }}
+              >
+                <option value="">{t('loyalty.allKinds')}</option>
+                {LEDGER_KINDS.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`loyalty.pointsKind.${value}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
           <DataTable
             columns={entryColumns}
             rows={entries.data?.results ?? []}

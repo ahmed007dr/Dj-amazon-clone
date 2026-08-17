@@ -197,3 +197,75 @@ export function useEmployeePerformance(id: string | null) {
     enabled: id !== null,
   });
 }
+
+// ═══════════════════════════════════════════════════════════
+//  الأدوار وتعديل الملفات
+// ═══════════════════════════════════════════════════════════
+
+export interface EmployeeRole {
+  id: string;
+  code: string;
+  kind: string;
+  name_ar: string;
+  name_en: string;
+  is_active: boolean;
+  permission_count: number;
+}
+
+export function useEmployeeRoles(enabled = true) {
+  return useQuery({
+    queryKey: ['admin', 'employee-roles'],
+    queryFn: () => http.get<EmployeeRole[]>('/employees/admin/roles/'),
+    enabled,
+  });
+}
+
+function useStaffMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: run,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'staff'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'employee-roles'] });
+    },
+  });
+}
+
+/**
+ * ⚠️  **الصلاحيات على الدور لا على الشخص.**
+ *
+ *     منحها فردًا يجعل كل موظف جديد يحتاج ضبطًا يدويًا، وأول
+ *     منسيّ يبقى بلا صلاحية أو بأكثر مما يجب. ولذلك تُنشأ الأدوار
+ *     هنا وتُسنَد الصلاحيات إليها.
+ */
+export function useCreateRole() {
+  return useStaffMutation((body: Record<string, unknown>) =>
+    http.post<EmployeeRole>('/employees/admin/roles/', body),
+  );
+}
+
+export function useUpdateEmployee() {
+  return useStaffMutation(({ id, body }: { id: string; body: Record<string, unknown> }) =>
+    http.patch(`/employees/admin/staff/${id}/`, body),
+  );
+}
+
+/**
+ * إنهاء إسناد عميل.
+ *
+ * ⚠️  الإسناد كان يُنشأ ولا يُنهى: مندوب يترك العمل وعملاؤه معلّقون
+ *     به — فلا يظهرون لأحد ولا يُسنَدون لغيره.
+ */
+export function useEndAssignment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (customerId: string) =>
+      http.post(`/employees/admin/assignments/${customerId}/end/`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'staff'] });
+      void queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
+  });
+}

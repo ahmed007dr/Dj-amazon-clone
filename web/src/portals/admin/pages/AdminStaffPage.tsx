@@ -11,7 +11,12 @@ import {
 import { isApiError } from '@/shared/http/errors';
 import { useDebounced } from '@/shared/hooks/useDebounced';
 import { useLocalized } from '@/shared/i18n/useLocalized';
+import {
+  EmployeeEditForm,
+  RolesPanel,
+} from '@/portals/admin/components/StaffAdminPanel';
 import { PageHeader } from '@/shared/layouts/PageHeader';
+import { Drawer } from '@/shared/ui/Drawer';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
 import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
@@ -23,7 +28,7 @@ import { useToast } from '@/shared/ui/useToast';
 
 import './AdminStaffPage.css';
 
-type Tab = 'staff' | 'unassigned';
+type Tab = 'staff' | 'unassigned' | 'roles';
 
 /**
  * الموظفون وإسناد العملاء.
@@ -40,6 +45,7 @@ export function AdminStaffPage() {
   const { notify } = useToast();
 
   const [tab, setTab] = useState<Tab>('staff');
+  const [editing, setEditing] = useState<EmployeeProfile | null>(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [assignTo, setAssignTo] = useState('');
@@ -97,6 +103,16 @@ export function AdminStaffPage() {
           //     عملاءه يبدون بلا مسؤول بلا تفسير.
           <Badge tone="danger">{t('staff.offDuty')}</Badge>
         ),
+    },
+    {
+      key: 'actions',
+      header: t('admin.actions'),
+      align: 'end',
+      render: (row) => (
+        <Button size="sm" variant="ghost" onClick={() => setEditing(row)}>
+          {t('common.edit')}
+        </Button>
+      ),
     },
   ];
 
@@ -184,7 +200,18 @@ export function AdminStaffPage() {
             <span className="staff-tabs__count">{unassigned.data.count}</span>
           ) : null}
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'roles'}
+          className={tab === 'roles' ? 'is-active' : ''}
+          onClick={() => setTab('roles')}
+        >
+          {t('staff.roles')}
+        </button>
       </div>
+
+      {tab === 'roles' ? <RolesPanel /> : null}
 
       {tab === 'staff' ? (
         <>
@@ -253,6 +280,20 @@ export function AdminStaffPage() {
           ) : null}
         </>
       )}
+
+      <Drawer
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        title={editing?.full_name ?? ''}
+      >
+        {editing ? (
+          <EmployeeEditForm
+            key={editing.id}
+            employee={editing}
+            onDone={() => setEditing(null)}
+          />
+        ) : null}
+      </Drawer>
     </>
   );
 }

@@ -5,8 +5,12 @@ import { useTranslation } from 'react-i18next';
 import {
   listProviders,
   toggleProvider,
+  useDeleteProvider,
+  useReorderProviders,
   type PaymentProvider,
 } from '@/features/payments/adminApi';
+import { ProviderForm } from '@/portals/admin/components/ProviderForm';
+import { Drawer } from '@/shared/ui/Drawer';
 import { isApiError } from '@/shared/http';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { TransactionsPanel } from '@/portals/admin/components/TransactionsPanel';
@@ -37,6 +41,11 @@ export function AdminPaymentsPage() {
   const [reasons, setReasons] = useState<Record<string, string>>({});
 
   const [tab, setTab] = useState<'providers' | 'transactions'>('providers');
+  const [editing, setEditing] = useState<PaymentProvider | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const removeProvider = useDeleteProvider();
+  const reorder = useReorderProviders();
 
   const providers = useQuery({ queryKey: KEY, queryFn: listProviders });
 
@@ -63,7 +72,15 @@ export function AdminPaymentsPage() {
 
   return (
     <>
-      <PageHeader title={t('nav.payments')} description={t('admin.gatewaysHint')} />
+      <PageHeader
+        title={t('nav.payments')}
+        description={t('admin.gatewaysHint')}
+        actions={
+          tab === 'providers' ? (
+            <Button onClick={() => setCreating(true)}>{t('admin.newGateway')}</Button>
+          ) : null
+        }
+      />
 
       <StatusTabs
         options={[
@@ -83,7 +100,7 @@ export function AdminPaymentsPage() {
       ) : null}
 
       <div className="gateways">
-        {providers.data?.map((provider) => (
+        {providers.data?.map((provider, index) => (
           <GatewayCard
             key={provider.id}
             provider={provider}
@@ -100,11 +117,64 @@ export function AdminPaymentsPage() {
             }}
             pending={toggle.isPending}
             localized={localized}
+            onEdit={() => setEditing(provider)}
+            onDelete={() =>
+              removeProvider.mutate(provider.id, {
+                onSuccess: () => notify(t('admin.gatewayDeleted'), 'success'),
+                onError: (cause) =>
+                  notify(
+                    isApiError(cause) ? cause.displayMessage : t('state.errorTitle'),
+                    'danger',
+                  ),
+              })
+            }
+            {...(index > 0
+              ? {
+                  onMoveUp: () => {
+                    // ⚠️  الترتيب يُرسَل **كاملًا** لا موضعًا واحدًا:
+                    //     الخادم يعيد ترقيم الأولويات من القائمة، وإرسال
+                    //     تبديل جزئي يترك فجوات تتراكم حتى تتساوى بوابتان.
+                    const order = (providers.data ?? []).map((row) => row.id);
+                    const above = order[index - 1];
+                    const current = order[index];
+                    if (above === undefined || current === undefined) return;
+                    order[index - 1] = current;
+                    order[index] = above;
+                    reorder.mutate(order, {
+                      onError: (cause) =>
+                        notify(
+                          isApiError(cause) ? cause.displayMessage : t('state.errorTitle'),
+                          'danger',
+                        ),
+                    });
+                  },
+                }
+              : {})}
           />
         ))}
       </div>
       </>
       )}
+
+      <Drawer
+        open={creating || editing !== null}
+        onClose={() => {
+          setCreating(false);
+          setEditing(null);
+        }}
+        title={editing ? localized(editing, 'name') : t('admin.newGateway')}
+      >
+        {creating || editing ? (
+          <ProviderForm
+            key={editing?.id ?? 'new'}
+            {...(editing ? { provider: editing } : {})}
+            onDone={() => {
+              setCreating(false);
+              setEditing(null);
+            }}
+          />
+        ) : null}
+      </Drawer>
     </>
   );
 }
@@ -116,6 +186,9 @@ function GatewayCard({
   onToggle,
   pending,
   localized,
+  onEdit,
+  onDelete,
+  onMoveUp,
 }: {
   provider: PaymentProvider;
   reason: string;
@@ -123,6 +196,10 @@ function GatewayCard({
   onToggle: () => void;
   pending: boolean;
   localized: (source: object, field: string) => string;
+  onEdit: () => void;
+  onDelete: () => void;
+  /** غائب على الأولى — لا شيء فوقها لترتفع إليه */
+  onMoveUp?: () => void;
 }) {
   const { t } = useTranslation();
 
@@ -138,11 +215,19 @@ function GatewayCard({
           <code className="gateway__code muted">{provider.code}</code>
         </div>
 
-        {provider.is_active ? (
-          <Badge tone="success">{t('admin.enabled')}</Badge>
-        ) : (
-          <Badge tone="neutral">{t('admin.disabled')}</Badge>
-        )}
+        <div className="gateway__badges">
+          {provider.is_active ? (
+            <Badge tone="success">{t('admin.enabled')}</Badge>
+          ) : (
+            <Badge tone="neutral">{t('admin.disabled')}</Badge>
+          )}
+
+          {/* ⚠️  الأولوية ظاهرة: هي التي تحدد أي بوابة تُجرَّب أولًا
+              حين تصلح أكثر من واحدة — والقرار يوجّه المال. */}
+          <span className="gateway__priority muted">
+            {t('admin.priority')}: {provider.priority}
+          </span>
+        </div>
       </header>
 
       <dl className="gateway__facts">
@@ -199,6 +284,27 @@ function GatewayCard({
           </Button>
         </div>
       )}
+
+      <footer className="gateway__manage">
+        {onMoveUp ? (
+          <Button size="sm" variant="ghost" onClick={onMoveUp}>
+            ↑ {t('admin.raisePriority')}
+          </Button>
+        ) : null}
+
+        <Button size="sm" variant="ghost" onClick={onEdit}>
+          {t('common.edit')}
+        </Button>
+
+        {/* ⚠️  الحذف يظهر للموقوفة وحدها: الخادم يرفض حذف بوابة ذات
+            معاملات، والمفعّلة تُوقَف أولًا — وزر يُرفض عند الضغط
+            تجربة سيئة. */}
+        {!provider.is_active ? (
+          <Button size="sm" variant="ghost" onClick={onDelete}>
+            {t('common.delete')}
+          </Button>
+        ) : null}
+      </footer>
     </article>
   );
 }

@@ -9,6 +9,7 @@ import { TradeAccountPage } from '@/portals/account/pages/TradeAccountPage';
 import { AddressesPage } from '@/portals/account/pages/AddressesPage';
 import { DocumentsPage } from '@/portals/account/pages/DocumentsPage';
 import { NotificationsPage } from '@/portals/account/pages/NotificationsPage';
+import { LoyaltyPage } from '@/portals/account/pages/LoyaltyPage';
 import { ProfilePage } from '@/portals/account/pages/ProfilePage';
 import { SecurityPage } from '@/portals/account/pages/SecurityPage';
 import { NotFoundPage } from '@/portals/store/pages/NotFoundPage';
@@ -79,6 +80,11 @@ const AdminReferencePage = lazy(() =>
     default: module.AdminReferencePage,
   })),
 );
+const AdminReviewsPage = lazy(() =>
+  import('@/portals/admin/pages/AdminReviewsPage').then((module) => ({
+    default: module.AdminReviewsPage,
+  })),
+);
 const AdminPricingPage = lazy(() =>
   import('@/portals/admin/pages/AdminPricingPage').then((module) => ({
     default: module.AdminPricingPage,
@@ -147,6 +153,12 @@ const AdminReportsPage = lazy(() =>
     default: module.AdminReportsPage,
   })),
 );
+const AdminLoyaltyPage = lazy(() =>
+  import('@/portals/admin/pages/AdminLoyaltyPage').then((module) => ({
+    default: module.AdminLoyaltyPage,
+  })),
+);
+
 const AdminTargetsPage = lazy(() =>
   import('@/portals/admin/pages/AdminTargetsPage').then((module) => ({
     default: module.AdminTargetsPage,
@@ -263,6 +275,10 @@ const router = createBrowserRouter([
           //     «لا ملف تجاري» لغير التجاري. إخفاء المسار كان
           //     يجعل رابطًا مُشارَكًا يعطي «غير موجودة».
           { path: 'trade', element: <TradeAccountPage /> },
+          // ⚠️  المسار موجود لكل حساب؛ والشاشة تقول «غير متاح»
+          //     لمن لا يشمله البرنامج. إخفاء المسار كان يجعل
+          //     رابطًا مُشارَكًا يعطي «غير موجودة» بدل تفسير.
+          { path: 'loyalty', element: <LoyaltyPage /> },
           { path: 'notifications', element: <NotificationsPage /> },
           { path: 'security', element: <SecurityPage /> },
         ],
@@ -294,6 +310,7 @@ const router = createBrowserRouter([
       { path: 'users', element: <Lazy><AdminAccountsPage /></Lazy> },
       { path: 'reference', element: <Lazy><AdminReferencePage /></Lazy> },
       { path: 'pricing', element: <Lazy><AdminPricingPage /></Lazy> },
+      { path: 'reviews', element: <Lazy><AdminReviewsPage /></Lazy> },
       { path: 'settings', element: <Lazy><AdminSettingsPage /></Lazy> },
       { path: 'tax', element: <Lazy><AdminTaxPage /></Lazy> },
       { path: 'payments', element: <Lazy><AdminPaymentsPage /></Lazy> },
@@ -303,6 +320,7 @@ const router = createBrowserRouter([
       { path: 'businesses', element: <Lazy><AdminBusinessesPage /></Lazy> },
       { path: 'staff', element: <Lazy><AdminStaffPage /></Lazy> },
       { path: 'targets', element: <Lazy><AdminTargetsPage /></Lazy> },
+      { path: 'loyalty', element: <Lazy><AdminLoyaltyPage /></Lazy> },
       { path: 'reports', element: <Lazy><AdminReportsPage /></Lazy> },
       { path: 'suppliers', element: <Lazy><AdminSuppliersPage /></Lazy> },
       { path: 'branding', element: <Lazy><AdminBrandingPage /></Lazy> },

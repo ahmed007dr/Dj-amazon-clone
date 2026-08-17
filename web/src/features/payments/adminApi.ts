@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { PagedResponse } from '@/features/orders/adminApi';
 import { http } from '@/shared/http';
@@ -171,5 +171,79 @@ export function useRefundTransaction() {
         ...(amount ? { amount } : {}),
         reason,
       }),
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+//  إدارة البوابات — إنشاء وتعديل وترتيب
+// ═══════════════════════════════════════════════════════════
+
+export interface AdapterOptions {
+  /** أسماء المحوّلات المسجّلة في الكود — الأدمن يختار منها */
+  adapters: string[];
+  methods: { value: string; label_ar: string }[];
+}
+
+/**
+ * ⚠️  المحوّل **كود لا بيانات**: إضافة بوابة تعني اختيار محوّل
+ *     موجود، لا كتابة اسم. واسم غير مسجّل يُنتج بوابة تفشل عند
+ *     أول عملية شراء.
+ */
+export function useAdapterOptions(enabled = true) {
+  return useQuery({
+    queryKey: ['admin', 'payment-adapters'],
+    queryFn: () => http.get<AdapterOptions>('/payments/admin/adapters/'),
+    staleTime: 30 * 60 * 1000,
+    enabled,
+  });
+}
+
+function useProviderMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: run,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] }),
+  });
+}
+
+export function useSaveProvider() {
+  return useProviderMutation(({ id, body }: { id?: string; body: Record<string, unknown> }) =>
+    id
+      ? http.patch<PaymentProvider>(`/payments/admin/providers/${id}/`, body)
+      : http.post<PaymentProvider>('/payments/admin/providers/', body),
+  );
+}
+
+/**
+ * ⚠️  الخادم يردّ ٤٠٩ للبوابة ذات المعاملات.
+ *
+ *     حذفها يترك معاملات تاريخية بلا مرجع، فينكسر كل تقرير مالي
+ *     سابق. والإيقاف هو البديل.
+ */
+export function useDeleteProvider() {
+  return useProviderMutation((id: string) =>
+    http.delete<void>(`/payments/admin/providers/${id}/`),
+  );
+}
+
+/**
+ * إعادة ترتيب الأولوية.
+ *
+ * ⚠️  الترتيب يحدد **أي بوابة تُجرَّب أولًا** حين تصلح أكثر من واحدة
+ *     لنفس العملية — وهو القرار الذي يوجّه المال إلى بوابة بعينها.
+ */
+export function useReorderProviders() {
+  return useProviderMutation((order: string[]) =>
+    http.post<PaymentProvider[]>('/payments/admin/providers/reorder/', { order }),
+  );
+}
+
+export function useDeleteCredential() {
+  return useProviderMutation(
+    ({ providerId, credentialId }: { providerId: string; credentialId: string }) =>
+      http.delete<void>(
+        `/payments/admin/providers/${providerId}/credentials/${credentialId}/`,
+      ),
   );
 }

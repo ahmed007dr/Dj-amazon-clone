@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
@@ -247,7 +248,23 @@ class LoyaltyProgramListCreateAPI(generics.ListCreateAPIView):
     queryset = LoyaltyProgram.objects.prefetch_related("tiers")
 
 
-class LoyaltyProgramDetailAPI(generics.RetrieveUpdateAPIView):
+def _refuse_delete_with_history(instance, entries) -> None:
+    """
+    ⚠️  **البرنامج الذي مُنحت منه نقاط لا يُحذف — يُوقَف.**
+
+        الحذف يترك حركات في الدفتر تشير إلى برنامج غير موجود، فلا
+        يُقرأ كشف عميل قديم ولا تُعرَف قيمة نقطته. والإيقاف يفعل
+        كل ما يريده الأدمن فعلًا: يمنع الكسب الجديد ويُبقي التاريخ.
+    """
+    if entries.exists():
+        raise BusinessError(
+            ErrorCode.CONFLICT,
+            detail="لا يُحذف برنامج مُنحت منه نقاط — أوقفه بدلًا من ذلك",
+            status_code=409,
+        )
+
+
+class LoyaltyProgramDetailAPI(generics.RetrieveUpdateDestroyAPIView):
     """
     ⚠️  **التفعيل والإيقاف يُدوَّنان في سجل التدقيق.**
 
@@ -277,6 +294,10 @@ class LoyaltyProgramDetailAPI(generics.RetrieveUpdateAPIView):
                 },
             )
 
+    def perform_destroy(self, instance):
+        _refuse_delete_with_history(instance, PointsEntry.objects.filter(program=instance))
+        instance.delete()
+
 
 class TierListCreateAPI(generics.ListCreateAPIView):
     permission_classes = [CanManageLoyalty]
@@ -301,10 +322,14 @@ class ReferralProgramListCreateAPI(generics.ListCreateAPIView):
     queryset = ReferralProgram.objects.all()
 
 
-class ReferralProgramDetailAPI(generics.RetrieveUpdateAPIView):
+class ReferralProgramDetailAPI(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [CanManageLoyalty]
     serializer_class = s.ReferralProgramSerializer
     queryset = ReferralProgram.objects.all()
+
+    def perform_destroy(self, instance):
+        _refuse_delete_with_history(instance, Referral.objects.filter(program=instance))
+        instance.delete()
 
 
 class TargetingOptionsAPI(APIView):
@@ -354,6 +379,85 @@ class AdminPointsListAPI(generics.ListAPIView):
         if value := params.get("kind"):
             queryset = queryset.filter(kind=value)
         return queryset
+
+
+class CustomerLookupAPI(APIView):
+    """
+    بحث عن عميل **برصيده**.
+
+    ⚠️  **الرصيد جزء من نتيجة البحث لا شاشة تالية.**
+
+        من يسجّل تسوية يحتاج أن يرى ما لدى العميل قبل أن يكتب
+        الرقم: سحب ١٠٠ من رصيد ٣٠ يُقصّ صامتًا إلى ٣٠، فيظن
+        الأدمن أنه سحب ما نوى.
+
+    ⚠️  و**الحد عشرة**: البحث للاختيار لا للتصفّح، وقائمة طويلة
+        في لوح ضيّق تُبطئ ولا تفيد.
+    """
+
+    permission_classes = [CanAdjustPoints]
+
+    def get(self, request):
+        from customers.models import CustomerProfile
+
+        term = (request.query_params.get("search") or "").strip()
+        if len(term) < 2:
+            return Response([])
+
+        rows = CustomerProfile.objects.filter(
+            Q(display_name_ar__icontains=term)
+            | Q(display_name_en__icontains=term)
+            | Q(customer_number__icontains=term)
+            | Q(user__email__icontains=term)
+            | Q(user__phone__icontains=term)
+        ).select_related("user")[:10]
+
+        return Response(
+            [
+                {
+                    "id": str(row.pk),
+                    "customer_number": row.customer_number,
+                    "name": row.display_name_ar or row.user.email,
+                    "email": row.user.email,
+                    "segment": row.segment,
+                    "balance": services.balance(row),
+                    "usable_points": services.usable_points(row),
+                    # ⚠️  «خارج البرنامج» يظهر قبل الكتابة لا بعد
+                    #     الإرسال: التسوية على حساب لا يشمله برنامج
+                    #     تُرفض، وإخفاء ذلك يجعل الرفض يبدو عطلًا.
+                    "covered": services.program_for(row.user, row) is not None,
+                }
+                for row in rows
+            ]
+        )
+
+
+class ExpirePointsAPI(APIView):
+    """
+    إسقاط النقاط المنتهية **الآن**.
+
+    ⚠️  المهمة دورية أصلًا (`run_periodic --job loyalty`)؛ وهذا
+        الزر لمن لم تُجدوَل عنده بعد، أو أراد أن يرى أثرها قبل
+        إقفال الشهر بدل أن ينتظر منتصف الليل.
+
+    ⚠️  وهي **آمنة التكرار**: لا تمسّ إلا دفعات تجاوز تاريخها
+        اليوم، وتسجّل حركة انتهاء بدل الحذف.
+    """
+
+    permission_classes = [CanManageLoyalty]
+
+    def post(self, request):
+        result = services.expire_points()
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditAction.UPDATE,
+            object_repr="إسقاط نقاط منتهية",
+            ip_address=request.META.get("REMOTE_ADDR"),
+            changes=result,
+        )
+
+        return Response(result)
 
 
 class AdjustPointsAPI(APIView):

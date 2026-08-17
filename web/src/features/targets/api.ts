@@ -178,3 +178,85 @@ export function useCommissionDecision() {
       http.post<CommissionRecord>(`/commissions/admin/${id}/decision/`, { decision, reason }),
   );
 }
+
+/**
+ * تعديل هدف قبل تفعيله.
+ *
+ * ⚠️  الهدف المفعَّل يُقاس عليه الأداء منذ لحظة تفعيله؛ وتعديل
+ *     قيمته بعدها يعيد كتابة معيار كان المندوب يعمل عليه. الخادم
+ *     يحرس ذلك، والواجهة تُخفي الزر عن المفعَّل.
+ */
+export function useUpdateTarget() {
+  return useTargetMutation(({ id, body }: { id: string; body: Record<string, unknown> }) =>
+    http.patch<MonthlyTarget>(`/targets/admin/${id}/`, body),
+  );
+}
+
+export interface BulkTargetRow {
+  employee: string;
+  target_value: string;
+  target_type?: string;
+  minimum_achievement_percent?: string;
+  note?: string;
+}
+
+/**
+ * أهداف الفريق دفعة واحدة.
+ *
+ * ⚠️  **الموجود يُتخطّى لا يُكتب فوقه.**
+ *
+ *     إعادة تشغيل الدفعة بعد إضافة موظف جديد يجب أن تُنشئ هدفه
+ *     وحده — والكتابة فوق الموجود تمحو أهدافًا عُدِّلت يدويًا بعد
+ *     الدفعة الأولى.
+ */
+export function useBulkTargets() {
+  return useTargetMutation(
+    (body: { year: number; month: number; rows: BulkTargetRow[] }) =>
+      http.post<{ created: number }>('/targets/admin/bulk/', body),
+  );
+}
+
+// ── قواعد العمولة ──────────────────────────────────────────
+
+export interface CommissionTier {
+  id: string;
+  min_achievement_percent: string;
+  rate_percent: string;
+}
+
+export interface CommissionScheme {
+  id: string;
+  code: string;
+  name_ar: string;
+  name_en: string;
+  /** ما تُحسب عليه النسبة: المبيعات أو الربح */
+  base: string;
+  role: string | null;
+  role_name: string | null;
+  is_active: boolean;
+  note: string;
+  tiers: CommissionTier[];
+}
+
+export function useCommissionSchemes(enabled = true) {
+  return useQuery({
+    queryKey: ['admin', 'commission-schemes'],
+    queryFn: () => http.get<CommissionScheme[]>('/commissions/admin/schemes/'),
+    enabled,
+  });
+}
+
+/**
+ * ⚠️  **قواعد العمولة بيانات لا كود**: «٣٪ فوق ١٠٠٪ تحقيق» قرار
+ *     إداري يتغيّر كل موسم، وتثبيته في الكود يجعل تعديله نشرًا.
+ */
+export function useCreateScheme() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      http.post<CommissionScheme>('/commissions/admin/schemes/', body),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['admin', 'commission-schemes'] }),
+  });
+}

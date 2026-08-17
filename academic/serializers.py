@@ -130,3 +130,169 @@ class CreateStudentProfileSerializer(serializers.Serializer):
     department = serializers.UUIDField(required=False, allow_null=True)
     academic_year = serializers.IntegerField(min_value=1, max_value=10)
     student_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
+
+
+# ═══════════════════════════════════════════════════════════
+#  الأدمن — الشجرة الأكاديمية والحزم
+# ═══════════════════════════════════════════════════════════
+#
+#  ⚠️  الشجرة **شرط لتسجيل أي طالب**: الطالب يختار جامعته وكليته
+#      قبل إنشاء الحساب. وكانت تُدار من لوحة Django وحدها.
+
+
+class AdminUniversitySerializer(serializers.ModelSerializer):
+    faculty_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = University
+        fields = [
+            "id",
+            "slug",
+            "code",
+            "name_ar",
+            "name_en",
+            "city",
+            "governorate",
+            "website",
+            "is_active",
+            "faculty_count",
+        ]
+        read_only_fields = ["id", "slug"]
+
+    def get_faculty_count(self, obj) -> int:
+        return obj.faculties.count()
+
+
+class AdminFacultySerializer(serializers.ModelSerializer):
+    university_name = serializers.CharField(source="university.name_ar", read_only=True)
+    department_count = serializers.SerializerMethodField()
+    student_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Faculty
+        fields = [
+            "id",
+            "slug",
+            "university",
+            "university_name",
+            "code",
+            "name_ar",
+            "name_en",
+            "years_count",
+            "is_active",
+            "department_count",
+            "student_count",
+        ]
+        read_only_fields = ["id", "slug"]
+
+    def get_department_count(self, obj) -> int:
+        return obj.departments.count()
+
+    def get_student_count(self, obj) -> int:
+        return obj.students.count()
+
+    def validate_years_count(self, value):
+        """
+        ⚠️  عدد السنوات يحكم **قوائم الحزم**: حزمة السنة الخامسة في
+            كلية بأربع سنوات لا يراها أحد. والصفر يجعل كل حزمة
+            غير قابلة للإسناد.
+        """
+        if value < 1:
+            raise serializers.ValidationError("عدد السنوات لا يقل عن واحدة")
+        return value
+
+
+class AdminDepartmentSerializer(serializers.ModelSerializer):
+    faculty_name = serializers.CharField(source="faculty.name_ar", read_only=True)
+
+    class Meta:
+        model = Department
+        fields = [
+            "id",
+            "slug",
+            "faculty",
+            "faculty_name",
+            "code",
+            "name_ar",
+            "name_en",
+            "is_active",
+        ]
+        read_only_fields = ["id", "slug"]
+
+
+class AdminBundleSerializer(serializers.ModelSerializer):
+    faculty_name = serializers.CharField(source="faculty.name_ar", read_only=True)
+    item_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StudyBundle
+        fields = [
+            "id",
+            "slug",
+            "faculty",
+            "faculty_name",
+            "department",
+            "academic_year",
+            "kind",
+            "name_ar",
+            "name_en",
+            "description_ar",
+            "description_en",
+            "display_order",
+            "is_active",
+            "item_count",
+        ]
+        read_only_fields = ["id", "slug"]
+
+    def get_item_count(self, obj) -> int:
+        return obj.items.count()
+
+    def validate(self, attrs):
+        """
+        ⚠️  **سنة الحزمة داخل سنوات كليتها.**
+
+            حزمة السنة الخامسة في كلية بأربع سنوات لا يصلها طالب
+            أبدًا — وهي تُنشأ صامتة ثم يُسأل «لماذا لا يراها أحد؟»
+            بعد أسابيع.
+        """
+        instance = self.instance
+        faculty = attrs.get("faculty", getattr(instance, "faculty", None))
+        year = attrs.get("academic_year", getattr(instance, "academic_year", None))
+
+        if faculty and year and year > faculty.years_count:
+            raise serializers.ValidationError(
+                {
+                    "academic_year": (
+                        f"كلية {faculty.name_ar} مدتها {faculty.years_count} سنوات — "
+                        "لن يصل هذه الحزمة أي طالب"
+                    )
+                }
+            )
+
+        return attrs
+
+
+class AdminBundleItemSerializer(serializers.ModelSerializer):
+    product_sku = serializers.CharField(source="product.sku", read_only=True)
+    product_name = serializers.CharField(source="product.name_ar", read_only=True)
+
+    class Meta:
+        model = BundleItem
+        fields = [
+            "id",
+            "bundle",
+            "product",
+            "product_sku",
+            "product_name",
+            "variant",
+            "quantity",
+            # ⚠️  «أساسي» يفصل ما لا غنى عنه عمّا يُستحسن — والطالب
+            #     يشتري الأساسي وحده حين يضيق المال.
+            "is_essential",
+            "note_ar",
+            "note_en",
+            "display_order",
+        ]
+        # ⚠️  الحزمة تأتي من المسار لا من الحمولة: قبولها في الجسم
+        #     يسمح بإضافة بند إلى حزمة أخرى بتخمين معرّفها.
+        read_only_fields = ["id", "bundle"]

@@ -1,0 +1,91 @@
+.loyalty-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.loyalty-page__title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+/* ⚠️  عمود واحد على الهاتف: لوحا الاستبدال والإحالة يحملان حقول
+   إدخال، وضغطهما جنبًا إلى جنب على شاشة ضيقة يجعل الحقول أضيق من
+   أن تُلمس. */
+.loyalty-page__panels {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 48rem) {
+  .loyalty-page__panels {
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  }
+}
+
+.loyalty-history h2 {
+  margin: 0 0 var(--space-3);
+  font-size: 1rem;
+}
+
+.loyalty-history__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.loyalty-history__row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.loyalty-history__icon {
+  font-size: 1.25rem;
+}
+
+.loyalty-history__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-inline-size: 0;
+}
+
+.loyalty-history__body strong {
+  font-size: 0.9375rem;
+}
+
+.loyalty-history__body small,
+.loyalty-history__side small {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* ⚠️  قصّ المرجع الطويل لا لفّه: رقم طلب يلتف على سطرين يدفع
+   المبلغ خارج الشاشة على الهاتف. */
+.loyalty-history__body small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loyalty-history__side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  align-items: end;
+  text-align: end;
+}
+
+.loyalty-history__side strong {
+  font-size: 1rem;
+}

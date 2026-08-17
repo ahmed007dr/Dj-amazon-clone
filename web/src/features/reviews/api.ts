@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import type { PagedResponse } from '@/features/orders/adminApi';
 import { http } from '@/shared/http';
 import type { CursorPage, Review } from '@/features/catalog/types';
 
@@ -86,4 +87,58 @@ export function useToggleHelpful() {
   return useReviewMutation((id: string) =>
     http.post<{ voted: boolean; helpful_count: number }>(`/reviews/${id}/helpful/`),
   );
+}
+
+// ═══════════════════════════════════════════════════════════
+//  الأدمن — المراجعة
+// ═══════════════════════════════════════════════════════════
+
+export interface AdminReview {
+  id: string;
+  product: string;
+  product_sku: string;
+  product_name: string;
+  user: string;
+  user_email: string;
+  rating: number;
+  title: string;
+  body: string;
+  status: ReviewStatus;
+  is_verified_purchase: boolean;
+  helpful_count: number;
+  moderation_reason?: string;
+  created_at: string;
+}
+
+export function useAdminReviews(params: { status?: string; page?: number }) {
+  return useQuery({
+    queryKey: ['admin', 'reviews', params],
+    queryFn: () =>
+      http.get<PagedResponse<AdminReview>>('/reviews/admin/', { params: { ...params } }),
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * اعتماد مراجعة أو رفضها.
+ *
+ * ⚠️  **سبب الرفض إلزامي** — الخادم يفرضه.
+ *
+ *     الرفض بلا سبب لا يُشرح للعميل، فيعيد كتابة نفس النص ظنًّا
+ *     أن شيئًا تعطّل. والسبب هو ما يجعل الرفض قابلًا للتصحيح.
+ *
+ * ⚠️  والاعتماد يعيد حساب متوسط المنتج على الخادم — ولذلك يُبطَل
+ *     الكتالوج معه، وإلا بقيت النجوم القديمة على بطاقة المنتج.
+ */
+export function useModerateReview() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, approved, reason }: { id: string; approved: boolean; reason?: string }) =>
+      http.post(`/reviews/admin/${id}/moderate/`, { approved, ...(reason ? { reason } : {}) }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'reviews'] });
+      void queryClient.invalidateQueries({ queryKey: ['catalog'] });
+    },
+  });
 }

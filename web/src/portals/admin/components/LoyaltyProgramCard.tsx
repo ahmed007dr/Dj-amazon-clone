@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
+  useDeleteProgram,
   useSaveProgram,
   useTargetingOptions,
   type LoyaltyProgram,
@@ -12,6 +13,7 @@ import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { useToast } from '@/shared/ui/useToast';
+import { TierEditor } from '@/portals/admin/components/TierEditor';
 
 import './LoyaltyProgramCard.css';
 
@@ -37,6 +39,7 @@ export function LoyaltyProgramCard({ program }: { program: LoyaltyProgram }) {
 
   const options = useTargetingOptions();
   const save = useSaveProgram();
+  const remove = useDeleteProgram();
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(program);
@@ -57,6 +60,9 @@ export function LoyaltyProgramCard({ program }: { program: LoyaltyProgram }) {
     save.mutate(
       {
         id: program.id,
+        name_ar: draft.name_ar,
+        name_en: draft.name_en,
+        note: draft.note,
         account_types: draft.account_types,
         customer_segments: draft.customer_segments,
         currency_per_point: draft.currency_per_point,
@@ -172,6 +178,39 @@ export function LoyaltyProgramCard({ program }: { program: LoyaltyProgram }) {
             submit();
           }}
         >
+          {/* ⚠️  الاسم يُعدَّل من هنا لا من قاعدة البيانات: حملة
+              تُعاد تسميتها موسميًا («نقاط الصيف») ولا يُعقل أن
+              تحتاج نشرًا. والرمز ثابت لأنه مرجع الحركات. */}
+          <div className="loyalty-grid">
+            <label>
+              {t('loyalty.nameAr')}
+              <input
+                required
+                value={draft.name_ar}
+                onChange={(event) => setDraft({ ...draft, name_ar: event.target.value })}
+              />
+            </label>
+
+            <label>
+              {t('loyalty.nameEn')}
+              <input
+                dir="ltr"
+                required
+                value={draft.name_en}
+                onChange={(event) => setDraft({ ...draft, name_en: event.target.value })}
+              />
+            </label>
+          </div>
+
+          <label className="loyalty-note-field">
+            {t('loyalty.internalNote')}
+            <textarea
+              rows={2}
+              value={draft.note}
+              onChange={(event) => setDraft({ ...draft, note: event.target.value })}
+            />
+          </label>
+
           <fieldset>
             <legend>{t('loyalty.accountTypes')}</legend>
             <p className="muted">{t('loyalty.emptyMeansAll')}</p>
@@ -349,8 +388,27 @@ export function LoyaltyProgramCard({ program }: { program: LoyaltyProgram }) {
               ? t('loyalty.pauseRedemption')
               : t('loyalty.resumeRedemption')}
           </Button>
+
+          {/* ⚠️  الحذف آخر الصف ويسأل أولًا؛ والخادم يرفضه أصلًا
+              لو مُنحت منه نقطة واحدة — والرسالة تقول «أوقفه». */}
+          <Button
+            size="sm"
+            variant="ghost"
+            loading={remove.isPending}
+            onClick={() => {
+              if (!window.confirm(t('loyalty.confirmDeleteProgram'))) return;
+              remove.mutate(program.id, {
+                onSuccess: () => notify(t('loyalty.deleted'), 'success'),
+                onError: fail,
+              });
+            }}
+          >
+            {t('common.delete')}
+          </Button>
         </div>
       )}
+
+      <TierEditor programId={program.id} tiers={program.tiers} />
     </article>
   );
 }

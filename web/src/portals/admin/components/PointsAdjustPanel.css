@@ -1,0 +1,143 @@
+.adjust-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  margin-block-end: var(--space-4);
+  border-radius: var(--radius);
+  /* ⚠️  حافة تحذيرية: هذه الشاشة تخلق نقاطًا وتمحوها بلا طلب
+     يقابلها، ولا يصحّ أن تبدو كجدول عادي. */
+  border-inline-start: 4px solid var(--color-warning);
+}
+
+.adjust-panel h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.adjust-panel p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.adjust-panel__search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.adjust-panel__search input {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.adjust-panel__results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.adjust-panel__results button {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  inline-size: 100%;
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text);
+  text-align: start;
+  cursor: pointer;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.adjust-panel__results button:hover,
+.adjust-panel__results button:focus-visible {
+  border-color: var(--color-primary);
+}
+
+.adjust-panel__who {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.adjust-panel__who code,
+.adjust-panel__selected code {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.adjust-panel__balance {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  font-weight: 700;
+}
+
+.adjust-panel__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-block-start: var(--space-3);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.adjust-panel__selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.adjust-panel__selected div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.adjust-panel__inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-3);
+}
+
+.adjust-panel__inputs label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.adjust-panel__inputs input {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.adjust-panel__inputs small {
+  font-size: 0.75rem;
+}
+
+.adjust-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

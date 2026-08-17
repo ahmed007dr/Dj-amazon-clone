@@ -781,6 +781,164 @@ class TestAPI:
         assert data["liability"]["points"] == 100
         assert data["liability"]["value"] == "1.00"
 
+    def test_everything_the_admin_needs_is_creatable_from_the_api(self, admin_client):
+        """
+        ⚠️  **ما لا يُنشأ من الواجهة يُنشأ من `manage.py` — أي لا
+            يُنشأ.**
+
+            الشاشة التي تعدّل ولا تُنشئ تجعل أول برنامج ثانٍ
+            يحتاج مبرمجًا. هذا الاختبار يمسك المسار من طرفه.
+        """
+        created = admin_client.post(
+            reverse("v1:loyalty:programs"),
+            {
+                "code": "vip-only",
+                "name_ar": "برنامج المميّزين",
+                "name_en": "VIP",
+                "is_active": True,
+                "customer_segments": [CustomerSegment.VIP],
+                "currency_per_point": "20.00",
+                "point_value": "0.2000",
+                "max_redemption_percent": "25.00",
+            },
+            format="json",
+        )
+        assert created.status_code == 201, created.data
+        program_id = created.data["id"]
+
+        tier = admin_client.post(
+            reverse("v1:loyalty:tiers"),
+            {
+                "program": program_id,
+                "code": "platinum",
+                "name_ar": "بلاتيني",
+                "name_en": "Platinum",
+                "threshold": "50000.00",
+                "multiplier": "2.00",
+            },
+            format="json",
+        )
+        assert tier.status_code == 201, tier.data
+
+        referral = admin_client.post(
+            reverse("v1:loyalty:referral-programs"),
+            {
+                "code": "launch",
+                "name_ar": "حملة الإطلاق",
+                "name_en": "Launch",
+                "is_active": True,
+                "referrer_points": 500,
+                "referee_points": 250,
+                "max_referrals_per_user": 5,
+                "min_order_amount": "200.00",
+            },
+            format="json",
+        )
+        assert referral.status_code == 201, referral.data
+
+        # والحذف متاح ما دام البرنامج بلا تاريخ
+        assert (
+            admin_client.delete(
+                reverse("v1:loyalty:tier-detail", args=[tier.data["id"]])
+            ).status_code
+            == 204
+        )
+        assert (
+            admin_client.delete(
+                reverse("v1:loyalty:program-detail", args=[program_id])
+            ).status_code
+            == 204
+        )
+
+    def test_a_program_with_history_refuses_deletion(
+        self, admin_client, customer, location, program
+    ):
+        """
+        ⚠️  الحذف يترك حركات تشير إلى برنامج غير موجود، فلا يُقرأ
+            كشف عميل قديم. الإيقاف يفعل ما يريده الأدمن فعلًا.
+        """
+        services.award_for_order(make_order(customer, location))
+
+        response = admin_client.delete(reverse("v1:loyalty:program-detail", args=[program.pk]))
+
+        assert response.status_code == 409
+        assert LoyaltyProgram.objects.filter(pk=program.pk).exists()
+
+    def test_customer_lookup_shows_the_balance_before_adjusting(
+        self, admin_client, customer, location, program
+    ):
+        """⚠️  سحب ١٠٠ من رصيد ٣٠ يُقصّ صامتًا: الرصيد يجب أن
+            يُرى قبل كتابة الرقم لا بعد إرساله."""
+        services.award_for_order(make_order(customer, location))
+
+        data = admin_client.get(
+            reverse("v1:loyalty:customer-lookup"), {"search": customer.customer_number}
+        ).data
+
+        assert len(data) == 1
+        assert data[0]["balance"] == 20
+        assert data[0]["covered"] is True
+
+    def test_a_one_letter_search_returns_nothing(self, admin_client, customer):
+        """⚠️  حرف واحد يعيد كل العملاء — تسريب قائمة لا بحث."""
+        assert admin_client.get(reverse("v1:loyalty:customer-lookup"), {"search": "ع"}).data == []
+
+    def test_adjusting_points_from_the_admin(self, admin_client, customer, program):
+        response = admin_client.post(
+            reverse("v1:loyalty:adjust-points", args=[customer.pk]),
+            {"points": 75, "reason": "تعويض شكوى"},
+            format="json",
+        )
+
+        assert response.status_code == 201
+        assert response.data["balance"] == 75
+        assert response.data["entry"]["note"] == "تعويض شكوى"
+
+    def test_an_adjustment_without_a_reason_is_refused(self, admin_client, customer, program):
+        response = admin_client.post(
+            reverse("v1:loyalty:adjust-points", args=[customer.pk]),
+            {"points": 75, "reason": ""},
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert services.balance(customer) == 0
+
+    def test_expiring_points_on_demand(self, admin_client, customer, program):
+        PointsEntry.objects.create(
+            customer=customer,
+            program=program,
+            kind=PointsKind.EARN,
+            points=40,
+            points_remaining=40,
+            expires_on=timezone.localdate() - timedelta(days=1),
+        )
+
+        response = admin_client.post(reverse("v1:loyalty:expire"))
+
+        assert response.status_code == 200
+        assert response.data == {"batches": 1, "points": 40}
+        assert services.usable_points(customer) == 0
+
+    def test_the_ledger_filters_by_kind_and_customer(
+        self, admin_client, customer, location, program
+    ):
+        other = make_customer("ledger-other@example.com")
+        services.award_for_order(make_order(customer, location))
+        services.award_for_order(make_order(other, location))
+        services.adjust_points(customer, 10, reason="هدية")
+
+        by_customer = admin_client.get(
+            reverse("v1:loyalty:admin-points"), {"customer": str(customer.pk)}
+        ).data
+        assert by_customer["count"] == 2
+
+        by_kind = admin_client.get(
+            reverse("v1:loyalty:admin-points"),
+            {"customer": str(customer.pk), "kind": PointsKind.ADJUSTMENT},
+        ).data
+        assert by_kind["count"] == 1
+
     def test_targeting_options_come_from_the_source(self, admin_client):
         data = admin_client.get(reverse("v1:loyalty:targeting")).data
 

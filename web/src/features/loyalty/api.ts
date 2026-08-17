@@ -281,6 +281,34 @@ export function useAdminReferrals(status?: string) {
   });
 }
 
+export interface CustomerLookupRow {
+  id: string;
+  customer_number: string;
+  name: string;
+  email: string;
+  segment: string;
+  balance: number;
+  usable_points: number;
+  covered: boolean;
+}
+
+/**
+ * ⚠️  الحد الأدنى حرفان — والخادم يفرضه أيضًا.
+ *
+ *     حرف واحد يطابق كل العملاء تقريبًا: قائمة لا بحث، ونداء
+ *     يجلب صفحة كاملة مع كل ضغطة مفتاح.
+ */
+export function useCustomerLookup(search: string) {
+  const term = search.trim();
+
+  return useQuery({
+    queryKey: ['loyalty', 'admin', 'customer-lookup', term],
+    queryFn: () =>
+      http.get<CustomerLookupRow[]>('/loyalty/admin/customers/', { params: { search: term } }),
+    enabled: term.length >= 2,
+  });
+}
+
 export function useSaveProgram() {
   return useLoyaltyMutation(({ id, ...body }: Partial<LoyaltyProgram> & { id?: string }) =>
     id
@@ -307,6 +335,25 @@ export function useSaveTier() {
 
 export function useDeleteTier() {
   return useLoyaltyMutation((id: string) => http.delete<void>(`/loyalty/admin/tiers/${id}/`));
+}
+
+export function useDeleteProgram() {
+  return useLoyaltyMutation((id: string) =>
+    http.delete<void>(`/loyalty/admin/programs/${id}/`),
+  );
+}
+
+export function useDeleteReferralProgram() {
+  return useLoyaltyMutation((id: string) =>
+    http.delete<void>(`/loyalty/admin/referral-programs/${id}/`),
+  );
+}
+
+/** ⚠️  آمنة التكرار: لا تمسّ إلا دفعات تجاوز تاريخها اليوم. */
+export function useExpirePoints() {
+  return useLoyaltyMutation(() =>
+    http.post<{ batches: number; points: number }>('/loyalty/admin/expire/', {}),
+  );
 }
 
 export function useAdjustPoints() {

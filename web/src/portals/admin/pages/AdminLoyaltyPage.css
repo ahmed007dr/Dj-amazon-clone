@@ -89,3 +89,46 @@
   font-size: 0.75rem;
   color: var(--color-text-muted);
 }
+
+.loyalty-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: end;
+  margin-block-end: var(--space-4);
+}
+
+.loyalty-filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.loyalty-filter select {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.loyalty-note-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.loyalty-note-field textarea {
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  color: var(--color-text);
+  resize: vertical;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}

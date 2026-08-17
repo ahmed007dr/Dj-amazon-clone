@@ -40,6 +40,7 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
       // ⚠️  التسعير تحت الكتالوج لا في «النظام»: السعر قرار تجاري
       //     يومي يتغيّر مع كل حملة، لا إعداد يُضبط مرة.
       { to: '/admin/pricing', key: 'nav.pricing', permission: 'pricing.change_pricelist' },
+      { to: '/admin/reviews', key: 'nav.reviews', permission: 'reviews.change_review' },
       { to: '/admin/inventory', key: 'nav.inventory', permission: 'inventory.view_stock' },
       // ⚠️  الموردون بجوار المخزون: الشراء يغذّيه، ومن
       //     يتابع النقص هو من يُنشئ أمر الشراء.
@@ -47,6 +48,12 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
       // ⚠️  الورديات تحت «التجارة» لا «النظام»: الفرق النقدي شأن
       //     تشغيلي يومي يُراجَع مع الطلبات، لا إعداد يُضبط مرة.
       { to: '/admin/pos-sessions', key: 'pos.sessions', permission: 'pos.view_possession' },
+      // ⚠️  الولاء تحت «التجارة» لا «النظام».
+      //
+      //     مفتاح البرنامج يُقلَب استجابةً لحملة أو شكوى، لا
+      //     يُضبط مرة عند التركيب. ودفنه في إعدادات النظام يجعل
+      //     من يحتاجه لا يجده.
+      { to: '/admin/loyalty', key: 'loyalty.title', permission: 'loyalty.change_loyaltyprogram' },
     ],
   },
   {

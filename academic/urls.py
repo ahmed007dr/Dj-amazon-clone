@@ -21,3 +21,56 @@ urlpatterns = [
         name="admin-promote",
     ),
 ]
+
+# ═══════════════════════════════════════════════════════════
+#  الأدمن — الشجرة الأكاديمية والحزم
+# ═══════════════════════════════════════════════════════════
+#
+#  ⚠️  الشجرة **شرط لتسجيل أي طالب**: يختار جامعته وكليته قبل
+#      إنشاء الحساب.
+
+urlpatterns += [
+    path(
+        "admin/universities/",
+        api.AdminUniversityListCreateAPI.as_view(),
+        name="admin-universities",
+    ),
+    path(
+        "admin/universities/<uuid:pk>/",
+        api.AdminUniversityDetailAPI.as_view(),
+        name="admin-university-detail",
+    ),
+    path("admin/faculties/", api.AdminFacultyListCreateAPI.as_view(), name="admin-faculties"),
+    path(
+        "admin/faculties/<uuid:pk>/",
+        api.AdminFacultyDetailAPI.as_view(),
+        name="admin-faculty-detail",
+    ),
+    path(
+        "admin/departments/",
+        api.AdminDepartmentListCreateAPI.as_view(),
+        name="admin-departments",
+    ),
+    path(
+        "admin/departments/<uuid:pk>/",
+        api.AdminDepartmentDetailAPI.as_view(),
+        name="admin-department-detail",
+    ),
+    path("admin/bundles/", api.AdminBundleListCreateAPI.as_view(), name="admin-bundles"),
+    path(
+        "admin/bundles/<uuid:pk>/",
+        api.AdminBundleDetailAPI.as_view(),
+        name="admin-bundle-detail",
+    ),
+    # بنود الحزمة — مُصفّاة بحزمتها إلزامًا
+    path(
+        "admin/bundles/<uuid:pk>/items/",
+        api.AdminBundleItemListCreateAPI.as_view(),
+        name="admin-bundle-items",
+    ),
+    path(
+        "admin/bundles/<uuid:pk>/items/<uuid:item_pk>/",
+        api.AdminBundleItemDetailAPI.as_view(),
+        name="admin-bundle-item-detail",
+    ),
+]

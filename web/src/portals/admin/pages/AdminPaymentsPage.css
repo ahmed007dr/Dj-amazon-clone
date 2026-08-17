@@ -79,3 +79,26 @@
 .gateway__reason:focus {
   border-color: var(--color-primary);
 }
+
+.gateway__badges {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: flex-end;
+}
+
+.gateway__priority {
+  font-size: 0.8125rem;
+}
+
+/* ⚠️  إجراءات الإدارة في تذييل مفصول: التفعيل والإيقاف قرار يومي،
+       والحذف وإعادة الترتيب قرار بنيوي — خلطهما في صف واحد يجعل
+       الضغطة الخطأ سهلة. */
+.gateway__manage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-block-start: var(--space-3);
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--color-border);
+}
