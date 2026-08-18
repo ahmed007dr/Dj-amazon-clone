@@ -1,0 +1,100 @@
+.brands-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding-block: var(--space-5);
+}
+
+.brands-page__heading {
+  margin: 0 0 var(--space-3);
+  font-size: 1rem;
+}
+
+/* ⚠️  `auto-fill` بحدّ أدنى لا عدد أعمدة ثابت: الشبكة تُعرض على
+   هاتف ٣٦٠ بكسل وعلى شاشة ١٩٢٠، وعمودان مفروضان يقصّان الأسماء
+   على الأول ويتركان فراغًا على الثاني. */
+.brands-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: var(--space-3);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.brand-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: center;
+  /* ⚠️  مساحة لمس كاملة: الشبكة تُلمس بالإبهام على الهاتف. */
+  min-block-size: var(--touch-target);
+  padding: var(--space-4) var(--space-3);
+  color: var(--color-text);
+  text-align: center;
+  text-decoration: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  transition: border-color var(--transition);
+}
+
+.brand-card:hover,
+.brand-card:focus-visible {
+  border-color: var(--color-primary);
+}
+
+.brand-card img {
+  block-size: 3rem;
+  max-inline-size: 100%;
+  object-fit: contain;
+}
+
+/* ⚠️  الحرف الأول بدل المربع الفارغ: أغلب الماركات المحلية بلا
+   شعار مرفوع، وشبكة المربعات الرمادية تُقرأ «الصور لم تُحمَّل». */
+.brand-card__initial {
+  display: grid;
+  place-items: center;
+  inline-size: 3rem;
+  block-size: 3rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-on-primary);
+  background: var(--color-secondary);
+  border-radius: 50%;
+}
+
+.brand-card strong {
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.brand-card small {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.manufacturer-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.manufacturer-list li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.manufacturer-list span {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}

@@ -6,6 +6,7 @@ import { useDebounced } from '@/shared/hooks/useDebounced';
 import { isApiError } from '@/shared/http/errors';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { PageHeader } from '@/shared/layouts/PageHeader';
+import { ReorderPanel } from '@/portals/admin/components/ReorderPanel';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -39,6 +40,7 @@ export function AdminSuppliersPage() {
   const [hasDebt, setHasDebt] = useState(false);
   const [overdue, setOverdue] = useState(false);
   const [page, setPage] = useState(1);
+  const [view, setView] = useState<'suppliers' | 'reorder'>('suppliers');
   const [selected, setSelected] = useState<Supplier | null>(null);
 
   const debounced = useDebounced(search);
@@ -139,6 +141,28 @@ export function AdminSuppliersPage() {
     <>
       <PageHeader title={t('suppliers.title')} />
 
+      {/* ⚠️  «ما يجب شراؤه» تبويب في شاشة الموردين لا شاشة بعيدة:
+          من يفتح الموردين إنما يفتحهم ليشتري، والنقص هو سبب
+          الفتح — لا قائمة الأسماء. */}
+      <div className="supplier-view-tabs" role="tablist">
+        {(['suppliers', 'reorder'] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={view === value}
+            className={view === value ? 'is-active' : ''}
+            onClick={() => setView(value)}
+          >
+            {t(`suppliers.view.${value}`)}
+          </button>
+        ))}
+      </div>
+
+      {view === 'reorder' ? <ReorderPanel /> : null}
+
+      {view === 'suppliers' ? (
+      <>
       <FilterBar>
         <FilterSearch
           value={search}
@@ -200,6 +224,8 @@ export function AdminSuppliersPage() {
 
       {query.data ? (
         <Pagination page={query.data.page} pages={query.data.pages} onChange={setPage} />
+      ) : null}
+      </>
       ) : null}
 
       <Drawer

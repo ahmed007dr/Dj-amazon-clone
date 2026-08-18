@@ -12,6 +12,7 @@ import {
   type MonthlyTarget,
 } from '@/features/targets/api';
 import { isApiError } from '@/shared/http/errors';
+import { CommissionExplainDrawer } from '@/portals/admin/components/CommissionExplainDrawer';
 import {
   BulkTargetsForm,
   SchemesPanel,
@@ -64,6 +65,7 @@ export function AdminTargetsPage() {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [page, setPage] = useState(1);
+  const [explaining, setExplaining] = useState<CommissionRecord | null>(null);
 
   const targets = useAdminTargets({ year, month, page });
   const commissions = useAdminCommissions({ year, month, page });
@@ -222,6 +224,13 @@ export function AdminTargetsPage() {
       align: 'end',
       render: (row) => (
         <div className="target-actions">
+          {/* ⚠️  «لماذا؟» أول الصف: «لماذا عمولتي ٤٢٠ لا ٦٠٠؟»
+              يُسأل قبل الاعتماد لا بعده، والاعتماد بلا تفسير هو
+              كيف يُصرَف رقم خاطئ. */}
+          <Button size="sm" variant="ghost" onClick={() => setExplaining(row)}>
+            {t('targets.why')}
+          </Button>
+
           {/* ⚠️  «صرف» لا تظهر إلا بعد الاعتماد: القفز فوقه يتجاوز
               المراجعة — وهي الخطوة الوحيدة التي تمسك خطأ الحساب
               قبل خروج المال. */}
@@ -412,6 +421,8 @@ export function AdminTargetsPage() {
           <BulkTargetsForm year={year} month={month} onDone={() => setBulkOpen(false)} />
         ) : null}
       </Drawer>
+
+      <CommissionExplainDrawer record={explaining} onClose={() => setExplaining(null)} />
     </>
   );
 }

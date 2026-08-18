@@ -162,3 +162,51 @@ export function useDeletePolicy() {
     [['admin', 'product-options']],
   );
 }
+
+/**
+ * مصفوفة «من يرى ماذا».
+ *
+ * ⚠️  **تُحسب من محرك التقييم نفسه — لا من قراءة الحقول.**
+ *
+ *     استنتاج النتيجة في الواجهة من `allowed_account_types` وحده
+ *     يتجاهل `requires_verification` و`required_permission`،
+ *     فتُظهر المصفوفة سماحًا حيث يمنع النظام فعلًا. والمصفوفة التي
+ *     تكذب أسوأ من غيابها: يُبنى عليها قرار ضبط.
+ */
+export interface AccessMatrixCell {
+  unverified: boolean;
+  verified?: boolean;
+}
+
+export interface AccessMatrix {
+  account_types: string[];
+  policies: { policy: AccessPolicy; access: Record<string, AccessMatrixCell> }[];
+}
+
+export function useAccessMatrix() {
+  return useQuery({
+    queryKey: ['access', 'matrix'],
+    queryFn: () => http.get<AccessMatrix>('/access/matrix/'),
+  });
+}
+
+export interface PreviewStatus {
+  active: boolean;
+  account_type?: string;
+  verified?: boolean;
+  note?: string;
+}
+
+/**
+ * ⚠️  وضع المعاينة **يجب أن يُعلَن**.
+ *
+ *     الأدمن الذي ينسى أنه يتصفّح بعيني طالب يقرأ كتالوجًا ناقصًا
+ *     ويظن أن منتجاته اختفت — ثم يُبلّغ عن عطل لا وجود له.
+ */
+export function usePreviewStatus() {
+  return useQuery({
+    queryKey: ['access', 'preview-status'],
+    queryFn: () => http.get<PreviewStatus>('/access/preview-status/'),
+    retry: false,
+  });
+}

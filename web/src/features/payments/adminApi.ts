@@ -128,6 +128,24 @@ export const listTransactions = (params: {
   });
 
 /**
+ * معاملة واحدة بتفصيلها.
+ *
+ * ⚠️  **رسالة الفشل هي سبب وجود هذه النقطة.**
+ *
+ *     صفّ الجدول يقول «فشلت»؛ و`failure_code` و`failure_message`
+ *     يقولان لماذا — «رصيد غير كافٍ» غير «بطاقة مرفوضة» غير
+ *     «انقطاع عن البوابة»، والثالث وحده يستحق إعادة المحاولة.
+ *     بلا التفصيل يتصل الدعم بالبوابة في كل حالة.
+ */
+export function useTransaction(id: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'transaction', id],
+    queryFn: () => http.get<PaymentTransaction>(`/payments/admin/transactions/${id}/`),
+    enabled: id !== null,
+  });
+}
+
+/**
  * ⚠️  إبطال المعاملات **والطلبات معًا**.
  *
  *     التحصيل والاسترداد يغيّران حالة الدفع على الطلب عبر إشارة في

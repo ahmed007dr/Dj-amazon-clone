@@ -91,6 +91,21 @@ export function useMyCommissions() {
   });
 }
 
+/**
+ * تفسير العمولة **للأدمن** — نقطة مختلفة عن تفسير المندوب.
+ *
+ * ⚠️  مسار المندوب يقرأ عمولته هو وحدها (`/commissions/me/…`)؛
+ *     ومسار الأدمن يقرأ أي سجل. استعمال الأول لصفّ في جدول
+ *     الأدمن كان يردّ ٤٠٤ على كل موظف عدا الأدمن نفسه.
+ */
+export function useAdminCommissionExplain(id: string | null) {
+  return useQuery({
+    queryKey: ['commissions', 'admin', 'explain', id],
+    queryFn: () => http.get<Record<string, string | number>>(`/commissions/admin/${id}/explain/`),
+    enabled: id !== null,
+  });
+}
+
 export function useCommissionExplain(id: string | null) {
   return useQuery({
     queryKey: ['commissions', 'explain', id],

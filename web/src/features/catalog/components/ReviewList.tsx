@@ -14,6 +14,8 @@ import { formatDate } from '@/shared/utils/format';
 
 import { useProductReviews } from '../hooks';
 
+import { useProductRating } from '../hooks';
+
 import { StarRating } from './StarRating';
 
 import './ReviewList.css';
@@ -38,6 +40,14 @@ export function ReviewList({ slug, productId }: { slug: string; productId?: stri
   const { user } = useAuth();
 
   const { data: reviews, isPending } = useProductReviews(slug);
+
+  // ⚠️  **التقييم المجمَّع يُجلب مستقلًا عن تفاصيل المنتج.**
+  //
+  //     صفحة المنتج تحمل `rating` مضمَّنًا بمهلة خمس دقائق؛ فمن
+  //     يكتب مراجعته الآن يرى متوسطًا لا يشمله حتى تنتهي المهلة،
+  //     ويظنّ أن مراجعته ضاعت. هذه النقطة خفيفة وتُبطَل مع كل
+  //     كتابة، فيتحرّك الرقم أمام صاحبه.
+  const rating = useProductRating(slug);
   const mine = useMyReviews(Boolean(user));
   const helpful = useToggleHelpful();
 
@@ -57,6 +67,14 @@ export function ReviewList({ slug, productId }: { slug: string; productId?: stri
 
   return (
     <>
+      {/* ⚠️  المتوسط الحيّ فوق قائمة المراجعات: هو ما يبحث عنه
+          القارئ قبل أن يقرأ نصًّا واحدًا. */}
+      {rating.data && rating.data.count > 0 ? (
+        <div className="review-summary">
+          <StarRating value={Number(rating.data.average)} count={rating.data.count} />
+        </div>
+      ) : null}
+
       {/* ── الكتابة ─────────────────────────────── */}
       {!user ? (
         <Alert tone="info">

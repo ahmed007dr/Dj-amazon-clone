@@ -9,8 +9,11 @@ import { http } from '@/shared/http';
 
 import type {
   Availability,
+  Brand,
   CategoryBrief,
+  CategoryDetail,
   CursorPage,
+  Manufacturer,
   ProductDetail,
   ProductListItem,
   ProductQuery,
@@ -43,3 +46,41 @@ export const getAvailability = (productIds: string[]) =>
 
 export const listProductReviews = (slug: string) =>
   http.get<CursorPage<Review> | Review[]>(`/reviews/products/${slug}/`);
+
+/**
+ * تقييم المنتج المجمَّع — **نقطة منفصلة عن قائمة المراجعات**.
+ *
+ * ⚠️  المتوسط والعدد يظهران في رأس الصفحة قبل أن يفتح أحد قائمة
+ *     المراجعات؛ وجلب القائمة كاملة لحساب رقمين يعني تحميل عشرات
+ *     النصوص لعرض نجمة.
+ */
+export const getProductRating = (slug: string) =>
+  http.get<{ average: string; count: number }>(`/reviews/products/${slug}/rating/`);
+
+// ── الماركات والمصنّعون والفئات ────────────────────────────
+//
+// ⚠️  **بلا ترقيم على الخادم** (`pagination_class = None`): مصفوفة
+//     مباشرة لا `results`. توقّع الترقيم هنا كان يعطي `undefined`
+//     صامتًا وشبكة فارغة.
+
+export const listBrands = (featured?: boolean) =>
+  http.get<Brand[]>('/catalog/brands/', {
+    params: featured ? { featured: 'true' } : {},
+  });
+
+export const getBrand = (slug: string) => http.get<Brand>(`/catalog/brands/${slug}/`);
+
+export const listManufacturers = () => http.get<Manufacturer[]>('/catalog/manufacturers/');
+
+export const getCategory = (slug: string) =>
+  http.get<CategoryDetail>(`/catalog/categories/${slug}/`);
+
+/**
+ * بحث بالباركود — **لماسح نقطة البيع**.
+ *
+ * ⚠️  نقطة منفصلة عن البحث النصّي: الماسح يرسل الرقم كاملًا ويجب
+ *     أن يعطي الصنف الواحد فورًا لا قائمة يختار منها الكاشير
+ *     بينما الطابور ينتظر.
+ */
+export const getProductByBarcode = (barcode: string) =>
+  http.get<ProductDetail>(`/catalog/barcode/${barcode}/`);

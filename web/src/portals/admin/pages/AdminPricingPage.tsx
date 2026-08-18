@@ -16,6 +16,7 @@ import {
   type PriceRule,
 } from '@/features/pricing/api';
 import { CouponForm } from '@/portals/admin/components/CouponForm';
+import { CouponRedemptionsDrawer } from '@/portals/admin/components/CouponRedemptionsDrawer';
 import { PriceListForm } from '@/portals/admin/components/PriceListForm';
 import { PriceRuleForm } from '@/portals/admin/components/PriceRuleForm';
 import { useDebounced } from '@/shared/hooks/useDebounced';
@@ -59,6 +60,7 @@ export function AdminPricingPage() {
   const [editingList, setEditingList] = useState<PriceList | null>(null);
   const [editingRule, setEditingRule] = useState<PriceRule | null>(null);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
+  const [usageOf, setUsageOf] = useState<Coupon | null>(null);
   const [creating, setCreating] = useState(false);
 
   const debouncedSearch = useDebounced(search);
@@ -334,6 +336,14 @@ export function AdminPricingPage() {
           <Button size="sm" variant="ghost" onClick={() => setEditingCoupon(row)}>
             {t('common.edit')}
           </Button>
+
+          {/* ⚠️  «الاستخدام» يظهر للمستخدَم وحده: كوبون بصفر صرف
+              يفتح لوحًا فارغًا لا يقول شيئًا. */}
+          {row.usage_count > 0 ? (
+            <Button size="sm" variant="ghost" onClick={() => setUsageOf(row)}>
+              {t('pricing.usage')}
+            </Button>
+          ) : null}
           {/* ⚠️  المستخدَم لا يُحذف — الخادم يردّ ٤٠٩ برسالة تعدّ
               الاستخدامات، وإخفاء الزر أوضح من رفض بعد الضغط. */}
           {row.usage_count === 0 ? (
@@ -538,6 +548,8 @@ export function AdminPricingPage() {
           />
         ) : null}
       </Drawer>
+
+      <CouponRedemptionsDrawer coupon={usageOf} onClose={() => setUsageOf(null)} />
     </>
   );
 }

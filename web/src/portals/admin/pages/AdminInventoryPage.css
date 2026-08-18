@@ -14,3 +14,23 @@
 .inventory-out {
   color: var(--color-danger);
 }
+
+/* ⚠️  حقلان صغيران في الخلية لا نموذج: نقطة إعادة الطلب رقم
+   يُضبط بالتجربة، ودفنه خلف شاشة تعديل يجعله يبقى على قيمته
+   الأولى للأبد فتصير التنبيهات ضجيجًا يُتجاهَل. */
+.stock-thresholds {
+  display: inline-flex;
+  gap: var(--space-1);
+  justify-content: end;
+}
+
+.stock-thresholds input {
+  inline-size: 3.5rem;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-1);
+  text-align: center;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}

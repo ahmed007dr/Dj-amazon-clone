@@ -6,6 +6,7 @@ import {
   listTransactions,
   useCaptureTransaction,
   useRefundTransaction,
+  useTransaction,
   type PaymentTransaction,
 } from '@/features/payments/adminApi';
 import { isApiError } from '@/shared/http/errors';
@@ -14,6 +15,7 @@ import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Field } from '@/shared/ui/Field';
 import { FilterBar, FilterSelect } from '@/shared/ui/FilterBar';
+import { Drawer } from '@/shared/ui/Drawer';
 import { Modal } from '@/shared/ui/Modal';
 import { Pagination } from '@/shared/ui/Pagination';
 import { useToast } from '@/shared/ui/useToast';
@@ -46,6 +48,9 @@ export function TransactionsPanel() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [refunding, setRefunding] = useState<PaymentTransaction | null>(null);
+  const [inspecting, setInspecting] = useState<string | null>(null);
+
+  const detail = useTransaction(inspecting);
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
 
@@ -136,6 +141,13 @@ export function TransactionsPanel() {
               {t('payments.refund')}
             </Button>
           ) : null}
+
+          {/* ⚠️  «التفاصيل» للفاشلة أولًا: الجدول يقول «فشلت»
+              والتفصيل يقول لماذا — و«انقطاع عن البوابة» وحده
+              يستحق إعادة المحاولة، أما «رصيد غير كافٍ» فلا. */}
+          <Button size="sm" variant="ghost" onClick={() => setInspecting(row.id)}>
+            {t('payments.details')}
+          </Button>
         </span>
       ),
     },
@@ -233,6 +245,48 @@ export function TransactionsPanel() {
           </div>
         ) : null}
       </Modal>
+
+      <Drawer
+        open={inspecting !== null}
+        onClose={() => setInspecting(null)}
+        {...(detail.data ? { title: detail.data.reference } : {})}
+      >
+        {detail.data ? (
+          <dl className="tx-detail">
+            {(
+              [
+                ['payments.provider', detail.data.provider_code],
+                ['payments.method', detail.data.method],
+                ['admin.status', t(`transactionStatus.${detail.data.status}`, { defaultValue: detail.data.status })],
+                ['payments.amount', detail.data.amount],
+                ['payments.refunded', detail.data.refunded_amount],
+                ['payments.providerReference', detail.data.provider_reference || '—'],
+                ['payments.referenceId', detail.data.reference_id || '—'],
+              ] as const
+            ).map(([key, value]) => (
+              <div key={key}>
+                <dt>{t(key)}</dt>
+                <dd dir="ltr">{value}</dd>
+              </div>
+            ))}
+
+            {/* ⚠️  سبب الفشل يأخذ سطره: هو ما يقرّر أتُعاد المحاولة
+                أم يُتصل بالعميل — والرمز بجوار الرسالة لأن الدعم
+                يبحث بالرمز لدى البوابة. */}
+            {detail.data.failure_message || detail.data.failure_code ? (
+              <div className="tx-detail__failure">
+                <dt>{t('payments.failureReason')}</dt>
+                <dd>
+                  {detail.data.failure_message || '—'}
+                  {detail.data.failure_code ? (
+                    <code dir="ltr">{detail.data.failure_code}</code>
+                  ) : null}
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : null}
+      </Drawer>
     </>
   );
 }

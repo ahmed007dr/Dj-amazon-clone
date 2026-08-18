@@ -42,3 +42,12 @@
 .account-cell span {
   font-size: 0.8125rem;
 }
+
+/* ⚠️  الأزرار تلتفّ ولا تُضغط: زرّان في عمود ضيّق على تابلت
+   يقصّان نصّهما ويصيران غير مقروءين. */
+.admin-accounts__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: end;
+}

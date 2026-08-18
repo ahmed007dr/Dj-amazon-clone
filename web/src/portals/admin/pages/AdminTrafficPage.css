@@ -1,0 +1,131 @@
+/*
+ * ⚠️  الخريطة الحرارية **تتمرّر أفقيًا داخل حاويتها**.
+ *
+ *     ٢٤ عمودًا لا تتّسع على هاتف؛ وبلا الحاوية كانت الصفحة كلها
+ *     تتمرّر أفقيًا فتنزلق القائمة الجانبية والعناوين معها.
+ */
+
+.traffic-panel {
+  padding: var(--space-4);
+  margin-block-end: var(--space-4);
+  border-radius: var(--radius-md);
+}
+
+.traffic-panel__meta {
+  margin-block-end: var(--space-3);
+  font-size: 0.875rem;
+}
+
+.heatmap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-x: auto;
+  padding-block-end: var(--space-2);
+}
+
+.heatmap__row {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.heatmap__day,
+.heatmap__corner {
+  flex: 0 0 4.5rem;
+  font-size: 0.75rem;
+  text-align: start;
+}
+
+.heatmap__hour {
+  flex: 0 0 1.25rem;
+  font-size: 0.6875rem;
+  text-align: center;
+}
+
+.heatmap__cell {
+  flex: 0 0 1.25rem;
+  block-size: 1.25rem;
+  border-radius: 3px;
+  /* الخلية الفارغة ليست شفافة: الشبكة نفسها معلومة */
+  background: var(--color-surface-sunken, var(--color-border));
+}
+
+.heatmap__cell.is-filled {
+  background: var(--color-primary);
+}
+
+/* ── الأجهزة ─────────────────────────────────────────── */
+
+.traffic-devices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-3);
+  margin-block-end: var(--space-4);
+  list-style: none;
+  padding: 0;
+}
+
+.traffic-devices__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+}
+
+.traffic-devices__value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+/* ── مبدّل الترتيب ───────────────────────────────────── */
+
+.traffic-toggle {
+  display: flex;
+  gap: var(--space-2);
+  margin-block-end: var(--space-3);
+}
+
+.traffic-toggle button {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-4);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.traffic-toggle button.is-active {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* ── الجدول ──────────────────────────────────────────── */
+
+.traffic-table-scroll {
+  overflow-x: auto;
+}
+
+.traffic-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.traffic-table th,
+.traffic-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: start;
+  border-block-end: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.traffic-table th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}

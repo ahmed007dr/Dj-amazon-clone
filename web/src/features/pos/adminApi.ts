@@ -42,3 +42,20 @@ export function useAdminRegisters() {
     queryFn: listAdminRegisters,
   });
 }
+
+/**
+ * وردية واحدة بتفصيلها.
+ *
+ * ⚠️  **القائمة تُختصر والتفصيل يُطلَب.**
+ *
+ *     صفّ الوردية في الجدول يعرض الفرق ولا يعرض تركيبه: كم بيعة
+ *     نقدًا وكم بالبطاقة وكم أُخرِج من الدرج ولماذا. جلب ذلك لكل
+ *     صفّ يعني عشرات النداءات لصفحة تُقرأ منها وردية واحدة.
+ */
+export function useAdminSession(id: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'pos-session', id],
+    queryFn: () => http.get<Session>(`/pos/admin/sessions/${id}/`),
+    enabled: id !== null,
+  });
+}

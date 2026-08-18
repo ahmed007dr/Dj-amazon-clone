@@ -73,3 +73,11 @@
   margin: 0;
   color: var(--color-text);
 }
+
+/* ⚠️  المتوسط الحيّ فوق القائمة: يُقرأ قبل أي نصّ، ويتحرّك فور
+   إرسال المراجعة بدل أن ينتظر تقادم كاش صفحة المنتج. */
+.review-summary {
+  padding-block-end: var(--space-3);
+  margin-block-end: var(--space-3);
+  border-block-end: 1px solid var(--color-border);
+}

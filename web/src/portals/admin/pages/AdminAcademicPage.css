@@ -1,0 +1,28 @@
+/* ⚠️  التبويبات تتمرّر أفقيًا على الهاتف ولا تلتفّ.
+   خمسة تبويبات ملتفّة على سطرين تدفع الجدول خارج الشاشة الأولى،
+   فيبدو أن لا بيانات. */
+.academic-tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-block-end: var(--space-4);
+  overflow-x: auto;
+  border-block-end: 1px solid var(--color-border);
+  scrollbar-width: thin;
+}
+
+.academic-tabs button {
+  flex: 0 0 auto;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-4);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-block-end: 2px solid transparent;
+}
+
+.academic-tabs button.is-active {
+  color: var(--color-primary);
+  border-block-end-color: var(--color-primary);
+}

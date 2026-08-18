@@ -10,6 +10,7 @@ import {
 import { SuspendAccountModal } from '@/features/administration/components/SuspendAccountModal';
 import { useDebounced } from '@/shared/hooks/useDebounced';
 import { PageHeader } from '@/shared/layouts/PageHeader';
+import { AccountHistoryDrawer } from '@/portals/admin/components/AccountHistoryDrawer';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -49,6 +50,7 @@ export function AdminAccountsPage() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [target, setTarget] = useState<AdminAccount | null>(null);
+  const [historyOf, setHistoryOf] = useState<AdminAccount | null>(null);
 
   const debouncedSearch = useDebounced(search);
 
@@ -129,15 +131,24 @@ export function AdminAccountsPage() {
       header: t('admin.actions'),
       align: 'end',
       render: (account) => (
-        <Button
-          variant={account.status === 'ACTIVE' ? 'secondary' : 'primary'}
-          size="sm"
-          onClick={() => {
-            setTarget(account);
-          }}
-        >
-          {account.status === 'ACTIVE' ? t('admin.suspend') : t('admin.activate')}
-        </Button>
+        <div className="admin-accounts__actions">
+          {/* ⚠️  «التاريخ» قبل «الإيقاف»: من يوشك أن يوقف حسابًا
+              يحتاج أن يرى ماذا فعل صاحبه أولًا — والترتيب يقود
+              إلى القراءة قبل القرار. */}
+          <Button variant="ghost" size="sm" onClick={() => setHistoryOf(account)}>
+            {t('admin.history.title')}
+          </Button>
+
+          <Button
+            variant={account.status === 'ACTIVE' ? 'secondary' : 'primary'}
+            size="sm"
+            onClick={() => {
+              setTarget(account);
+            }}
+          >
+            {account.status === 'ACTIVE' ? t('admin.suspend') : t('admin.activate')}
+          </Button>
+        </div>
       ),
     },
   ];
@@ -152,7 +163,7 @@ export function AdminAccountsPage() {
       <div className="admin-accounts__stats">
         <StatCard
           label={t('admin.onlineNow')}
-          value={online.data?.length ?? 0}
+          value={online.data?.count ?? 0}
           hint={t('admin.onlineHint')}
           tone="success"
           icon="●"
@@ -164,11 +175,11 @@ export function AdminAccountsPage() {
         />
       </div>
 
-      {online.data && online.data.length > 0 ? (
+      {online.data && online.data.count > 0 ? (
         <section className="surface admin-accounts__online">
           <h2 className="admin-accounts__heading">{t('admin.whoIsOnline')}</h2>
           <ul className="admin-accounts__list">
-            {online.data.map((user) => (
+            {online.data.users.map((user) => (
               <li key={user.id}>
                 <strong>{user.full_name || user.email}</strong>
                 <span className="muted">{t(`accountType.${user.account_type}`)}</span>
@@ -241,6 +252,8 @@ export function AdminAccountsPage() {
           setTarget(null);
         }}
       />
+
+      <AccountHistoryDrawer account={historyOf} onClose={() => setHistoryOf(null)} />
     </>
   );
 }

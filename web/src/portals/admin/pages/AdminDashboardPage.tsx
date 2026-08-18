@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { getOnlineNow, listAccounts } from '@/features/administration/api';
+import { listAccounts } from '@/features/administration/api';
+import { getLivePulse } from '@/features/analytics/api';
 import { listAlerts } from '@/features/inventory/api';
 import { listAdminOrders } from '@/features/orders/adminApi';
 import { listProviders } from '@/features/payments/adminApi';
@@ -42,9 +43,16 @@ export function AdminDashboardPage() {
     staleTime: 30 * 1000,
   });
 
-  const online = useQuery({
-    queryKey: ['admin', 'online-now'],
-    queryFn: getOnlineNow,
+  /**
+   * ⚠️  `analytics/live` لا `online-now`.
+   *
+   *     الثانية تُسلسِل كل متصل بملفه وآخر عملياته — عملٌ ثقيل
+   *     يتكرّر كل ثلاثين ثانية في كل لوحة مفتوحة لأجل رقم واحد.
+   *     الأولى ثلاثة أعداد وحدها، فمراقبة الضغط لا تصير هي الضغط.
+   */
+  const live = useQuery({
+    queryKey: ['admin', 'live-pulse'],
+    queryFn: getLivePulse,
     refetchInterval: 30 * 1000,
   });
 
@@ -116,13 +124,27 @@ export function AdminDashboardPage() {
           />
         </Link>
 
+        {/* ⚠️  بطاقتان لا واحدة.
+            المسجَّل له اسم وملف يُفتح بنقرة؛ والمجهول عدد بلا هوية.
+            جمعهما في «١٥ متصلًا» يُنتج رقمًا لا يقابله إلا ثلاثة
+            صفوف في جدول المستخدمين — تناقضٌ ظاهر يفقد اللوحة ثقتها. */}
         <Link to="/admin/users" className="dashboard__link">
           <StatCard
             label={t('admin.onlineNow')}
-            value={online.data?.length ?? '—'}
+            value={live.data?.users_online ?? '—'}
             hint={t('admin.onlineHint')}
             tone="success"
             icon="●"
+          />
+        </Link>
+
+        <Link to="/admin/traffic" className="dashboard__link">
+          <StatCard
+            label={t('traffic.guestsOnline')}
+            value={live.data?.guests_online ?? '—'}
+            hint={t('traffic.guestsOnlineHint')}
+            tone="neutral"
+            icon="◍"
           />
         </Link>
 

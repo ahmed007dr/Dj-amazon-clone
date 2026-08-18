@@ -1,0 +1,73 @@
+.reorder-hint {
+  margin-block-end: var(--space-3);
+  font-size: 0.875rem;
+}
+
+.reorder-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.reorder-cell code {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* ⚠️  النفاد يُميَّز عن الانخفاض: «صفر» قرار عاجل و«تحت العتبة»
+   قرار مجدوَل — ولونٌ واحد يجعلهما سواء. */
+.reorder-out {
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+.reorder-low {
+  font-weight: 600;
+  color: var(--color-warning);
+}
+
+.reorder-offers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.reorder-offers li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ⚠️  الأول في القائمة هو الأرخص (الخادم يرتّب بالسعر) — حافة
+   خفيفة تقوله بلا شرح. */
+.reorder-offers li:first-child {
+  border-inline-start: 3px solid var(--color-success);
+}
+
+.reorder-offers__main {
+  display: flex;
+  flex: 1 1 10rem;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-inline-size: 0;
+}
+
+.reorder-offers__main small {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.reorder-offers__side {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}

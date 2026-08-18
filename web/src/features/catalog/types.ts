@@ -138,3 +138,53 @@ export interface Review {
   is_mine: boolean;
   created_at: string;
 }
+
+// ═══════════════════════════════════════════════════════════
+//  الماركات والمصنّعون والفئات — صفحات المتجر العامة
+// ═══════════════════════════════════════════════════════════
+
+/** ⚠️  المصنّع كائن مضمَّن لا معرّف: `BrandSerializer` يُدرجه كاملًا. */
+export interface Manufacturer {
+  id: string;
+  slug: string;
+  name_ar: string;
+  name_en: string;
+  country: string;
+  registration_number: string;
+  website: string;
+  logo: string | null;
+}
+
+export interface ManufacturerInline {
+  id: string;
+  slug: string;
+  name_ar: string;
+  name_en: string;
+  country: string;
+}
+
+export interface Brand {
+  id: string;
+  slug: string;
+  name_ar: string;
+  name_en: string;
+  description_ar: string;
+  description_en: string;
+  logo: string | null;
+  manufacturer: ManufacturerInline | null;
+  is_featured: boolean;
+}
+
+export interface CategoryDetail {
+  id: string;
+  slug: string;
+  name_ar: string;
+  name_en: string;
+  description_ar: string;
+  description_en: string;
+  image: string | null;
+  icon: string;
+  depth: number;
+  display_order: number;
+  children: CategoryBrief[];
+}

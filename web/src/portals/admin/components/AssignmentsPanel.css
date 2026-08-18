@@ -1,0 +1,24 @@
+.assignments-toggle {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-block-size: var(--touch-target);
+  margin-block-end: var(--space-3);
+  font-size: 0.875rem;
+}
+
+.assignment-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.assignment-cell code {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.assignment-period {
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}

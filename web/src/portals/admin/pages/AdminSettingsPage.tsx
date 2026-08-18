@@ -19,6 +19,7 @@ import {
 import { isApiError } from '@/shared/http/errors';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
+import { AccessMatrix } from '@/portals/admin/components/AccessMatrix';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Drawer } from '@/shared/ui/Drawer';
@@ -40,7 +41,11 @@ export function AdminSettingsPage() {
   const { t } = useTranslation();
   const { notify } = useToast();
 
-  const [kind, setKind] = useState<SettingsKind>('locations');
+  // ⚠️  المصفوفة تبويب للعرض لا نوعًا يُحرَّر: `SettingsKind` يقود
+  //     نموذج الإنشاء، وضمّها إليه كان يُلزم النموذج بحقول لكيان
+  //     لا يُنشأ من هنا إطلاقًا.
+  const [tab, setTab] = useState<SettingsKind | 'matrix'>('locations');
+  const kind: SettingsKind = tab === 'matrix' ? 'policies' : tab;
   const [editing, setEditing] = useState<Row | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -183,7 +188,13 @@ export function AdminSettingsPage() {
       <PageHeader
         title={t('nav.settings')}
         description={t('settings.hint')}
-        actions={<Button onClick={() => setCreating(true)}>{t(`settings.new_${kind}`)}</Button>}
+        {...(tab === 'matrix'
+          ? {}
+          : {
+              actions: (
+                <Button onClick={() => setCreating(true)}>{t(`settings.new_${kind}`)}</Button>
+              ),
+            })}
       />
 
       <StatusTabs
@@ -191,24 +202,31 @@ export function AdminSettingsPage() {
           { value: 'locations', label: t('settings.locations') },
           { value: 'expense-categories', label: t('settings.expenseCategories') },
           { value: 'policies', label: t('settings.policies') },
+          // ⚠️  المصفوفة بجوار السياسات لا في شاشة بعيدة: تُقرأ
+          //     بعد كل تعديل للتأكّد من أثره الفعلي.
+          { value: 'matrix', label: t('access.matrix') },
         ]}
-        value={kind}
+        value={tab}
         onChange={(next) => {
-          setKind(next as SettingsKind);
+          setTab(next as SettingsKind | 'matrix');
           setEditing(null);
           setCreating(false);
         }}
       />
 
-      <DataTable
-        columns={columns}
-        rows={active.data ?? []}
-        rowKey={(row) => row.id}
-        isLoading={active.isPending}
-        error={active.error}
-        emptyTitle={t('settings.empty')}
-        emptyBody={t(`settings.emptyBody_${kind}`)}
-      />
+      {tab === 'matrix' ? (
+        <AccessMatrix />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={active.data ?? []}
+          rowKey={(row) => row.id}
+          isLoading={active.isPending}
+          error={active.error}
+          emptyTitle={t('settings.empty')}
+          emptyBody={t(`settings.emptyBody_${kind}`)}
+        />
+      )}
 
       <Drawer
         open={creating || editing !== null}

@@ -6,6 +6,9 @@ import './StoreNav.css';
 const LINKS = [
   { to: '/', key: 'nav.home', end: true },
   { to: '/products', key: 'nav.catalog' },
+  // ⚠️  الماركات مدخل تصفّح مستقل لا فلتر داخل الكتالوج: مشتري
+  //     الدواء يبحث باسم الماركة التي يعرفها قبل أن يعرف فئتها.
+  { to: '/brands', key: 'nav.brands' },
   { to: '/bundles', key: 'nav.bundles' },
 ];
 

@@ -9,6 +9,8 @@ import { DataTable, type Column } from '@/shared/tables/DataTable';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Drawer } from '@/shared/ui/Drawer';
+import { BusinessDetailsForm } from '@/portals/admin/components/BusinessDetailsForm';
+import { BusinessLedgerPanel } from '@/portals/admin/components/BusinessLedgerPanel';
 import { FilterBar, FilterSearch, FilterSelect } from '@/shared/ui/FilterBar';
 import { Pagination } from '@/shared/ui/Pagination';
 import { StateMessage } from '@/shared/ui/StateMessage';
@@ -39,6 +41,7 @@ export function AdminBusinessesPage() {
   const [creditStatus, setCreditStatus] = useState('');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<BusinessProfile | null>(null);
+  const [panel, setPanel] = useState<'credit' | 'details' | 'ledger'>('credit');
 
   const debounced = useDebounced(search);
   const query = useAdminBusinesses({
@@ -167,13 +170,43 @@ export function AdminBusinessesPage() {
 
       <Drawer
         open={selected !== null}
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          setSelected(null);
+          // ⚠️  العودة إلى «الائتمان» مع كل إغلاق: فتح عميل جديد
+          //     على تبويب «الحركات» يعرض كشفًا قبل أن يُطلَب.
+          setPanel('credit');
+        }}
         {...(selected ? { title: selected.legal_name } : {})}
       >
-        {/* ⚠️  `key` يعيد تركيب اللوح لكل عميل: بلا ذلك تبقى قيم
-            النموذج من العميل السابق ظاهرة للحظة — وهي حقول تُمنح
-            بها حدود ائتمانية. */}
-        {selected ? <CreditPanel key={selected.id} business={selected} /> : null}
+        {selected ? (
+          <>
+            <div className="business-tabs" role="tablist">
+              {(['credit', 'details', 'ledger'] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={panel === value}
+                  className={panel === value ? 'is-active' : ''}
+                  onClick={() => setPanel(value)}
+                >
+                  {t(`b2b.panel.${value}`)}
+                </button>
+              ))}
+            </div>
+
+            {/* ⚠️  `key` يعيد تركيب اللوح لكل عميل: بلا ذلك تبقى قيم
+                النموذج من العميل السابق ظاهرة للحظة — وهي حقول
+                تُمنح بها حدود ائتمانية. */}
+            {panel === 'credit' ? <CreditPanel key={selected.id} business={selected} /> : null}
+            {panel === 'details' ? (
+              <BusinessDetailsForm key={selected.id} business={selected} />
+            ) : null}
+            {panel === 'ledger' ? (
+              <BusinessLedgerPanel key={selected.id} business={selected} />
+            ) : null}
+          </>
+        ) : null}
       </Drawer>
     </>
   );

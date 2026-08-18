@@ -5,11 +5,15 @@
 ## التشغيل
 
 ```bash
+cd ..
+cp .env.public.example .env.public   # الدومين — للفرونت والباك معًا
 cd web
-cp .env.example .env      # اضبط VITE_API_BASE_URL
 npm install
-npm run dev               # http://localhost:5173
+npm run dev                          # المنفذ من PUBLIC_SITE_DOMAIN
 ```
+
+> **لا ملف بيئة في `web/`.** الإعداد يأتي من `../.env.public` — نفس
+> الملف الذي يقرأه Django. انظر القاعدة ١ أدناه.
 
 يحتاج الباك إند يعمل على `http://127.0.0.1:8000` مع بذرة بيانات:
 
@@ -34,6 +38,20 @@ python manage.py runserver
 
 المصدر الوحيد [`src/shared/http/config.ts`](src/shared/http/config.ts)،
 والقيمة من `VITE_API_BASE_URL`. تبديل البيئة = تغيير متغيّر واحد.
+
+**ومن أين تأتي القيمة؟** من [`../.env.public`](../.env.public.example)
+عبر [`vite.config.ts`](vite.config.ts) (ADR-73 · ADR-74):
+
+```
+.env.public          PUBLIC_SCHEME · PUBLIC_API_DOMAIN · PUBLIC_API_PREFIX
+      │                            ↓ يقرؤه الطرفان
+      ├──→ vite.config.ts  →  VITE_API_BASE_URL   →  shared/http/config.ts
+      └──→ settings/base.py →  CORS · CSRF · ALLOWED_HOSTS · FRONTEND_BASE_URL
+```
+
+⚠️  **الحقن قائمة بيضاء مكتوبة بالاسم** في `define`، والقارئ يقبل
+البادئة `PUBLIC_` وحدها — فملف الأسرار `../.env` لا يُفتح أصلًا،
+ولا يخرج منه مفتاح إلى حزمة المتصفح.
 
 **يُفرَض بـ ESLint لا بالمراجعة.** جرّبها:
 

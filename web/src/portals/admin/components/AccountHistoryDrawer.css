@@ -1,0 +1,87 @@
+.account-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ⚠️  تمرير أفقي لا التفاف: ثلاثة تبويبات ملتفّة داخل لوح ضيّق
+   تدفع المحتوى خارج النظر. */
+.account-history__tabs {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  border-block-end: 1px solid var(--color-border);
+}
+
+.account-history__tabs button {
+  flex: 0 0 auto;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-block-end: 2px solid transparent;
+}
+
+.account-history__tabs button.is-active {
+  color: var(--color-primary);
+  border-block-end-color: var(--color-primary);
+}
+
+.account-history__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.account-history__list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: start;
+  justify-content: space-between;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.account-history__main {
+  display: flex;
+  flex: 1 1 12rem;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-inline-size: 0;
+}
+
+.account-history__main strong {
+  font-size: 0.9375rem;
+}
+
+.account-history__main span {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.account-history__main code {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.account-history__side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  align-items: end;
+  text-align: end;
+}
+
+.account-history__side small {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}

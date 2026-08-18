@@ -13,3 +13,41 @@
 .pos-variance.is-notable.is-short {
   color: var(--color-danger);
 }
+
+.session-detail {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.session-detail > div {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  justify-content: space-between;
+  padding-block: var(--space-2);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.session-detail dt {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.session-detail dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ⚠️  التفسير يأخذ سطره كاملًا: نصّ حرّ في عمود ضيّق يُقصّ،
+   وهو بالضبط ما تبحث عنه المراجعة. */
+.session-detail__note {
+  flex-direction: column !important;
+  align-items: start !important;
+  gap: var(--space-1) !important;
+}
+
+.session-detail__note dd {
+  font-weight: 400;
+  line-height: 1.6;
+}

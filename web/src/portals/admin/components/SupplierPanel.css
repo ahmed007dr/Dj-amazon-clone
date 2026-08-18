@@ -133,3 +133,69 @@
   direction: ltr;
   color: var(--color-text-muted);
 }
+
+/* ── كشف الحركات ─────────────────────────────────────────── */
+/* ⚠️  ألوان الاتجاه تُعرَّف **هنا** لا في ملف لوح B2B.
+   الفئتان كانتا معرَّفتين هناك وحده، وvite يفصل حزمة كل شاشة —
+   فتظهر أرقام الكشف بلا لون في شاشة الموردين ويضيع الاتجاه. */
+.supplier-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.supplier-ledger__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.supplier-ledger__list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: start;
+  justify-content: space-between;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.supplier-ledger__main {
+  display: flex;
+  flex: 1 1 10rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: start;
+  min-inline-size: 0;
+}
+
+.supplier-ledger__main span {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.supplier-ledger__side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  align-items: end;
+}
+
+.supplier-ledger__side small {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.supplier-ledger .ledger-debit {
+  color: var(--color-danger);
+}
+
+.supplier-ledger .ledger-credit {
+  color: var(--color-success);
+}

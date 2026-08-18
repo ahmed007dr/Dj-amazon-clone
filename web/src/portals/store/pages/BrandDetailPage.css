@@ -1,0 +1,55 @@
+.brand-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding-block: var(--space-5);
+}
+
+/* ⚠️  عمودان على الشاشة الواسعة وعمود واحد على الهاتف: الشعار
+   بجوار النص يضغط الوصف إلى شريط ضيّق غير مقروء على ٣٦٠ بكسل. */
+.brand-detail__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.brand-detail__head img {
+  block-size: 4.5rem;
+  max-inline-size: 8rem;
+  object-fit: contain;
+}
+
+.brand-detail__initial {
+  display: grid;
+  place-items: center;
+  inline-size: 4.5rem;
+  block-size: 4.5rem;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-on-primary);
+  background: var(--color-secondary);
+  border-radius: 50%;
+}
+
+.brand-detail__head h1 {
+  margin: 0;
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+}
+
+.brand-detail__maker {
+  margin: var(--space-1) 0 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.brand-detail__about {
+  max-inline-size: 60ch;
+  margin: var(--space-2) 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}

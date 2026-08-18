@@ -205,3 +205,44 @@ export function useDeleteCoupon() {
     http.delete<void>(`/promotions/admin/coupons/${id}/`),
   );
 }
+
+// ═══════════════════════════════════════════════════════════
+//  سجل صرف الكوبونات
+// ═══════════════════════════════════════════════════════════
+
+export interface CouponRedemption {
+  id: string;
+  coupon: string;
+  coupon_code: string;
+  user: string | null;
+  user_email: string | null;
+  reference_type: string;
+  reference_id: string;
+  discount_amount: string;
+  is_cancelled: boolean;
+  cancelled_at: string | null;
+  created_at: string;
+}
+
+/**
+ * من صرف الكوبون ومتى وبكم.
+ *
+ * ⚠️  **الملغى مُستبعَد افتراضيًا ويُطلَب صراحةً.**
+ *
+ *     السجل يبقي استخدام طلبٍ أُلغي ويُعلّمه؛ ضمّه إلى العدّ
+ *     الافتراضي يجعل «صُرف ٣٠٠ مرة» تشمل مئة طلب لم يخرج منها
+ *     شيء — ويُبنى على الرقم قرار تمديد الحملة.
+ */
+export function useCouponRedemptions(params: {
+  coupon?: string;
+  cancelled?: string;
+  page?: number;
+}) {
+  return useQuery({
+    queryKey: ['pricing', 'redemptions', params],
+    queryFn: () =>
+      http.get<PagedResponse<CouponRedemption>>('/promotions/admin/redemptions/', {
+        params: { ...params },
+      }),
+  });
+}

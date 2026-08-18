@@ -82,6 +82,37 @@ export interface CustomersReport {
   by_segment: { segment: string; customers: number; total: string }[];
 }
 
+/** خلية في شبكة ساعات الأسبوع — الشبكة تصل مكتملة (١٦٨ خلية). */
+export interface PeakCell {
+  weekday: number;
+  hour: number;
+  orders: number;
+  total: string;
+}
+
+export interface PeakRollup {
+  hour?: number;
+  weekday?: number;
+  name_ar?: string;
+  name_en?: string;
+  orders: number;
+  total: string;
+}
+
+export interface PeakHoursReport {
+  start: string;
+  end: string;
+  /** ⚠️  تُعرَض دائمًا: «الذروة ٥ م» بلا منطقة رقمٌ يُقرأ خطأً. */
+  timezone: string;
+  orders_count: number;
+  cells: PeakCell[];
+  by_hour: PeakRollup[];
+  by_weekday: PeakRollup[];
+  peak_cell: PeakCell | null;
+  peak_hour: PeakRollup | null;
+  peak_weekday: PeakRollup | null;
+}
+
 export interface PerformanceReport {
   start: string; end: string;
   employees: {
@@ -111,8 +142,24 @@ function useReport<T>(path: string, key: string, period: Period) {
 export const useOverview = (period: Period) =>
   useReport<Overview>('/reports/overview/', 'overview', period);
 
-export const useSalesReport = (period: Period) =>
-  useReport<SalesReport>('/reports/sales/', 'sales', period);
+/**
+ * ⚠️  `by` صريح لا افتراضي صامت.
+ *
+ *     «الأكثر طلبًا» بالقيمة و«الأكثر طلبًا» بالعدد جدولان مختلفان
+ *     وكلاهما صحيح؛ ترك الاختيار للخادم يجعل الأدمن يقرأ ترتيبًا
+ *     لا يعرف على أي أساس بُني.
+ */
+export type TopProductsBy = 'revenue' | 'quantity';
+
+export const useSalesReport = (period: Period, by: TopProductsBy = 'revenue') =>
+  useQuery({
+    queryKey: ['reports', 'sales', period, by],
+    queryFn: () =>
+      http.get<SalesReport>('/reports/sales/', { params: { ...period, by } }),
+  });
+
+export const usePeakHours = (period: Period) =>
+  useReport<PeakHoursReport>('/reports/peak-hours/', 'peak-hours', period);
 
 export const useCustomersReport = (period: Period) =>
   useReport<CustomersReport>('/reports/customers/', 'customers', period);

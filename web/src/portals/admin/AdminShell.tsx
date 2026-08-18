@@ -4,6 +4,7 @@ import { SidebarLayout } from '@/shared/layouts/SidebarLayout';
 
 import { AdminHeader } from './components/AdminHeader';
 import { AdminSidebar } from './components/AdminSidebar';
+import { PreviewBanner } from './components/PreviewBanner';
 
 /**
  * قشرة لوحة الأدمن.
@@ -17,6 +18,9 @@ import { AdminSidebar } from './components/AdminSidebar';
 export function AdminShell() {
   return (
     <SidebarLayout sidebar={<AdminSidebar />} header={<AdminHeader />}>
+      {/* ⚠️  في القشرة لا في صفحة: وضع المعاينة يسري على كل نداء،
+          والأدمن الذي ينساه يقرأ كتالوجًا ناقصًا ويظنه عطلًا. */}
+      <PreviewBanner />
       <Outlet />
     </SidebarLayout>
   );

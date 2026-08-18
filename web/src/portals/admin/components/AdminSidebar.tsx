@@ -37,6 +37,14 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
       // ⚠️  تحت المنتجات لا في «النظام»: الفئة إلزامية على المنتج،
       //     فهي خطوة في إضافة صنف لا إعدادًا يُضبط مرة.
       { to: '/admin/reference', key: 'nav.reference', permission: 'catalog.change_category' },
+      // ⚠️  الشجرة الأكاديمية بجوار المرجعيات: كلاهما بيانات أساسية
+      //     تُضبط قبل أن يعمل ما فوقها — والطالب لا يُسجَّل أصلًا
+      //     قبل وجود جامعته وكليته في النظام.
+      {
+        to: '/admin/academic',
+        key: 'academic.adminTitle',
+        permission: 'academic.change_university',
+      },
       // ⚠️  التسعير تحت الكتالوج لا في «النظام»: السعر قرار تجاري
       //     يومي يتغيّر مع كل حملة، لا إعداد يُضبط مرة.
       { to: '/admin/pricing', key: 'nav.pricing', permission: 'pricing.change_pricelist' },
@@ -67,6 +75,9 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
       // ⚠️  التقارير أول القسم المالي: هي ما يُفتح يوميًا،
       //     وقائمة الأرباح تُقرأ عند الإقفال.
       { to: '/admin/reports', key: 'reports.title', permission: 'finance.view_revenueentry' },
+      // ⚠️  الضغط بجوار التقارير لا في «النظام»: «متى يشتري الناس؟»
+      //     سؤال تجاري يُبنى عليه جدول المناوبات والعروض، لا إعداد.
+      { to: '/admin/traffic', key: 'traffic.title', permission: 'finance.view_revenueentry' },
       { to: '/admin/finance', key: 'finance.title', permission: 'finance.view_revenueentry' },
       { to: '/admin/expenses', key: 'finance.expensesTitle', permission: 'finance.add_expense' },
       { to: '/admin/businesses', key: 'b2b.businesses', permission: 'b2b.change_businessprofile' },

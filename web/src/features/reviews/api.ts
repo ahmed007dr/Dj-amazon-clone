@@ -58,6 +58,9 @@ function useReviewMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult
       void queryClient.invalidateQueries({ queryKey: ['catalog', 'reviews'] });
       void queryClient.invalidateQueries({ queryKey: MINE_KEY });
       void queryClient.invalidateQueries({ queryKey: ['catalog', 'product'] });
+      // ⚠️  والتقييم المجمَّع معها: كاتب المراجعة ينظر إلى المتوسط
+      //     مباشرةً بعد الإرسال، ورقمٌ لم يتحرّك يُقرأ «لم تُحفظ».
+      void queryClient.invalidateQueries({ queryKey: ['reviews', 'rating'] });
     },
   });
 }

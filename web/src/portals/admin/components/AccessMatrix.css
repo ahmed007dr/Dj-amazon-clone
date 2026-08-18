@@ -1,0 +1,86 @@
+.access-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.access-matrix p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+/* ⚠️  التمرير داخل الحاوية لا في الصفحة: الجدول أعرض من أي هاتف،
+   وتمرير الصفحة أفقيًا يكسر التنقّل والهيدر معه. */
+.access-matrix__scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.access-matrix table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+
+.access-matrix th,
+.access-matrix td {
+  padding: var(--space-2) var(--space-3);
+  text-align: center;
+  white-space: nowrap;
+  border-block-end: 1px solid var(--color-border);
+}
+
+.access-matrix thead th {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+}
+
+/* ⚠️  عمود السياسة ملتصق عند التمرير: بدونه يفقد القارئ اسم
+   الصف حين يصل إلى آخر الأنواع. */
+.access-matrix tbody th {
+  position: sticky;
+  inset-inline-start: 0;
+  text-align: start;
+  background: var(--color-surface);
+}
+
+.access-matrix__policy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  align-items: start;
+}
+
+.access-matrix__policy code {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.access-matrix__policy em {
+  font-size: 0.7rem;
+  font-style: normal;
+  color: var(--color-warning);
+}
+
+.access-matrix__pair {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+}
+
+.is-allowed {
+  font-weight: 700;
+  color: var(--color-success);
+}
+
+.is-denied {
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+.access-matrix__legend {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}

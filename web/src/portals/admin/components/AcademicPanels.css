@@ -1,0 +1,199 @@
+/* ⚠️  ملف واحد لألواح الشجرة الأكاديمية الخمسة.
+   الألواح متطابقة الشكل عمدًا (شريط ترشيح ← جدول ← لوح نموذج)،
+   وخمسة ملفات بنفس القواعد كانت تتباعد عند أول تعديل في أحدها. */
+
+.academic-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: end;
+  margin-block-end: var(--space-4);
+}
+
+.academic-filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.academic-filter select,
+.academic-filter input {
+  min-block-size: var(--touch-target);
+  min-inline-size: 9rem;
+  padding-inline: var(--space-3);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.academic-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.academic-cell code {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.academic-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  justify-content: end;
+}
+
+.academic-hint {
+  padding: var(--space-3);
+  margin-block: var(--space-3);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
+  border-radius: var(--radius-sm);
+}
+
+/* ── النماذج داخل اللوح المنزلق ──────────────────────────── */
+
+.academic-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.academic-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.academic-form input,
+.academic-form select,
+.academic-form textarea {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.academic-form textarea {
+  padding-block: var(--space-2);
+  resize: vertical;
+}
+
+.academic-form small {
+  font-size: 0.75rem;
+}
+
+.academic-check {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: var(--space-2);
+  align-items: center;
+  min-block-size: var(--touch-target);
+  font-size: 0.875rem;
+  color: var(--color-text) !important;
+}
+
+.academic-check input {
+  min-block-size: auto;
+}
+
+.academic-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-block-start: var(--space-3);
+  border-block-start: 1px solid var(--color-border);
+}
+
+/* ── بنود الحزمة ─────────────────────────────────────────── */
+
+.bundle-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.bundle-items__head h4 {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.bundle-items__add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.bundle-items__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+/* ⚠️  عمود واحد على الهاتف: البند يحمل كمية وخانة «أساسي» وزر
+   حذف — ضغطها في صفّ واحد يجعل الحقول أضيق من أن تُلمس. */
+.bundle-items__list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.bundle-items__info {
+  display: flex;
+  flex: 1 1 10rem;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-inline-size: 0;
+}
+
+.bundle-items__info code {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.bundle-items__qty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.bundle-items__qty input {
+  inline-size: 5rem;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-2);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.bundle-items__essential {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-block-size: var(--touch-target);
+  font-size: 0.8125rem;
+}

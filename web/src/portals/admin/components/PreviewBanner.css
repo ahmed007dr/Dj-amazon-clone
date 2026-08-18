@@ -1,0 +1,22 @@
+/* ⚠️  لون تحذيري صريح وموضع ثابت: الشريط الهادئ يُعتاد عليه في
+   دقيقتين فيفقد وظيفته كلها. */
+.preview-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.875rem;
+  color: #1b1f23;
+  background: var(--color-accent);
+}
+
+.preview-banner strong {
+  font-weight: 700;
+}
+
+.preview-banner em {
+  font-size: 0.75rem;
+  font-style: normal;
+  opacity: 0.85;
+}

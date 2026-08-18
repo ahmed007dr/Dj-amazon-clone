@@ -160,6 +160,90 @@ export function usePurchaseOrders(supplier: string | null, status: string) {
   });
 }
 
+/**
+ * كشف حركات المورّد — **كل التاريخ مرقَّمًا**.
+ *
+ * ⚠️  ليس كشف الحساب: ذاك مقيَّد بفترة ويعطي رصيدًا افتتاحيًا
+ *     وختاميًا وتجميعات. وهذا يعطي كل حركة على حدة بلا نافذة —
+ *     سؤالان مختلفان لا نسختان من سؤال.
+ */
+export function useSupplierLedger(supplier: string | null, page = 1) {
+  return useQuery({
+    queryKey: ['suppliers', 'ledger', supplier, page],
+    queryFn: () =>
+      http.get<PagedResponse<LedgerEntry>>(`/suppliers/${supplier}/ledger/`, {
+        params: { page },
+      }),
+    enabled: supplier !== null,
+  });
+}
+
+/**
+ * كل من يعرض هذا المنتج — **مرتّبين بالسعر**.
+ *
+ * ⚠️  هذه نقطة المقارنة قبل الشراء: أمر شراء يُكتب بلا رؤية
+ *     البدائل يدفع سعر أول مورّد يخطر على البال. والمفضّل مُعلَّم
+ *     لكنه لا يُخفي الأرخص.
+ */
+export function useProductOffers(product: string | null) {
+  return useQuery({
+    queryKey: ['suppliers', 'product-offers', product],
+    queryFn: () => http.get<ProductOffer[]>(`/suppliers/products/${product}/offers/`),
+    enabled: product !== null,
+  });
+}
+
+export interface ProductOffer {
+  supplier: string;
+  supplier_name_ar: string;
+  supplier_name_en: string;
+  unit_cost: string;
+  minimum_order_quantity: number;
+  lead_time_days: number;
+  is_preferred: boolean;
+}
+
+export interface ReorderSuggestion {
+  product: string;
+  sku: string;
+  name_ar: string;
+  name_en: string;
+  on_hand: number;
+  reorder_point: number;
+  supplier: string | null;
+  supplier_name: string | null;
+  unit_cost: string | null;
+  has_supplier: boolean;
+}
+
+/**
+ * ما يجب شراؤه — أصناف تحت نقطة إعادة الطلب.
+ *
+ * ⚠️  **الصنف بلا مورّد يُدرَج ويُعلَّم لا يُحذف** (قرار الخادم).
+ *
+ *     استبعاده يُخفي أهم نقص في المخزن من شاشة الشراء — والسبب
+ *     أنه بلا مورّد، وهو بالضبط ما يجب أن يُعالَج.
+ */
+export function useReorderSuggestions(location?: string) {
+  return useQuery({
+    queryKey: ['suppliers', 'reorder', location ?? ''],
+    queryFn: () =>
+      http.get<ReorderSuggestion[]>('/suppliers/reorder-suggestions/', { params: { location } }),
+  });
+}
+
+export function useSaveOffer() {
+  return useSupplierMutation(({ id, ...body }: Partial<SupplierOffer> & { id?: string }) =>
+    id
+      ? http.patch<SupplierOffer>(`/suppliers/offers/${id}/`, body)
+      : http.post<SupplierOffer>('/suppliers/offers/', body),
+  );
+}
+
+export function useDeleteOffer() {
+  return useSupplierMutation((id: string) => http.delete<void>(`/suppliers/offers/${id}/`));
+}
+
 export function useSupplierOffers(supplier: string | null) {
   return useQuery({
     queryKey: ['suppliers', 'offers', supplier],

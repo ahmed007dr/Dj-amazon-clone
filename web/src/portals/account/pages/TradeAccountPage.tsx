@@ -5,6 +5,7 @@ import { useMyAccount, useMyInvoices, useMyStatement } from '@/features/b2b/api'
 import { isApiError } from '@/shared/http/errors';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { Alert } from '@/shared/ui/Alert';
+import { BusinessProfileForm } from '@/portals/account/components/BusinessProfileForm';
 import { Spinner } from '@/shared/ui/Spinner';
 import { StateMessage } from '@/shared/ui/StateMessage';
 
@@ -14,7 +15,7 @@ import { StatementTable } from '../components/StatementTable';
 
 import './TradeAccountPage.css';
 
-type Tab = 'invoices' | 'statement';
+type Tab = 'invoices' | 'statement' | 'details';
 
 /**
  * حساب العميل التجاري.
@@ -98,9 +99,23 @@ export function TradeAccountPage() {
         >
           {t('b2b.statement')}
         </button>
+        {/* ⚠️  «بياناتي» تبويب لا شاشة منفصلة: يُفتح لتجديد ترخيص
+            انتهى، والتنبيه بانتهائه يظهر فوق هذه التبويبات
+            مباشرةً — فالمسافة بين التنبيه وعلاجه خطوة واحدة. */}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'details'}
+          className={tab === 'details' ? 'is-active' : ''}
+          onClick={() => setTab('details')}
+        >
+          {t('b2b.myDetails')}
+        </button>
       </div>
 
-      {tab === 'invoices' ? (
+      {tab === 'details' ? (
+        <BusinessProfileForm />
+      ) : tab === 'invoices' ? (
         invoices.data ? (
           <InvoiceList invoices={invoices.data.results} />
         ) : (

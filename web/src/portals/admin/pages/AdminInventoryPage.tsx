@@ -8,6 +8,7 @@ import {
   listMovements,
   listStock,
   runMaintenance,
+  useUpdateStockThresholds,
   type Stock,
   type StockAlert,
   type StockMovement,
@@ -19,6 +20,7 @@ import {
   type MovementAction,
 } from '@/portals/admin/components/StockMovementForm';
 import { useDebounced } from '@/shared/hooks/useDebounced';
+import { isApiError } from '@/shared/http/errors';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
@@ -28,6 +30,7 @@ import { Drawer } from '@/shared/ui/Drawer';
 import { FilterBar, FilterSearch, FilterSelect } from '@/shared/ui/FilterBar';
 import { Pagination } from '@/shared/ui/Pagination';
 import { StatusTabs } from '@/shared/ui/StatusTabs';
+import { ReservationsTab } from '@/portals/admin/components/ReservationsTab';
 import { useToast } from '@/shared/ui/useToast';
 import { formatDate, formatDateTime } from '@/shared/utils/format';
 
@@ -63,7 +66,7 @@ const MOVEMENT_ACTIONS: MovementAction[] = ['receive', 'adjust', 'transfer', 'da
  *     أمين المخزن يفتح الشاشة على التنبيهات: ما نفد وما قارب
  *     الانتهاء. أما الجرد فيُفتح مرة كل شهر — وموضعه في الآخر.
  */
-type Tab = 'alerts' | 'stock' | 'batches' | 'movements' | 'counts';
+type Tab = 'alerts' | 'stock' | 'batches' | 'movements' | 'counts' | 'reservations';
 
 const ALERT_TONES = {
   LOW_STOCK: 'warning',
@@ -87,6 +90,11 @@ export function AdminInventoryPage() {
   const localized = useLocalized();
   const queryClient = useQueryClient();
   const { notify } = useToast();
+
+  const thresholds = useUpdateStockThresholds();
+
+  const fail = (error: unknown) =>
+    notify(isApiError(error) ? error.displayMessage : t('state.errorTitle'), 'danger');
 
   const [tab, setTab] = useState<Tab>('alerts');
   const [search, setSearch] = useState('');
@@ -230,6 +238,58 @@ export function AdminInventoryPage() {
         </strong>
       ),
     },
+    {
+      key: 'thresholds',
+      header: t('inventory.thresholds'),
+      align: 'end',
+      // ⚠️  **الحدود تُعدَّل في مكانها — والكميات لا.**
+      //
+      //     نقطة إعادة الطلب رقم يُضبط بالتجربة موسمًا بعد موسم،
+      //     ودفنه خلف شاشة تعديل يجعله يبقى على قيمته الأولى
+      //     للأبد فتصير التنبيهات ضجيجًا يُتجاهَل. أما الكميات
+      //     فلها مساراتها المسجَّلة (استلام · تسوية · تحويل)،
+      //     والخادم يرفض تعديلها من هنا أصلًا.
+      render: (row) => (
+        <span className="stock-thresholds">
+          <input
+            type="number"
+            min="0"
+            dir="ltr"
+            aria-label={t('inventory.reorderPoint')}
+            defaultValue={row.reorder_point}
+            onBlur={(event) => {
+              const value = Number(event.target.value);
+              if (value < 0 || value === row.reorder_point) return;
+              thresholds.mutate(
+                { id: row.id, reorder_point: value },
+                {
+                  onSuccess: () => notify(t('inventory.thresholdSaved'), 'success'),
+                  onError: fail,
+                },
+              );
+            }}
+          />
+          <input
+            type="number"
+            min="0"
+            dir="ltr"
+            aria-label={t('inventory.criticalPoint')}
+            defaultValue={row.critical_point}
+            onBlur={(event) => {
+              const value = Number(event.target.value);
+              if (value < 0 || value === row.critical_point) return;
+              thresholds.mutate(
+                { id: row.id, critical_point: value },
+                {
+                  onSuccess: () => notify(t('inventory.thresholdSaved'), 'success'),
+                  onError: fail,
+                },
+              );
+            }}
+          />
+        </span>
+      ),
+    },
   ];
 
   const movementColumns: Column<StockMovement>[] = [
@@ -324,6 +384,9 @@ export function AdminInventoryPage() {
           { value: 'batches', label: t('inventory.batches') },
           { value: 'movements', label: t('inventory.movements') },
           { value: 'counts', label: t('inventory.counts') },
+          // ⚠️  الحجوزات بجوار الأرصدة: هي تفسير الفرق بين الرصيد
+          //     والمتاح، ومن يفتح الأرصدة هو من يسأل عنه.
+          { value: 'reservations', label: t('inventory.reservations') },
         ]}
         value={tab}
         onChange={(next) => {
@@ -443,6 +506,8 @@ export function AdminInventoryPage() {
         <BatchesTab />
       ) : tab === 'counts' ? (
         <StockCountsTab />
+      ) : tab === 'reservations' ? (
+        <ReservationsTab />
       ) : tab === 'alerts' ? (
         <>
           <DataTable

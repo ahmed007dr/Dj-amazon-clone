@@ -11,6 +11,9 @@ import { DocumentsPage } from '@/portals/account/pages/DocumentsPage';
 import { NotificationsPage } from '@/portals/account/pages/NotificationsPage';
 import { LoyaltyPage } from '@/portals/account/pages/LoyaltyPage';
 import { ProfilePage } from '@/portals/account/pages/ProfilePage';
+import { BrandDetailPage } from '@/portals/store/pages/BrandDetailPage';
+import { BrandsPage } from '@/portals/store/pages/BrandsPage';
+import { CategoryPage } from '@/portals/store/pages/CategoryPage';
 import { SecurityPage } from '@/portals/account/pages/SecurityPage';
 import { NotFoundPage } from '@/portals/store/pages/NotFoundPage';
 import { StoreShell } from '@/portals/store/StoreShell';
@@ -153,6 +156,17 @@ const AdminReportsPage = lazy(() =>
     default: module.AdminReportsPage,
   })),
 );
+const AdminTrafficPage = lazy(() =>
+  import('@/portals/admin/pages/AdminTrafficPage').then((module) => ({
+    default: module.AdminTrafficPage,
+  })),
+);
+const AdminAcademicPage = lazy(() =>
+  import('@/portals/admin/pages/AdminAcademicPage').then((module) => ({
+    default: module.AdminAcademicPage,
+  })),
+);
+
 const AdminLoyaltyPage = lazy(() =>
   import('@/portals/admin/pages/AdminLoyaltyPage').then((module) => ({
     default: module.AdminLoyaltyPage,
@@ -204,6 +218,12 @@ const router = createBrowserRouter([
       { path: 'products', element: <ProductsPage /> },
       // ⚠️  `slug` لا UUID — الرابط يُشارَك ويُفهرَس (ADR-27)
       { path: 'products/:slug', element: <ProductDetailPage /> },
+      // ⚠️  صفحات عامة بلا حارس: الماركة والفئة مدخلا بحث خارجي
+      //     (ADR-37) — وإخفاؤها خلف تسجيل دخول يقطع الطريق الذي
+      //     يصل منه أغلب الزوار.
+      { path: 'brands', element: <BrandsPage /> },
+      { path: 'brands/:slug', element: <BrandDetailPage /> },
+      { path: 'categories/:slug', element: <CategoryPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
 
@@ -321,7 +341,9 @@ const router = createBrowserRouter([
       { path: 'staff', element: <Lazy><AdminStaffPage /></Lazy> },
       { path: 'targets', element: <Lazy><AdminTargetsPage /></Lazy> },
       { path: 'loyalty', element: <Lazy><AdminLoyaltyPage /></Lazy> },
+      { path: 'academic', element: <Lazy><AdminAcademicPage /></Lazy> },
       { path: 'reports', element: <Lazy><AdminReportsPage /></Lazy> },
+      { path: 'traffic', element: <Lazy><AdminTrafficPage /></Lazy> },
       { path: 'suppliers', element: <Lazy><AdminSuppliersPage /></Lazy> },
       { path: 'branding', element: <Lazy><AdminBrandingPage /></Lazy> },
     ],

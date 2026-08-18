@@ -269,3 +269,46 @@ export function useEndAssignment() {
     },
   });
 }
+
+// ═══════════════════════════════════════════════════════════
+//  سجل الإسناد
+// ═══════════════════════════════════════════════════════════
+
+export interface CustomerAssignment {
+  id: string;
+  customer: string;
+  customer_number: string;
+  employee: string;
+  employee_number: string;
+  employee_name: string;
+  status: 'ACTIVE' | 'ENDED' | 'TRANSFERRED';
+  started_at: string;
+  ended_at: string | null;
+}
+
+/**
+ * من أُسند إلى من — **وتاريخ ذلك**.
+ *
+ * ⚠️  **العمولة تتبع الإسناد، فالتاريخ مالٌ لا سجل.**
+ *
+ *     «هذا العميل كان لي في مارس» دعوى تُحسم بهذا الجدول وحده.
+ *     شاشة الموظفين تعرض العدد الحالي؛ والعدد لا يقول متى انتقل
+ *     العميل ولا من كان قبله.
+ *
+ * ⚠️  و**المنتهي مُدرَج**: قصر القائمة على النشط يجعل السؤال
+ *     الوحيد الذي تُفتح لأجله بلا جواب.
+ */
+export function useAssignments(params: {
+  employee?: string;
+  customer?: string;
+  active?: string;
+  page?: number;
+}) {
+  return useQuery({
+    queryKey: ['employees', 'admin', 'assignments', params],
+    queryFn: () =>
+      http.get<PagedResponse<CustomerAssignment>>('/employees/admin/assignments/', {
+        params: { ...params },
+      }),
+  });
+}

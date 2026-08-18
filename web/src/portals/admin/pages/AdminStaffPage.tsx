@@ -28,7 +28,7 @@ import { useToast } from '@/shared/ui/useToast';
 
 import './AdminStaffPage.css';
 
-type Tab = 'staff' | 'unassigned' | 'roles';
+type Tab = 'staff' | 'unassigned' | 'roles' | 'assignments';
 
 /**
  * الموظفون وإسناد العملاء.
@@ -209,9 +209,24 @@ export function AdminStaffPage() {
         >
           {t('staff.roles')}
         </button>
+        {/* ⚠️  سجل الإسناد بجوار الموظفين: من يراجع عمولة يراجع
+            من كان يخدم العميل وقتها — وهما شاشة واحدة عمليًا. */}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'assignments'}
+          className={tab === 'assignments' ? 'is-active' : ''}
+          onClick={() => {
+            setTab('assignments');
+            setPage(1);
+          }}
+        >
+          {t('staff.assignments')}
+        </button>
       </div>
 
       {tab === 'roles' ? <RolesPanel /> : null}
+      {tab === 'assignments' ? <AssignmentsPanel /> : null}
 
       {tab === 'staff' ? (
         <>

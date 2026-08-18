@@ -367,3 +367,56 @@ export function useCancelCount() {
     http.post<StockCount>(`/inventory/counts/${id}/cancel/`, { reason }),
   );
 }
+
+// ═══════════════════════════════════════════════════════════
+//  الحجوزات وحدود التنبيه
+// ═══════════════════════════════════════════════════════════
+
+export interface StockReservation {
+  id: string;
+  product: string;
+  product_sku: string;
+  variant: string | null;
+  location: string;
+  quantity: number;
+  status: 'ACTIVE' | 'RELEASED' | 'CONSUMED' | 'EXPIRED';
+  reference_type: string;
+  reference_id: string;
+  expires_at: string | null;
+  resolved_at: string | null;
+}
+
+/**
+ * الحجوزات القائمة.
+ *
+ * ⚠️  **الحجز يخصم من المتاح ولا يظهر في أي شاشة كانت.**
+ *
+ *     «الرصيد ١٠٠ والمتاح ٦٠ — أين الأربعون؟» سؤال لا جواب له
+ *     بلا هذه القائمة. الجواب دائمًا سلال مفتوحة أو طلبات لم
+ *     تُشحن، وبلا رؤيتها يبدو النظام وكأنه يُخفي بضاعة.
+ */
+export function useReservations(params: { status?: string; page?: number }, enabled = true) {
+  return useQuery({
+    queryKey: ['inventory', 'reservations', params],
+    queryFn: () =>
+      http.get<PagedResponse<StockReservation>>('/inventory/reservations/', {
+        params: { ...params },
+      }),
+    enabled,
+  });
+}
+
+/**
+ * تعديل حدود التنبيه — **الحدود وحدها**.
+ *
+ * ⚠️  الكميات لا تُعدَّل من هنا (الخادم يمنعها `read_only`):
+ *     كل حركة مخزون تمرّ بمسارها المسجَّل (استلام · تسوية ·
+ *     تحويل · تلف)، وتعديل رقم مباشرةً يترك فرقًا بلا سبب في
+ *     الدفتر.
+ */
+export function useUpdateStockThresholds() {
+  return useInventoryMutation(
+    ({ id, ...body }: { id: number; reorder_point?: number; critical_point?: number }) =>
+      http.patch<Stock>(`/inventory/stock/${id}/`, body),
+  );
+}

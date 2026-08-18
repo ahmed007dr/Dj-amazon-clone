@@ -200,6 +200,61 @@ export function useAdminBusinesses(filters: BusinessFilters) {
   });
 }
 
+/**
+ * ملف الحساب التجاري المفرد — **للتعديل لا للعرض فقط**.
+ *
+ * ⚠️  رقم الترخيص وتاريخ انتهائه يُعدَّلان من هنا.
+ *
+ *     الترخيص المنتهي يمنع الآجل (`license_is_valid`)، فصيدلية
+ *     جدّدت ترخيصها تبقى ممنوعة حتى يُحدَّث التاريخ — ولا سبيل
+ *     لتحديثه كان موجودًا في أي شاشة.
+ */
+export function useAdminBusiness(id: string | null) {
+  return useQuery({
+    queryKey: ['b2b', 'admin', 'business', id],
+    queryFn: () => http.get<BusinessProfile>(`/b2b/admin/businesses/${id}/`),
+    enabled: id !== null,
+  });
+}
+
+export function useUpdateBusiness() {
+  return useCreditMutation(({ id, ...body }: Partial<BusinessProfile> & { id: string }) =>
+    http.patch<BusinessProfile>(`/b2b/admin/businesses/${id}/`, body),
+  );
+}
+
+/** كشف حركات الحساب — أكثر تفصيلًا من كشف الحساب المُجمَّع. */
+export function useAdminLedger(id: string | null, page = 1) {
+  return useQuery({
+    queryKey: ['b2b', 'admin', 'ledger', id, page],
+    queryFn: () =>
+      http.get<PagedResponse<LedgerEntry>>(`/b2b/admin/businesses/${id}/ledger/`, {
+        params: { page },
+      }),
+    enabled: id !== null,
+  });
+}
+
+/**
+ * ملفي التجاري — **يقرأه العميل ويعدّله**.
+ *
+ * ⚠️  الحدّ الائتماني وحالته **لا يُعدَّلان من هنا**: الخادم يتجاهل
+ *     ما لا يملكه العميل. هذه الشاشة لبيانات المنشأة لا لمالها.
+ */
+export function useMyBusinessProfile() {
+  return useQuery({
+    queryKey: ['b2b', 'profile'],
+    queryFn: () => http.get<BusinessProfile>('/b2b/profile/'),
+    retry: false,
+  });
+}
+
+export function useUpdateMyBusinessProfile() {
+  return useCreditMutation((body: Partial<BusinessProfile>) =>
+    http.patch<BusinessProfile>('/b2b/profile/', body),
+  );
+}
+
 export function useAdminStatement(id: string | null) {
   return useQuery({
     queryKey: ['b2b', 'admin', 'statement', id],

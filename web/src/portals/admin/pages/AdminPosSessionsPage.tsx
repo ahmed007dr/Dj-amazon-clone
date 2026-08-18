@@ -2,11 +2,14 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Session } from '@/features/pos/api';
-import { useAdminRegisters, useAdminSessions } from '@/features/pos/adminApi';
+import { useAdminRegisters, useAdminSession, useAdminSessions } from '@/features/pos/adminApi';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
 import { Badge } from '@/shared/ui/Badge';
+import { Button } from '@/shared/ui/Button';
+import { Drawer } from '@/shared/ui/Drawer';
+import { Spinner } from '@/shared/ui/Spinner';
 import { FilterBar, FilterSelect } from '@/shared/ui/FilterBar';
 import { Pagination } from '@/shared/ui/Pagination';
 import { formatDate } from '@/shared/utils/format';
@@ -34,6 +37,9 @@ export function AdminPosSessionsPage() {
   const [status, setStatus] = useState('');
   const [register, setRegister] = useState('');
   const [page, setPage] = useState(1);
+  const [detailOf, setDetailOf] = useState<string | null>(null);
+
+  const detail = useAdminSession(detailOf);
 
   const registers = useAdminRegisters();
   const query = useAdminSessions({
@@ -126,7 +132,21 @@ export function AdminPosSessionsPage() {
       </FilterBar>
 
       <DataTable
-        columns={columns}
+        columns={[
+          ...columns,
+          {
+            key: 'actions',
+            header: '',
+            align: 'end',
+            // ⚠️  التفصيل يُطلَب ولا يُجلب لكل صفّ: الصفحة تعرض
+            //     عشرين وردية وتُقرأ منها واحدة.
+            render: (row) => (
+              <Button size="sm" variant="ghost" onClick={() => setDetailOf(row.id)}>
+                {t('pos.sessionDetail')}
+              </Button>
+            ),
+          },
+        ]}
         rows={query.data?.results ?? []}
         isLoading={query.isPending}
         error={query.error}
@@ -137,6 +157,43 @@ export function AdminPosSessionsPage() {
       {query.data ? (
         <Pagination page={query.data.page} pages={query.data.pages} onChange={setPage} />
       ) : null}
+
+      <Drawer
+        open={detailOf !== null}
+        onClose={() => setDetailOf(null)}
+        {...(detail.data ? { title: detail.data.number } : {})}
+      >
+        {detail.isPending ? (
+          <Spinner />
+        ) : detail.data ? (
+          <dl className="session-detail">
+            {(
+              [
+                ['pos.register', detail.data.register_code],
+                ['pos.cashier', detail.data.cashier_name],
+                ['pos.openingFloat', detail.data.opening_float],
+                ['pos.countedCash', detail.data.counted_cash ?? '—'],
+                ['pos.expectedCash', detail.data.expected_cash ?? '—'],
+                ['pos.variance', detail.data.variance ?? '—'],
+              ] as const
+            ).map(([key, value]) => (
+              <div key={key}>
+                <dt>{t(key)}</dt>
+                <dd dir="ltr">{value}</dd>
+              </div>
+            ))}
+
+            {/* ⚠️  تفسير الفرق هو المحتوى لا حاشية: وردية بفرق
+                بلا تفسير هي بالضبط ما تبحث عنه المراجعة. */}
+            {detail.data.variance_note ? (
+              <div className="session-detail__note">
+                <dt>{t('pos.varianceNote')}</dt>
+                <dd>{detail.data.variance_note}</dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : null}
+      </Drawer>
     </>
   );
 }

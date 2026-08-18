@@ -1,0 +1,43 @@
+.commission-explain {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+}
+
+.commission-explain > div {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  justify-content: space-between;
+  padding-block: var(--space-2);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.commission-explain dt {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.commission-explain dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ⚠️  المبلغ النهائي يُبرَز: هو الرقم الذي يُصرَف، وبقية السطور
+   طريقه إليه. */
+.commission-explain .is-total {
+  padding-block: var(--space-3);
+  margin-block-start: var(--space-2);
+  border-block-end: none;
+}
+
+.commission-explain .is-total dt {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.commission-explain .is-total dd {
+  font-size: 1.25rem;
+  color: var(--color-primary);
+}

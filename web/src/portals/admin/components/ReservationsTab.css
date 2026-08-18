@@ -1,0 +1,11 @@
+.reservation-ref {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.reservation-ref code {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}

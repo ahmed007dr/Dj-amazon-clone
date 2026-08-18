@@ -1,0 +1,102 @@
+/* ⚠️  ملف واحد للوحَي الحساب التجاري (البيانات · الحركات):
+   نفس اللوح المنزلق ونفس المقاسات. */
+
+.business-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.business-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.business-form input,
+.business-form select,
+.business-form textarea {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.business-form textarea {
+  padding-block: var(--space-2);
+  resize: vertical;
+}
+
+.business-form small {
+  font-size: 0.75rem;
+}
+
+.business-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.business-ledger__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.business-ledger__list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: start;
+  justify-content: space-between;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.business-ledger__main {
+  display: flex;
+  flex: 1 1 10rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: start;
+  min-inline-size: 0;
+}
+
+.business-ledger__main span {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.business-ledger__side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  align-items: end;
+  text-align: end;
+}
+
+.business-ledger__side small {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* ⚠️  الاتجاه بلونين متضادّين: القراءة السريعة للكشف تعتمد على
+   اللون قبل الرقم. */
+.ledger-debit {
+  color: var(--color-danger);
+}
+
+.ledger-credit {
+  color: var(--color-success);
+}

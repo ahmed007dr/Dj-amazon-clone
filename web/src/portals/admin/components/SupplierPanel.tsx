@@ -8,15 +8,16 @@ import { Button } from '@/shared/ui/Button';
 import { Field } from '@/shared/ui/Field';
 import { Spinner } from '@/shared/ui/Spinner';
 import { useToast } from '@/shared/ui/useToast';
+import { SupplierLedgerTab } from '@/portals/admin/components/SupplierLedgerTab';
 import { formatDate } from '@/shared/utils/format';
 
 import { PurchaseOrdersTab } from './PurchaseOrdersTab';
 
 import './SupplierPanel.css';
 
-type Tab = 'profile' | 'account' | 'orders' | 'statement';
+type Tab = 'profile' | 'account' | 'orders' | 'statement' | 'ledger';
 
-const TABS: Tab[] = ['profile', 'account', 'orders', 'statement'];
+const TABS: Tab[] = ['profile', 'account', 'orders', 'statement', 'ledger'];
 
 /**
  * لوح المورّد بأربعة تبويبات.
@@ -217,6 +218,11 @@ export function SupplierPanel({ supplier }: { supplier: Supplier }) {
           </div>
         ) : null
       ) : null}
+
+      {/* ⚠️  الكشف الكامل تبويب مستقل عن «كشف الحساب»: الأول
+          يجيب «متى دفعنا له آخر مرة؟» والثاني «كم عليه في هذه
+          الفترة؟» — وسؤالان مختلفان لا يُدمجان في جدول واحد. */}
+      {tab === 'ledger' ? <SupplierLedgerTab supplier={supplier.id} /> : null}
     </div>
   );
 }

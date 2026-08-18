@@ -55,7 +55,23 @@ export interface OnlineUser {
   last_activity: string;
 }
 
-export const getOnlineNow = () => http.get<OnlineUser[]>('/administration/online-now/');
+/**
+ * ⛔ كان النوع `OnlineUser[]` والخادم يردّ كائنًا يلفّها.
+ *
+ *    فكان `data.length` دائمًا `undefined`: بطاقة «المتصلون الآن»
+ *    تعرض «—» أبدًا، وقائمة المتصلين لا تظهر إطلاقًا — بلا خطأ في
+ *    الطرفية يدلّ على السبب.
+ */
+export interface OnlineNow {
+  count: number;
+  /** المتصفّحون المجهولون — بلا هوية، من `analytics`. */
+  guests_count: number;
+  total_online: number;
+  window_minutes: number;
+  users: OnlineUser[];
+}
+
+export const getOnlineNow = () => http.get<OnlineNow>('/administration/online-now/');
 
 export interface AuditEntry {
   id: string;
@@ -69,3 +85,53 @@ export interface AuditEntry {
 
 export const listAuditLog = (params: { action?: string; page?: number }) =>
   http.get<PagedResponse<AuditEntry>>('/administration/audit-log/', { params: { ...params } });
+
+// ═══════════════════════════════════════════════════════════
+//  تاريخ الحساب الواحد
+// ═══════════════════════════════════════════════════════════
+//
+// ⚠️  **ثلاثة أسئلة مختلفة لا سؤال واحد:**
+//
+//       الجلسات      «متى ظهر ومن أي جهاز؟»
+//       النشاط       «ماذا فعل؟»
+//       تاريخ الحالة «من أوقفه ولماذا؟»
+//
+//     دمجها في قائمة واحدة يخلط دخولًا عاديًا بإيقاف إداري، فيضيع
+//     ما يُبحث عنه وسط ما لا يُبحث عنه.
+
+export interface AccountSession {
+  id: string;
+  user: string;
+  user_email: string;
+  login_at: string;
+  logout_at: string | null;
+  last_activity: string | null;
+  duration_seconds: number | null;
+  ip_address: string | null;
+  device_type: string;
+  is_open: boolean;
+}
+
+export interface AccountStatusChange {
+  id: string;
+  from_status: string;
+  to_status: string;
+  reason: string;
+  changed_by: string | null;
+  changed_by_email: string | null;
+  changed_at: string;
+}
+
+export const listAccountSessions = (id: string, page = 1) =>
+  http.get<PagedResponse<AccountSession>>(`/administration/accounts/${id}/sessions/`, {
+    params: { page },
+  });
+
+export const listAccountActivity = (id: string, page = 1) =>
+  http.get<PagedResponse<AuditEntry>>(`/administration/accounts/${id}/activity/`, {
+    params: { page },
+  });
+
+/** ⚠️  بلا ترقيم على الخادم — مصفوفة مباشرة لا `results`. */
+export const listAccountStatusHistory = (id: string) =>
+  http.get<AccountStatusChange[]>(`/administration/accounts/${id}/status-history/`);

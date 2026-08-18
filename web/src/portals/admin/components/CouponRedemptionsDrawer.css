@@ -1,0 +1,70 @@
+.redemptions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.redemptions__toggle {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-block-size: var(--touch-target);
+  font-size: 0.875rem;
+}
+
+.redemptions__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.redemptions__list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: start;
+  justify-content: space-between;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ⚠️  الملغى باهت ومشطوب: يبقى مقروءًا للتدقيق لكنه لا يُحسب
+   بصريًا ضمن أثر الحملة. */
+.redemptions__list li.is-cancelled {
+  opacity: 0.6;
+}
+
+.redemptions__list li.is-cancelled strong {
+  text-decoration: line-through;
+}
+
+.redemptions__main {
+  display: flex;
+  flex: 1 1 10rem;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-inline-size: 0;
+}
+
+.redemptions__main code {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.redemptions__side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  align-items: end;
+}
+
+.redemptions__side small {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
