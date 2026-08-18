@@ -61,8 +61,11 @@ api_v1 = [
     #     والكوبون يُتحقَّق منه في السلة. لا نقطة عامة في النطاقين.
     path("pricing/", include("pricing.urls")),
     path("promotions/", include("promotions.urls")),
-    # ── الإشعارات ──────────────────────────────────────────
+    # ── الإشعارات والبريد ──────────────────────────────────
+    # ⚠️  `mailing` بلا نقطة عامة: أسماء الخوادم والمستخدمين تكشف
+    #     بنية تحتية وتدلّ مهاجمًا على أين يجرّب كلمات المرور.
     path("notifications/", include("notifications.urls")),
+    path("mailing/", include("mailing.urls")),
     # ── نقطة البيع ─────────────────────────────────────────
     path("pos/", include("pos.urls")),
     # ── المالية ────────────────────────────────────────────
@@ -78,6 +81,7 @@ api_v1 = [
     # ── الموردون والتقارير ─────────────────────────────────
     path("suppliers/", include("suppliers.urls")),
     path("reports/", include("reporting.urls")),
+    path("analytics/", include("analytics.urls")),
     # ── لاحقًا ─────────────────────────────────────────────
 ]
 

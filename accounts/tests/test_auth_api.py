@@ -64,25 +64,36 @@ class TestRegistration:
         assert not user.is_email_verified
         assert not user.can_authenticate
 
-    def test_register_sends_verification_email(self, client):
+    def test_register_sends_verification_email(self, client, django_capture_on_commit_callbacks):
+        """
+        ⚠️  التسليم يبدأ على `on_commit` — أي بعد إيداع المعاملة.
+
+            بريد يخرج قبل الإيداع يعني رسالة عن حساب قد تُلغى معاملته
+            فلا يوجد. والاختبار يلتقط المُستدعَيات وينفّذها ليقيس ما
+            يقع في الإنتاج فعلًا.
+        """
         django_mail.outbox.clear()
-        client.post(
-            reverse("v1:accounts:register"),
-            {"email": "mail@test.local", "password": PASSWORD},
-            format="json",
-        )
+        with django_capture_on_commit_callbacks(execute=True):
+            client.post(
+                reverse("v1:accounts:register"),
+                {"email": "mail@test.local", "password": PASSWORD},
+                format="json",
+            )
         assert len(django_mail.outbox) == 1
         assert "فعّل" in django_mail.outbox[0].subject
 
-    def test_register_respects_preferred_language(self, client):
+    def test_register_respects_preferred_language(
+        self, client, django_capture_on_commit_callbacks
+    ):
         """البريد يصل بلغة المستلم لا بلغة الطلب."""
         django_mail.outbox.clear()
-        client.post(
-            reverse("v1:accounts:register"),
-            {"email": "en@test.local", "password": PASSWORD, "preferred_language": "en"},
-            format="json",
-            HTTP_ACCEPT_LANGUAGE="ar",
-        )
+        with django_capture_on_commit_callbacks(execute=True):
+            client.post(
+                reverse("v1:accounts:register"),
+                {"email": "en@test.local", "password": PASSWORD, "preferred_language": "en"},
+                format="json",
+                HTTP_ACCEPT_LANGUAGE="ar",
+            )
         assert "Activate" in django_mail.outbox[0].subject
 
     def test_duplicate_email_rejected(self, client, active_user):
@@ -481,7 +492,9 @@ class TestEmailChange:
         assert response.status_code == 400
         assert "current_password" in response.data["fields"]
 
-    def test_sends_two_emails_old_and_new(self, client, active_user):
+    def test_sends_two_emails_old_and_new(
+        self, client, active_user, django_capture_on_commit_callbacks
+    ):
         """
         القديم يتلقى تحذيرًا · الجديد يتلقى رمز تأكيد.
         الاكتفاء بالجديد يسمح بسرقة الحساب بصمت.
@@ -489,11 +502,12 @@ class TestEmailChange:
         django_mail.outbox.clear()
         self._authenticate(client, active_user)
 
-        response = client.post(
-            reverse("v1:accounts:email-change"),
-            {"new_email": "brand-new@test.local", "current_password": PASSWORD},
-            format="json",
-        )
+        with django_capture_on_commit_callbacks(execute=True):
+            response = client.post(
+                reverse("v1:accounts:email-change"),
+                {"new_email": "brand-new@test.local", "current_password": PASSWORD},
+                format="json",
+            )
         assert response.status_code == 200
         assert len(django_mail.outbox) == 2
 

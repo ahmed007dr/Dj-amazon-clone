@@ -5,14 +5,15 @@
 """
 
 from .base import *
-from .base import INSTALLED_APPS, MIDDLEWARE, env
+from .base import ALLOWED_HOSTS, CORS_ALLOWED_ORIGINS, INSTALLED_APPS, MIDDLEWARE, env
 
 DEBUG = env.bool("DJANGO_DEBUG", default=True)
 
-ALLOWED_HOSTS = env.list(
-    "DJANGO_ALLOWED_HOSTS",
-    default=["localhost", "127.0.0.1", "[::1]"],
-)
+# ⚠️  الأسماء الثلاثة تُضاف إلى المشتقّ من `PUBLIC_API_DOMAIN` لا تحلّ محلّه.
+#
+#     المطوّر يفتح `localhost` تارة و`127.0.0.1` تارة — وهما مضيفان
+#     مختلفان عند المتصفح وإن كانا نفس الجهاز.
+ALLOWED_HOSTS = list(dict.fromkeys([*ALLOWED_HOSTS, "localhost", "127.0.0.1", "[::1]"]))
 
 
 # ── شريط التصحيح — بيئة التطوير فقط ────────────────────────
@@ -39,14 +40,26 @@ INSTALLED_APPS += ["devtools"]
 #     الخادم ويرفض المتصفح تسليمها للكود. والخطأ يظهر في وحدة
 #     تحكّم المتصفح لا في سجل Django، فيُبحث عنه في المكان الخطأ.
 #
-#     التطوير وحده. الإنتاج يضبطها من CORS_ALLOWED_ORIGINS صراحةً.
+#     التطوير وحده. الإنتاج يبقى على الأصل المشتقّ من دومين الموقع.
+#
+# ⚠️  والتوأم مضاف هنا: `localhost` و`127.0.0.1` نفس الجهاز وأصلان
+#     مختلفان عند المتصفح. المطوّر الذي يفتح أحدهما بينما الإعداد
+#     يذكر الآخر يرى كل نداء محجوبًا بلا سطر واحد في سجل Django.
 
-CORS_ALLOWED_ORIGINS = env.list(
-    "CORS_ALLOWED_ORIGINS",
-    default=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+_CORS_TWINS = {"localhost": "127.0.0.1", "127.0.0.1": "localhost"}
+
+CORS_ALLOWED_ORIGINS = list(
+    dict.fromkeys(
+        [
+            *CORS_ALLOWED_ORIGINS,
+            *(
+                origin.replace(host, twin, 1)
+                for origin in CORS_ALLOWED_ORIGINS
+                for host, twin in _CORS_TWINS.items()
+                if f"//{host}" in origin
+            ),
+        ]
+    )
 )
 
 INTERNAL_IPS = ["127.0.0.1"]

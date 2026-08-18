@@ -38,9 +38,11 @@ python -m venv .venv
 # ٢. الاعتماديات
 pip install -r requirements.txt
 
-# ٣. متغيرات البيئة
-copy .env.example .env            # ويندوز
+# ٣. متغيرات البيئة — ملفان: الأسرار، والمشترك مع الفرونت إند
+copy .env.example .env                          # ويندوز
+copy .env.public.example .env.public
 # cp .env.example .env
+# cp .env.public.example .env.public
 
 # ٤. مفتاح سري جديد — ضعه في .env
 python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
@@ -192,9 +194,25 @@ project/settings/
 ## قواعد ملزمة
 
 1. **صفر سر في الكود.** كل قيمة حساسة عبر `env(...)`.
-2. **كل متغير جديد يُضاف إلى `.env.example`** بقيمة نموذجية — وإلا لن يعرف أحد بوجوده.
-3. `prod.py` **بلا قيم افتراضية للمتغيرات الحرجة.** غياب `DJANGO_ALLOWED_HOSTS` يوقف الإقلاع عمدًا — أفضل من إقلاع صامت بإعداد غير آمن.
+2. **كل متغير جديد يُضاف إلى النموذج المناسب** بقيمة نموذجية — وإلا لن يعرف أحد بوجوده.
+3. `prod.py` **بلا قيم افتراضية للمتغيرات الحرجة.** غياب `PUBLIC_SITE_DOMAIN` أو `PUBLIC_API_DOMAIN` يوقف الإقلاع عمدًا — أفضل من إقلاع صامت بإعداد غير آمن.
 4. **`.env` لا يُرفع أبدًا.**
+5. **الفصل بين ملفَي البيئة بالحساسية لا بالجهة** (ADR-73):
+
+   | الملف | يقرؤه | ما فيه |
+   |---|---|---|
+   | `.env.public` | Django **و** Vite | الدومين · المخطَّط · بادئة الـ API · اللغة الافتراضية |
+   | `.env` | Django وحده | المفتاح السري · قاعدة البيانات · البريد · مفتاح التشفير |
+
+   ⚠️  **لا سرّ في `.env.public`** — كل ما فيه قد ينتهي في حزمة
+   المتصفح. والبادئة `PUBLIC_` هي العقد: قارئ الفرونت إند في
+   `web/vite.config.ts` يرفض أي مفتاح بغيرها.
+
+6. **الدومين يُكتب مرة واحدة** (ADR-74). `ALLOWED_HOSTS` و`CORS_ALLOWED_ORIGINS`
+   و`CSRF_TRUSTED_ORIGINS` و`FRONTEND_BASE_URL` و`VITE_API_BASE_URL`
+   و`VITE_MEDIA_BASE_URL` **كلها مشتقّة** من `PUBLIC_SITE_DOMAIN`
+   و`PUBLIC_API_DOMAIN`. كل واحدة تقبل تجاوزًا صريحًا — للحالات
+   الخارجة عن النمط وحدها.
 
 ---
 
@@ -204,6 +222,8 @@ project/settings/
 |---|---|
 | `.env` | ⛔ محظور في `.gitignore` |
 | `.env.example` | ✅ يُرفع — بقيم نموذجية فقط |
+| `.env.public` | ⛔ محظور — بلا سرّ، لكنه إعداد بيئة بعينها |
+| `.env.public.example` | ✅ يُرفع — **مُستثنى صراحةً**، فـ `.env.*` يبتلعه |
 | `db.sqlite3` | ⛔ أُزيل من التتبع في المرحلة 0.1 |
 | `media/` | ⛔ محظور |
 | `full-temp/` | ⛔ محظور — قالب خارجي |
@@ -457,8 +477,10 @@ lint-imports
 
 ```text
 src/
-├── .env                    ⛔ محلي فقط
+├── .env                    ⛔ محلي فقط — الأسرار
 ├── .env.example            ✅ نموذج
+├── .env.public             ⛔ محلي فقط — الدومين (يقرؤه Vite أيضًا)
+├── .env.public.example     ✅ نموذج
 ├── .gitignore
 ├── .venv/                  ⛔ محلي
 ├── manage.py

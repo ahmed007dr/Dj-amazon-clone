@@ -21,7 +21,7 @@ import logging
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from core import mail
+from mailing import templates as mail_templates
 from notifications import services
 from notifications.models import NotificationCategory, NotificationPriority
 
@@ -94,7 +94,7 @@ def _register_order_listeners():
             category=NotificationCategory.ORDER,
             title=f"اكتمل طلبك {order.number}",
             body=f"تم تسليم طلبك بنجاح. إجماليه {order.grand_total} جنيه.",
-            template_key=mail.ORDER_DELIVERED.key,
+            template_key=mail_templates.ORDER_DELIVERED.key,
             template_context=_order_context(order),
             action_url=f"/orders/{order.pk}",
             reference_type="order",
@@ -123,7 +123,7 @@ def _register_order_listeners():
                 category=NotificationCategory.ORDER,
                 title=f"استلمنا طلبك {instance.number}",
                 body="طلبك قيد المراجعة وسنبلغك بتأكيده.",
-                template_key=mail.ORDER_PLACED.key,
+                template_key=mail_templates.ORDER_PLACED.key,
                 template_context=_order_context(instance),
                 action_url=f"/orders/{instance.pk}",
                 reference_type="order",
@@ -138,13 +138,21 @@ def _register_order_listeners():
         #     `notify` ترسل البريد **حين يُمرَّر قالب** — والغياب
         #     كان يُقرأ كأنه اختيار.
         messages = {
-            OrderStatus.CONFIRMED: ("تأكد طلبك", "جارٍ تجهيز طلبك للشحن.", mail.ORDER_CONFIRMED),
-            OrderStatus.SHIPPED: ("شُحن طلبك", "طلبك في الطريق إليك.", mail.ORDER_SHIPPED),
-            OrderStatus.DELIVERED: ("سُلّم طلبك", "نتمنى أن ينال رضاك.", mail.ORDER_DELIVERED),
+            OrderStatus.CONFIRMED: (
+                "تأكد طلبك",
+                "جارٍ تجهيز طلبك للشحن.",
+                mail_templates.ORDER_CONFIRMED,
+            ),
+            OrderStatus.SHIPPED: ("شُحن طلبك", "طلبك في الطريق إليك.", mail_templates.ORDER_SHIPPED),
+            OrderStatus.DELIVERED: (
+                "سُلّم طلبك",
+                "نتمنى أن ينال رضاك.",
+                mail_templates.ORDER_DELIVERED,
+            ),
             OrderStatus.CANCELLED: (
                 "أُلغي طلبك",
                 instance.cancellation_reason or "",
-                mail.ORDER_CANCELLED,
+                mail_templates.ORDER_CANCELLED,
             ),
         }
 
@@ -202,7 +210,11 @@ def _register_account_listeners():
             category=NotificationCategory.ACCOUNT,
             title="أُوقف حسابك" if suspended else "أُعيد تفعيل حسابك",
             body=instance.reason,
-            template_key=(mail.ACCOUNT_SUSPENDED.key if suspended else mail.ACCOUNT_ACTIVATED.key),
+            template_key=(
+                mail_templates.ACCOUNT_SUSPENDED.key
+                if suspended
+                else mail_templates.ACCOUNT_ACTIVATED.key
+            ),
             template_context={"reason": instance.reason},
             priority=NotificationPriority.URGENT,
             reference_type="account_status_change",

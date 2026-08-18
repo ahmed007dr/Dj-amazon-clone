@@ -11,7 +11,7 @@ from django.utils import translation
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from accounts.models import AccountStatus
-from accounts.services import is_suspended_cached
+from accounts.services import is_suspended_cached, touch_activity
 from core.errors import BusinessError, ErrorCode
 from core.middleware import EXPLICIT_FLAG, supported_languages
 
@@ -54,7 +54,17 @@ class StatefulJWTAuthentication(JWTAuthentication):
     def authenticate(self, request):
         result = super().authenticate(request)
         if result is not None:
-            apply_user_language(request, result[0])
+            user = result[0]
+            apply_user_language(request, user)
+
+            # ⚠️  نبضة التواجد **هنا** لا في وسيط.
+            #
+            #     مع JWT تقع المصادقة في طبقة DRF، أي بعد كل الوسائط؛
+            #     فـ `request.user` في أيّ منها مجهول دائمًا. وهذا هو
+            #     الموضع الوحيد الذي يمرّ به كل طلب مُصادَق ويعرف صاحبه.
+            #
+            #     والنبضة في الكاش لا القاعدة — انظر `touch_activity`.
+            touch_activity(user.pk)
         return result
 
     def get_user(self, validated_token):

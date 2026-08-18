@@ -35,11 +35,12 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = [
-    "core", "branding", "accounts", "customers", "administration",
+    "core", "branding", "mailing", "accounts", "customers", "administration",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
     "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
     "employees", "targets", "commissions", "suppliers", "reporting", "loyalty",
+    "analytics",
     "config",
 ]
 
@@ -52,7 +53,7 @@ DJANGO_SETTINGS_MODULE = "config.settings.dev"
 python_files = ["test_*.py"]
 addopts = "--reuse-db --strict-markers -q"
 testpaths = [
-    "core", "accounts", "customers", "administration", "branding",
+    "core", "accounts", "customers", "administration", "branding", "mailing",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
     "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
@@ -72,11 +73,12 @@ omit = ["*/migrations/*", "*/tests/*", ".venv/*", "config/*", "manage.py"]
 
 [tool.importlinter]
 root_packages = [
-    "core", "branding", "accounts", "customers", "administration",
+    "core", "branding", "mailing", "accounts", "customers", "administration",
     "catalog", "shipping", "access", "pricing", "inventory",
     "reviews", "promotions", "cart", "orders", "payments",
     "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
     "employees", "targets", "commissions", "suppliers", "reporting", "loyalty",
+    "analytics",
 ]
 
 [[tool.importlinter.contracts]]
@@ -172,7 +174,14 @@ layers = [
     "promotions",
     "pricing | inventory | reviews",
     "customers | administration | academic | catalog | shipping",
-    "access",
+    # ⚠️  `analytics` شقيق `access` فوق `accounts` وتحت `administration`.
+    #
+    #     يستورد `accounts` لتصنيف الأجهزة ولا يعرف أي نطاق عمل،
+    #     و`administration` يقرأ منه عدد الزوار — فلو وُضع أعلى
+    #     لانقلب الاتجاه. ولا يستورد `reporting` أبدًا: خريطتا
+    #     الذروة متوازيتان لا متداخلتان، والصلاحية المشتركة بينهما
+    #     في `core.permissions` لهذا السبب بالذات.
+    "access | analytics",
     "accounts",
     # ⚠️  `branding` **فوق** `core` لا شقيقًا له.
     #
@@ -182,7 +191,13 @@ layers = [
     #
     #     الترتيب الصحيح يعبّر عن الحقيقة: الهوية البصرية تستهلك
     #     البنية التحتية، ولا نطاق عمل يستهلكها.
-    "branding",
+    # ⚠️  `mailing` شقيق `branding` فوق `core`.
+    #
+    #     كلاهما يستهلك البنية التحتية ولا يعرف نطاق عمل، ولا يستورد
+    #     أحدهما الآخر. و`accounts` فوقهما لأنه يرسل بريد التفعيل —
+    #     الاتجاه نازل: الهوية تستدعي البريد، والبريد لا يعرف من
+    #     يستدعيه.
+    "branding | mailing",
     "core",
 ]
 
@@ -238,6 +253,20 @@ type = "forbidden"
 source_modules = ["branding"]
 forbidden_modules = [
     "accounts", "customers", "catalog", "orders", "cart", "inventory",
+]
+
+[[tool.importlinter.contracts]]
+name = "Mailing is independent of business domains"
+# ⚠️  `send_to_user(user)` يقبل الكائن ولا يستورد نوعه.
+#
+#     أول استيراد لـ`accounts.User` هنا يقلب الاتجاه: البريد يصير
+#     فوق الهوية بينما الهوية تستدعيه — وهي دائرة لا يكسرها إلا
+#     استيراد داخل دالة، أي إخفاء الدائرة لا حلّها.
+type = "forbidden"
+source_modules = ["mailing"]
+forbidden_modules = [
+    "accounts", "customers", "catalog", "orders", "cart", "inventory",
+    "notifications", "payments",
 ]
 
 [[tool.importlinter.contracts]]

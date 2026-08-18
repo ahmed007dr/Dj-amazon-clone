@@ -12,4 +12,5 @@ urlpatterns = [
     path("inventory/", api.InventoryReportAPI.as_view(), name="inventory"),
     path("customers/", api.CustomersReportAPI.as_view(), name="customers"),
     path("performance/", api.PerformanceReportAPI.as_view(), name="performance"),
+    path("peak-hours/", api.PeakHoursAPI.as_view(), name="peak-hours"),
 ]

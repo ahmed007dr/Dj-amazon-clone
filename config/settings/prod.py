@@ -12,8 +12,22 @@ from .base import env
 
 DEBUG = False
 
-# بلا قيمة افتراضية — الغياب يوقف الإقلاع
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS")
+#: تُشغّل فحوص الدومين الصارمة في `core/checks.py`
+IS_PRODUCTION = True
+
+# ⚠️  الدومينات **إلزامية هنا بلا قيمة افتراضية** — الغياب يوقف الإقلاع.
+#
+#     `base.py` يعطيها افتراضيات تطوير (`localhost`) لتبقى بيئة
+#     التطوير تقلع بلا ضبط. وهي بعينها ما لا يجوز أن يقلع به
+#     الإنتاج: خادم حقيقي بـ `ALLOWED_HOSTS = ["localhost"]` يعيد
+#     400 لكل زائر، وبأصل `localhost` في CORS يحجب المتصفح كل
+#     استجابة. القراءة هنا لا تُستعمل قيمتها — الغرض أن يفشل
+#     الإقلاع الآن بدل أن يفشل الموقع بعد النشر.
+#
+#     و`ALLOWED_HOSTS` و`CORS_ALLOWED_ORIGINS` و`CSRF_TRUSTED_ORIGINS`
+#     تبقى مشتقّة منها في `base.py` — لا تُكرَّر هنا.
+env("PUBLIC_SITE_DOMAIN")
+env("PUBLIC_API_DOMAIN")
 
 # ⚠️  مفتاح تشفير بيانات اعتماد البوابات — **إلزامي هنا**.
 #
@@ -43,7 +57,10 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 
-CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+# ⚠️  `CSRF_TRUSTED_ORIGINS` مشتقّ في `base.py` من دومينَي الموقع
+#     والخادم. كان هنا بافتراضي فارغ وغير مذكور في أي نموذج بيئة —
+#     أي أن الحالة الافتراضية للإنتاج كانت لوحة إدارة تردّ 403 على
+#     كل حفظ خلف وكيل HTTPS.
 
 
 # ═══════════════════════════════════════════════════════════

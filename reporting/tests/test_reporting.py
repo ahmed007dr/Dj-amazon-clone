@@ -366,3 +366,159 @@ def test_reporting_has_no_models():
     from django.apps import apps
 
     assert list(apps.get_app_config("reporting").get_models()) == []
+
+
+# ═══════════════════════════════════════════════════════════
+#  أوقات الضغط
+# ═══════════════════════════════════════════════════════════
+
+
+def place_order_at(customer, moment, total="500.00"):
+    """
+    ⚠️  `created_at` حقل `auto_now_add` — لا يُقبل في `create`.
+
+        الطريق الوحيد لطلب في وقت ماضٍ هو تحديثه بعد إنشائه،
+        وبدونه لا يمكن اختبار توزيع زمني إطلاقًا.
+    """
+    order = make_order(customer, total)
+    Order.objects.filter(pk=order.pk).update(created_at=moment)
+    return Order.objects.get(pk=order.pk)
+
+
+@pytest.mark.django_db
+class TestPeakHours:
+    def test_the_grid_is_always_complete(self, db):
+        """⚠️  خريطة حرارية بخلايا ناقصة تُرسم مشوّهة."""
+        start, end = today_range()
+        result = services.peak_hours(start, end)
+
+        assert len(result["cells"]) == 24 * 7
+        assert len(result["by_hour"]) == 24
+        assert len(result["by_weekday"]) == 7
+
+    def test_an_empty_period_has_no_peak(self, db):
+        """«ذروتك الاثنين ١٢ ص بصفر طلب» أسوأ من لا إجابة."""
+        start, end = today_range()
+        result = services.peak_hours(start, end)
+
+        assert result["peak_cell"] is None
+        assert result["peak_hour"] is None
+        assert result["orders_count"] == 0
+
+    def test_orders_land_in_their_local_hour(self, customer):
+        """
+        ⚠️  أخطر خطأ في هذا التقرير: القراءة بتوقيت UTC.
+
+            القاهرة تسبق UTC بساعتين صيفًا؛ طلب الساعة ١٠ مساءً
+            محليًا يقع في اليوم **السابق** بتوقيت UTC. جدول مناوبات
+            يُبنى على ذلك يضع الموظفين في الوردية الخطأ.
+
+        ⚠️  و`override` لا `activate` — الثانية تسرّب المنطقة إلى
+            كل اختبار بعدها.
+        """
+        with timezone.override("Africa/Cairo"):
+            local = timezone.localtime(timezone.now()).replace(hour=22, minute=30)
+            place_order_at(customer, local)
+
+            day = local.date()
+            result = services.peak_hours(day, day)
+
+            assert result["peak_cell"]["hour"] == 22
+            assert result["peak_cell"]["weekday"] == day.isoweekday()
+            assert result["timezone"] == "Africa/Cairo"
+
+    def test_rollups_match_the_grid(self, customer):
+        local = timezone.localtime(timezone.now()).replace(hour=9, minute=0)
+        place_order_at(customer, local, "700.00")
+        place_order_at(customer, local, "300.00")
+
+        day = local.date()
+        result = services.peak_hours(day, day)
+
+        assert result["peak_hour"]["hour"] == 9
+        assert result["peak_hour"]["orders"] == 2
+        assert result["peak_hour"]["total"] == "1000.00"
+        assert result["peak_weekday"]["orders"] == 2
+        assert result["orders_count"] == 2
+
+    def test_cancelled_orders_are_not_pressure(self, customer):
+        """⚠️  نفس تعريف «مبيعة» في كل تقرير — لا تعريف ثانٍ هنا."""
+        local = timezone.localtime(timezone.now()).replace(hour=14, minute=0)
+        order = make_order(customer, "900.00", status=OrderStatus.CANCELLED)
+        Order.objects.filter(pk=order.pk).update(created_at=local)
+
+        day = local.date()
+        assert services.peak_hours(day, day)["orders_count"] == 0
+
+    def test_endpoint_needs_the_reports_permission(self, customer, viewer):
+        assert (
+            client_for(customer.user).get(reverse("v1:reporting:peak-hours")).status_code == 403
+        )
+        assert client_for(viewer).get(reverse("v1:reporting:peak-hours")).status_code == 200
+
+
+# ═══════════════════════════════════════════════════════════
+#  ترتيب الأكثر طلبًا
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.django_db
+class TestTopProductOrdering:
+    @pytest.fixture
+    def two_products(self, customer, product):
+        cheap = Product.objects.create(
+            sku="REP-CHEAP",
+            name_ar="رخيص",
+            name_en="Cheap",
+            category=product.category,
+            base_price=Decimal("2.00"),
+        )
+        order = make_order(customer, "1400.00")
+        for item, quantity, price in (
+            (product, 10, "100.00"),
+            (cheap, 200, "2.00"),
+        ):
+            OrderLine.objects.create(
+                order=order,
+                product=item,
+                product_sku=item.sku,
+                product_name_ar=item.name_ar,
+                product_name_en=item.name_en,
+                quantity=quantity,
+                unit_price=Decimal(price),
+                list_price=Decimal(price),
+            )
+        return product, cheap
+
+    def test_value_and_count_give_different_leaders(self, two_products):
+        """⚠️  المقياسان مختلفان وكلاهما صحيح — ولذلك الفرز خيار."""
+        expensive, cheap = two_products
+        start, end = today_range()
+
+        assert services.top_products(start, end, by="revenue")[0]["sku"] == expensive.sku
+        assert services.top_products(start, end, by="quantity")[0]["sku"] == cheap.sku
+
+    def test_both_measures_are_always_present(self, two_products):
+        start, end = today_range()
+        row = services.top_products(start, end, by="quantity")[0]
+
+        assert row["quantity"] == 200
+        assert row["revenue"] == "400.00"
+
+    def test_an_unknown_ordering_is_refused(self, db):
+        """⚠️  السقوط الصامت على الافتراضي يُري الأدمن فرزًا لم يقع."""
+        start, end = today_range()
+
+        with pytest.raises(BusinessError):
+            services.top_products(start, end, by="units")
+
+    def test_the_limit_is_capped(self, viewer, two_products):
+        response = client_for(viewer).get(
+            reverse("v1:reporting:sales"), {"limit": "100000", "by": "quantity"}
+        )
+        assert response.status_code == 200
+        assert response.data["top_products"][0]["sku"] == "REP-CHEAP"
+
+    def test_a_negative_limit_is_refused(self, viewer):
+        response = client_for(viewer).get(reverse("v1:reporting:sales"), {"limit": "-5"})
+        assert response.status_code == 400

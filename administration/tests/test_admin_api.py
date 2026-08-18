@@ -140,15 +140,18 @@ class TestAccountManagement:
         assert change.reason == "مخالفة الشروط"
         assert change.changed_by == admin
 
-    def test_suspension_notifies_the_user(self, admin_client, customer):
+    def test_suspension_notifies_the_user(
+        self, admin_client, customer, django_capture_on_commit_callbacks
+    ):
         from django.core import mail as django_mail
 
         django_mail.outbox.clear()
-        admin_client.post(
-            reverse("v1:administration:account-suspend", args=[customer.pk]),
-            {"reason": "مخالفة"},
-            format="json",
-        )
+        with django_capture_on_commit_callbacks(execute=True):
+            admin_client.post(
+                reverse("v1:administration:account-suspend", args=[customer.pk]),
+                {"reason": "مخالفة"},
+                format="json",
+            )
 
         assert len(django_mail.outbox) == 1
         assert "مخالفة" in django_mail.outbox[0].body

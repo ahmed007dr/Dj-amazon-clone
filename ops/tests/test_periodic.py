@@ -112,3 +112,25 @@ def test_unknown_job_exits_with_a_usable_message():
 
     assert exit_info.value.code == 2
     assert "release_reservations" in err.getvalue()
+
+
+def test_outbound_mail_is_scheduled():
+    """
+    ⚠️  الطابور بلا جدولة يجعل الفشل المؤقت ضياعًا دائمًا.
+
+        التسليم يبدأ على `on_commit` فور وقوع الحدث؛ وما يفشل حينها
+        (خادم متوقف · مهلة) لا يعيده أحد إلا هذا المسح. وغيابه من
+        الجدول لا يكسر اختبارًا واحدًا في `mailing` — الطابور يعمل
+        والرسائل تنتظر إلى الأبد.
+
+    ⚠️  ويُجدوَل **كل بضع دقائق** لا يوميًا كبقية المهام: أول إعادة
+        محاولة بعد دقيقة، وتأخيرها يومًا يجعل بريد إعادة تعيين كلمة
+        المرور يصل بعد أن ينساه صاحبه.
+    """
+    from mailing import services as mail_services
+
+    group, label, job = JOBS["send_outbound_mail"]
+
+    assert group == "mail"
+    assert label
+    assert job is mail_services.deliver_pending

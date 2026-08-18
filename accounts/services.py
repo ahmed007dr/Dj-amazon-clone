@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import timedelta
 
 from django.conf import settings
@@ -28,6 +29,7 @@ from accounts.models import (
 from core.errors import BusinessError, ErrorCode
 from core.identifiers import hash_token, secure_token
 from core.models.audit import AuditAction, AuditLog
+from core.presence import PresenceRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -177,11 +179,17 @@ def activate_account(user: User, *, reason: str = "", actor: User | None = None)
 
 
 # ═══════════════════════════════════════════════════════════
-#  الجلسات والتواجد  (ADR-17)
+#  الجلسات
 # ═══════════════════════════════════════════════════════════
 
 
-def _device_type(user_agent: str) -> str:
+def device_type_from_user_agent(user_agent: str) -> str:
+    """
+    ⚠️  عامّة لا خاصة — `analytics` يصنّف أجهزة الزوار بها.
+
+        نسخة ثانية من التصنيف كانت ستجعل جهازًا يُحسب «لوحيًا» في
+        الجلسات و«هاتفًا» في تقرير الحركة.
+    """
     from accounts.models import DeviceType
 
     ua = (user_agent or "").lower()
@@ -205,7 +213,7 @@ def open_session(user: User, *, session_key: str, request=None) -> UserSession:
         session_key=session_key,
         ip_address=ip,
         user_agent=user_agent or "",
-        device_type=_device_type(user_agent or ""),
+        device_type=device_type_from_user_agent(user_agent or ""),
     )
 
 
@@ -216,6 +224,13 @@ def close_session(session: UserSession, *, revoked: bool = False) -> UserSession
         session.revoked_at = now
     session.duration_seconds = int((now - session.login_at).total_seconds())
     session.save(update_fields=["logout_at", "revoked_at", "duration_seconds"])
+
+    # ⚠️  الخروج يُسقط النبضة — وإلا بقي الخارج «متصلًا» حتى تنتهي
+    #     النافذة، فيرى الأدمن خمسة متصلين وقد خرج ثلاثة منهم.
+    #     والشرط مقصود: جهاز ثانٍ ما زال مفتوحًا يعني أن صاحبه متصل.
+    if not UserSession.objects.filter(user_id=session.user_id, logout_at__isnull=True).exists():
+        drop_presence(session.user_id)
+
     return session
 
 
@@ -227,24 +242,97 @@ def close_all_sessions(user: User, *, revoked: bool = False) -> int:
     return count
 
 
-def touch_activity(user_id, session_key: str) -> None:
-    """
-    ⚠️  الكتابة في الكاش لا في قاعدة البيانات.
+# ═══════════════════════════════════════════════════════════
+#  التواجد اللحظي  (ADR-17)
+# ═══════════════════════════════════════════════════════════
 
-    تحديث `last_activity` في PostgreSQL على كل طلب يقتلها.
-    مهمة دورية تفرّغ الكاش دفعةً كل ٦٠ ثانية.
+PRESENCE_KEY = "presence:live"
+
+#: النبضة لا تُكتب على كل طلب — مرة كل نصف دقيقة تكفي لنافذة الخمس.
+PRESENCE_HEARTBEAT = timedelta(seconds=30)
+
+#: السجل نفسه يخدم الزوار المجهولين في `analytics` — انظر `core.presence`.
+presence = PresenceRegistry(PRESENCE_KEY, window=PRESENCE_WINDOW, heartbeat=PRESENCE_HEARTBEAT)
+
+
+def touch_activity(user_id) -> None:
     """
-    cache.set(f"presence:{user_id}:{session_key}", timezone.now().isoformat(), 300)
+    نبضة تواجد — **في الكاش لا في قاعدة البيانات**.
+
+    ⚠️  كتابة `last_activity` على كل طلب تقتل القاعدة (ADR-17).
+        `flush_presence` تفرّغ السجل إلى الجلسات كل دقيقة.
+
+    ⚠️  والمفتاح **المستخدم لا الجلسة**: توكن الوصول لا يحمل معرّف
+        جلسة الدخول، وربطه بها يحتاج ادعاءً جديدًا في التوكن —
+        و«من متصل الآن» سؤال عن المستخدم أصلًا.
+    """
+    presence.touch(user_id)
+
+
+def drop_presence(user_id) -> None:
+    """إسقاط النبضة — عند الخروج أو الإبطال."""
+    presence.drop(user_id)
+
+
+def live_user_ids() -> set:
+    """المتصلون من الكاش وحده — قبل أي تفريغ."""
+    result = set()
+    for identity in presence.identities():
+        try:
+            result.add(uuid.UUID(identity))
+        except (AttributeError, ValueError):
+            continue
+    return result
 
 
 def online_user_ids() -> list:
-    """من متصل الآن — من قاعدة البيانات بعد آخر تفريغ."""
+    """
+    من متصل الآن — **اتحاد** الكاش وقاعدة البيانات.
+
+    ⚠️  المصدران ليسا تكرارًا:
+
+        الكاش يعرف النبضة التي لم تُفرَّغ بعد، والقاعدة تعرف جلسةً
+        فُتحت قبل وصول أول نبضة (وتنجو من إعادة تشغيل الكاش).
+        الاكتفاء بأحدهما يُسقط إحدى الحالتين.
+    """
     cutoff = timezone.now() - PRESENCE_WINDOW
-    return list(
+    from_db = set(
         UserSession.objects.filter(last_activity__gte=cutoff, logout_at__isnull=True)
         .values_list("user_id", flat=True)
         .distinct()
     )
+    return list(from_db | live_user_ids())
+
+
+def flush_presence() -> int:
+    """
+    تفريغ سجل التواجد إلى `UserSession.last_activity` — مهمة كل دقيقة.
+
+    ⚠️  الطوابع تُجمَّع بالدقيقة لا تُكتب فرديًا.
+
+        دقة الثانية في «آخر ظهور» لا يقرأها أحد، والتجميع يجعل
+        عدد التحديثات = عدد الدقائق المتميّزة لا عدد المتصلين.
+    """
+    alive = presence.alive()
+    if not alive:
+        return 0
+
+    groups: dict = {}
+    for key, stamp in alive.items():
+        try:
+            user_id = uuid.UUID(key)
+        except (AttributeError, ValueError):
+            continue
+        groups.setdefault(stamp.replace(second=0, microsecond=0), []).append(user_id)
+
+    updated = 0
+    for stamp, user_ids in groups.items():
+        # ⚠️  `last_activity__lt` يمنع إرجاع طابع أحدث إلى الوراء
+        updated += UserSession.objects.filter(
+            user_id__in=user_ids, logout_at__isnull=True, last_activity__lt=stamp
+        ).update(last_activity=stamp)
+
+    return updated
 
 
 # ═══════════════════════════════════════════════════════════

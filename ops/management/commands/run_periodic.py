@@ -34,11 +34,15 @@ from collections.abc import Callable
 
 from django.core.management.base import BaseCommand
 
+from accounts import services as account_services
+from analytics import services as analytics_services
 from cart import services as cart_services
 from inventory import services as inventory_services
 from loyalty import services as loyalty_services
+from mailing import services as mail_services
 
 logger = logging.getLogger(__name__)
+
 
 def _expire_points() -> int:
     """⚠️  المهام تُرجع عددًا؛ خدمة الولاء تُرجع تفصيلًا."""
@@ -83,6 +87,49 @@ JOBS: dict[str, tuple[str, str, Callable[[], int]]] = {
         "إسقاط نقاط الولاء المنتهية",
         _expire_points,
     ),
+    # ⚠️  **شبكة أمان لا مسار رئيسي.**
+    #
+    #     التسليم يبدأ على `on_commit` فور وقوع الحدث — أي في ثوانٍ.
+    #     هذه المهمة تلتقط ما فشل (خادم متوقف · مهلة) وما عَلِق (عملية
+    #     سقطت بين الحجز والإرسال). وبدونها كان الفشل المؤقت يعني
+    #     رسالة ضائعة إلى الأبد.
+    #
+    #     ولذلك تُجدوَل **كل بضع دقائق** لا يوميًا كبقية المهام:
+    #     أول إعادة محاولة بعد دقيقة، وتأخيرها يوميًا يجعل بريد
+    #     إعادة تعيين كلمة المرور يصل بعد أن ينساه صاحبه.
+    "send_outbound_mail": (
+        "mail",
+        "تسليم بريد الطابور",
+        mail_services.deliver_pending,
+    ),
+    # ⚠️  **تُجدوَل بالدقيقة لا باليوم** (ADR-17).
+    #
+    #     التواجد يُكتب في الكاش على كل طلب، والقاعدة تحفظ التاريخ.
+    #     بلا تفريغ يبقى «آخر ظهور» في جدول الحسابات عند لحظة الدخول
+    #     إلى الأبد، ويضيع سجل الجلسة كله إذا أُعيد تشغيل الكاش.
+    #
+    #     والأمر خفيف عمدًا: استعلام واحد لكل دقيقة متميّزة، ولا
+    #     استعلام إطلاقًا حين لا يكون أحد متصلًا.
+    "flush_presence": (
+        "presence",
+        "تفريغ سجل التواجد إلى الجلسات",
+        account_services.flush_presence,
+    ),
+    # ⚠️  بالدقيقة أيضًا — العدّادات في الكاش، وإعادة تشغيله بين
+    #     تفريغين تُضيّع ما بينهما. والساعة السابقة تُفرَّغ مع
+    #     الحالية فلا تضيع دقائق عبور الساعة.
+    "flush_traffic": (
+        "presence",
+        "تفريغ عدّادات الحركة",
+        analytics_services.flush_traffic,
+    ),
+    # ⚠️  الاحتفاظ ٩٠ يومًا — حركة لا يقرأها أحد بعدها تبقى
+    #     مسؤولية بلا فائدة. تُجدوَل يوميًا لا بالدقيقة.
+    "purge_traffic": (
+        "traffic",
+        "حذف الحركة الأقدم من ٩٠ يومًا",
+        analytics_services.purge_traffic,
+    ),
 }
 
 
@@ -90,7 +137,13 @@ class Command(BaseCommand):
     help = "تشغيل المهام الدورية (الجدولة من cron أو Task Scheduler)"
 
     def add_arguments(self, parser):
-        parser.add_argument("--job", help="اسم مهمة واحدة أو مجموعة (inventory · cart · loyalty)")
+        parser.add_argument(
+            "--job",
+            help=(
+                "اسم مهمة واحدة أو مجموعة "
+                "(inventory · cart · loyalty · mail · presence · traffic)"
+            ),
+        )
         parser.add_argument("--dry-run", action="store_true", help="عرض ما سيُنفَّذ بلا تنفيذ")
 
     def handle(self, *args, **options):
@@ -98,7 +151,10 @@ class Command(BaseCommand):
 
         if not selected:
             self.stderr.write(self.style.ERROR(f"لا مهمة بهذا الاسم: {options.get('job')}"))
-            self.stderr.write(f"المتاح: {' · '.join(JOBS)} — أو مجموعة: inventory · cart · loyalty")
+            self.stderr.write(
+                f"المتاح: {' · '.join(JOBS)} — "
+                "أو مجموعة: inventory · cart · loyalty · mail · presence · traffic"
+            )
             raise SystemExit(2)
 
         if options["dry_run"]:

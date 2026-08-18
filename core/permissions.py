@@ -23,6 +23,35 @@ class IsAdminAccount(BasePermission):
         return bool(user and user.is_authenticated and hasattr(user, "admin_profile"))
 
 
+class CanViewReports(BasePermission):
+    """
+    ⚠️  صلاحية **صريحة** لا مجرد دخول اللوحة.
+
+        التقارير وأرقام الحركة تكشف المبيعات والأرباح وأداء كل موظف
+        بالاسم، وحجم النشاط بدقّة الساعة. جعلها تابعة لدخول اللوحة
+        يفتحها لمن فتحها لسبب آخر تمامًا.
+
+    ⚠️  ومكانها `core` لا `reporting`.
+
+        `analytics` يحتاجها أيضًا، وهو **تحت** `reporting` في مخطط
+        الطبقات — فاستيرادها منه كان يقلب الاتجاه ويكسر العقد.
+        نسخة ثانية منها كانت أسوأ: صلاحية تُشدَّد في مكان وتُنسى
+        في الآخر.
+    """
+
+    message = "التقارير تحتاج صلاحية صريحة"
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        if user.is_superuser:
+            return True
+        # ⚠️  نفس صلاحية المالية: من يرى الأرباح يرى التقارير.
+        #     صلاحية ثالثة منفصلة كانت تُنسى فتُفتح أو تُغلق سهوًا.
+        return user.has_perm("finance.view_revenueentry")
+
+
 class IsSystemOwner(BasePermission):
     """المالك — لأخطر العمليات فقط."""
 

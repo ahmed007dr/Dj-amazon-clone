@@ -24,7 +24,24 @@
 python manage.py run_periodic              # كل المهام
 python manage.py run_periodic --job inventory   # مجموعة
 python manage.py run_periodic --dry-run    # عرض بلا تنفيذ
+
+python manage.py env_doctor                # الإعداد الفعّال (بلا أسرار)
 ```
+
+### `env_doctor` — أول أمر في أي حادثة
+
+يجيب على «أنا على أي دومين وأي قاعدة بيانات؟» في مخرَج واحد:
+الدومين المكتوب والمشتقّ · ما تبنيه الواجهة من نفس المصدر · قاعدة
+البيانات والكاش مع اختبار اتصال فعلي · محوّل البريد.
+
+⚠️  **ولا يطبع سرًّا واحدًا** — الأسرار تُقاس بحالتها (مضبوط · غائب ·
+عدد المفاتيح) لا بقيمتها، لأن مخرَجه يُنسخ إلى تذكرة أو محادثة وقت
+العطل فيصير علنيًا بحكم الأمر الواقع. يفرضه اختبار في
+`core/tests/test_config.py`.
+
+ويعيد رمز خروج غير صفري عند فشل اتصال — فيصلح فحصًا في خط النشر.
+أما صحّة الإعداد نفسه (تطابق CORS · دومين إنتاج حقيقي · `https`)
+فيفحصها `manage.py check` ويوقف الإقلاع عليها.
 
 ## ⚠️ الجدولة خارج التطبيق
 
@@ -36,7 +53,24 @@ python manage.py run_periodic --dry-run    # عرض بلا تنفيذ
 **لينكس** — `crontab -e`:
 
 ```cron
-0 2 * * *  cd /srv/app && /srv/venv/bin/python manage.py run_periodic >> /var/log/periodic.log 2>&1
+0 2 * * *   cd /srv/app && /srv/venv/bin/python manage.py run_periodic >> /var/log/periodic.log 2>&1
+
+# ⚠️  بريد الطابور **كل خمس دقائق** لا يوميًا.
+#
+#     التسليم يبدأ على `on_commit` فور وقوع الحدث؛ وهذا المسح يلتقط
+#     ما فشل (خادم متوقف · مهلة) وما عَلِق. وتأخيره يومًا يجعل بريد
+#     إعادة تعيين كلمة المرور يصل بعد أن ينساه صاحبه.
+*/5 * * * * cd /srv/app && /srv/venv/bin/python manage.py run_periodic --job mail >> /var/log/mail.log 2>&1
+
+# ⚠️  التواجد والحركة **كل دقيقة** (ADR-17 · ADR-80 · ADR-81).
+#
+#     النبضات وعدّادات الزوار تعيش في الكاش، والقاعدة تحفظ التاريخ.
+#     بلا هذا السطر يبقى «آخر ظهور» عند لحظة الدخول إلى الأبد،
+#     وتضيع كل حركة وقعت قبل أي إعادة تشغيل للكاش.
+#
+#     وهي أخفّ مهمة في الجدول: استعلام واحد لكل دقيقة متميّزة،
+#     ولا استعلام إطلاقًا حين لا يكون أحد متصلًا.
+* * * * *   cd /srv/app && /srv/venv/bin/python manage.py run_periodic --job presence >> /var/log/presence.log 2>&1
 ```
 
 **ويندوز** — Task Scheduler:
@@ -44,7 +78,17 @@ python manage.py run_periodic --dry-run    # عرض بلا تنفيذ
 ```powershell
 schtasks /Create /SC DAILY /ST 02:00 /TN "MedicalStore-Periodic" ^
   /TR "F:\path\.venv\Scripts\python.exe F:\path\manage.py run_periodic"
+
+schtasks /Create /SC MINUTE /MO 5 /TN "MedicalStore-Mail" ^
+  /TR "F:\path\.venv\Scripts\python.exe F:\path\manage.py run_periodic --job mail"
+
+schtasks /Create /SC MINUTE /MO 1 /TN "MedicalStore-Presence" ^
+  /TR "F:\path\.venv\Scripts\python.exe F:\path\manage.py run_periodic --job presence"
 ```
+
+⚠️  المهمة اليومية تشمل البريد أيضًا، والمسح كل خمس دقائق فوقها لا
+بدلًا منها: تشغيل الطابور مرتين لا يضرّ (الحجز الذرّي يمنع الازدواج)،
+أما حصر البريد في اليومية فيجعل أول إعادة محاولة بعد ٢٤ ساعة.
 
 **متى يُضاف Celery؟** حين يظهر عمل يستحقه فعلًا: توليد تقارير ثقيلة ·
 آلاف الرسائل · معالجة صور. البنية لا تمنعه — كل مهمة دالة مستقلة

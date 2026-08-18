@@ -23,7 +23,12 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum, Value
-from django.db.models.functions import Coalesce, TruncDate
+from django.db.models.functions import (
+    Coalesce,
+    ExtractHour,
+    ExtractIsoWeekDay,
+    TruncDate,
+)
 from django.utils import timezone
 
 from core.errors import BusinessError, ErrorCode
@@ -178,25 +183,45 @@ def sales_by_channel(start: date, end: date) -> list[dict]:
     ]
 
 
-def top_products(start: date, end: date, limit: int = 20) -> list[dict]:
+#: ترتيب «الأكثر طلبًا» — القيمة أو العدد.
+TOP_PRODUCT_ORDERINGS = {"revenue": "-revenue", "quantity": "-units_sold"}
+
+
+def top_products(start: date, end: date, limit: int = 20, by: str = "revenue") -> list[dict]:
     """
-    الأصناف الأكثر مبيعًا — **بالقيمة لا بالعدد وحده**.
+    الأصناف الأكثر طلبًا.
 
-    ⚠️  الترتيب بالعدد يضع أرخص صنف أولًا دائمًا.
+    ⚠️  **المقياسان مختلفان وكلاهما صحيح.**
 
-        علبة كمامات بجنيهين تُباع ألف مرة تسبق جهازًا بألف جنيه
-        بيع عشرين — والقرار الشرائي يُبنى على القيمة. العدّ يُعرَض
-        بجواره لا بدلًا منه.
+        بالقيمة: علبة كمامات بجنيهين تُباع ألف مرة لا تسبق جهازًا
+        بألف جنيه بيع عشرين — والقرار الشرائي يُبنى على القيمة.
+
+        بالعدد: «الأكثر طلبًا» بمعناه الحرفي، وهو ما يُبنى عليه
+        قرار المخزون ومساحة الرفّ.
+
+        ولذلك الرقمان يُعرضان معًا دائمًا، والفرز خيار لا حكم.
+
+    ⚠️  والمفتاح غير المعروف **يُرفض ولا يُتجاهَل**.
+
+        السقوط الصامت على الافتراضي يجعل `?by=units` يُرجع ترتيبًا
+        بالقيمة بلا أي إشارة — فيقرأ الأدمن جدولًا يظن أنه فرزه.
     """
     from orders.models import OrderLine
 
     assert_period(start, end)
 
+    ordering = TOP_PRODUCT_ORDERINGS.get(by)
+    if ordering is None:
+        raise BusinessError(
+            ErrorCode.VALIDATION_ERROR,
+            detail=f"ترتيب غير معروف: {by} — المتاح: {' · '.join(TOP_PRODUCT_ORDERINGS)}",
+        )
+
     rows = (
         OrderLine.objects.filter(order__in=_sold_orders(start, end))
         .values("product_id", "product_sku", "product_name_ar", "product_name_en")
         .annotate(units_sold=Sum("quantity"), revenue=Sum(LINE_REVENUE))
-        .order_by("-revenue")[:limit]
+        .order_by(ordering)[:limit]
     )
 
     return [
@@ -236,6 +261,115 @@ def sales_by_category(start: date, end: date, limit: int = 20) -> list[dict]:
         }
         for row in rows
     ]
+
+
+# ═══════════════════════════════════════════════════════════
+#  أوقات الضغط
+# ═══════════════════════════════════════════════════════════
+
+
+#: أيام الأسبوع بترتيب ISO — الاثنين ١ والأحد ٧.
+WEEKDAY_NAMES = {
+    1: ("الاثنين", "Monday"),
+    2: ("الثلاثاء", "Tuesday"),
+    3: ("الأربعاء", "Wednesday"),
+    4: ("الخميس", "Thursday"),
+    5: ("الجمعة", "Friday"),
+    6: ("السبت", "Saturday"),
+    7: ("الأحد", "Sunday"),
+}
+
+
+def peak_hours(start: date, end: date) -> dict:
+    """
+    توزيع الطلبات على ساعات الأسبوع — ١٦٨ خلية (٧ أيام × ٢٤ ساعة).
+
+    ⚠️  **بالتوقيت المحلي لا UTC.**
+
+        «أكثر ساعة ضغطًا ١٧:٠٠ UTC» رقم لا يُبنى عليه جدول
+        مناوبات في القاهرة. `Extract` يحوّل إلى المنطقة الفعّالة
+        تلقائيًا حين `USE_TZ`، والمنطقة تُقرأ من الإعدادات.
+
+    ⚠️  والشبكة **مكتملة دائمًا**.
+
+        الاستعلام لا يُرجع صفًا لساعة بلا طلبات، وخريطة حرارية
+        بخلايا ناقصة تُرسم مشوّهة. الأصفار تُملأ هنا مرة واحدة
+        لا في كل واجهة تستهلك التقرير.
+
+    ⚠️  والأساس **وقت إنشاء الطلب** لا وقت الدفع أو التسليم.
+
+        الضغط الذي نقيسه ضغط على المتجر والمخزون لحظة الشراء؛
+        وقت التسليم يقيس ضغطًا على الشحن — سؤال آخر.
+    """
+    assert_period(start, end)
+
+    rows = (
+        _sold_orders(start, end)
+        .annotate(weekday=ExtractIsoWeekDay("created_at"), hour=ExtractHour("created_at"))
+        .values("weekday", "hour")
+        .annotate(orders=Count("id"), total=Sum("grand_total"))
+    )
+
+    grid = {(row["weekday"], row["hour"]): row for row in rows}
+
+    cells = []
+    for weekday in range(1, 8):
+        for hour in range(24):
+            row = grid.get((weekday, hour))
+            cells.append(
+                {
+                    "weekday": weekday,
+                    "hour": hour,
+                    "orders": row["orders"] if row else 0,
+                    "total": str(quantize(row["total"] or ZERO)) if row else str(ZERO),
+                }
+            )
+
+    def _rollup(key: str, span) -> list[dict]:
+        totals = {value: {"orders": 0, "total": ZERO} for value in span}
+        for cell in cells:
+            bucket = totals[cell[key]]
+            bucket["orders"] += cell["orders"]
+            bucket["total"] += Decimal(cell["total"])
+
+        return [
+            {
+                key: value,
+                "orders": bucket["orders"],
+                "total": str(quantize(bucket["total"])),
+                **(
+                    {
+                        "name_ar": WEEKDAY_NAMES[value][0],
+                        "name_en": WEEKDAY_NAMES[value][1],
+                    }
+                    if key == "weekday"
+                    else {}
+                ),
+            }
+            for value, bucket in totals.items()
+        ]
+
+    by_hour = _rollup("hour", range(24))
+    by_weekday = _rollup("weekday", range(1, 8))
+
+    def _busiest(rows_: list[dict]) -> dict | None:
+        # ⚠️  فترة بلا طلبات تُرجع `None` لا الخلية الأولى صفرًا —
+        #     «ذروتك الاثنين ١٢ ص بصفر طلب» أسوأ من لا إجابة.
+        top = max(rows_, key=lambda item: item["orders"], default=None)
+        return top if top and top["orders"] else None
+
+    return {
+        "start": str(start),
+        "end": str(end),
+        "timezone": str(timezone.get_current_timezone()),
+        "orders_count": sum(cell["orders"] for cell in cells),
+        "cells": cells,
+        "by_hour": by_hour,
+        "by_weekday": by_weekday,
+        "peak_cell": _busiest(cells),
+        "peak_hour": _busiest(by_hour),
+        "peak_weekday": _busiest(by_weekday),
+    }
 
 
 # ═══════════════════════════════════════════════════════════
@@ -490,4 +624,7 @@ def overview(start: date, end: date) -> dict:
         "net_profit": str(pnl.net_profit),
         "profit_is_reliable": pnl.is_reliable,
         "inventory": inventory_summary(),
+        # ⚠️  خمسة لا عشرون — هذه لوحة لا تقرير. القائمة الكاملة
+        #     في `/reports/sales/` بفرزها وحدّها.
+        "top_products": top_products(start, end, limit=5),
     }

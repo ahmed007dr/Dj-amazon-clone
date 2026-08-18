@@ -91,18 +91,31 @@ class AccountDetailAPI(generics.RetrieveAPIView):
 
 
 class OnlineNowAPI(APIView):
-    """من يستخدم النظام الآن."""
+    """
+    من يستخدم النظام الآن.
+
+    ⚠️  **المسجَّل والمجهول رقمان منفصلان.**
+
+        المسجَّل له اسم وسجل ويُفتح ملفه بنقرة؛ والمجهول عدد بلا
+        هوية. جمعهما في رقم واحد يُنتج «١٧ متصلًا» لا يقابله إلا
+        ثلاثة صفوف في الجدول — تناقضٌ ظاهر يفقد الشاشة مصداقيتها.
+    """
 
     permission_classes = [IsAdminAccount]
 
     def get(self, request):
+        from analytics import services as analytics_services
+
         online_ids = selectors.online_user_ids()
         users = User.objects.filter(pk__in=online_ids)
+        guests = analytics_services.guests_online()
 
         context = selectors.enrich_context(online_ids)
         return Response(
             {
                 "count": len(online_ids),
+                "guests_count": guests,
+                "total_online": len(online_ids) + guests,
                 "window_minutes": int(account_services.PRESENCE_WINDOW.total_seconds() // 60),
                 "users": s.AccountListSerializer(users, many=True, context=context).data,
             }

@@ -71,6 +71,9 @@ class TestMoney:
 #: نماذج داخلية عالية الحجم — لا تظهر في رابط أبدًا فتبقى BigInt (ADR-28)
 INTERNAL_BIGINT_MODELS = {
     ("core", "AuditLog"),
+    # حركة الاستخدام: صف لكل ساعة ونوع جهاز · أعداد بلا هوية ·
+    # لا يظهر معرّفه في أي رابط ولا استجابة — القراءة بالفترة وحدها
+    ("analytics", "TrafficBucket"),
     ("accounts", "UserSession"),
     ("accounts", "AccountStatusChange"),
     ("accounts", "SecurityToken"),

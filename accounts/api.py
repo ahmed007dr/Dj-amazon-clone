@@ -18,8 +18,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from accounts import serializers as s
 from accounts import services
 from accounts.models import TokenPurpose, UserSession
-from core import mail
 from core.errors import BusinessError, ErrorCode
+from mailing import services as mail_services
+from mailing import templates as mail_templates
 
 User = get_user_model()
 
@@ -71,8 +72,8 @@ class RegisterAPI(APIView):
         #     is_active=False — فكان نظام التفعيل زخرفيًا بالكامل.
 
         _, raw_token = services.issue_token(user, TokenPurpose.EMAIL_VERIFICATION, request=request)
-        mail.send_to_user(
-            mail.VERIFY_EMAIL.key,
+        mail_services.send_to_user(
+            mail_templates.VERIFY_EMAIL.key,
             user,
             {"link": services.frontend_url(f"/auth/verify-email?token={raw_token}")},
         )
@@ -118,8 +119,8 @@ class ResendVerificationAPI(APIView):
             _, raw_token = services.issue_token(
                 user, TokenPurpose.EMAIL_VERIFICATION, request=request
             )
-            mail.send_to_user(
-                mail.VERIFY_EMAIL.key,
+            mail_services.send_to_user(
+                mail_templates.VERIFY_EMAIL.key,
                 user,
                 {"link": services.frontend_url(f"/auth/verify-email?token={raw_token}")},
             )
@@ -145,12 +146,12 @@ class LoginAPI(APIView):
         user = serializer.validated_data["user"]
         tokens = services.issue_jwt(user)
 
-        session = services.open_session(
+        services.open_session(
             user,
             session_key=RefreshToken(tokens["refresh"])["jti"],
             request=request,
         )
-        services.touch_activity(user.pk, session.session_key)
+        services.touch_activity(user.pk)
 
         user.last_login_at = timezone.now()
         user.save(update_fields=["last_login_at"])
@@ -206,8 +207,8 @@ class PasswordResetRequestAPI(APIView):
 
         if user is not None:
             _, raw_token = services.issue_token(user, TokenPurpose.PASSWORD_RESET, request=request)
-            mail.send_to_user(
-                mail.PASSWORD_RESET.key,
+            mail_services.send_to_user(
+                mail_templates.PASSWORD_RESET.key,
                 user,
                 {"link": services.frontend_url(f"/auth/reset-password?token={raw_token}")},
             )
@@ -227,7 +228,7 @@ class PasswordResetConfirmAPI(APIView):
             serializer.validated_data["token"],
             serializer.validated_data["new_password"],
         )
-        mail.send_to_user(mail.PASSWORD_CHANGED.key, user, {})
+        mail_services.send_to_user(mail_templates.PASSWORD_CHANGED.key, user, {})
 
         return Response({"message": "تم تعيين كلمة المرور. سجّل الدخول من جديد."})
 
@@ -248,7 +249,7 @@ class PasswordChangeAPI(APIView):
         # كل الجلسات تُنهى — من عرف القديمة يفقد وصوله
         services.revoke_all_tokens(user)
         services.close_all_sessions(user, revoked=True)
-        mail.send_to_user(mail.PASSWORD_CHANGED.key, user, {})
+        mail_services.send_to_user(mail_templates.PASSWORD_CHANGED.key, user, {})
 
         return Response({"message": "تم تغيير كلمة المرور. سجّل الدخول من جديد."})
 
@@ -287,11 +288,13 @@ class EmailChangeRequestAPI(APIView):
         )
 
         # ١ — تحذير للعنوان القديم
-        mail.send_to_user(mail.EMAIL_CHANGE_ALERT.key, request.user, {"new_email": new_email})
+        mail_services.send_to_user(
+            mail_templates.EMAIL_CHANGE_ALERT.key, request.user, {"new_email": new_email}
+        )
 
         # ٢ — تأكيد للعنوان الجديد
-        mail.send_mail(
-            mail.EMAIL_CHANGE_CONFIRM.key,
+        mail_services.send_mail(
+            mail_templates.EMAIL_CHANGE_CONFIRM.key,
             to=new_email,
             language=request.user.preferred_language,
             context={

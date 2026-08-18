@@ -12,7 +12,7 @@ from decimal import Decimal
 import pytest
 from django.core import mail as django_mail
 
-from core import mail
+from mailing import templates as mail_templates
 from orders.models import Order, OrderStatus
 
 
@@ -63,14 +63,14 @@ class TestTemplates:
 
     def test_all_order_templates_exist(self):
         for key in self.ORDER_KEYS:
-            assert key in mail.TEMPLATES, key
+            assert key in mail_templates.TEMPLATES, key
 
     def test_both_languages_are_filled(self):
         """
         ⚠️  قالب بلغة واحدة يعني مستخدمًا يتلقى رسالة لا يفهمها.
         """
         for key in self.ORDER_KEYS:
-            template = mail.TEMPLATES[key]
+            template = mail_templates.TEMPLATES[key]
             assert template.subject_ar and template.subject_en, key
             assert template.body_ar and template.body_en, key
 
@@ -82,7 +82,7 @@ class TestTemplates:
             للدعم.
         """
         for key in self.ORDER_KEYS:
-            template = mail.TEMPLATES[key]
+            template = mail_templates.TEMPLATES[key]
             assert "{number}" in template.subject_ar, key
             assert "{number}" in template.subject_en, key
 
@@ -104,7 +104,7 @@ class TestTemplates:
 
         for key in self.ORDER_KEYS:
             for language in ("ar", "en"):
-                subject, body = mail.TEMPLATES[key].render(language, context)
+                subject, body = mail_templates.TEMPLATES[key].render(language, context)
                 assert "{" not in subject, f"{key}/{language}"
                 assert "{" not in body, f"{key}/{language}"
 
@@ -116,34 +116,45 @@ class TestTemplates:
 
 @pytest.mark.django_db
 class TestOrderMailDelivery:
-    def test_new_order_sends_confirmation(self, customer):
-        make_order(customer)
+    def test_new_order_sends_confirmation(self, customer, django_capture_on_commit_callbacks):
+        """
+        ⚠️  التسليم على `on_commit`: المعاملة التي تُلغى بعد إنشاء
+            الطلب كانت تترك العميل ومعه رسالة عن طلب لا وجود له.
+        """
+        with django_capture_on_commit_callbacks(execute=True):
+            make_order(customer)
 
         assert len(django_mail.outbox) == 1
         assert "ORD-" in django_mail.outbox[0].subject
 
-    def test_shipping_sends_mail_with_the_address(self, customer):
+    def test_shipping_sends_mail_with_the_address(
+        self, customer, django_capture_on_commit_callbacks
+    ):
         order = make_order(customer, status=OrderStatus.CONFIRMED)
         django_mail.outbox.clear()
 
-        order.status = OrderStatus.SHIPPED
-        order.save()
+        with django_capture_on_commit_callbacks(execute=True):
+            order.status = OrderStatus.SHIPPED
+            order.save()
 
         assert len(django_mail.outbox) == 1
         assert "مدينة نصر" in django_mail.outbox[0].body
 
-    def test_cancellation_includes_the_reason(self, customer):
+    def test_cancellation_includes_the_reason(
+        self, customer, django_capture_on_commit_callbacks
+    ):
         order = make_order(customer)
         django_mail.outbox.clear()
 
-        order.status = OrderStatus.CANCELLED
-        order.cancellation_reason = "نفد المخزون"
-        order.save()
+        with django_capture_on_commit_callbacks(execute=True):
+            order.status = OrderStatus.CANCELLED
+            order.cancellation_reason = "نفد المخزون"
+            order.save()
 
         assert len(django_mail.outbox) == 1
         assert "نفد المخزون" in django_mail.outbox[0].body
 
-    def test_internal_edits_send_nothing(self, customer):
+    def test_internal_edits_send_nothing(self, customer, django_capture_on_commit_callbacks):
         """
         ⚠️  إشعار عند كل حفظ يغرق العميل برسائل لا تخصّه.
 
@@ -152,12 +163,15 @@ class TestOrderMailDelivery:
         order = make_order(customer)
         django_mail.outbox.clear()
 
-        order.internal_note = "راجعه محمود"
-        order.save()
+        with django_capture_on_commit_callbacks(execute=True):
+            order.internal_note = "راجعه محمود"
+            order.save()
 
         assert django_mail.outbox == []
 
-    def test_language_follows_the_recipient_not_the_actor(self, customer):
+    def test_language_follows_the_recipient_not_the_actor(
+        self, customer, django_capture_on_commit_callbacks
+    ):
         """
         ⚠️  الأدمن ينقل الحالة بواجهة إنجليزية — والعميل العربي يجب
             أن يتلقّى رسالته بالعربية.
@@ -165,7 +179,8 @@ class TestOrderMailDelivery:
         customer.user.preferred_language = "en"
         customer.user.save()
 
-        make_order(customer)
+        with django_capture_on_commit_callbacks(execute=True):
+            make_order(customer)
 
         assert len(django_mail.outbox) == 1
         assert "We received your order" in django_mail.outbox[0].subject

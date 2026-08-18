@@ -13,7 +13,64 @@ import environ
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 env = environ.Env()
+
+# ⚠️  **الملف الأول يفوز.**
+#
+#     `read_env` لا يستبدل قيمة موجودة سلفًا في البيئة — ولا قيمةً
+#     قرأها ملف سابق. فالترتيب أدناه هو سلّم الأسبقية بعينه:
+#
+#         بيئة التشغيل الحقيقية  >  .env (خاص)  >  .env.public (مشترك)
+#
+#     وهو معكوس ما يتوقّعه القارئ عادةً (أن يطغى الأخير)، ولذلك
+#     يُذكر صراحةً: الحاوية تتجاوز الملفين، والملف الخاص يتجاوز
+#     المشترك بلا أن يعدّله.
 environ.Env.read_env(BASE_DIR / ".env")
+environ.Env.read_env(BASE_DIR / ".env.public")
+
+
+# ═══════════════════════════════════════════════════════════
+#  الدومين — مصدر واحد يشتق منه الطرفان (ADR-73 · ADR-74)
+# ═══════════════════════════════════════════════════════════
+# ⚠️  الدومين يُكتب مرة واحدة في `.env.public`، ويقرأ الفرونت إند
+#     **نفس الملف** (`web/vite.config.ts`).
+#
+#     قبل هذا كان الدومين موزّعًا على خمس قيم في ملفين:
+#     `DJANGO_ALLOWED_HOSTS` (مضيف بلا مخطَّط) و`CORS_ALLOWED_ORIGINS`
+#     (أصل كامل) و`FRONTEND_BASE_URL` (الفرونت) و`CSRF_TRUSTED_ORIGINS`
+#     و`VITE_API_BASE_URL` (الخادم). أربعة أشكال لشيء واحد تعني أن
+#     نسيان واحد ينتج فشلًا **صامتًا** — والاشتقاق يجعل النسيان
+#     مستحيلًا لا نادرًا.
+#
+# ⚠️  والتجاوز الصريح يبقى ممكنًا: كل قيمة مشتقّة أدناه تقبل متغيّر
+#     بيئة يعلوها، للحالات التي تخرج عن النمط (دومين ثانٍ · CDN ·
+#     موازن حِمل يمرّر مضيفًا داخليًا).
+
+PUBLIC_SCHEME = env("PUBLIC_SCHEME", default="http")
+PUBLIC_SITE_DOMAIN = env("PUBLIC_SITE_DOMAIN", default="localhost:5173")
+PUBLIC_API_DOMAIN = env("PUBLIC_API_DOMAIN", default="127.0.0.1:8000")
+PUBLIC_API_PREFIX = env("PUBLIC_API_PREFIX", default="/api/v1")
+PUBLIC_MEDIA_ORIGIN = env("PUBLIC_MEDIA_ORIGIN", default="")
+PUBLIC_DEFAULT_LOCALE = env("PUBLIC_DEFAULT_LOCALE", default="ar")
+
+
+def _origin(domain: str) -> str:
+    """`shop.example.com` ← `https://shop.example.com`"""
+    return f"{PUBLIC_SCHEME}://{domain}"
+
+
+def _hostname(domain: str) -> str:
+    """⚠️  `ALLOWED_HOSTS` يقارن بالمضيف وحده — والمنفذ فيه يُفشل المطابقة."""
+    return domain.rsplit(":", 1)[0] if ":" in domain else domain
+
+
+#: الموقع الذي يزوره الإنسان — تُبنى منه روابط البريد وخريطة الموقع
+SITE_ORIGIN = _origin(PUBLIC_SITE_DOMAIN)
+
+#: خادم الـ API
+API_ORIGIN = _origin(PUBLIC_API_DOMAIN)
+
+#: أصل الوسائط — يتبع الخادم ما لم يُضبط CDN صراحةً
+MEDIA_ORIGIN = PUBLIC_MEDIA_ORIGIN or API_ORIGIN
 
 
 # ═══════════════════════════════════════════════════════════
@@ -25,7 +82,27 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 # الافتراضي آمن — البيئات التي تحتاج التصحيح تفعّله صراحةً
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
+#: علامة الإنتاج — تقرأها فحوص الإقلاع في `core/checks.py`.
+#:
+#: ⚠️  **لا تُشتقّ من `DEBUG`.**
+#:
+#:     `DEBUG=False` حالة مشروعة خارج الإنتاج: مشغّل الاختبارات
+#:     يفرضها، والمطوّر يشغّلها ليختبر سلوكًا إنتاجيًا محليًا. وربط
+#:     فحوص «الدومين ليس localhost» و«المخطَّط https» بها كان يُفشل
+#:     الاختبارات على إعداد صحيح تمامًا في مكانه.
+IS_PRODUCTION = False
+
+# ⚠️  دومين الموقع مُدرَج مع دومين الخادم.
+#
+#     `seo/` يخدم `robots.txt` و`sitemap.xml` على **الجذر** لأن
+#     المزحف يطلبهما حرفيًا من الدومين الذي يزوره الإنسان. وأي وكيل
+#     يمرّرهما إلى Django يصل بترويسة `Host` تحمل دومين الموقع —
+#     فغيابه هنا يعطي 400 لطلبَي المزحف وحدهما، وهو عطل لا يلاحظه
+#     أحد إلا حين تختفي الصفحات من نتائج البحث.
+ALLOWED_HOSTS = env.list(
+    "DJANGO_ALLOWED_HOSTS",
+    default=list(dict.fromkeys([_hostname(PUBLIC_API_DOMAIN), _hostname(PUBLIC_SITE_DOMAIN)])),
+)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -56,10 +133,19 @@ LOCAL_APPS = [
     # L0 — البنية التحتية
     "core",
     "branding",
+    # ⚠️  `mailing` بجوار `branding`: يعتمد على `core` وحده ولا يعرف
+    #     أي نطاق عمل. و`accounts` فوقه لأنه يرسل بريد التفعيل.
+    "mailing",
     # L1 — الهوية
     "accounts",
     # L1.5 — سياسات الوصول: تعتمد على accounts فقط ويستهلكها الجميع
     "access",
+    # ⚠️  `analytics` شقيق `access` فوق `accounts`.
+    #
+    #     يقيس الحركة ويصنّف الأجهزة بـ`accounts.services`، ولا يعرف
+    #     أي نطاق عمل: المتجر والسلة والطلب كلها «طلب HTTP» عنده.
+    #     ووضعه أعلى كان سيمنع `administration` من قراءة رقم الزوار.
+    "analytics",
     # L2 — الشخصيات ونطاقات الأساس
     "customers",
     "administration",
@@ -135,12 +221,31 @@ MIDDLEWARE = [
     "core.middleware.LanguageMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # ⚠️  **الأخير عمدًا** — القياس على الاستجابة الجاهزة.
+    #
+    #     وسائط الاستجابة تعمل بالترتيب المعكوس، فموضعه هنا يعني أنه
+    #     أول من يرى الاستجابة النهائية برمزها الصحيح. وضعه في الأعلى
+    #     كان سيعدّ طلبات ردّها CORS أو CSRF بالرفض استخدامًا حقيقيًا.
+    "analytics.middleware.TrafficMiddleware",
 ]
 
 
 # ═══════════════════════════════════════════════════════════
 #  CORS — الفرونت إند منفصل (ADR-03)
 # ═══════════════════════════════════════════════════════════
+
+#: الأصل الوحيد المسموح — مشتقّ من دومين الموقع لا مكتوبًا بجانبه
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[SITE_ORIGIN])
+
+# ⚠️  الموقع **والخادم** معًا في الأصول الموثوقة لـ CSRF.
+#
+#     لوحة إدارة Django تُقدَّم من دومين الخادم وتعتمد على الجلسة
+#     والتوكن معًا؛ وحذفه منها يجعل كل حفظ في `/admin/` يفشل بـ 403
+#     خلف وكيل HTTPS.
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS",
+    default=list(dict.fromkeys([SITE_ORIGIN, API_ORIGIN])),
+)
 
 CORS_ALLOW_CREDENTIALS = True
 # ⚠️  كل ترويسة مخصّصة يقرأها الخادم **يجب** أن تُدرَج هنا.
@@ -307,7 +412,11 @@ else:
 #  اللغة والتوقيت
 # ═══════════════════════════════════════════════════════════
 
-LANGUAGE_CODE = env("LANGUAGE_CODE", default="ar")
+# ⚠️  اللغة الافتراضية تُكتب مرة واحدة في `.env.public` ويقرأها
+#     الطرفان: الخادم هنا، والواجهة عبر `VITE_DEFAULT_LOCALE`.
+#     قيمتان منفصلتان كانتا تعنيان خادمًا يردّ بالعربية وواجهةً
+#     تبدأ بالإنجليزية — تناقضٌ يظهر في أول تحميل صفحة.
+LANGUAGE_CODE = env("LANGUAGE_CODE", default=PUBLIC_DEFAULT_LOCALE)
 TIME_ZONE = env("TIME_ZONE", default="Africa/Cairo")
 
 USE_I18N = True
@@ -366,9 +475,14 @@ TAX_PRICES_INCLUDE_TAX = env.bool("TAX_PRICES_INCLUDE_TAX", default=False)
 # ═══════════════════════════════════════════════════════════
 #  الفرونت إند
 # ═══════════════════════════════════════════════════════════
-
-FRONTEND_BASE_URL = env("FRONTEND_BASE_URL", default="http://localhost:3000")
-CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
+# ⚠️  مشتقّ من `PUBLIC_SITE_DOMAIN` — لا قيمة مكتوبة.
+#
+#     كان افتراضيه `localhost:3000` وهو بقيّة من زمن Next.js بينما
+#     خادم Vite على ٥١٧٣. ولأنه مصدر روابط البريد وخريطة الموقع
+#     (`seo/sitemaps.py`)، كان الافتراضي الخاطئ ينتج روابط تفعيل
+#     ميتة وخريطة موقع تشير إلى منفذ لا أحد عليه — بلا خطأ واحد
+#     في أي سجل.
+FRONTEND_BASE_URL = env("FRONTEND_BASE_URL", default=SITE_ORIGIN)
 
 
 # ═══════════════════════════════════════════════════════════

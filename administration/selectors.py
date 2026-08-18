@@ -8,21 +8,25 @@
 from __future__ import annotations
 
 from django.db.models import Count, Max, Sum
-from django.utils import timezone
 
+from accounts import services as account_services
 from accounts.models import UserSession
-from accounts.services import PRESENCE_WINDOW
 from core.models.audit import AuditLog
 
 
 def online_user_ids(user_ids=None) -> set:
-    """معرّفات المتصلين الآن."""
-    cutoff = timezone.now() - PRESENCE_WINDOW
-    queryset = UserSession.objects.filter(last_activity__gte=cutoff, logout_at__isnull=True)
-    if user_ids is not None:
-        queryset = queryset.filter(user_id__in=user_ids)
+    """
+    معرّفات المتصلين الآن.
 
-    return set(queryset.values_list("user_id", flat=True))
+    ⚠️  المصدر واحد — `accounts.services`.
+
+        نسخة ثانية من نافذة التواجد هنا كانت ستقرأ القاعدة وحدها،
+        فيظهر جدول الحسابات مَن لا يظهر في «المتصلون الآن» أو العكس.
+    """
+    ids = set(account_services.online_user_ids())
+    if user_ids is not None:
+        ids &= set(user_ids)
+    return ids
 
 
 def last_seen_map(user_ids) -> dict:

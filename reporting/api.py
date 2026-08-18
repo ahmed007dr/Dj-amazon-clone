@@ -13,26 +13,12 @@ from __future__ import annotations
 from datetime import date
 
 from django.utils import timezone
-from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.errors import BusinessError, ErrorCode
+from core.permissions import CanViewReports
 from reporting import services
-
-
-class CanViewReports(BasePermission):
-    message = "التقارير تحتاج صلاحية صريحة"
-
-    def has_permission(self, request, view):
-        user = request.user
-        if not (user and user.is_authenticated):
-            return False
-        if user.is_superuser:
-            return True
-        # ⚠️  نفس صلاحية المالية: من يرى الأرباح يرى التقارير.
-        #     صلاحية ثالثة منفصلة كانت تُنسى فتُفتح أو تُغلق سهوًا.
-        return user.has_perm("finance.view_revenueentry")
 
 
 def _period(request) -> tuple[date, date]:
@@ -60,6 +46,29 @@ class OverviewAPI(APIView):
         return Response(services.overview(start, end))
 
 
+def _positive_int(request, name: str, default: int, ceiling: int) -> int:
+    """
+    ⚠️  الحدّ **مسقوف**.
+
+        `?limit=100000` على جدول سطور الطلبات استعلامٌ يشلّ القاعدة،
+        ولا شاشة تعرض مئة ألف صف. السقف يجعل النقطة غير قابلة
+        للاستخدام كأداة إنهاك.
+    """
+    raw = request.query_params.get(name)
+    if raw is None:
+        return default
+
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise BusinessError(ErrorCode.VALIDATION_ERROR, detail=f"{name} يجب أن يكون عددًا") from exc
+
+    if value < 1:
+        raise BusinessError(ErrorCode.VALIDATION_ERROR, detail=f"{name} يجب أن يكون موجبًا")
+
+    return min(value, ceiling)
+
+
 class SalesReportAPI(APIView):
     permission_classes = [CanViewReports]
 
@@ -80,7 +89,12 @@ class SalesReportAPI(APIView):
                 "by_day": services.sales_by_day(start, end),
                 "by_channel": services.sales_by_channel(start, end),
                 "by_category": services.sales_by_category(start, end),
-                "top_products": services.top_products(start, end),
+                "top_products": services.top_products(
+                    start,
+                    end,
+                    limit=_positive_int(request, "limit", 20, 200),
+                    by=request.query_params.get("by", "revenue"),
+                ),
             }
         )
 
@@ -111,6 +125,23 @@ class CustomersReportAPI(APIView):
                 "by_segment": services.segment_breakdown(start, end),
             }
         )
+
+
+class PeakHoursAPI(APIView):
+    """
+    أوقات الضغط — خريطة ٧×٢٤.
+
+    ⚠️  تحت **نفس صلاحية التقارير** لا مجرد دخول اللوحة.
+
+        منحنى الحركة يكشف حجم النشاط بدقة الساعة — وهو ما مُنع
+        تسريبه في الترقيم حين حُذف `count` منه (ADR-32).
+    """
+
+    permission_classes = [CanViewReports]
+
+    def get(self, request):
+        start, end = _period(request)
+        return Response(services.peak_hours(start, end))
 
 
 class PerformanceReportAPI(APIView):

@@ -31,6 +31,7 @@ from devtools.seeds import (
     counter,
     logistics,
     loyalty,
+    mailing,
     people,
     pricing,
     staffing,
@@ -85,6 +86,11 @@ class Command(BaseCommand):
         #     تبدو معطّلة لا «غير مضبوطة بعد».
         self._step("الهوية البصرية")
         report["branding"] = branding.seed()["counts"]
+
+        # ⚠️  البريد بنية تحتية كالهوية: شاشة بلا حساب واحد تبدو
+        #     معطّلة، ولا تُظهر الفرق بين الأمان والتسويق (ADR-76).
+        self._step("حسابات البريد")
+        report["mailing"] = mailing.seed()["counts"]
 
         # ⚠️  الإخراج مكتوم: الأمران يطبعان تعليماتهما الخاصة، وهي
         #     ضجيج وسط تقرير البذرة لا معلومة.

@@ -1,5 +1,5 @@
 """
-البريد الإلكتروني.
+قوالب البريد المعاملاتية — معرَّفة في الكود.
 
 ⚠️  اللغة تُختار من **تفضيل المستلم**، لا من لغة الطلب الذي أطلق الحدث.
 
@@ -8,20 +8,50 @@
     لصاحب الحساب بلغته هو.
 
     هذا يختلف عن تفاوض لغة الـ API في core.middleware — عمدًا.
+
+⚠️  **بيانات لا سلوك.** الإرسال في `mailing/services.py`.
+
+    الفصل ليس ترتيبًا: القوالب تنتقل إلى قاعدة البيانات لتصير قابلة
+    للتحرير من الشاشة، وما هنا يبقى **القيمة الافتراضية الاحتياطية**.
+    تحرير فاسد لا يجوز أن يعطّل «إعادة تعيين كلمة المرور».
 """
 
 from __future__ import annotations
 
-import logging
+import re
 from dataclasses import dataclass
 
-from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
-from django.utils import translation
-
-logger = logging.getLogger(__name__)
+from mailing.purposes import MailPurpose
 
 FALLBACK_LANGUAGE = "ar"
+
+#: ⚠️  `{اسم}` وحده — لا صيغ ولا نقاط ولا فهارس.
+#:
+#:     `str.format` كان يقبل `{link.__class__}` و`{user.password}`:
+#:     تعبير يتنقّل في خصائص الكائنات. وهو مقبول ما دام القالب في
+#:     الكود، وثغرة قراءة ذاكرة لحظة يصير حقلًا يحرّره الأدمن من
+#:     شاشة. المحدِّد هنا لا يطابق نقطةً أصلًا.
+PLACEHOLDER = re.compile(r"\{(\w+)\}")
+
+
+def placeholders(text: str) -> set[str]:
+    return set(PLACEHOLDER.findall(text))
+
+
+def render_text(text: str, context: dict) -> str:
+    """
+    استبدال آمن.
+
+    ⚠️  **المتغيّر المجهول يبقى ظاهرًا ولا يرفع استثناء.**
+
+        `str.format` كان يرفع `KeyError` على حرف زائد واحد في
+        `{totall}` — فتُفقَد الرسالة كلها. و`{totall}` ظاهرًا في نصّ
+        وصل قبيحٌ ومحرج، لكنه يصل ويُقرأ ويُبلَّغ عنه؛ أما الرسالة
+        المفقودة فلا يعرف أحد أنها كانت.
+
+        والتحقق وقت الحفظ يمنع الحالة أصلًا — وهذا حارس أخير لا أول.
+    """
+    return PLACEHOLDER.sub(lambda match: str(context.get(match.group(1), match.group(0))), text)
 
 
 @dataclass(frozen=True)
@@ -34,16 +64,45 @@ class MailTemplate:
     """
 
     key: str
+
+    #: ⚠️  الغرض **يُعلَن في القالب** لا يُستنتَج من اسمه.
+    #:
+    #:     الاستنتاج بالبادئة (`order_*` ← الطلبات) يبدو كافيًا حتى
+    #:     يظهر `order_cancelled` الذي يخص الطلبات و`payment_received`
+    #:     الذي لا يبدأ بها. والقالب الجديد كان سيقع في الغرض الخطأ
+    #:     بلا خطأ واحد — أي يخرج من الحساب الخطأ بصمت.
+    purpose: str
+
     subject_ar: str
     subject_en: str
     body_ar: str
     body_en: str
 
     def render(self, language: str, context: dict) -> tuple[str, str]:
-        lang = language if language in ("ar", "en") else FALLBACK_LANGUAGE
-        subject = getattr(self, f"subject_{lang}")
-        body = getattr(self, f"body_{lang}")
-        return subject.format(**context), body.format(**context)
+        lang = self.language_or_fallback(language)
+        return (
+            render_text(getattr(self, f"subject_{lang}"), context),
+            render_text(getattr(self, f"body_{lang}"), context),
+        )
+
+    @staticmethod
+    def language_or_fallback(language: str) -> str:
+        return language if language in ("ar", "en") else FALLBACK_LANGUAGE
+
+    @property
+    def variables(self) -> frozenset[str]:
+        """
+        المتغيّرات التي يعرفها هذا القالب — مستخرَجة من نصّه هو.
+
+        ⚠️  هي **قائمة السماح** لأي تحرير من الشاشة: القالب المحرَّر
+            لا يجوز أن يطلب متغيّرًا لا يمرّره الكود، لأن الكود وحده
+            يعرف ما يضعه في السياق.
+        """
+        return frozenset(
+            name
+            for text in (self.subject_ar, self.subject_en, self.body_ar, self.body_en)
+            for name in placeholders(text)
+        )
 
 
 # ═══════════════════════════════════════════════════════════
@@ -63,6 +122,7 @@ def register(template: MailTemplate) -> MailTemplate:
 VERIFY_EMAIL = register(
     MailTemplate(
         key="verify_email",
+        purpose=MailPurpose.ACCOUNT,
         subject_ar="فعّل حسابك",
         subject_en="Activate your account",
         body_ar=(
@@ -83,6 +143,7 @@ VERIFY_EMAIL = register(
 PASSWORD_RESET = register(
     MailTemplate(
         key="password_reset",
+        purpose=MailPurpose.ACCOUNT,
         subject_ar="إعادة تعيين كلمة المرور",
         subject_en="Reset your password",
         body_ar=(
@@ -105,6 +166,7 @@ PASSWORD_RESET = register(
 PASSWORD_CHANGED = register(
     MailTemplate(
         key="password_changed",
+        purpose=MailPurpose.ACCOUNT,
         subject_ar="تم تغيير كلمة المرور",
         subject_en="Your password was changed",
         body_ar=(
@@ -123,6 +185,7 @@ PASSWORD_CHANGED = register(
 ACCOUNT_SUSPENDED = register(
     MailTemplate(
         key="account_suspended",
+        purpose=MailPurpose.ACCOUNT,
         subject_ar="تم إيقاف حسابك",
         subject_en="Your account has been suspended",
         body_ar=(
@@ -143,6 +206,7 @@ ACCOUNT_SUSPENDED = register(
 EMAIL_CHANGE_CONFIRM = register(
     MailTemplate(
         key="email_change_confirm",
+        purpose=MailPurpose.ACCOUNT,
         subject_ar="أكّد بريدك الجديد",
         subject_en="Confirm your new email",
         body_ar=(
@@ -163,6 +227,7 @@ EMAIL_CHANGE_CONFIRM = register(
 EMAIL_CHANGE_ALERT = register(
     MailTemplate(
         key="email_change_alert",
+        purpose=MailPurpose.ACCOUNT,
         subject_ar="طلب تغيير بريد حسابك",
         subject_en="Email change requested on your account",
         body_ar=(
@@ -183,6 +248,7 @@ EMAIL_CHANGE_ALERT = register(
 ACCOUNT_ACTIVATED = register(
     MailTemplate(
         key="account_activated",
+        purpose=MailPurpose.ACCOUNT,
         subject_ar="تم تفعيل حسابك",
         subject_en="Your account has been reactivated",
         body_ar="مرحبًا {name}،\n\nتم إعادة تفعيل حسابك. يمكنك تسجيل الدخول الآن.",
@@ -208,6 +274,7 @@ ACCOUNT_ACTIVATED = register(
 ORDER_PLACED = register(
     MailTemplate(
         key="order_placed",
+        purpose=MailPurpose.ORDERS,
         subject_ar="استلمنا طلبك {number}",
         subject_en="We received your order {number}",
         body_ar=(
@@ -228,6 +295,7 @@ ORDER_PLACED = register(
 ORDER_CONFIRMED = register(
     MailTemplate(
         key="order_confirmed",
+        purpose=MailPurpose.ORDERS,
         subject_ar="تأكد طلبك {number}",
         subject_en="Your order {number} is confirmed",
         body_ar=(
@@ -244,6 +312,7 @@ ORDER_CONFIRMED = register(
 ORDER_SHIPPED = register(
     MailTemplate(
         key="order_shipped",
+        purpose=MailPurpose.SHIPPING,
         subject_ar="شُحن طلبك {number}",
         subject_en="Your order {number} has shipped",
         body_ar=(
@@ -264,6 +333,7 @@ ORDER_SHIPPED = register(
 ORDER_DELIVERED = register(
     MailTemplate(
         key="order_delivered",
+        purpose=MailPurpose.SHIPPING,
         subject_ar="سُلّم طلبك {number}",
         subject_en="Your order {number} was delivered",
         body_ar=(
@@ -284,6 +354,7 @@ ORDER_DELIVERED = register(
 ORDER_CANCELLED = register(
     MailTemplate(
         key="order_cancelled",
+        purpose=MailPurpose.ORDERS,
         subject_ar="أُلغي طلبك {number}",
         subject_en="Your order {number} was cancelled",
         body_ar=(
@@ -308,6 +379,7 @@ ORDER_CANCELLED = register(
 PAYMENT_RECEIVED = register(
     MailTemplate(
         key="payment_received",
+        purpose=MailPurpose.PAYMENTS,
         subject_ar="تأكيد استلام الدفع — طلب {number}",
         subject_en="Payment received — order {number}",
         body_ar=(
@@ -326,60 +398,3 @@ PAYMENT_RECEIVED = register(
         ),
     )
 )
-
-
-# ═══════════════════════════════════════════════════════════
-#  الإرسال
-# ═══════════════════════════════════════════════════════════
-
-
-def send_mail(
-    template_key: str,
-    *,
-    to: str,
-    language: str,
-    context: dict,
-    fail_silently: bool = True,
-) -> bool:
-    """
-    إرسال بلغة المستلم.
-
-    `fail_silently=True` افتراضيًا — فشل إرسال بريد يجب ألا يُفشل
-    عملية تجارية. الفشل يُسجَّل ويُعاد المحاولة لاحقًا.
-
-    ينتقل إلى Celery في المرحلة ٦.
-    """
-    template = TEMPLATES.get(template_key)
-    if template is None:
-        raise KeyError(f"قالب بريد غير معروف: {template_key}")
-
-    with translation.override(language):
-        subject, body = template.render(language, context)
-
-    message = EmailMultiAlternatives(
-        subject=subject,
-        body=body,
-        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@localhost"),
-        to=[to],
-    )
-
-    try:
-        message.send(fail_silently=False)
-    except Exception:
-        logger.exception("فشل إرسال بريد %s إلى %s", template_key, to)
-        if not fail_silently:
-            raise
-        return False
-    return True
-
-
-def send_to_user(template_key: str, user, context: dict, **kwargs) -> bool:
-    """يستنتج اللغة والعنوان من المستخدم."""
-    payload = {"name": user.get_short_name(), **context}
-    return send_mail(
-        template_key,
-        to=user.email,
-        language=getattr(user, "preferred_language", FALLBACK_LANGUAGE),
-        context=payload,
-        **kwargs,
-    )

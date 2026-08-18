@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from django.db import transaction
 from django.utils import timezone
 
-from core import mail
+from mailing import services as mail_services
 from notifications.models import (
     DeliveryStatus,
     Notification,
@@ -129,14 +129,21 @@ def notify(
                 skipped.append(channel)
                 continue
 
-            delivered = mail.send_to_user(template_key, user, context)
-            sent.append(channel) if delivered else skipped.append(channel)
+            # ⚠️  **`PENDING` لا `SENT`** — البريد يُقيَّد في طابور
+            #     `mailing` ويُسلَّم بعد إيداع المعاملة.
+            #
+            #     تسجيله «أُرسل» لحظة التقييد كان يجعل السجل يجيب
+            #     «نعم وصل» عن رسالة لم تغادر بعد — وهو أول سؤال في
+            #     كل شكوى، وأسوأ جواب أن يكون واثقًا وخاطئًا.
+            #     مصير التسليم يعرفه صفّ الصادر.
+            queued = mail_services.send_to_user(template_key, user, context)
+            sent.append(channel) if queued else skipped.append(channel)
             _log(
                 user,
                 channel,
                 category,
                 template_key,
-                DeliveryStatus.SENT if delivered else DeliveryStatus.FAILED,
+                DeliveryStatus.PENDING if queued else DeliveryStatus.FAILED,
                 recipient=user.email,
             )
 
