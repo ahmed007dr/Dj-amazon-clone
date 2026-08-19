@@ -37,6 +37,7 @@ from devtools.seeds import (
     staffing,
     stock,
     trade,
+    traffic,
     transactions,
 )
 
@@ -168,6 +169,14 @@ class Command(BaseCommand):
         report["transactions"] = transactions.seed(
             people_data["users"], people_data["customers"], products
         )["counts"]
+
+        # ⚠️  **الأخيرة عمدًا** — توزّع ما أُنشئ قبلها على الزمن.
+        #
+        #     كل طلب مبذور يقع في لحظة تشغيل الأمر، فتُظهر شاشة
+        #     الضغط خلية واحدة مضيئة و١٦٧ فارغة — وهو مظهر شاشة
+        #     معطّلة لا شاشة فارغة.
+        self._step("الحركة وتوزيع الزمن")
+        report["traffic"] = traffic.seed()["counts"]
 
         return report
 

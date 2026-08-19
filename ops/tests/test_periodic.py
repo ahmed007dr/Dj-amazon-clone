@@ -134,3 +134,17 @@ def test_outbound_mail_is_scheduled():
     assert group == "mail"
     assert label
     assert job is mail_services.deliver_pending
+
+
+def test_inbound_mail_is_scheduled_after_delivery():
+    """
+    ⚠️  الترتيب جزء من الصحة: الصندوق الوارد يمتلئ بردود على ما
+        أرسلناه. وسحبه قبل تسليم ما ينتظر يجعل ردّ العميل يصل قبل
+        الرسالة التي يردّ عليها — فيقرأ الموظف جوابًا بلا سؤال.
+    """
+    from mailing import inbound as mail_inbound
+
+    names = list(JOBS)
+
+    assert JOBS["fetch_inbound_mail"][2] is mail_inbound.fetch_all
+    assert names.index("send_outbound_mail") < names.index("fetch_inbound_mail")

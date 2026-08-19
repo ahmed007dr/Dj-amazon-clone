@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from email.utils import formataddr
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -30,6 +31,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core.encryption import EncryptedTextField
+from core.identifiers import random_filename
 from core.models.base import BaseModel
 from core.models.translatable import TranslatedFieldMixin
 from mailing.purposes import SECURITY_PURPOSES, MailPurpose
@@ -425,6 +427,13 @@ class OutboundMessage(BaseModel):
     last_error = models.TextField(_("آخر خطأ"), blank=True)
     sent_at = models.DateTimeField(_("وقت التسليم"), null=True, blank=True)
 
+    #: ⚠️  ترويسات المحادثة — تجعل الردّ يظهر **داخل** سلسلة العميل.
+    #:
+    #:     بدونها يصل جوابنا رسالةً منفصلة في صندوقه، فيقرأه بلا
+    #:     سؤاله الأصلي أمامه — ويعيد السؤال.
+    in_reply_to = models.CharField(_("ردّ على"), max_length=998, blank=True)
+    references = models.TextField(_("سلسلة المراجع"), blank=True)
+
     #: ⚠️  `SET_NULL` لا `PROTECT`: حساب يُحذف بعد تسليم رسائله يجب
     #:     ألا يبقى محجوزًا بسجل تاريخي. الرسالة تبقى، ونسبتها تسقط.
     account = models.ForeignKey(
@@ -538,3 +547,135 @@ class TemplateOverride(BaseModel):
 
         if errors:
             raise ValidationError(errors)
+
+
+class InboundState(models.TextChoices):
+    NEW = "NEW", _("جديدة")
+    ASSIGNED = "ASSIGNED", _("مُسنَدة")
+    REPLIED = "REPLIED", _("مُجاب عليها")
+    CLOSED = "CLOSED", _("مغلقة")
+    SPAM = "SPAM", _("مزعجة")
+
+
+def inbound_attachment_path(instance, filename: str) -> str:
+    return f"mail/inbound/{random_filename(filename)}"
+
+
+class InboundMessage(BaseModel):
+    """
+    رسالة واردة إلى أحد صناديقنا.
+
+    ⚠️  **`message_id` هو مفتاح عدم التكرار** — لا رقم الرسالة في
+        الخادم ولا وقت الوصول.
+
+        السحب يقع كل بضع دقائق، وأي انقطاع في منتصفه يعيد المرور على
+        ما سُحب. وبلا مفتاح ثابت من الرسالة نفسها يظهر البريد الواحد
+        عشر مرات في صندوق الدعم، فيردّ عليه موظفان.
+
+    ⚠️  **و`body_html` يُخزَّن ولا يُعرَض.**
+
+        رسالة واردة من مجهول تحمل `<script>` تُعرَض في شاشة أدمن
+        مسجَّل الدخول هي XSS مباشر على أعلى صلاحية في النظام. النص
+        الصريح يكفي للقراءة والردّ، والـ HTML يبقى للأرشيف.
+    """
+
+    account = models.ForeignKey(
+        EmailAccount,
+        on_delete=models.CASCADE,
+        related_name="inbound",
+        verbose_name=_("الصندوق"),
+    )
+
+    #: معرّف الرسالة من ترويسة `Message-ID`
+    message_id = models.CharField(_("معرّف الرسالة"), max_length=998, db_index=True)
+
+    #: ⚠️  لبناء `In-Reply-To` عند الردّ — بدونه يظهر ردّنا عند العميل
+    #:     رسالةً منفصلة لا جوابًا، فيفقد السياق ويعيد السؤال.
+    in_reply_to = models.CharField(_("ردّ على"), max_length=998, blank=True)
+    references = models.TextField(_("سلسلة المراجع"), blank=True)
+
+    from_email = models.EmailField(_("المرسل"), max_length=254)
+    from_name = models.CharField(_("اسم المرسل"), max_length=255, blank=True)
+    to_email = models.CharField(_("إلى"), max_length=998, blank=True)
+
+    subject = models.CharField(_("الموضوع"), max_length=500, blank=True)
+    body_text = models.TextField(_("النص"), blank=True)
+    body_html = models.TextField(_("HTML"), blank=True)
+
+    received_at = models.DateTimeField(_("وقت الوصول"), db_index=True)
+    size_bytes = models.PositiveIntegerField(_("الحجم"), default=0)
+
+    #: ⚠️  ردّ آلي: لا يُردّ عليه أبدًا. انظر `services.reply`.
+    is_auto = models.BooleanField(_("رسالة آلية"), default=False)
+
+    status = models.CharField(
+        _("الحالة"),
+        max_length=16,
+        choices=InboundState.choices,
+        default=InboundState.NEW,
+        db_index=True,
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_mail",
+        verbose_name=_("المسؤول"),
+    )
+
+    #: مرجع نصي — لا مفتاح صاعد إلى أي نطاق (نمط `Notification`)
+    reference_type = models.CharField(_("نوع المرجع"), max_length=32, blank=True)
+    reference_id = models.CharField(_("معرّف المرجع"), max_length=64, blank=True)
+
+    class Meta:
+        verbose_name = _("رسالة واردة")
+        verbose_name_plural = _("الوارد")
+        ordering = ["-received_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["account", "message_id"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_inbound_message",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status", "-received_at"]),
+            models.Index(fields=["from_email", "-received_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.from_email} · {self.subject[:40]}"
+
+
+class InboundAttachment(BaseModel):
+    """
+    مرفق رسالة واردة.
+
+    ⚠️  **أخطر مسار رفع في النظام كله**: بلا مستخدم مسجَّل ولا حدّ ولا
+        نيّة معلومة — يكفي أن يعرف المهاجم عنوان صندوقنا.
+
+        ولذلك يخضع لفحص التوقيع نفسه الذي يخضع له رفع المنتجات
+        (ADR-45): `content_type` تكتبه الرسالة ويمكن تزويره، والنوع
+        الحقيقي يُقرأ من أول بايتات الملف. وما لا يُعرف توقيعه
+        **لا يُخزَّن**.
+    """
+
+    message = models.ForeignKey(
+        InboundMessage,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+        verbose_name=_("الرسالة"),
+    )
+    file = models.FileField(_("الملف"), upload_to=inbound_attachment_path)
+    filename = models.CharField(_("الاسم الأصلي"), max_length=255)
+    content_type = models.CharField(_("النوع المُتحقَّق منه"), max_length=100)
+    size_bytes = models.PositiveIntegerField(_("الحجم"), default=0)
+
+    class Meta:
+        verbose_name = _("مرفق وارد")
+        verbose_name_plural = _("المرفقات الواردة")
+        ordering = ["filename"]
+
+    def __str__(self):
+        return self.filename

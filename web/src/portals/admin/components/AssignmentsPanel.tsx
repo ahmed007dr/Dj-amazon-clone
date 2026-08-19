@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useAssignments, type CustomerAssignment } from '@/features/employees/api';
+import { useAdminStaff, useAssignments, type CustomerAssignment } from '@/features/employees/api';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
 import { Badge } from '@/shared/ui/Badge';
 import { Pagination } from '@/shared/ui/Pagination';
@@ -31,9 +31,21 @@ export function AssignmentsPanel() {
   const { t } = useTranslation();
 
   const [activeOnly, setActiveOnly] = useState(false);
+  const [employee, setEmployee] = useState('');
   const [page, setPage] = useState(1);
 
-  const query = useAssignments({ ...(activeOnly ? { active: 'true' } : {}), page });
+  // ⚠️  **الترشيح بالمندوب هو الاستعمال الحقيقي للشاشة.**
+  //
+  //     السؤال يأتي دائمًا في صيغة «أرني عملاء فلان في مارس» لا
+  //     «أرني كل الإسنادات». وقائمة بلا ترشيح تعني تمريرًا في
+  //     آلاف الصفوف لإيجاد اسم واحد.
+  const employees = useAdminStaff({ active: 'true', page: 1 });
+
+  const query = useAssignments({
+    ...(activeOnly ? { active: 'true' } : {}),
+    ...(employee ? { employee } : {}),
+    page,
+  });
 
   const columns: Column<CustomerAssignment>[] = [
     {
@@ -76,7 +88,26 @@ export function AssignmentsPanel() {
 
   return (
     <>
-      <label className="assignments-toggle">
+      <div className="assignments-filters">
+        <label className="assignments-filter">
+          {t('staff.employee')}
+          <select
+            value={employee}
+            onChange={(event) => {
+              setEmployee(event.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">{t('staff.allEmployees')}</option>
+            {(employees.data?.results ?? []).map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.full_name || row.employee_number}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="assignments-toggle">
         <input
           type="checkbox"
           checked={activeOnly}
@@ -85,8 +116,9 @@ export function AssignmentsPanel() {
             setPage(1);
           }}
         />
-        {t('staff.activeOnly')}
-      </label>
+          {t('staff.activeOnly')}
+        </label>
+      </div>
 
       <DataTable
         columns={columns}

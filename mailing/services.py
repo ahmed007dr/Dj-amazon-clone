@@ -492,6 +492,14 @@ def deliver(message_id) -> bool:
 def _attempt(message: OutboundMessage) -> bool:
     account = resolve_account(purpose=message.purpose, template_key=message.template_key)
 
+    # ⚠️  ترويسات المحادثة تُضاف عند التسليم لا عند التقييد: الصفّ
+    #     يحمل المعرّفات، والبناء هنا يبقيها في مكان واحد.
+    headers = {}
+    if message.in_reply_to:
+        headers["In-Reply-To"] = message.in_reply_to
+    if message.references:
+        headers["References"] = message.references
+
     email = EmailMultiAlternatives(
         subject=message.subject,
         body=message.body,
@@ -499,6 +507,7 @@ def _attempt(message: OutboundMessage) -> bool:
         to=[message.to_email],
         reply_to=[account.reply_to] if account and account.reply_to else None,
         connection=connection_for(account),
+        headers=headers or None,
     )
 
     try:
@@ -584,3 +593,78 @@ def retry(message: OutboundMessage) -> bool:
         status=DeliveryState.PENDING, next_attempt_at=timezone.now()
     )
     return deliver(message.pk)
+
+
+# ═══════════════════════════════════════════════════════════
+#  الردّ على الوارد
+# ═══════════════════════════════════════════════════════════
+
+
+def enqueue_raw(
+    *,
+    to: str,
+    subject: str,
+    body: str,
+    language: str = "ar",
+    purpose: str = "",
+    in_reply_to: str = "",
+    references: str = "",
+) -> OutboundMessage:
+    """
+    رسالة بنصّ حرّ — للردّ الذي يكتبه موظف.
+
+    ⚠️  تمرّ بنفس الطابور لا بإرسال مباشر: الردّ اليدوي يستحق ما
+        يستحقه البريد الآلي من إعادة محاولة وسجل. وأسوأ رسالة تُفقد
+        هي التي كتبها إنسان مرة واحدة.
+    """
+    message = OutboundMessage.objects.create(
+        to_email=to,
+        subject=subject[:500],
+        body=body,
+        purpose=purpose,
+        language=language,
+        in_reply_to=in_reply_to[:998],
+        references=references,
+    )
+    transaction.on_commit(lambda: deliver(message.pk))
+    return message
+
+
+def reply(inbound, *, body: str, subject: str = "", actor=None) -> OutboundMessage:
+    """
+    ردّ على رسالة واردة — داخل سلسلتها.
+
+    ⚠️  **ولا يُردّ على رسالة آلية أبدًا.**
+
+        ردّان آليان متقابلان يولّدان آلاف الرسائل في دقائق، وينتهيان
+        بالدومين في القوائم السوداء — فيسقط معه بريد الطلبات وإعادة
+        تعيين كلمات المرور. المنع هنا لا في الشاشة: الشاشة تُلتَفّ.
+    """
+    from core.errors import BusinessError, ErrorCode
+    from mailing.models import InboundState
+
+    if inbound.is_auto:
+        raise BusinessError(
+            ErrorCode.VALIDATION_ERROR,
+            detail="لا يُردّ على رسالة آلية — حماية من حلقات البريد",
+        )
+
+    # ⚠️  السلسلة تُبنى بإضافة معرّف الرسالة إلى مراجعها لا باستبداله:
+    #     الاستبدال يقطع الخيط عند العميل فيظهر الردّ محادثةً جديدة.
+    references = " ".join(filter(None, [inbound.references, inbound.message_id]))
+
+    outbound = enqueue_raw(
+        to=inbound.from_email,
+        subject=subject or f"Re: {inbound.subject}",
+        body=body,
+        purpose=inbound.account.routes.values_list("purpose", flat=True).first() or "",
+        in_reply_to=inbound.message_id,
+        references=references,
+    )
+
+    inbound.status = InboundState.REPLIED
+    if actor is not None and inbound.assigned_to_id is None:
+        inbound.assigned_to = actor
+    inbound.save(update_fields=["status", "assigned_to", "updated_at"])
+
+    return outbound

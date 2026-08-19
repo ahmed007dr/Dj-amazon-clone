@@ -94,6 +94,7 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
       { to: '/admin/tax', key: 'admin.tax', permission: 'core.change_taxclass' },
       { to: '/admin/settings', key: 'nav.settings', permission: 'inventory.change_stocklocation' },
       { to: '/admin/payments', key: 'nav.payments', permission: 'payments.view_paymentprovider' },
+      { to: '/admin/mail', key: 'nav.mail', permission: 'mailing.change_emailaccount' },
       { to: '/admin/branding', key: 'nav.branding', permission: 'branding.change_brandprofile' },
     ],
   },

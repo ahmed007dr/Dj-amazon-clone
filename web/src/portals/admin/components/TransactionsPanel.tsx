@@ -3,18 +3,20 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
+  listProviders,
   listTransactions,
   useCaptureTransaction,
   useRefundTransaction,
   useTransaction,
   type PaymentTransaction,
 } from '@/features/payments/adminApi';
+import { useDebounced } from '@/shared/hooks/useDebounced';
 import { isApiError } from '@/shared/http/errors';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Field } from '@/shared/ui/Field';
-import { FilterBar, FilterSelect } from '@/shared/ui/FilterBar';
+import { FilterBar, FilterSearch, FilterSelect } from '@/shared/ui/FilterBar';
 import { Drawer } from '@/shared/ui/Drawer';
 import { Modal } from '@/shared/ui/Modal';
 import { Pagination } from '@/shared/ui/Pagination';
@@ -46,6 +48,13 @@ export function TransactionsPanel() {
   const { notify } = useToast();
 
   const [status, setStatus] = useState('');
+  const [provider, setProvider] = useState('');
+  // ⚠️  **البحث بالمرجع هو مسار الدعم كله.**
+  //
+  //     العميل يقول «طلبي رقم كذا لم يُدفع»؛ وبلا هذا الحقل يمرّر
+  //     الموظف في صفحات المعاملات حتى يجده — أو لا يجده فيفترض
+  //     أن الدفع لم يصل.
+  const [reference, setReference] = useState('');
   const [page, setPage] = useState(1);
   const [refunding, setRefunding] = useState<PaymentTransaction | null>(null);
   const [inspecting, setInspecting] = useState<string | null>(null);
@@ -54,9 +63,23 @@ export function TransactionsPanel() {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
 
+  const debouncedReference = useDebounced(reference);
+
+  const providers = useQuery({
+    queryKey: ['admin', 'payment-providers'],
+    queryFn: listProviders,
+    staleTime: 30 * 60 * 1000,
+  });
+
   const query = useQuery({
-    queryKey: ['admin', 'transactions', status, page],
-    queryFn: () => listTransactions({ ...(status ? { status } : {}), page }),
+    queryKey: ['admin', 'transactions', status, provider, debouncedReference, page],
+    queryFn: () =>
+      listTransactions({
+        ...(status ? { status } : {}),
+        ...(provider ? { provider } : {}),
+        ...(debouncedReference ? { reference_id: debouncedReference } : {}),
+        page,
+      }),
     staleTime: 30 * 1000,
   });
 
@@ -155,7 +178,37 @@ export function TransactionsPanel() {
 
   return (
     <>
-      <FilterBar hasFilters={Boolean(status)} onClear={() => { setStatus(''); setPage(1); }}>
+      <FilterBar
+        hasFilters={Boolean(status || provider || reference)}
+        onClear={() => {
+          setStatus('');
+          setProvider('');
+          setReference('');
+          setPage(1);
+        }}
+      >
+        <FilterSearch
+          value={reference}
+          onChange={(next) => {
+            setReference(next);
+            setPage(1);
+          }}
+          placeholder={t('payments.searchByReference')}
+        />
+
+        <FilterSelect
+          value={provider}
+          label={t('payments.provider')}
+          options={(providers.data ?? []).map((row) => ({
+            value: row.id,
+            label: row.name_ar || row.code,
+          }))}
+          onChange={(next) => {
+            setProvider(next);
+            setPage(1);
+          }}
+        />
+
         <FilterSelect
           value={status}
           label={t('admin.status')}

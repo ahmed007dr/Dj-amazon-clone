@@ -27,6 +27,10 @@ urlpatterns = [
     #     وهو ثابت في الكود، بخلاف صفّ التجاوز الذي قد يُحذف ويُعاد.
     path("admin/templates/", api.TemplateListAPI.as_view(), name="templates"),
     path("admin/templates/<slug:key>/", api.TemplateDetailAPI.as_view(), name="template-detail"),
+    # ── الوارد ─────────────────────────────────────────────
+    path("admin/inbox/", api.InboxListAPI.as_view(), name="inbox"),
+    path("admin/inbox/<uuid:pk>/", api.InboxDetailAPI.as_view(), name="inbox-detail"),
+    path("admin/inbox/<uuid:pk>/reply/", api.ReplyAPI.as_view(), name="inbox-reply"),
     path(
         "admin/templates/<slug:key>/preview/",
         api.TemplatePreviewAPI.as_view(),

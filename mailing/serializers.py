@@ -14,6 +14,8 @@ from mailing.models import (
     CredentialKey,
     EmailAccount,
     EmailCredential,
+    InboundAttachment,
+    InboundMessage,
     MailRoute,
     OutboundMessage,
     TemplateOverride,
@@ -233,3 +235,67 @@ class TemplatePreviewSerializer(serializers.Serializer):
     subject_en = serializers.CharField(required=False, allow_blank=True)
     body_ar = serializers.CharField(required=False, allow_blank=True)
     body_en = serializers.CharField(required=False, allow_blank=True)
+
+
+class InboundAttachmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InboundAttachment
+        fields = ["id", "filename", "content_type", "size_bytes", "file"]
+        read_only_fields = fields
+
+
+class InboundMessageSerializer(serializers.ModelSerializer):
+    """
+    ⚠️  **`body_html` غائب عن الحمولة عمدًا.**
+
+        رسالة من مجهول تحمل `<script>` تُعرَض في شاشة أدمن مسجَّل
+        الدخول هي XSS مباشر على أعلى صلاحية في النظام. النص الصريح
+        يكفي للقراءة والردّ، والـ HTML يبقى مخزَّنًا للأرشيف وحده.
+    """
+
+    attachments = InboundAttachmentSerializer(many=True, read_only=True)
+    account_code = serializers.CharField(source="account.code", read_only=True)
+    has_html = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InboundMessage
+        fields = [
+            "id",
+            "account",
+            "account_code",
+            "from_email",
+            "from_name",
+            "to_email",
+            "subject",
+            "body_text",
+            "has_html",
+            "received_at",
+            "size_bytes",
+            "is_auto",
+            "status",
+            "assigned_to",
+            "reference_type",
+            "reference_id",
+            "attachments",
+        ]
+        read_only_fields = [
+            "id",
+            "account",
+            "from_email",
+            "from_name",
+            "to_email",
+            "subject",
+            "body_text",
+            "received_at",
+            "size_bytes",
+            "is_auto",
+            "attachments",
+        ]
+
+    def get_has_html(self, message) -> bool:
+        return bool(message.body_html)
+
+
+class ReplySerializer(serializers.Serializer):
+    body = serializers.CharField()
+    subject = serializers.CharField(required=False, allow_blank=True)

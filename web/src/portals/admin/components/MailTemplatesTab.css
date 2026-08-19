@@ -1,0 +1,88 @@
+.templates__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.templates__open {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  inline-size: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-align: start;
+  min-block-size: var(--touch-target);
+  cursor: pointer;
+}
+
+.templates__key {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.templates__subject {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.templates__editor,
+.templates__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.templates__editor {
+  gap: var(--space-4);
+}
+
+.templates__field {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.templates__field input,
+.templates__field textarea {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 400;
+  resize: vertical;
+}
+
+.templates__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.templates__preview section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  margin-block-end: var(--space-3);
+}
+
+/* ⚠️  النص يلتفّ ولا يتمرّر أفقيًا — القاعدة على كل الشاشات */
+.templates__preview pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  font: inherit;
+  color: var(--color-text-muted);
+}

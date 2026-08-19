@@ -82,9 +82,7 @@ class TestRegistration:
         assert len(django_mail.outbox) == 1
         assert "فعّل" in django_mail.outbox[0].subject
 
-    def test_register_respects_preferred_language(
-        self, client, django_capture_on_commit_callbacks
-    ):
+    def test_register_respects_preferred_language(self, client, django_capture_on_commit_callbacks):
         """البريد يصل بلغة المستلم لا بلغة الطلب."""
         django_mail.outbox.clear()
         with django_capture_on_commit_callbacks(execute=True):

@@ -198,6 +198,12 @@ const AdminPosSessionsPage = lazy(() =>
     default: module.AdminPosSessionsPage,
   })),
 );
+const AdminMailPage = lazy(() =>
+  import('@/portals/admin/pages/AdminMailPage').then((module) => ({
+    default: module.AdminMailPage,
+  })),
+);
+
 const AdminPaymentsPage = lazy(() =>
   import('@/portals/admin/pages/AdminPaymentsPage').then((module) => ({
     default: module.AdminPaymentsPage,
@@ -334,6 +340,7 @@ const router = createBrowserRouter([
       { path: 'settings', element: <Lazy><AdminSettingsPage /></Lazy> },
       { path: 'tax', element: <Lazy><AdminTaxPage /></Lazy> },
       { path: 'payments', element: <Lazy><AdminPaymentsPage /></Lazy> },
+      { path: 'mail', element: <Lazy><AdminMailPage /></Lazy> },
       { path: 'pos-sessions', element: <Lazy><AdminPosSessionsPage /></Lazy> },
       { path: 'finance', element: <Lazy><AdminFinancePage /></Lazy> },
       { path: 'expenses', element: <Lazy><AdminExpensesPage /></Lazy> },

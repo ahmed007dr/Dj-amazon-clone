@@ -9,6 +9,7 @@ import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Field } from '@/shared/ui/Field';
+import { CustomerProfileCard } from '@/portals/account/components/CustomerProfileCard';
 
 import './ProfilePage.css';
 
@@ -128,6 +129,12 @@ export function ProfilePage() {
           {t('common.save')}
         </Button>
       </form>
+
+      {/* ⚠️  بطاقة مستقلة لا حقول في النموذج نفسه: هذه بيانات
+          ملف العميل (`customers/me`) لا بيانات الحساب
+          (`auth/me`) — ونموذج واحد بمسارَي حفظ يُنتج نصف حفظ
+          حين يفشل أحدهما. */}
+      <CustomerProfileCard />
     </>
   );
 }

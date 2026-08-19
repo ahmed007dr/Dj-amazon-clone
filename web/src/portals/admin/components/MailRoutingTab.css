@@ -1,0 +1,74 @@
+.routing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.routing__assign {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.routing__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+  flex: 1 1 12rem;
+}
+
+.routing__field select {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 400;
+  min-block-size: var(--touch-target);
+}
+
+.routing__rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.routing__rules li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: 0.875rem;
+}
+
+/* ⚠️  السهم منطقي لا اتجاهي: ينقلب مع اللغة تلقائيًا */
+.routing__arrow {
+  color: var(--color-text-muted);
+}
+
+.routing__template {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.routing__template code {
+  font-size: 0.8125rem;
+}
+
+.routing__template small,
+.routing__none {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}

@@ -18,7 +18,13 @@ from core.models.audit import AuditAction, AuditLog
 from core.permissions import IsAdminAccount
 from mailing import serializers as s
 from mailing import services
-from mailing.models import EmailAccount, MailRoute, OutboundMessage, TemplateOverride
+from mailing.models import (
+    EmailAccount,
+    InboundMessage,
+    MailRoute,
+    OutboundMessage,
+    TemplateOverride,
+)
 from mailing.templates import TEMPLATES, placeholders, render_text
 
 
@@ -341,3 +347,75 @@ class TemplatePreviewAPI(APIView):
             }
 
         return Response(result)
+
+
+class InboxListAPI(generics.ListAPIView):
+    """صندوق الوارد — ما وصل ولم يُجَب عليه بعد."""
+
+    permission_classes = [IsAdminAccount]
+    serializer_class = s.InboundMessageSerializer
+    pagination_class = AdminPageNumberPagination
+
+    def get_queryset(self):
+        queryset = InboundMessage.objects.select_related("account").prefetch_related("attachments")
+        params = self.request.query_params
+
+        if status_filter := params.get("status"):
+            queryset = queryset.filter(status=status_filter)
+        if sender := params.get("from"):
+            queryset = queryset.filter(from_email__icontains=sender)
+        if params.get("hide_auto") == "true":
+            queryset = queryset.filter(is_auto=False)
+
+        return queryset.order_by("-received_at")
+
+
+class InboxDetailAPI(generics.RetrieveUpdateAPIView):
+    """
+    قراءة رسالة أو تغيير حالتها وإسنادها.
+
+    ⚠️  المحتوى للقراءة فقط — تعديل نصّ رسالة وصلت تزوير للسجل.
+        القابل للتغيير: الحالة · المسؤول · الربط بمرجع.
+    """
+
+    permission_classes = [IsAdminAccount]
+    serializer_class = s.InboundMessageSerializer
+    queryset = InboundMessage.objects.select_related("account").prefetch_related("attachments")
+
+
+class ReplyAPI(APIView):
+    """
+    ردّ يكتبه موظف — يمرّ بالطابور كأي بريد.
+
+    ⚠️  ويُرفض على الرسائل الآلية: حلقة بريد تولّد آلاف الرسائل في
+        دقائق وتُدرِج الدومين في القوائم السوداء.
+    """
+
+    permission_classes = [IsAdminAccount]
+    serializer_class = s.ReplySerializer
+
+    def post(self, request, pk):
+        inbound = generics.get_object_or_404(InboundMessage.objects.all(), pk=pk)
+
+        payload = s.ReplySerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+
+        outbound = services.reply(
+            inbound,
+            body=payload.validated_data["body"],
+            subject=payload.validated_data.get("subject", ""),
+            actor=request.user,
+        )
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditAction.SETTING_CHANGE,
+            object_repr=f"ردّ على {inbound.from_email}",
+            changes={"inbound": str(inbound.pk), "outbound": str(outbound.pk)},
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        return Response(
+            {"queued": True, "outbound_id": str(outbound.pk)},
+            status=status.HTTP_201_CREATED,
+        )

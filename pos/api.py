@@ -108,6 +108,47 @@ class AdminRegisterListCreateAPI(generics.ListCreateAPIView):
     queryset = Register.objects.select_related("location")
 
 
+class AdminRegisterDetailAPI(generics.RetrieveUpdateAPIView):
+    """
+    تعديل كاونتر — **بلا حذف**.
+
+    ⚠️  **الكاونتر يُوقَف ولا يُحذف.**
+
+        كل وردية وكل بيعة تشير إليه؛ حذفه يقطع تاريخ الفرع كله عن
+        مصدره فلا يُقرأ إقفال قديم ولا يُنسب فرق نقدي إلى درجه.
+        و`is_active=False` يفعل ما يريده الأدمن فعلًا: يختفي من
+        بوابة الكاشير ويبقى تاريخه.
+
+    ⚠️  و**الموقع لا يُنقل ووردية مفتوحة عليه**.
+
+        الكاونتر يخصم من مخزون موقعه؛ نقله أثناء وردية يجعل
+        النصف الأول من البيعات يخصم من فرع والنصف الثاني من
+        آخر — ولا شيء في الدفتر يقول أين وقع الانقسام.
+    """
+
+    permission_classes = [IsAdminAccount]
+    serializer_class = s.RegisterSerializer
+    queryset = Register.objects.select_related("location")
+
+    def perform_update(self, serializer):
+        register = self.get_object()
+        new_location = serializer.validated_data.get("location")
+
+        moving = new_location is not None and new_location != register.location
+        closing = serializer.validated_data.get("is_active") is False
+
+        if (moving or closing) and POSSession.objects.filter(
+            register=register, status=SessionStatus.OPEN
+        ).exists():
+            raise BusinessError(
+                ErrorCode.CONFLICT,
+                detail="أغلق وردية هذا الكاونتر أولًا",
+                status_code=409,
+            )
+
+        serializer.save()
+
+
 # ═══════════════════════════════════════════════════════════
 #  الوردية
 # ═══════════════════════════════════════════════════════════

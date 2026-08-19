@@ -19,6 +19,11 @@ urlpatterns = [
     path("refund/", api.POSRefundAPI.as_view(), name="refund"),
     # ── الأدمن ─────────────────────────────────────────────
     path("admin/registers/", api.AdminRegisterListCreateAPI.as_view(), name="admin-registers"),
+    path(
+        "admin/registers/<uuid:pk>/",
+        api.AdminRegisterDetailAPI.as_view(),
+        name="admin-register-detail",
+    ),
     path("admin/sessions/", api.AdminSessionListAPI.as_view(), name="admin-sessions"),
     path(
         "admin/sessions/<uuid:pk>/",

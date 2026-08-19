@@ -378,6 +378,34 @@ pytest -k "test_suspend"                # اختبار محدد
 pytest --cov --cov-report=term-missing  # التغطية
 ```
 
+## ⚠️ حين تنهار الحزمة فجأة بعشرات الأخطاء
+
+أعراضها: تشغيلٌ يمرّ كاملًا، والذي بعده يفشل بأخطاء **متنقّلة** في
+نطاقات لا علاقة لها ببعضها (`cart` · `pos` · `finance` · `suppliers`)،
+ورسائلها عن جداول مقطوعة أو مفاتيح مكرّرة لا عن منطق العمل.
+
+**السبب ليس الكود.** اختبارا التزامن الحقيقيان
+(`b2b::test_two_simultaneous_orders…` و`inventory::TestConcurrency`)
+يعملان بخيوط ومعاملات فعلية، ويقطعان الجداول (`TRUNCATE`) عند
+التفكيك. وحين يتزامن ذلك مع اتصالٍ آخر ما زال يكتب يقع **قفل متبادل**:
+
+```
+Process A waits for AccessExclusiveLock on accounts_user   ← TRUNCATE
+Process B waits for RowExclusiveLock  on core_taxclass     ← كتابة حيّة
+```
+
+فيفشل التفكيك، وتبقى قاعدة الاختبار المُعاد استخدامها (`--reuse-db`)
+نصف منظَّفة — فينهار كل ما بعده.
+
+**العلاج: إسقاط قاعدة الاختبار وحدها** (اسمها `test_` + اسم قاعدتك،
+وهي قابلة للحذف بحكم تعريفها — لا تلمس القاعدة الأصلية):
+
+```bash
+psql -U postgres -d postgres -c   "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'test_store-m'"
+psql -U postgres -d postgres -c 'DROP DATABASE IF EXISTS "test_store-m"'
+pytest
+```
+
 ## حدود التغطية
 
 | الطبقة | الحد الأدنى |

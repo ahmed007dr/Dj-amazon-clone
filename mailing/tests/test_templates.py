@@ -129,9 +129,7 @@ class TestOverrideResolution:
 
         assert subject and body
 
-    def test_a_broken_override_falls_back_to_code_instead_of_dropping_the_mail(
-        self, monkeypatch
-    ):
+    def test_a_broken_override_falls_back_to_code_instead_of_dropping_the_mail(self, monkeypatch):
         """
         ⚠️  التجاوز يحرّره إنسان، وإنسان يخطئ. وخلل فيه يجب ألا يمنع
             وصول «إعادة تعيين كلمة المرور» — النسخة الأصلية قائمة

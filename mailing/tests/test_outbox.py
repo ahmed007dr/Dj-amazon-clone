@@ -31,6 +31,22 @@ from mailing.models import (
 LOCMEM = "django.core.mail.backends.locmem.EmailBackend"
 
 
+@pytest.fixture(autouse=True)
+def clean_outbox(db):
+    """
+    ⚠️  الطابور جدول **مشترك**، والعدّ عليه يقيس ما تركه غيرك.
+
+        اختبارات التزامن في نطاقات أخرى تعمل بمعاملات حقيقية: تُودِع
+        صفوفًا فعلًا، وتُنظّفها بـ`TRUNCATE` عند تفكيكها. وحين يفشل
+        ذلك التفكيك (وهو يفشل أحيانًا على اتصالات خيوط معلّقة) تبقى
+        صفوفها في قاعدة الاختبار المُعاد استخدامها — فيقرأ اختبارٌ
+        هنا «صفّان» بينما لم يُنشئ واحدًا.
+
+        التنظيف قبل كل اختبار يجعل التأكيد يقيس ما فعله هو.
+    """
+    OutboundMessage.objects.all().delete()
+
+
 @pytest.fixture
 def console_account(db, monkeypatch):
     monkeypatch.setattr(services, "CONSOLE_BACKEND", LOCMEM)

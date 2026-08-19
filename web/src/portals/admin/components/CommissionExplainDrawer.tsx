@@ -62,7 +62,7 @@ export function CommissionExplainDrawer({
         <dl className="commission-explain">
           {ORDER.filter((key) => explain.data[key] !== undefined).map((key) => (
             <div key={key} className={key === 'amount' ? 'is-total' : ''}>
-              <dt>{t(`targets.explain.${key}`, { defaultValue: key })}</dt>
+              <dt>{t(`targets.explainRow.${key}`, { defaultValue: key })}</dt>
               <dd dir="ltr">{String(explain.data[key])}</dd>
             </div>
           ))}

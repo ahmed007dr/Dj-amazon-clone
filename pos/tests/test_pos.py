@@ -762,3 +762,118 @@ def test_session_closed_event_fires(session, cashier):
 
     assert len(received) == 1
     assert received[0].status == SessionStatus.CLOSED
+
+
+# ═══════════════════════════════════════════════════════════
+#  إدارة الكاونترات — من اللوحة
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.fixture
+def manager_client(manager):
+    client = APIClient()
+    client.force_authenticate(user=manager)
+    return client
+
+
+@pytest.mark.django_db
+class TestRegisterAdmin:
+    """
+    ⚠️  بوابة الخروج: الكاونتر يُنشأ ويُعدَّل ويُوقَف **من الشاشة**،
+        ولا يُحذف، ولا يُنقل ووردية مفتوحة عليه.
+    """
+
+    def test_creating_a_register_from_the_panel(self, manager_client, location):
+        response = manager_client.post(
+            reverse("v1:pos:admin-registers"),
+            {
+                "code": "reg-new",
+                "name_ar": "كاونتر جديد",
+                "name_en": "New counter",
+                "location": str(location.pk),
+                "is_active": True,
+            },
+            format="json",
+        )
+
+        assert response.status_code == 201, response.data
+        assert Register.objects.filter(code="reg-new").exists()
+
+    def test_renaming_and_deactivating(self, manager_client, register):
+        url = reverse("v1:pos:admin-register-detail", args=[register.pk])
+
+        response = manager_client.patch(url, {"name_ar": "كاونتر معدَّل"}, format="json")
+        assert response.status_code == 200
+        assert response.data["name_ar"] == "كاونتر معدَّل"
+
+        response = manager_client.patch(url, {"is_active": False}, format="json")
+        assert response.status_code == 200
+
+        register.refresh_from_db()
+        assert register.is_active is False
+
+    def test_an_open_session_blocks_deactivation(self, manager_client, register, session):
+        """
+        ⚠️  إيقاف كاونتر بوردية مفتوحة يترك نقدًا في درج لا يظهر
+            في أي شاشة، ولا سبيل لإقفاله بعدها من البوابة.
+        """
+        response = manager_client.patch(
+            reverse("v1:pos:admin-register-detail", args=[register.pk]),
+            {"is_active": False},
+            format="json",
+        )
+
+        assert response.status_code == 409
+        register.refresh_from_db()
+        assert register.is_active is True
+
+    def test_an_open_session_blocks_moving_the_location(
+        self, manager_client, register, session, db
+    ):
+        """
+        ⚠️  النقل أثناء وردية يجعل نصف البيعات تخصم من فرع والنصف
+            الآخر من فرع ثانٍ — ولا شيء في الدفتر يقول أين وقع
+            الانقسام.
+        """
+        other = StockLocation.objects.create(
+            code="branch-2",
+            name_ar="فرع ثانٍ",
+            name_en="Branch 2",
+            kind=LocationKind.BRANCH,
+            is_sellable=True,
+        )
+
+        response = manager_client.patch(
+            reverse("v1:pos:admin-register-detail", args=[register.pk]),
+            {"location": str(other.pk)},
+            format="json",
+        )
+
+        assert response.status_code == 409
+
+    def test_a_closed_register_still_moves(self, manager_client, register, location):
+        """⚠️  المنع مشروط بالوردية المفتوحة لا بوجود تاريخ."""
+        other = StockLocation.objects.create(
+            code="branch-3",
+            name_ar="فرع ثالث",
+            name_en="Branch 3",
+            kind=LocationKind.BRANCH,
+            is_sellable=True,
+        )
+
+        response = manager_client.patch(
+            reverse("v1:pos:admin-register-detail", args=[register.pk]),
+            {"location": str(other.pk)},
+            format="json",
+        )
+
+        assert response.status_code == 200
+
+    def test_the_register_is_never_deleted(self, manager_client, register):
+        """⚠️  كل وردية تشير إليه — والحذف يقطع تاريخ الفرع."""
+        response = manager_client.delete(
+            reverse("v1:pos:admin-register-detail", args=[register.pk])
+        )
+
+        assert response.status_code == 405
+        assert Register.objects.filter(pk=register.pk).exists()

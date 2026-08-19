@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { http } from '@/shared/http';
 import type { PagedResponse } from '@/features/orders/adminApi';
@@ -57,5 +57,32 @@ export function useAdminSession(id: string | null) {
     queryKey: ['admin', 'pos-session', id],
     queryFn: () => http.get<Session>(`/pos/admin/sessions/${id}/`),
     enabled: id !== null,
+  });
+}
+
+/**
+ * إدارة الكاونترات.
+ *
+ * ⚠️  **الكاونتر يُوقَف ولا يُحذف** — والخادم لا يعرض `DELETE`
+ *     أصلًا: كل وردية وكل بيعة تشير إليه، وحذفه يقطع تاريخ الفرع
+ *     عن مصدره.
+ *
+ * ⚠️  والخادم يردّ ٤٠٩ على الإيقاف أو النقل ووردية مفتوحة عليه؛
+ *     الشاشة تُظهر رسالته كما هي بدل أن تخترع تفسيرًا.
+ */
+export function useSaveRegister() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, ...body }: Partial<Register> & { id?: string }) =>
+      id
+        ? http.patch<Register>(`/pos/admin/registers/${id}/`, body)
+        : http.post<Register>('/pos/admin/registers/', body),
+    onSuccess: () => {
+      // ⚠️  إبطال بوابة الكاشير معها: الكاونتر الموقوف يجب أن
+      //     يختفي من قائمة الفتح فورًا لا بعد إعادة تحميل.
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'pos-registers'] });
+      void queryClient.invalidateQueries({ queryKey: ['pos', 'registers'] });
+    },
   });
 }

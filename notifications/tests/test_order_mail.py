@@ -140,9 +140,7 @@ class TestOrderMailDelivery:
         assert len(django_mail.outbox) == 1
         assert "مدينة نصر" in django_mail.outbox[0].body
 
-    def test_cancellation_includes_the_reason(
-        self, customer, django_capture_on_commit_callbacks
-    ):
+    def test_cancellation_includes_the_reason(self, customer, django_capture_on_commit_callbacks):
         order = make_order(customer)
         django_mail.outbox.clear()
 

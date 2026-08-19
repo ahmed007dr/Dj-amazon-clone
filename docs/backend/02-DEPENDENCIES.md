@@ -11,9 +11,17 @@
 ```text
 L0   core                              ← بنية تحتية بحتة
        ↑
-L0.5 branding                          ← ⚠️ فوق core لا شقيقًا له
-       ↑                                  يستهلك BaseModel وrandom_filename
-       ↑                                  ولا نطاق عمل يستهلكه
+L0.5 branding ──────── mailing         ← ⚠️ فوق core لا شقيقين له
+       ↑                                  branding: يستهلك BaseModel و
+       ↑                                  random_filename، ولا نطاق عمل يستهلكه
+       ↑
+       ↑                                  mailing: نقل البريد وهويته
+       ↑                                  (حساب · مسؤولية · قالب · طابور · وارد)
+       ↑                                  ⚠️ **تحت accounts** لأن الهوية ترسل
+       ↑                                     بريد التفعيل — والبريد لا يعرف من
+       ↑                                     يستدعيه: `send_to_user(user)` يقبل
+       ↑                                     الكائن ولا يستورد نوعه (ADR-75)
+       ↑                                  ⚠️ ولا يعرف أي نطاق عمل — كـ`branding`
 L1   accounts                          ← الهوية فقط. كل شيء يقف عليها
        ↑
 L1.5 access                            ← ⚠️ تحت catalog لا فوقه
@@ -39,6 +47,18 @@ L8   finance                           ← إيراد · COGS · مصروف · P
      ══════ مستهلكون فقط — لا أحد يعتمد عليهم ══════
      notifications        (تستمع للأحداث · بريد · داخل التطبيق)
      reporting            (تقرأ الكل، لا تكتب شيئًا)
+
+     ══════ L1.5 — شقيق access فوق accounts ══════
+     analytics            (حركة الاستخدام · من يتصفّح الآن · ساعات الضغط)
+                          ⚠️ **تحت** administration لا فوقه: الأخير
+                             يقرأ منه عدد الزوار في «المتصلون الآن».
+                             يستورد accounts لتصنيف الأجهزة، ولا يعرف
+                             أي نطاق عمل — المتجر والسلة والطلب كلها
+                             «طلب HTTP» عنده.
+                          ⚠️ ولا يستورد reporting أبدًا: ذروة التصفّح
+                             وذروة الشراء تقريران متوازيان، وصلاحيتهما
+                             المشتركة `CanViewReports` في core.permissions
+                             لهذا السبب بالذات (ADR-81 · ADR-83)
 
      ══════ فوق نطاقات العمل ══════
      ops                  (المهام الدورية · مثبّت في الإنتاج ✅)
@@ -161,7 +181,7 @@ layers =
     access | pricing | inventory | reviews
     academic | customers | administration | shipping | catalog
     accounts
-    core | branding
+    core | branding | mailing
 
 [importlinter:contract:identity-isolation]
 name = Identity domains must expand independently

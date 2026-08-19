@@ -39,6 +39,7 @@ from analytics import services as analytics_services
 from cart import services as cart_services
 from inventory import services as inventory_services
 from loyalty import services as loyalty_services
+from mailing import inbound as mail_inbound
 from mailing import services as mail_services
 
 logger = logging.getLogger(__name__)
@@ -101,6 +102,16 @@ JOBS: dict[str, tuple[str, str, Callable[[], int]]] = {
         "mail",
         "تسليم بريد الطابور",
         mail_services.deliver_pending,
+    ),
+    # ⚠️  السحب **بعد** التسليم في الترتيب.
+    #
+    #     الصندوق الوارد يمتلئ بردود على ما أرسلناه؛ وسحبه قبل تسليم
+    #     ما ينتظر يجعل ردّ العميل يصل قبل الرسالة التي يردّ عليها —
+    #     فيقرأ الموظف جوابًا بلا سؤال.
+    "fetch_inbound_mail": (
+        "mail",
+        "سحب البريد الوارد",
+        mail_inbound.fetch_all,
     ),
     # ⚠️  **تُجدوَل بالدقيقة لا باليوم** (ADR-17).
     #

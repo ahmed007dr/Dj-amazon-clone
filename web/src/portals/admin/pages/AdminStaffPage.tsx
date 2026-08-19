@@ -15,6 +15,7 @@ import {
   EmployeeEditForm,
   RolesPanel,
 } from '@/portals/admin/components/StaffAdminPanel';
+import { AssignmentsPanel } from '@/portals/admin/components/AssignmentsPanel';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { Drawer } from '@/shared/ui/Drawer';
 import { DataTable, type Column } from '@/shared/tables/DataTable';

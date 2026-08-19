@@ -17,6 +17,8 @@ from core.admin import DeletedListFilter, DomainModelAdmin, ReadOnlyDomainAdmin
 from mailing.models import (
     EmailAccount,
     EmailCredential,
+    InboundAttachment,
+    InboundMessage,
     MailRoute,
     OutboundMessage,
     TemplateOverride,
@@ -124,3 +126,43 @@ class TemplateOverrideAdmin(DomainModelAdmin):
     list_display = ("key", "subject_ar", "is_active", "updated_at")
     list_filter = ("is_active", DeletedListFilter)
     search_fields = ("key", "subject_ar", "subject_en")
+
+
+class InboundAttachmentInline(admin.TabularInline):
+    model = InboundAttachment
+    extra = 0
+    readonly_fields = ("filename", "content_type", "size_bytes", "file")
+    can_delete = False
+
+
+@admin.register(InboundMessage)
+class InboundMessageAdmin(DomainModelAdmin):
+    """
+    ⚠️  المحتوى للقراءة فقط — تعديل نصّ رسالة وصلت تزوير للسجل.
+        والقابل للتغيير هو الحالة والإسناد وحدهما.
+
+    ⚠️  و`body_html` **غير معروض**: رسالة من مجهول تحمل `<script>`
+        تُعرَض في صفحة أدمن مسجَّل الدخول هي XSS على أعلى صلاحية.
+    """
+
+    list_display = ("received_at", "from_email", "subject", "status", "is_auto", "assigned_to")
+    list_filter = ("status", "is_auto", "account", DeletedListFilter)
+    list_select_related = ("account", "assigned_to")
+    search_fields = ("from_email", "subject", "message_id")
+    date_hierarchy = "received_at"
+    inlines = (InboundAttachmentInline,)
+    readonly_fields = (
+        "account",
+        "message_id",
+        "in_reply_to",
+        "references",
+        "from_email",
+        "from_name",
+        "to_email",
+        "subject",
+        "body_text",
+        "received_at",
+        "size_bytes",
+        "is_auto",
+    )
+    exclude = ("body_html",)

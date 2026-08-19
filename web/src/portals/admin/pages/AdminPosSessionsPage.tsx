@@ -6,6 +6,7 @@ import { useAdminRegisters, useAdminSession, useAdminSessions } from '@/features
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
+import { RegistersPanel } from '@/portals/admin/components/RegistersPanel';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Drawer } from '@/shared/ui/Drawer';
@@ -38,6 +39,7 @@ export function AdminPosSessionsPage() {
   const [register, setRegister] = useState('');
   const [page, setPage] = useState(1);
   const [detailOf, setDetailOf] = useState<string | null>(null);
+  const [view, setView] = useState<'sessions' | 'registers'>('sessions');
 
   const detail = useAdminSession(detailOf);
 
@@ -101,6 +103,28 @@ export function AdminPosSessionsPage() {
     <>
       <PageHeader title={t('pos.sessions')} />
 
+      {/* ⚠️  الكاونترات هنا لا في «النظام»: من يقرأ ورديات فرع هو
+          من يضيف كاونتره الثاني ويوقف المعطّل — وفصلهما يجعل
+          فتح فرع جديد رحلة بين شاشتين. */}
+      <div className="pos-view-tabs" role="tablist">
+        {(['sessions', 'registers'] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={view === value}
+            className={view === value ? 'is-active' : ''}
+            onClick={() => setView(value)}
+          >
+            {t(`pos.view.${value}`)}
+          </button>
+        ))}
+      </div>
+
+      {view === 'registers' ? <RegistersPanel /> : null}
+
+      {view === 'sessions' ? (
+      <>
       <FilterBar>
         <FilterSelect
           label={t('admin.status')}
@@ -156,6 +180,8 @@ export function AdminPosSessionsPage() {
 
       {query.data ? (
         <Pagination page={query.data.page} pages={query.data.pages} onChange={setPage} />
+      ) : null}
+      </>
       ) : null}
 
       <Drawer
