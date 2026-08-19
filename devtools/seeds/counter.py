@@ -1,19 +1,19 @@
 """
-أجهزة نقطة البيع.
+Point-of-sale registers.
 
-⚠️  **الجهاز مربوط بموقع مخزني — والربط هو كل الفكرة.**
+⚠️  **A register is tied to a stock location — and that link is the whole point.**
 
-    البيعة على الكاونتر تخصم من مخزون **الفرع الذي تقف فيه** لا من
-    المخزن الرئيسي. جهاز مربوط بالمخزن الخطأ يبيع بضاعة موجودة في
-    مدينة أخرى: الرصيد ينزل حيث لم يخرج شيء، ويبقى في الفرع صنف
-    يقول النظام إنه بيع.
+    A sale at the counter deducts from the stock of **the branch you are
+    standing in**, not from the main warehouse. A register tied to the wrong
+    warehouse sells goods that are in another city: the balance drops where
+    nothing left, and the branch keeps an item the system says was sold.
 
-⚠️  وجهازان في الفرع الواحد لا جهاز.
+⚠️  And two registers per branch, not one.
 
-    الفرع الفعلي له أكثر من كاونتر، وكل كاونتر وردية وكاشير ودرج
-    مستقل. جهاز واحد في البذرة يجعل «وردية مفتوحة على هذا الجهاز»
-    حالة لا تُختبر أبدًا في التطوير — وهي أول ما يقابله كاشير
-    الوردية الثانية في الإنتاج.
+    A real branch has more than one counter, and each counter has its own shift,
+    cashier and drawer. A single register in the seed makes "a shift open on
+    this register" a state never exercised in development — and the first thing
+    the second shift's cashier meets in production.
 """
 
 from pos.models import Register
@@ -32,8 +32,8 @@ REGISTERS = [
         "location_code": "br-nasr",
     },
     {
-        # ⚠️  كاونتر المخزن الرئيسي: البيع المباشر من المخزن حالة
-        #     قائمة (تاجر يمرّ بنفسه) وليست استثناءً نادرًا.
+        # ⚠️  A main-warehouse counter: selling directly from the warehouse is a real
+        #     case (a trader dropping in) rather than a rare exception.
         "code": "main-1",
         "name_ar": "كاونتر المخزن",
         "name_en": "Warehouse counter",
@@ -44,12 +44,13 @@ REGISTERS = [
 
 def seed(locations: dict) -> dict:
     """
-    `locations` خريطة `{code: StockLocation}` من بذرة اللوجستيات.
+    `locations` is a `{code: StockLocation}` map from the logistics seed.
 
-    ⚠️  الموقع غير البائع لا يحمل جهازًا.
+    ⚠️  A non-selling location carries no register.
 
-        الحجر موقع للتالف والمنتهي؛ ربط كاونتر به يعني بيع بضاعة
-        عُزلت عمدًا. الفحص هنا يمنع خطأ إعداد لا خطأ برمجة.
+        Quarantine is a location for damaged and expired goods; attaching a
+        counter to it means selling stock that was deliberately isolated. The
+        check here prevents a configuration error, not a programming error.
     """
     registers = {}
 

@@ -1,4 +1,4 @@
-"""لوحة الهوية البصرية."""
+"""Visual identity admin panel."""
 
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
@@ -10,7 +10,7 @@ from core.admin import DeletedListFilter, DomainModelAdmin, TimeStampedAdmin
 class ThemePaletteInline(admin.StackedInline):
     model = ThemePalette
     extra = 0
-    max_num = 2  # فاتح ومظلم لا أكثر
+    max_num = 2  # light and dark, no more
     readonly_fields = ("created_at", "updated_at")
 
 

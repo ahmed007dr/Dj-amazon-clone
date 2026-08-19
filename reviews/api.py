@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
-from core.permissions import IsAdminAccount
+from core.permissions import CanModerateReviews
 from reviews import serializers as s
 from reviews import services
 from reviews.models import ProductRating, Review, ReviewStatus
@@ -119,7 +119,7 @@ class ReviewHelpfulAPI(APIView):
 
 
 class AdminReviewListAPI(generics.ListAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanModerateReviews]
     serializer_class = s.AdminReviewSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -135,7 +135,7 @@ class AdminReviewListAPI(generics.ListAPIView):
 
 
 class ModerateReviewAPI(APIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanModerateReviews]
     serializer_class = s.ModerateReviewSerializer
 
     def post(self, request, pk):

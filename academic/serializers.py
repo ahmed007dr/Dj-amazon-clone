@@ -1,4 +1,4 @@
-"""عقود النطاق الأكاديمي."""
+"""Academic domain contracts."""
 
 from rest_framework import serializers
 
@@ -28,10 +28,10 @@ class FacultySerializer(serializers.ModelSerializer):
 
 class UniversitySerializer(serializers.ModelSerializer):
     """
-    الجامعة بكلياتها وأقسامها.
+    A university with its faculties and departments.
 
-    ⚠️  شجرة كاملة في استجابة واحدة — نموذج التسجيل يحتاجها كلها
-        دفعةً، والتحميل التدريجي هنا يعني ثلاثة نداءات لكل طالب.
+    ⚠️  The full tree in a single response — the registration form needs all of
+        it at once, and lazy loading here means three calls per student.
     """
 
     faculties = FacultySerializer(many=True, read_only=True)
@@ -43,10 +43,10 @@ class UniversitySerializer(serializers.ModelSerializer):
 
 class BundleItemSerializer(serializers.ModelSerializer):
     """
-    ⚠️  **بلا سعر.**
+    ⚠️  **No price.**
 
-        السعر يحسبه `pricing` لكل عميل حسب قائمته — إدراجه هنا
-        يعني رقمًا يتقادم بصمت داخل الحزمة.
+        `pricing` computes the price per customer from their price list —
+        including it here means a number going silently stale inside the bundle.
     """
 
     product_slug = serializers.CharField(source="product.slug", read_only=True)
@@ -94,7 +94,7 @@ class StudyBundleSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_item_count(self, obj) -> int:
-        # يقرأ من الـ prefetch — بلا استعلام إضافي
+        # Read from the prefetch — no extra query
         return len(obj.items.all())
 
 
@@ -120,7 +120,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
             "is_verified",
             "expected_graduation_year",
         ]
-        # ⚠️  التوثيق يحدده الأدمن بعد اعتماد الكارنيه لا الطالب
+        # ⚠️  Verification is set by the admin after approving the student ID, not by the student
         read_only_fields = ["id", "is_verified"]
 
 
@@ -133,11 +133,11 @@ class CreateStudentProfileSerializer(serializers.Serializer):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن — الشجرة الأكاديمية والحزم
+#  Admin — the academic tree and bundles
 # ═══════════════════════════════════════════════════════════
 #
-#  ⚠️  الشجرة **شرط لتسجيل أي طالب**: الطالب يختار جامعته وكليته
-#      قبل إنشاء الحساب. وكانت تُدار من لوحة Django وحدها.
+#  ⚠️  The tree is **a precondition for registering any student**: they pick
+#      their university and faculty before creating an account. It used to be managed from the Django admin alone.
 
 
 class AdminUniversitySerializer(serializers.ModelSerializer):
@@ -193,9 +193,9 @@ class AdminFacultySerializer(serializers.ModelSerializer):
 
     def validate_years_count(self, value):
         """
-        ⚠️  عدد السنوات يحكم **قوائم الحزم**: حزمة السنة الخامسة في
-            كلية بأربع سنوات لا يراها أحد. والصفر يجعل كل حزمة
-            غير قابلة للإسناد.
+        ⚠️  The year count governs **the bundle lists**: a fifth-year bundle in
+            a four-year faculty is seen by nobody. And zero makes every bundle
+            impossible to assign.
         """
         if value < 1:
             raise serializers.ValidationError("عدد السنوات لا يقل عن واحدة")
@@ -249,11 +249,11 @@ class AdminBundleSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        ⚠️  **سنة الحزمة داخل سنوات كليتها.**
+        ⚠️  **A bundle's year must fall within its faculty's years.**
 
-            حزمة السنة الخامسة في كلية بأربع سنوات لا يصلها طالب
-            أبدًا — وهي تُنشأ صامتة ثم يُسأل «لماذا لا يراها أحد؟»
-            بعد أسابيع.
+            A fifth-year bundle in a four-year faculty never reaches a student
+            — it is created silently and then, weeks later, someone asks "why
+            does nobody see it?".
         """
         instance = self.instance
         faculty = attrs.get("faculty", getattr(instance, "faculty", None))
@@ -286,13 +286,13 @@ class AdminBundleItemSerializer(serializers.ModelSerializer):
             "product_name",
             "variant",
             "quantity",
-            # ⚠️  «أساسي» يفصل ما لا غنى عنه عمّا يُستحسن — والطالب
-            #     يشتري الأساسي وحده حين يضيق المال.
+            # ⚠️  "Essential" separates what cannot be skipped from what is merely
+            #     recommended — and a student buys only the essentials when money is tight.
             "is_essential",
             "note_ar",
             "note_en",
             "display_order",
         ]
-        # ⚠️  الحزمة تأتي من المسار لا من الحمولة: قبولها في الجسم
-        #     يسمح بإضافة بند إلى حزمة أخرى بتخمين معرّفها.
+        # ⚠️  The bundle comes from the path, not the payload: accepting it in the body
+        #     allows adding an item to another bundle by guessing its id.
         read_only_fields = ["id", "bundle"]

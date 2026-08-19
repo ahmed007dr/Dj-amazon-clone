@@ -1,12 +1,13 @@
 """
-رفع أصول الهوية من اللوحة.
+Uploading identity assets from the panel.
 
-⚠️  **الأصول كانت بلا أي فحص** بينما صور المنتجات مفحوصة بتوقيعها —
-    تفاوت لا يبرّره شيء. واللوجو أخطر: يُقدَّم من أصل الموقع نفسه
-    ويظهر في **كل** صفحة لكل زائر.
+⚠️  **The assets used to have no check at all** while product images were
+    checked by signature — a disparity nothing justified. And the logo is more
+    dangerous: it is served from the site's own origin and appears on **every**
+    page for every visitor.
 
-⚠️  و`apps.get_model` لا `import`: `branding` ممنوع من استيراد أي
-    نطاق عمل، والاختبار جزء من الحزمة لا استثناء منها.
+⚠️  And `apps.get_model`, not `import`: `branding` is forbidden from importing
+    any business domain, and the test is part of the package, not an exception to it.
 """
 
 import pytest
@@ -56,7 +57,7 @@ def detail_url(profile):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الرفع
+#  Uploading
 # ═══════════════════════════════════════════════════════════
 
 
@@ -74,11 +75,11 @@ class TestUpload:
 
     def test_a_forged_content_type_is_refused(self, admin_client, profile):
         """
-        ⚠️  **الفحص على توقيع الملف لا على ترويسته.**
+        ⚠️  **The check is on the file signature, not on its header.**
 
-            `content_type` يأتي من العميل ويُزوَّر بسطر واحد. وملف
-            نصّي يحمل ترويسة صورة كان يمرّ ويُقدَّم من أصل الموقع —
-            وهو بالضبط ما تصدّه القائمة البيضاء على التوقيع.
+            `content_type` comes from the client and is forged in one line. A
+            text file carrying an image header used to pass and be served from
+            the site's origin — precisely what the signature allowlist blocks.
         """
         response = admin_client.patch(
             detail_url(profile),
@@ -93,7 +94,7 @@ class TestUpload:
         assert not profile.logo_light.name
 
     def test_an_oversized_file_is_refused(self, admin_client, profile):
-        """اللوجو يُحمَّل في كل صفحة لكل زائر — الملف الثقيل يبطئ الموقع كله."""
+        """The logo is downloaded on every page by every visitor — a heavy file slows the whole site."""
         heavy = real_png_bytes() + b"0" * (3 * 1024 * 1024)
 
         response = admin_client.patch(
@@ -105,7 +106,7 @@ class TestUpload:
         assert response.status_code == 400
 
     def test_an_empty_file_is_refused(self, admin_client, profile):
-        """الحجم صفر يمرّ كل فحص محتوى ويُخزَّن كملف يبدو سليمًا."""
+        """A zero size passes every content check and is stored as a file that looks fine."""
         response = admin_client.patch(
             detail_url(profile),
             {"favicon": SimpleUploadedFile("empty.png", b"", "image/png")},
@@ -117,8 +118,8 @@ class TestUpload:
     @pytest.mark.parametrize("field", ["logo_light", "logo_dark", "icon", "favicon", "og_image"])
     def test_every_asset_field_is_guarded(self, admin_client, profile, field):
         """
-        ⚠️  الحقل المنسيّ من الفحص هو الثغرة — والخمسة تُرفع من نفس
-            الشاشة بنفس الزر.
+        ⚠️  The field forgotten from the check is the hole — and all five are
+            uploaded from the same screen with the same button.
         """
         response = admin_client.patch(
             detail_url(profile),
@@ -130,21 +131,21 @@ class TestUpload:
 
 
 # ═══════════════════════════════════════════════════════════
-#  المسح والصلاحية
+#  Clearing and permissions
 # ═══════════════════════════════════════════════════════════
 
 
 class TestClearAndPermissions:
     def test_an_asset_can_be_removed(self, admin_client, profile):
-        """رفع لوجو بالخطأ يجب أن يُصحَّح من نفس الشاشة."""
+        """A logo uploaded by mistake must be correctable from the same screen."""
         admin_client.patch(
             detail_url(profile),
             {"logo_light": SimpleUploadedFile("logo.png", real_png_bytes(), "image/png")},
             format="multipart",
         )
 
-        # ⚠️  JSON بقيمة `null` لا نموذجًا بقيمة فارغة: الثاني
-        #     يتجاهله DRF بصمت ويعيد ٢٠٠ بينما الصورة مكانها.
+        # ⚠️  JSON with a `null` value, not a form with an empty value: DRF
+        #     silently ignores the latter and returns 200 with the image still there.
         response = admin_client.patch(detail_url(profile), {"logo_light": None}, format="json")
 
         assert response.status_code == 200
@@ -153,8 +154,8 @@ class TestClearAndPermissions:
 
     def test_editing_other_fields_leaves_assets_alone(self, admin_client, profile):
         """
-        ⚠️  الشاشة تحفظ ما تغيّر وحده. حفظ الاسم يجب ألا يمسح لوجو
-            رُفع في تبويب آخر.
+        ⚠️  The screen saves only what changed. Saving the name must not erase a
+            logo uploaded on another tab.
         """
         admin_client.patch(
             detail_url(profile),
@@ -188,7 +189,7 @@ class TestClearAndPermissions:
 
 
 # ═══════════════════════════════════════════════════════════
-#  بقية حقول الملف
+#  The remaining profile fields
 # ═══════════════════════════════════════════════════════════
 
 
@@ -215,8 +216,8 @@ class TestProfileFields:
 
     def test_out_of_range_values_are_refused(self, admin_client, profile):
         """
-        ⚠️  الحدود على الخادم لا في الواجهة وحدها — فحصان متطابقان
-            في مكانين يفترقان عند أول تعديل.
+        ⚠️  The limits live on the server, not in the frontend alone — two
+            identical checks in two places diverge at the first edit.
         """
         response = admin_client.patch(
             detail_url(profile), {"font_size_base": "9.000"}, format="json"

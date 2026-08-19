@@ -1,8 +1,9 @@
 """
-اختبارات نموذج المستخدم.
+User model tests.
 
-تسكن في `accounts/` لا `core/` — الاختبار يتبع نطاقه.
-وضعها في `core/tests` كسر عقد الحدود وأمسكه import-linter فورًا.
+They live in `accounts/`, not `core/` — a test follows its own domain.
+Putting them in `core/tests` broke the boundary contract and import-linter
+caught it immediately.
 """
 
 import pytest
@@ -14,17 +15,18 @@ from accounts.models import AccountStatus, AccountType, User
 class TestUserModel:
     def test_email_is_unique(self):
         """
-        ⛔ الباكند القديم كان يستدعي `get(email=...)` على حقل غير فريد
-           ⟵ MultipleObjectsReturned عند تكرار البريد.
+        ⛔ The legacy backend called `get(email=...)` on a non-unique field
+           ⟵ MultipleObjectsReturned on a duplicate email.
         """
         assert User._meta.get_field("email").unique
 
     def test_user_stays_thin(self):
         """
-        `User` للهوية فقط. أي حقل تجاري مكانه ملف الشخصية في نطاقه.
+        `User` is for identity only. Any business field belongs on the persona
+        profile in its own domain.
 
-        هذا الاختبار هو الحارس الفعلي لـ ADR-11 — بدونه يتسلل
-        أول حقل تجاري بعد ثلاثة أشهر ثم لا يتوقف الزحف.
+        This test is the actual guard for ADR-11 — without it the first business
+        field creeps in three months later and the drift never stops.
         """
         forbidden = {
             "address",
@@ -46,8 +48,9 @@ class TestUserModel:
 
     def test_account_status_separate_from_verification(self):
         """
-        طبيب موثّق قد يكون موقوفًا لمخالفة،
-        وحساب نشط قد يكون قيد التحقق. خلط المفهومين خطأ شائع.
+        A verified doctor may be suspended for a violation,
+        and an active account may still be pending verification. Conflating the
+        two concepts is a common mistake.
         """
         names = {f.name for f in User._meta.get_fields()}
         assert "status" in names
@@ -57,8 +60,8 @@ class TestUserModel:
 @pytest.mark.django_db
 class TestAuthenticationGating:
     """
-    ⛔ الباكند القديم استدعى `check_password` مباشرة دون أي فحص للحالة
-       ⟵ الموقوفون وغير المفعّلين كانوا يدخلون.
+    ⛔ The legacy backend called `check_password` directly with no status check
+       ⟵ suspended and unactivated users could log in.
     """
 
     def test_suspended_user_cannot_authenticate(self):
@@ -80,11 +83,11 @@ class TestAuthenticationGating:
 
     def test_inactive_user_cannot_authenticate(self):
         user = User.objects.create_user(email="inactive@test.local", password="pw-for-test-12345")
-        assert not user.is_active  # الافتراضي: غير مفعّل حتى تأكيد البريد
+        assert not user.is_active  # Default: inactive until the email is confirmed
         assert not user.can_authenticate
 
     def test_backend_rejects_suspended_user(self):
-        """الفحص على مستوى الباكند لا الموديل فقط."""
+        """The check is at the backend level, not on the model alone."""
         from accounts.backend import EmailOrPhoneBackend
 
         user = User.objects.create_user(email="backend@test.local", password="pw-for-test-12345")
@@ -162,7 +165,7 @@ class TestUserManager:
 
     def test_email_is_normalised(self):
         user = User.objects.create_user(email="Mixed@TEST.local", password="pw-for-test-12345")
-        assert user.email == "Mixed@test.local"  # النطاق يُخفَّض لا الجزء المحلي
+        assert user.email == "Mixed@test.local"  # The domain is lower-cased, not the local part
 
 
 @pytest.mark.django_db
@@ -185,7 +188,7 @@ class TestSecurityToken:
         )
         assert token.is_valid
 
-        # الرمز الصريح لا يُخزَّن أبدًا
+        # The plaintext token is never stored
         assert raw not in token.token_hash
 
         token.used_at = timezone.now()

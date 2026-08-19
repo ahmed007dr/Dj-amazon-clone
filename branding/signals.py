@@ -1,9 +1,9 @@
 """
-إبطال كاش الهوية عند أي تعديل.
+Invalidate the identity cache on any edit.
 
-⚠️  الكاش هنا طويل عمدًا (١٢ ساعة) لأن الهوية تُقرأ في كل تحميل
-    صفحة ولا تتغيّر مرة في الشهر. وهذا بالضبط ما يجعل الإبطال
-    إلزاميًا: نافذة الخطأ نصف يوم لا ثوانٍ.
+⚠️  The cache here is deliberately long (12 hours) because the identity is read
+    on every page load and does not change once a month. And that is exactly
+    what makes invalidation mandatory: the error window is half a day, not seconds.
 """
 
 from django.db.models.signals import post_delete, post_save

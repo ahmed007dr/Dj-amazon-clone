@@ -8,7 +8,7 @@ class CoreConfig(AppConfig):
     verbose_name = _("البنية التحتية")
 
     def ready(self):
-        # ⚠️  الاستيراد هنا لا في رأس الملف — تسجيل الفحوص يقرأ
-        #     الإعدادات، وقراءتها قبل جهوزية التطبيقات تُجمّد قيمًا
-        #     لم تكتمل بعد.
+        # ⚠️  Imported here rather than at the top of the file — registering the checks
+        #     reads settings, and reading them before the apps are ready freezes values
+        #     that are not yet complete.
         from core import checks  # noqa: F401

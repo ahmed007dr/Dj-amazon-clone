@@ -1,12 +1,13 @@
 """
-اختبارات إعداد الدومين. (ADR-73 · ADR-74)
+Domain configuration tests. (ADR-73 · ADR-74)
 
-⚠️  **لماذا تُختبر الإعدادات أصلًا؟**
+⚠️  **Why test settings at all?**
 
-    لأن كل خطأ فيها صامت عند الخادم: أصل ناقص في CORS يجعل المتصفح
-    يحجب استجابة ٢٠٠ سليمة، ومضيف ناقص يعطي 400 لطلبات المزحف
-    وحدها. لا واحد منها يكتب سطرًا في سجل Django، وكلها تُكتشف بعد
-    النشر. الاختبار هنا يجعل الاشتقاق نفسه — لا الانتباه — هو الحارس.
+    Because every mistake in them is silent at the server: a missing origin in
+    CORS makes the browser block a perfectly good 200, and a missing host
+    returns 400 for the crawler's requests alone. Not one of them writes a line
+    to the Django log, and all of them are discovered after deployment. The test
+    here makes the derivation itself — not vigilance — the guard.
 """
 
 from io import StringIO
@@ -19,27 +20,27 @@ from django.test import override_settings
 from core import checks
 
 # ═══════════════════════════════════════════════════════════
-#  الاشتقاق — قيمة واحدة تُنتج الخمس
+#  Derivation — one value produces all five
 # ═══════════════════════════════════════════════════════════
 
 
 class TestDerivedDomain:
     def test_frontend_origin_is_allowed_by_cors(self):
         """
-        ⚠️  عدم التطابق هنا يُنتج شاشة فارغة وخادمًا يقول إنه ردّ ٢٠٠.
+        ⚠️  A mismatch here produces a blank screen and a server reporting it answered 200.
         """
         assert settings.FRONTEND_BASE_URL.rstrip("/") in settings.CORS_ALLOWED_ORIGINS
 
     def test_both_domains_are_in_allowed_hosts(self):
         """
-        دومين الموقع مُدرَج مع دومين الخادم: `seo` يخدم `robots.txt`
-        و`sitemap.xml` على الدومين الذي يزوره الإنسان.
+        The site domain is listed alongside the server domain: `seo` serves
+        `robots.txt` and `sitemap.xml` on the domain a human visits.
         """
         for domain in (settings.PUBLIC_SITE_DOMAIN, settings.PUBLIC_API_DOMAIN):
             assert checks._hostname(domain) in settings.ALLOWED_HOSTS
 
     def test_allowed_hosts_carry_no_port(self):
-        """⚠️  المنفذ في `ALLOWED_HOSTS` يُفشل المطابقة بصمت."""
+        """⚠️  A port in `ALLOWED_HOSTS` breaks the match silently."""
         assert not [host for host in settings.ALLOWED_HOSTS if ":" in host and host != "[::1]"]
 
     def test_media_origin_follows_api_when_unset(self):
@@ -47,12 +48,12 @@ class TestDerivedDomain:
             assert settings.MEDIA_ORIGIN == settings.API_ORIGIN
 
     def test_language_matches_the_shared_default(self):
-        """خادم بالعربية وواجهة بالإنجليزية تناقض يظهر في أول تحميل."""
+        """A server in Arabic and a frontend in English is a contradiction visible on the first load."""
         assert settings.LANGUAGE_CODE == settings.PUBLIC_DEFAULT_LOCALE
 
 
 # ═══════════════════════════════════════════════════════════
-#  الفحوص — تفشل وقت الإقلاع لا بعد النشر
+#  The checks — they fail at startup, not after deployment
 # ═══════════════════════════════════════════════════════════
 
 
@@ -78,12 +79,12 @@ class TestDomainChecks:
     @override_settings(ALLOWED_HOSTS=[".example.com"], PUBLIC_SITE_DOMAIN="shop.example.com")
     def test_wildcard_subdomain_is_accepted(self):
         """
-        ⚠️  البادئة النقطية تعني «كل النطاقات الفرعية» — والفحص
-            البسيط بـ `in` كان يرفضها ويدفع المشغّل إلى «إصلاح»
-            إعداد سليم.
+        ⚠️  The leading dot means "all subdomains" — and the naive `in` check
+            rejected it, pushing the operator to "fix" a perfectly sound
+            configuration.
         """
         errors = checks.check_domains_in_allowed_hosts(None)
-        assert [e.id for e in errors] == ["core.E002"]  # دومين الخادم وحده
+        assert [e.id for e in errors] == ["core.E002"]  # the server domain alone
 
     @override_settings(PUBLIC_API_PREFIX="api/v1")
     def test_prefix_without_leading_slash_is_an_error(self):
@@ -106,14 +107,14 @@ class TestDomainChecks:
     @override_settings(IS_PRODUCTION=False, PUBLIC_SCHEME="http", PUBLIC_SITE_DOMAIN="localhost")
     def test_development_is_left_alone(self):
         """
-        ⚠️  الفحوص الصارمة مربوطة بـ `IS_PRODUCTION` لا بـ `DEBUG`:
-            مشغّل الاختبارات يفرض `DEBUG=False` على إعداد تطوير صحيح.
+        ⚠️  The strict checks are tied to `IS_PRODUCTION`, not to `DEBUG`: the
+            test runner forces `DEBUG=False` on a correct development configuration.
         """
         assert checks.check_production_domains(None) == []
 
 
 # ═══════════════════════════════════════════════════════════
-#  env_doctor — مخرَجه يُلصق في تذكرة عطل
+#  env_doctor — its output gets pasted into an incident ticket
 # ═══════════════════════════════════════════════════════════
 
 
@@ -131,11 +132,11 @@ class TestEnvDoctor:
 
     def test_prints_no_secret_value(self):
         """
-        ⚠️  **قيده التصميمي الأول.**
+        ⚠️  **Its first design constraint.**
 
-            الأمر يُشغَّل وقت الحادثة ويُنسخ مخرَجه إلى تذكرة أو
-            محادثة — فكل ما يطبعه علنيّ بحكم الأمر الواقع. والأسرار
-            تُقاس بحالتها لا بقيمتها.
+            The command is run during an incident and its output is copied into
+            a ticket or a chat — so everything it prints is public as a matter
+            of fact. And secrets are judged by their status, not their value.
         """
         output = self._run()
 

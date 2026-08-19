@@ -1,13 +1,14 @@
 """
-الهوية والمصادقة — لا شيء غير ذلك.
+Identity and authentication — nothing else.
 
-⚠️  `User` نحيف. **صفر حقول تجارية.**
-    كل شخصية تُعلّق ملفها عبر OneToOne:
+⚠️  `User` is thin. **Zero business fields.**
+    Each persona attaches its own profile through a OneToOne:
         customers.CustomerProfile
         administration.AdminProfile
-        employees.EmployeeProfile     (المرحلة ١٠)
+        employees.EmployeeProfile     (phase 10)
 
-هذا مصدر قابلية التوسع المستقل — كل شخصية تنمو دون أن تمس الأخرى. (ADR-11)
+This is the source of independent scalability — each persona grows without
+touching the others. (ADR-11)
 """
 
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
@@ -19,7 +20,7 @@ from core.models.base import TimeStampedModel, UUIDPrimaryKeyModel
 
 
 class AccountType(models.TextChoices):
-    """نوع الحساب — يحدد التجربة والكتالوج المتاح."""
+    """Account type — determines the experience and the available catalogue."""
 
     GUEST = "GUEST", _("زائر")
     STUDENT = "STUDENT", _("طالب")
@@ -35,11 +36,11 @@ class AccountType(models.TextChoices):
 
 class AccountStatus(models.TextChoices):
     """
-    هل يُسمح لهذا الحساب بالعمل؟
+    Is this account allowed to operate?
 
-    ⚠️  **منفصل تمامًا عن `VerificationStatus`.**
-        طبيب مُتحقَّق منه قد يكون موقوفًا لمخالفة،
-        وحساب نشط قد يكون قيد التحقق.
+    ⚠️  **Entirely separate from `VerificationStatus`.**
+        A verified doctor may be suspended for a violation,
+        and an active account may still be pending verification.
     """
 
     ACTIVE = "ACTIVE", _("نشط")
@@ -48,7 +49,7 @@ class AccountStatus(models.TextChoices):
 
 
 class VerificationStatus(models.TextChoices):
-    """هل تم التحقق من مهنية/تجارية صاحب الحساب؟"""
+    """Has the account holder's professional/commercial status been verified?"""
 
     NOT_REQUIRED = "NOT_REQUIRED", _("غير مطلوب")
     PENDING = "PENDING", _("قيد المراجعة")
@@ -62,7 +63,7 @@ class Language(models.TextChoices):
 
 
 class UserManager(BaseUserManager):
-    """البريد هو المعرّف — لا اسم المستخدم."""
+    """Email is the identifier — not a username."""
 
     use_in_migrations = True
 
@@ -98,13 +99,13 @@ class UserManager(BaseUserManager):
 
 class User(UUIDPrimaryKeyModel, AbstractBaseUser, PermissionsMixin):
     """
-    المستخدم — الهوية فقط.
+    The user — identity only.
 
-    ⚠️  ممنوع إضافة أي حقل تجاري هنا (عنوان · نقاط ولاء · تارجت …).
-        مكانه الملف الشخصي في نطاقه.
+    ⚠️  Adding any business field here is forbidden (address · loyalty points · target …).
+        It belongs on the persona profile in its own domain.
     """
 
-    # ── الهوية ─────────────────────────────────────────────
+    # ── Identity ───────────────────────────────────────────
     email = models.EmailField(
         _("البريد الإلكتروني"),
         unique=True,
@@ -123,7 +124,7 @@ class User(UUIDPrimaryKeyModel, AbstractBaseUser, PermissionsMixin):
     last_name = models.CharField(_("الاسم الأخير"), max_length=150, blank=True)
     avatar = models.ImageField(_("الصورة"), upload_to="avatars/", null=True, blank=True)
 
-    # ── التصنيف والحالة ────────────────────────────────────
+    # ── Classification and status ──────────────────────────
     account_type = models.CharField(
         _("نوع الحساب"),
         max_length=16,
@@ -146,7 +147,7 @@ class User(UUIDPrimaryKeyModel, AbstractBaseUser, PermissionsMixin):
         db_index=True,
     )
 
-    # ── التفضيلات ──────────────────────────────────────────
+    # ── Preferences ────────────────────────────────────────
     preferred_language = models.CharField(
         _("اللغة المفضلة"),
         max_length=2,
@@ -155,7 +156,7 @@ class User(UUIDPrimaryKeyModel, AbstractBaseUser, PermissionsMixin):
         help_text=_("تحدد لغة كل بريد يصل هذا المستخدم"),
     )
 
-    # ── التأكيد ────────────────────────────────────────────
+    # ── Confirmation ───────────────────────────────────────
     email_verified_at = models.DateTimeField(_("تأكيد البريد"), null=True, blank=True)
     phone_verified_at = models.DateTimeField(_("تأكيد الهاتف"), null=True, blank=True)
 
@@ -187,7 +188,7 @@ class User(UUIDPrimaryKeyModel, AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.email
 
-    # ── خصائص مشتقة ────────────────────────────────────────
+    # ── Derived properties ─────────────────────────────────
 
     @property
     def full_name(self) -> str:
@@ -214,19 +215,19 @@ class User(UUIDPrimaryKeyModel, AbstractBaseUser, PermissionsMixin):
     @property
     def can_authenticate(self) -> bool:
         """
-        الشرط الكامل للسماح بالدخول.
+        The complete condition for allowing login.
 
-        ⚠️  الباكند القديم كان يستدعي `check_password` مباشرة
-            دون أي فحص للحالة — فكان الموقوف يدخل.
+        ⚠️  The legacy backend called `check_password` directly with no status
+            check at all — so suspended users could log in.
         """
         return self.is_active and self.status == AccountStatus.ACTIVE
 
 
 class AccountStatusChange(models.Model):
     """
-    سجل الإيقاف والتفعيل. **إضافة فقط.**
+    The suspension and reactivation log. **Append-only.**
 
-    مفتاح BigInt — جدول داخلي لا يظهر في رابط.
+    A BigInt key — an internal table that never appears in a URL.
     """
 
     user = models.ForeignKey(
@@ -266,12 +267,12 @@ class DeviceType(models.TextChoices):
 
 class UserSession(models.Model):
     """
-    جلسة مستخدم — لسؤال الأدمن: «من متصل الآن؟».
+    A user session — for the admin's question: "who is online right now?".
 
-    ⚠️  `last_activity` **لا يُكتب على كل طلب**.
-        يُحدَّث في Redis ثم يُفرَّغ دفعةً كل ٦٠ ثانية. (ADR-17)
+    ⚠️  `last_activity` is **not written on every request**.
+        It is updated in Redis and then flushed in bulk every 60 seconds. (ADR-17)
 
-    مفتاح BigInt — حجم ضخم ولا يظهر في رابط.
+    A BigInt key — high volume, and it never appears in a URL.
     """
 
     user = models.ForeignKey(
@@ -320,13 +321,13 @@ class TokenPurpose(models.TextChoices):
 
 class SecurityToken(TimeStampedModel):
     """
-    رمز أمني بصلاحية زمنية واستخدام واحد.
+    A security token with a time limit and a single use.
 
-    ⚠️  يُخزَّن **مُجزَّأً** لا صريحًا — تسريب قاعدة البيانات
-        لا يجب أن يمنح أحدًا القدرة على إعادة تعيين كلمات المرور.
+    ⚠️  Stored **hashed**, never in the clear — a database leak must not grant
+        anyone the ability to reset passwords.
 
-    يستبدل `Profile.code` القديم الذي كان يُولَّد بـ `random`
-    غير الآمن تشفيريًا ويُخزَّن صريحًا بلا صلاحية زمنية.
+    It replaces the legacy `Profile.code`, which was generated with the
+    cryptographically unsafe `random` and stored in the clear with no expiry.
     """
 
     user = models.ForeignKey(

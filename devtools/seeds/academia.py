@@ -1,11 +1,11 @@
 """
-الجامعات والكليات وحزم المستلزمات الدراسية.
+Universities, faculties and study supply bundles.
 
-⚠️  الحزمة ليست منتجًا مركّبًا — إنها **قائمة إرشادية**.
+⚠️  A bundle is not a composite product — it is **a guidance list**.
 
-    بيعها كوحدة واحدة يعني أن طالبًا يملك السماعة بالفعل يُجبَر
-    على شرائها ثانيةً. `add_bundle` يضيف الأصناف إلى السلة فيحذف
-    منها ما يشاء.
+    Selling it as a single unit means a student who already owns the
+    stethoscope is forced to buy it again. `add_bundle` adds the items to the
+    cart, so they can remove whatever they like.
 """
 
 from academic.models import (
@@ -24,7 +24,7 @@ UNIVERSITIES = [
     ("mansoura", "جامعة المنصورة", "Mansoura University", "المنصورة", "الدقهلية"),
 ]
 
-#: (الرمز، عربي، إنجليزي، رمز الجامعة، عدد السنوات)
+#: (code, Arabic, English, university code, number of years)
 FACULTIES = [
     ("cairo-pharm", "كلية الصيدلة", "Faculty of Pharmacy", "cairo", 5),
     ("cairo-med", "كلية الطب", "Faculty of Medicine", "cairo", 6),
@@ -36,14 +36,14 @@ FACULTIES = [
     ("mansoura-med", "كلية الطب", "Faculty of Medicine", "mansoura", 6),
 ]
 
-#: (الرمز، عربي، إنجليزي، رمز الكلية)
+#: (code, Arabic, English, faculty code)
 DEPARTMENTS = [
     ("cairo-pharm-clin", "الصيدلة الإكلينيكية", "Clinical Pharmacy", "cairo-pharm"),
     ("cairo-pharm-ind", "الصيدلة الصناعية", "Industrial Pharmacy", "cairo-pharm"),
     ("cairo-med-surg", "الجراحة", "Surgery", "cairo-med"),
 ]
 
-#: (الرمز النصي، عربي، إنجليزي، رمز الكلية، السنة، النوع، [(SKU، كمية، أساسي؟)])
+#: (string code, Arabic, English, faculty code, year, type, [(SKU, quantity, essential?)])
 BUNDLES = [
     (
         "cairo-med-y1",

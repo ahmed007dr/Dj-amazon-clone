@@ -5,19 +5,20 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 /**
- * ⚠️  **كل القيود في `no-restricted-syntax` واحد.**
+ * ⚠️  **Every restriction lives in a single `no-restricted-syntax`.**
  *
- *     في الإعداد المسطّح تُدمَج الكائنات بالمفتاح، والأخير
- *     **يستبدل** السابق لا يضاف إليه. فصلها إلى كتلتين يبدو أنظف
- *     ويُسقط الأولى بصمت — وهو ما وقع فعلًا هنا: قاعدة الألوان
- *     ألغت قاعدة الروابط، فمرّ `fetch('http://localhost:8000/…')`
- *     بلا اعتراض بينما بدا الحارس قائمًا في الملف.
+ *     In flat config, objects are merged by key and the last one **replaces**
+ *     the previous rather than adding to it. Splitting them into two blocks
+ *     looks tidier and silently drops the first — which is exactly what
+ *     happened here: the colour rule cancelled the URL rule, so
+ *     `fetch('http://localhost:8000/…')` passed unchallenged while the guard
+ *     still appeared to be in the file.
  */
 const RESTRICTED_SYNTAX = [
-  // ── `base_url` — مصدر واحد (ADR-19) ────────────────────
-  //    «ممنوع كتابة عنوان API يدويًا» اتفاق شفهي يُخرَق في أول ليلة
-  //    تسليم متأخرة، ولا يُكتشف إلا بعد النشر حين يشير الإنتاج إلى
-  //    خادم التطوير.
+  // ── `base_url` — a single source (ADR-19) ───────────────
+  //    "never write an API address by hand" is a verbal agreement, broken on the
+  //    first late delivery night, and discovered only after deployment when
+  //    production points at the dev server.
   {
     selector: 'Literal[value=/^(https?:)?\\/\\//]',
     message:
@@ -32,9 +33,9 @@ const RESTRICTED_SYNTAX = [
     message: 'اسم مضيف أو منفذ مكتوب يدويًا — يأتي من متغيّر البيئة وحده.',
   },
   {
-    // ⚠️  `MetaProperty` لا `MemberExpression` — `import.meta` عقدة
-    //     نحوية خاصة، والمحدِّد الخاطئ يمرّ صامتًا فيبدو الحارس قائمًا
-    //     وهو لا يمسك شيئًا.
+    // ⚠️  `MetaProperty`, not `MemberExpression` — `import.meta` is a dedicated
+    //     syntax node, and the wrong selector passes silently, so the guard looks
+    //     present while catching nothing.
     selector: "MetaProperty[meta.name='import']",
     message: 'اقرأ متغيّرات البيئة من shared/http/config فقط — لا من import.meta مباشرة.',
   },
@@ -43,9 +44,9 @@ const RESTRICTED_SYNTAX = [
     message: 'لا fetch مباشر. استخدم shared/http/client — فيه التوكن واللغة ومعالجة الأخطاء.',
   },
 
-  // ── الثيم — لا لون مكتوب يدويًا ────────────────────────
-  //    زر واحد بلون ثابت يبقى أخضر بعد أن يصير النظام أزرق، ولا
-  //    يُكتشف إلا بالنظر.
+  // ── Theme — no hand-written colour ──────────────────────
+  //    One button with a hard-coded colour stays green after the system turns
+  //    blue, and is only ever caught by eye.
   {
     selector: 'Literal[value=/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/]',
     message: 'لون مكتوب يدويًا — استخدم رمز الثيم var(--color-*).',
@@ -79,15 +80,15 @@ export default tseslint.config(
     },
   },
 
-  // ⚠️  `shared/http` هو المكان **الوحيد** المسموح فيه بقراءة
-  //     متغيّرات البيئة واستخدام `fetch`. حصره في مجلد واحد هو ما
-  //     يجعل «مصدر واحد» قابلًا للتحقق بالعين لا بالثقة.
+  // ⚠️  `shared/http` is the **only** place allowed to read environment
+  //     variables and to use `fetch`. Confining it to one folder is what makes
+  //     "a single source" verifiable by eye rather than taken on trust.
   {
     files: ['src/shared/http/**/*.ts'],
     rules: { 'no-restricted-syntax': 'off' },
   },
 
-  // القيم الابتدائية للثيم تُعرَّف هنا قبل أن يستبدلها الخادم
+  // The theme's initial values are defined here before the server replaces them
   {
     files: ['src/shared/theme/**/*.{ts,tsx}'],
     rules: { 'no-restricted-syntax': 'off' },

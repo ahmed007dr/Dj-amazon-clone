@@ -1,11 +1,11 @@
 """
-واجهات السلة.
+Cart endpoints.
 
-⚠️  كل استجابة تمر بـ `revalidate()`.
+⚠️  Every response passes through `revalidate()`.
 
-    السلة تعيش أيامًا: المنتج قد يُوقَف والسعر يتغيّر والمخزون
-    ينفد. إعادة العرض من البيانات المخزَّنة تعني عميلًا يرى حالة
-    ماتت أمس.
+    A cart lives for days: the product may be discontinued, the price may
+    change, the stock may run out. Re-rendering from stored data means a
+    customer looking at a state that died yesterday.
 """
 
 from django.shortcuts import get_object_or_404
@@ -20,16 +20,16 @@ from cart.models import CartLine
 from catalog.models import Product, ProductVariant
 from core.errors import BusinessError, ErrorCode
 
-#: ترويسة سلة الزائر — قبل التسجيل
+#: The guest cart header — before registration
 GUEST_HEADER = "HTTP_X_CART_SESSION"
 
 
 class CartMixin:
     """
-    ⚠️  الزائر يتسوّق قبل التسجيل.
+    ⚠️  A visitor shops before registering.
 
-        إجباره على إنشاء حساب أولًا يفقد المبيعة. السلة تُربط
-        بمفتاح جلسة يرسله العميل، وتُدمج عند الدخول.
+        Forcing them to create an account first loses the sale. The cart is tied
+        to a session key the client sends, and merged on login.
     """
 
     permission_classes = [AllowAny]
@@ -98,7 +98,7 @@ class CartLineDetailAPI(CartMixin, APIView):
     serializer_class = s.SetQuantitySerializer
 
     def _line(self, cart, pk) -> CartLine:
-        # ⚠️  الفلترة بالسلة — لا سطر لغير صاحبه يصل هنا
+        # ⚠️  Filtered by cart — no line belonging to someone else reaches here
         line = CartLine.objects.filter(pk=pk, cart=cart).first()
         if line is None:
             raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
@@ -123,19 +123,20 @@ class CartCouponAPI(CartMixin, APIView):
 
     def post(self, request):
         """
-        ⚠️  الكوبون المرفوض يعيد `200` لا `400`.
+        ⚠️  A rejected coupon returns `200`, not `400`.
 
-            العميل يجرّب أكوادًا — الرفض حالة متوقعة لا خطأ.
-            الاستجابة تحمل السبب في `coupon.reason` ليعرضه الفرونت.
+            The customer is trying codes — rejection is an expected state, not
+            an error. The response carries the reason in `coupon.reason` for the
+            frontend to display.
         """
         serializer = s.ApplyCouponSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         cart = self.get_cart()
-        # ⚠️  تُستخدم لقطة `apply_coupon` مباشرةً.
+        # ⚠️  The `apply_coupon` snapshot is used directly.
         #
-        #     الكود المرفوض لا يُحفظ في السلة، فإعادة التحقق هنا
-        #     تفقد سبب الرفض ويرى العميل خطأً عامًا بدل السبب.
+        #     A rejected code is not saved on the cart, so re-validating here
+        #     loses the rejection reason and the customer sees a generic error instead.
         snapshot = services.apply_coupon(cart, serializer.validated_data["code"])
         return Response(s.CartSnapshotSerializer(snapshot, context={"request": request}).data)
 
@@ -147,11 +148,12 @@ class CartCouponAPI(CartMixin, APIView):
 
 class CartBundleAPI(CartMixin, APIView):
     """
-    إضافة حزمة دراسية.
+    Add a study bundle.
 
-    ⚠️  الاستجابة تحمل ما أُضيف **وما تعذّر**.
+    ⚠️  The response carries what was added **and what could not be**.
 
-        صنف نافد من عشرة لا يمنع التسعة — والعميل يرى ما نقص.
+        One item out of ten being out of stock does not block the other nine —
+        and the customer sees what is missing.
     """
 
     serializer_class = s.AddBundleSerializer
@@ -185,9 +187,9 @@ class CartBundleAPI(CartMixin, APIView):
 
 class CartMergeAPI(APIView):
     """
-    دمج سلة الزائر بعد الدخول.
+    Merge the guest cart after login.
 
-    يُستدعى مرة واحدة من الفرونت عقب تسجيل الدخول الناجح.
+    Called once from the frontend following a successful login.
     """
 
     def post(self, request):

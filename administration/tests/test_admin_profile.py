@@ -1,14 +1,14 @@
 """
-اختبارات نطاق إدارة النظام.
+System administration domain tests.
 
-⚠️  يسكن هنا لا في `accounts/`.
+⚠️  These live here, not in `accounts/`.
 
-    اختبار «المالك لا يُوقَف» يمس النطاقين، لكنه يستورد
-    `administration.models`. وضعه في `accounts` استيراد صاعد
-    (L1 ← L2) وقد أمسكه import-linter فورًا.
+    The "the owner is never suspended" test touches both domains, but it
+    imports `administration.models`. Putting it in `accounts` is an upward
+    import (L1 ← L2) and import-linter caught it immediately.
 
-    القاعدة: الاختبار يسكن في النطاق **الأعلى** بين ما يلمسه —
-    فالتبعية تبقى نازلة.
+    The rule: a test lives in the **highest** domain among those it touches —
+    so the dependency stays downward.
 """
 
 import pytest
@@ -39,7 +39,7 @@ class TestAdminProfile:
         assert first.admin_number != second.admin_number
 
     def test_only_one_owner_allowed(self, admin_user):
-        """المالك واحد — تعدّده يجعل «من يملك النظام» سؤالًا بلا إجابة."""
+        """There is exactly one owner — several make "who owns the system" a question with no answer."""
         from django.db.utils import IntegrityError
 
         AdminProfile.objects.create(user=admin_user, is_owner=True)
@@ -53,7 +53,7 @@ class TestAdminProfile:
 class TestOwnerProtection:
     def test_owner_cannot_be_suspended(self, admin_user):
         """
-        إيقاف المالك يقفل النظام على الجميع بلا طريق للعودة.
+        Suspending the owner locks the system away from everyone with no way back.
         """
         from accounts import services
         from core.errors import BusinessError
@@ -63,8 +63,8 @@ class TestOwnerProtection:
         with pytest.raises(BusinessError) as exc:
             services.suspend_account(admin_user, reason="محاولة")
 
-        # الرسالة عامة ومترجمة؛ السياق يسكن في `detail` — وهذا مقصود:
-        # منطق الفرونت يبني على `code` الثابت لا على النص المترجم.
+        # The message is generic and translated; the context lives in `detail` — deliberately:
+        # frontend logic builds on the stable `code`, not on the translated text.
         assert exc.value.code == "PERMISSION_DENIED"
         assert "مالك النظام" in exc.value.error_detail
 
@@ -85,8 +85,8 @@ class TestOwnerProtection:
 class TestAdminRoles:
     def test_role_assignment_tracks_period(self, admin_user):
         """
-        الإسناد المنتهي يبقى محفوظًا — التدقيق يحتاج معرفة مَن كان
-        يملك أي صلاحية وقت وقوع حدث ما.
+        An expired assignment is retained — auditing needs to know who held
+        which permission at the moment an event occurred.
         """
         from datetime import timedelta
 
@@ -105,7 +105,7 @@ class TestAdminRoles:
         assert not assignment.is_current
 
     def test_role_in_use_cannot_be_deleted(self, admin_user):
-        """PROTECT — حذف دور مُسنَد يترك مديرين بصلاحيات معلّقة."""
+        """PROTECT — deleting an assigned role leaves administrators with dangling permissions."""
         from django.db.models import ProtectedError
 
         profile = AdminProfile.objects.create(user=admin_user)

@@ -1,10 +1,10 @@
 """
-إعدادات الإنتاج.
+Production settings.
 
     DJANGO_SETTINGS_MODULE=config.settings.prod
 
-⚠️  كل متغير هنا إلزامي. غيابه يوقف الإقلاع عمدًا —
-    أفضل من إقلاع صامت بإعداد غير آمن.
+⚠️  Every variable here is mandatory. A missing one halts startup on purpose —
+    better than booting silently with an insecure configuration.
 """
 
 from .base import *
@@ -12,40 +12,41 @@ from .base import env
 
 DEBUG = False
 
-#: تُشغّل فحوص الدومين الصارمة في `core/checks.py`
+#: Enables the strict domain checks in `core/checks.py`
 IS_PRODUCTION = True
 
-# ⚠️  الدومينات **إلزامية هنا بلا قيمة افتراضية** — الغياب يوقف الإقلاع.
+# ⚠️  The domains are **mandatory here, with no default** — absence halts startup.
 #
-#     `base.py` يعطيها افتراضيات تطوير (`localhost`) لتبقى بيئة
-#     التطوير تقلع بلا ضبط. وهي بعينها ما لا يجوز أن يقلع به
-#     الإنتاج: خادم حقيقي بـ `ALLOWED_HOSTS = ["localhost"]` يعيد
-#     400 لكل زائر، وبأصل `localhost` في CORS يحجب المتصفح كل
-#     استجابة. القراءة هنا لا تُستعمل قيمتها — الغرض أن يفشل
-#     الإقلاع الآن بدل أن يفشل الموقع بعد النشر.
+#     `base.py` gives them development defaults (`localhost`) so the development
+#     environment boots without configuration. Those are exactly the values
+#     production must never boot with: a real server with
+#     `ALLOWED_HOSTS = ["localhost"]` returns 400 to every visitor, and with a
+#     `localhost` origin in CORS the browser blocks every response. The value read
+#     here is never used — the point is to fail startup now instead of
+#     failing the site after deployment.
 #
-#     و`ALLOWED_HOSTS` و`CORS_ALLOWED_ORIGINS` و`CSRF_TRUSTED_ORIGINS`
-#     تبقى مشتقّة منها في `base.py` — لا تُكرَّر هنا.
+#     `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS`
+#     stay derived from them in `base.py` — they are not repeated here.
 env("PUBLIC_SITE_DOMAIN")
 env("PUBLIC_API_DOMAIN")
 
-# ⚠️  مفتاح تشفير بيانات اعتماد البوابات — **إلزامي هنا**.
+# ⚠️  Encryption key for gateway credentials — **mandatory here**.
 #
-#     الافتراضي الفارغ في `base.py` يخدم التطوير والاختبار. أما في
-#     الإنتاج فغيابه يعني إما رفض كل حفظ لمفتاح بوابة، أو — لو
-#     تساهلنا — مفاتيح دفع نصًّا صريحًا في قاعدة بيانات حقيقية.
-#     إيقاف الإقلاع أرخص من الاثنين.
+#     The empty default in `base.py` serves development and testing. In
+#     production its absence means either rejecting every gateway-key save or —
+#     if we were lenient — payment keys stored as plaintext in a real database.
+#     Halting startup is cheaper than either.
 FIELD_ENCRYPTION_KEY = env("FIELD_ENCRYPTION_KEY")
 
 
 # ═══════════════════════════════════════════════════════════
-#  تشديد HTTPS
+#  HTTPS hardening
 # ═══════════════════════════════════════════════════════════
 
 SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=31536000)  # سنة
+SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=31536000)  # one year
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
@@ -57,14 +58,14 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 
-# ⚠️  `CSRF_TRUSTED_ORIGINS` مشتقّ في `base.py` من دومينَي الموقع
-#     والخادم. كان هنا بافتراضي فارغ وغير مذكور في أي نموذج بيئة —
-#     أي أن الحالة الافتراضية للإنتاج كانت لوحة إدارة تردّ 403 على
-#     كل حفظ خلف وكيل HTTPS.
+# ⚠️  `CSRF_TRUSTED_ORIGINS` is derived in `base.py` from the site and server
+#     domains. It used to live here with an empty default and appeared in no
+#     environment template — meaning the default state of production was an
+#     admin panel answering 403 to every save behind an HTTPS proxy.
 
 
 # ═══════════════════════════════════════════════════════════
-#  السجلات
+#  Logging
 # ═══════════════════════════════════════════════════════════
 
 LOGGING = {

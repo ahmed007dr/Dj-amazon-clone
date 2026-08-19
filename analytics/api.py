@@ -1,12 +1,13 @@
 """
-واجهات حركة الاستخدام — **قراءة فقط**.
+Usage traffic endpoints — **read-only**.
 
-⚠️  الصلاحية مقسومة عمدًا على مستويين:
+⚠️  The permission is split across two levels on purpose:
 
-    «كم متصلًا الآن؟» رقم تشغيلي يراه من يدير اللوحة.
-    أما منحنى الحركة بدقّة الساعة فيكشف حجم النشاط — وهو ما مُنع
-    تسريبه حين حُذف `count` من الترقيم (ADR-32). ولذلك يتبع صلاحية
-    التقارير لا مجرد دخول اللوحة.
+    "How many are online now?" is an operational number visible to whoever runs
+    the panel. But an hour-resolution traffic curve reveals the size of the
+    business — precisely what was blocked from leaking when `count` was removed
+    from pagination (ADR-32). It therefore follows the reporting permission
+    rather than mere panel access.
 """
 
 from __future__ import annotations
@@ -25,10 +26,10 @@ from core.permissions import CanViewReports, IsAdminAccount
 
 def _period(request) -> tuple[date, date]:
     """
-    ⚠️  الافتراضي آخر ٣٠ يومًا لا الشهر الجاري.
+    ⚠️  The default is the last 30 days, not the current month.
 
-        سؤال الضغط أسبوعي الطابع؛ وفي أول يوم من الشهر كان الشهر
-        الجاري يعني «يوم واحد» — خريطة حرارية بعمود واحد.
+        The load question is weekly in character; and on the first day of the
+        month "the current month" meant "one day" — a heatmap with a single column.
     """
     today = timezone.localdate()
 
@@ -49,12 +50,12 @@ def _period(request) -> tuple[date, date]:
 
 class LiveAPI(APIView):
     """
-    نبض الاستخدام الآن — يُستدعى كل ٣٠ ثانية من اللوحة.
+    The live usage pulse — called every 30 seconds from the panel.
 
-    ⚠️  خفيفة عمدًا: قراءتان من الكاش واستعلام واحد.
+    ⚠️  Deliberately light: two cache reads and one query.
 
-        نقطة تُنادى كل نصف دقيقة من كل لوحة مفتوحة لا يجوز أن تلمس
-        جدولًا كبيرًا — وإلا صارت مراقبة الضغط هي الضغط.
+        An endpoint called every half minute from every open panel must not
+        touch a large table — or monitoring the load becomes the load.
     """
 
     permission_classes = [IsAdminAccount]
@@ -67,8 +68,8 @@ class LiveAPI(APIView):
                 "window_minutes": int(
                     account_services.PRESENCE_WINDOW.total_seconds() // 60
                 ),
-                # ⚠️  ثلاثة أرقام لا رقم واحد: «١٢ متصفّحًا مجهولًا»
-                #     و«٣ مسجَّلين» قراران مختلفان، ومجموعهما يخفيهما.
+                # ⚠️  Three numbers, not one: "12 anonymous browsers" and
+                #     "3 registered" are two different decisions, and their sum hides both.
                 "users_online": len(online),
                 "guests_online": services.guests_online(),
                 "total_online": len(online) + services.guests_online(),

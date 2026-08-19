@@ -1,18 +1,19 @@
 """
-برامج الولاء والإحالة.
+Loyalty and referral programmes.
 
-⚠️  **البرنامج يُبذر مُفعَّلًا والإحالة موقوفة — عمدًا.**
+⚠️  **The programme is seeded enabled and the referral disabled — deliberately.**
 
-    الاثنان معًا مفعَّلين يخفيان أهم سلوك في النظام: أن الأدمن
-    يشغّل ما يريد ويوقف ما لا يريد. برنامج موقوف في البذرة يجعل
-    شاشة «مفتاح موقوف» حالةً تُرى في أول دقيقة من التطوير بدل أن
-    تُكتشف في الإنتاج.
+    Both enabled together hide the most important behaviour in the system: that
+    the admin turns on what they want and turns off what they do not. A disabled
+    programme in the seed makes the "switch is off" screen a state seen in the
+    first minute of development rather than discovered in production.
 
-⚠️  وبرنامجان لا برنامج واحد.
+⚠️  And two programmes, not one.
 
-    الثاني موجَّه للصيدليات وحدها، فيُختبر الاستهداف فعليًا: أيّ
-    خطأ في `program_for` يظهر فورًا كصيدلية تكسب بمعدّل الطلاب أو
-    العكس. برنامج واحد بلا استهداف يجعل المسار كله غير مُجرَّب.
+    The second targets pharmacies alone, so targeting is genuinely exercised:
+    any error in `program_for` shows up immediately as a pharmacy earning at the
+    student rate or the reverse. A single programme with no targeting leaves the
+    whole path untested.
 """
 
 from decimal import Decimal
@@ -26,8 +27,8 @@ PROGRAMS = [
         "name_en": "Store points",
         "defaults": {
             "is_active": True,
-            # ⚠️  فارغ = الجميع: الحالة الافتراضية التي يبدأ بها
-            #     أي متجر قبل أن يقرّر تضييقها.
+            # ⚠️  Empty = everyone: the default state any store starts from
+            #     before it decides to narrow it.
             "account_types": [],
             "customer_segments": [],
             "currency_per_point": Decimal("10.00"),
@@ -44,8 +45,8 @@ PROGRAMS = [
         ],
     },
     {
-        # ⚠️  موقوف في البذرة: تفعيله من الشاشة هو أول ما يجرّبه
-        #     من يفتح لوحة الولاء.
+        # ⚠️  Disabled in the seed: enabling it from the screen is the first thing
+        #     anyone opening the loyalty panel tries.
         "code": "pharmacies",
         "name_ar": "نقاط الصيدليات",
         "name_en": "Pharmacy points",
@@ -103,8 +104,8 @@ def seed() -> dict:
             "account_types": [],
             "referrer_points": 200,
             "referee_points": 100,
-            # ⚠️  سقف منخفض في البذرة: بلوغه أثناء التطوير يكشف
-            #     رسالة السقف، وهي رسالة لا تُرى أبدًا بسقف مفتوح.
+            # ⚠️  A low cap in the seed: reaching it during development reveals the
+            #     cap message, which is never seen with an open ceiling.
             "max_referrals_per_user": 10,
             "min_order_amount": Decimal("100.00"),
         },

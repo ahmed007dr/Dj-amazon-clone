@@ -1,12 +1,13 @@
 """
-سجل التواجد — بنية تحتية مشتركة  (ADR-17).
+The presence record — shared infrastructure  (ADR-17).
 
-⚠️  **الكاش مصدر «الآن»، وقاعدة البيانات مصدر «كان».**
+⚠️  **The cache is the source of "now", and the database the source of "was".**
 
-    كتابة صف على كل طلب لمعرفة من متصل تقتل القاعدة تحت أي ضغط
-    حقيقي. والسجل هنا لا يعرف من يستخدمه: المستخدم المسجَّل في
-    `accounts` والزائر المجهول في `analytics` سؤالهما واحد
-    وإجابتهما بنفس الآلية — ونسختان منها كانتا ستنحرفان.
+    Writing a row on every request to learn who is online kills the database
+    under any real load. And the record here does not know who uses it: the
+    registered user in `accounts` and the anonymous visitor in `analytics` ask
+    the same question and are answered by the same mechanism — and two copies of
+    it would have drifted.
 """
 
 from __future__ import annotations
@@ -19,19 +20,20 @@ from django.utils import timezone
 
 class PresenceRegistry:
     """
-    مَن ظهر خلال النافذة الأخيرة.
+    Who appeared during the most recent window.
 
-    ⚠️  **سجل واحد مجمّع لا مفتاح لكل هوية.**
+    ⚠️  **One aggregated record, not a key per identity.**
 
-        «كم متصلًا الآن؟» سؤال عن المجموعة، والمفاتيح المتفرّقة لا
-        تُعَدّ إلا بمسح مساحة المفاتيح — غير المتاح على LocMem في
-        التطوير والاختبار. سجل واحد يُقرأ بنداء واحد على الاثنين.
+        "How many are online now?" is a question about the set, and scattered
+        keys can only be counted by scanning the keyspace — which is unavailable
+        on LocMem in development and testing. A single record is read with one
+        call on both.
 
-    ⚠️  والقراءة-ثم-الكتابة على سجل واحد تتسابق بين العمّال.
+    ⚠️  And read-then-write on a single record races between workers.
 
-        أسوأ ما يقع: نبضة تُدهَس فيتأخّر ظهور هوية دورةً واحدة،
-        ويُصحَّح نفسه في الطلب التالي بعد ثوانٍ. قفل موزّع لهذا
-        أغلى من الخطأ الذي يمنعه.
+        The worst that happens: a heartbeat is overwritten, so one identity
+        appears a cycle late and corrects itself on the next request seconds
+        later. A distributed lock for that costs more than the error it prevents.
     """
 
     def __init__(self, key: str, *, window: timedelta, heartbeat: timedelta):
@@ -39,17 +41,17 @@ class PresenceRegistry:
         self.window = window
         self.heartbeat = heartbeat
 
-    # ── القراءة ───────────────────────────────────────────
+    # ── Reading ────────────────────────────────────────────
 
     def _raw(self) -> dict:
         return cache.get(self.key) or {}
 
     def alive(self) -> dict:
         """
-        الهويات الحيّة وطوابعها.
+        The live identities and their timestamps.
 
-        ⚠️  التنقية عند القراءة لا بمهمة كانسة — السجل لا ينمو
-            إلا بعدد الحاضرين فعلًا.
+        ⚠️  Pruning happens on read rather than through a sweeper task — the
+            record grows only with the number of people actually present.
         """
         cutoff = timezone.now() - self.window
 
@@ -69,7 +71,7 @@ class PresenceRegistry:
     def count(self) -> int:
         return len(self.alive())
 
-    # ── الكتابة ───────────────────────────────────────────
+    # ── Writing ────────────────────────────────────────────
 
     def _save(self, alive: dict) -> None:
         cache.set(
@@ -79,12 +81,12 @@ class PresenceRegistry:
         )
 
     def touch(self, identity) -> None:
-        """نبضة — تُهمَل إن كانت السابقة أحدث من `heartbeat`."""
+        """A heartbeat — skipped if the previous one is newer than `heartbeat`."""
         identity = str(identity)
         now = timezone.now()
         registry = self._raw()
 
-        # ⚠️  كتابة على كل طلب تُغرق الكاش بلا أن تغيّر إجابة واحدة
+        # ⚠️  Writing on every request floods the cache without changing a single answer
         previous = registry.get(identity)
         if previous:
             try:

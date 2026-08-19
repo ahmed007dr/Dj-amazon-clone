@@ -1,4 +1,4 @@
-"""مسارات النطاق الأكاديمي — /api/v1/academic/"""
+"""Academic domain routes — /api/v1/academic/"""
 
 from django.urls import path
 
@@ -7,13 +7,13 @@ from academic import api
 app_name = "academic"
 
 urlpatterns = [
-    # عام — الطالب يختار جامعته قبل إنشاء الحساب
+    # Public — a student picks their university before creating an account
     path("universities/", api.UniversityTreeAPI.as_view(), name="universities"),
     path("bundles/<slug:slug>/", api.BundleDetailAPI.as_view(), name="bundle-detail"),
-    # الطالب
+    # Student
     path("me/", api.MyStudentProfileAPI.as_view(), name="me"),
     path("me/bundles/", api.MyBundlesAPI.as_view(), name="my-bundles"),
-    # الأدمن
+    # Admin
     path("admin/students/", api.AdminStudentListAPI.as_view(), name="admin-students"),
     path(
         "admin/faculties/<uuid:pk>/promote/",
@@ -23,11 +23,11 @@ urlpatterns = [
 ]
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن — الشجرة الأكاديمية والحزم
+#  Admin — the academic tree and bundles
 # ═══════════════════════════════════════════════════════════
 #
-#  ⚠️  الشجرة **شرط لتسجيل أي طالب**: يختار جامعته وكليته قبل
-#      إنشاء الحساب.
+#  ⚠️  The tree is **a precondition for registering any student**: they pick
+#      their university and faculty before creating an account.
 
 urlpatterns += [
     path(
@@ -62,7 +62,7 @@ urlpatterns += [
         api.AdminBundleDetailAPI.as_view(),
         name="admin-bundle-detail",
     ),
-    # بنود الحزمة — مُصفّاة بحزمتها إلزامًا
+    # Bundle items — filtering by their bundle is mandatory
     path(
         "admin/bundles/<uuid:pk>/items/",
         api.AdminBundleItemListCreateAPI.as_view(),

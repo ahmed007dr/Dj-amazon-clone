@@ -1,13 +1,13 @@
 """
-إنشاء المنتجات وحذفها واسترجاعها من بوابة الأدمن.
+Creating, deleting and restoring products from the admin portal.
 
-⚠️  هذه العمليات كانت متاحة عبر الـ API ولوحة Django وحدهما، ولم
-    يكن لها طريق من لوحة الأدمن. الاختبارات هنا تحرس **العقد** الذي
-    تعتمد عليه الشاشة: خيارات النموذج، والفلاتر، والحذف الناعم
-    القابل للاسترجاع.
+⚠️  These operations were available only through the API and the Django panel,
+    with no route from the admin portal. The tests here guard the **contract**
+    the screen depends on: the form's options, the filters, and the restorable
+    soft delete.
 
-⚠️  و`administration` يُوصَل إليه بـ `apps.get_model` لا بالاستيراد —
-    هو و`catalog` صنوان مستقلان في نفس الطبقة.
+⚠️  And `administration` is reached through `apps.get_model` rather than by
+    import — it and `catalog` are independent siblings on the same layer.
 """
 
 from decimal import Decimal
@@ -67,7 +67,7 @@ def draft(category, **overrides) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الإنشاء
+#  Creation
 # ═══════════════════════════════════════════════════════════
 
 
@@ -84,8 +84,8 @@ class TestCreate:
 
     def test_slug_is_generated_not_supplied(self, admin_client, category):
         """
-        ⚠️  `slug` للقراءة فقط — تغييره يكسر الروابط الخارجية
-            وفهرسة محركات البحث. وإرساله يجب أن يُتجاهَل لا أن يُقبل.
+        ⚠️  `slug` is read-only — changing it breaks external links and search
+            engine indexing. Sending it must be ignored, not accepted.
         """
         response = admin_client.post(
             reverse("v1:catalog:admin-products"),
@@ -97,7 +97,7 @@ class TestCreate:
         assert Product.objects.get(sku="NEW-001").slug != "attacker-chosen"
 
     def test_duplicate_sku_is_refused(self, admin_client, category):
-        """رمز مكرر يعني صنفين على رفّ واحد لا يميّزهما الماسح."""
+        """A duplicate code means two items on one shelf that the scanner cannot tell apart."""
         admin_client.post(reverse("v1:catalog:admin-products"), draft(category), format="json")
 
         response = admin_client.post(
@@ -133,15 +133,16 @@ class TestCreate:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحذف والاسترجاع
+#  Deletion and restoration
 # ═══════════════════════════════════════════════════════════
 
 
 class TestDeleteAndRestore:
     def test_deleted_product_can_be_restored(self, admin_client, category):
         """
-        ⚠️  الحذف الناعم بلا استرجاع حذفٌ نهائي من منظور المستخدم —
-            وأول سؤال بعد حذف بالخطأ هو «كيف أرجعه؟».
+        ⚠️  A soft delete with no restore is a permanent delete from the user's
+            point of view — and the first question after an accidental delete is
+            "how do I get it back?".
         """
         product = Product.objects.create(
             sku="DEL-001", name_ar="صنف", name_en="Item", category=category
@@ -186,18 +187,18 @@ class TestDeleteAndRestore:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الفلاتر
+#  Filters
 # ═══════════════════════════════════════════════════════════
 
 
 class TestFilters:
     def test_status_filter_actually_filters(self, admin_client, category):
         """
-        ⚠️  **انحدار**: الواجهة ترسل `is_active` وكان الخادم يقرأ
-            `inactive` وحده — فيمرّ الفلتر بلا أثر والشاشة تعرض
-            «مفعّل» بينما النتائج تشمل الموقوف.
+        ⚠️  **A regression**: the frontend sends `is_active` while the server
+            read `inactive` alone — so the filter passed through with no effect
+            and the screen showed "active" while the results included the discontinued.
 
-            الفلتر الذي لا يفلتر أسوأ من غيابه، لأنه يُصدَّق.
+            A filter that does not filter is worse than none, because it gets believed.
         """
         Product.objects.create(
             sku="ON-1", name_ar="مفعّل", name_en="On", category=category, is_active=True
@@ -215,7 +216,7 @@ class TestFilters:
         assert [row["sku"] for row in off.data["results"]] == ["OFF-1"]
 
     def test_barcode_search_is_exact(self, admin_client, category):
-        """الماسح يرسل رقمًا كاملًا — والمطابقة الجزئية تعيد صنفًا آخر."""
+        """The scanner sends a complete number — and a partial match returns a different item."""
         Product.objects.create(
             sku="BC-1",
             name_ar="صنف",
@@ -231,7 +232,7 @@ class TestFilters:
 
 
 # ═══════════════════════════════════════════════════════════
-#  خيارات النموذج
+#  Form options
 # ═══════════════════════════════════════════════════════════
 
 
@@ -255,10 +256,10 @@ class TestFormOptions:
 
     def test_categories_hidden_from_the_menu_are_still_selectable(self, admin_client):
         """
-        ⚠️  `show_in_menu` تصنيف **عرضي** لا تصنيف صلاحية.
+        ⚠️  `show_in_menu` is a **display** classification, not a permission one.
 
-            نقطة الفئات العامة تُصفّي به، والاعتماد عليها هنا كان
-            يمنع الأدمن من إسناد منتج إلى فئة موجودة فعلًا.
+            The public categories endpoint filters by it, and relying on that
+            here stopped the admin assigning a product to a category that genuinely exists.
         """
         hidden = Category.objects.create(
             name_ar="فئة داخلية", name_en="Internal", show_in_menu=False
@@ -270,7 +271,7 @@ class TestFormOptions:
         assert str(hidden.pk) in ids
 
     def test_category_label_shows_the_full_path(self, admin_client, category):
-        """«أقراص» وحدها غامضة حين توجد تحت «أدوية» و«مكمّلات» معًا."""
+        """"Tablets" alone is ambiguous when it exists under both "Medicines" and "Supplements"."""
         child = Category.objects.create(name_ar="شاش", name_en="Gauze", parent=category)
 
         response = admin_client.get(reverse("v1:catalog:admin-product-options"))
@@ -280,10 +281,10 @@ class TestFormOptions:
 
     def test_options_carry_the_access_policies(self, admin_client, policies):
         """
-        ⚠️  «مَن يرى هذا المنتج؟» جزء من نموذج الإنشاء لا إعداد
-            متقدّم. غيابه يجعل كل منتج جديد يرث الافتراضية بصمت —
-            فيُنشر دواء مقيّد للجميع ولا يُكتشف إلا حين يشتريه من
-            لا يحقّ له.
+        ⚠️  "Who sees this product?" is part of the creation form, not an
+            advanced setting. Its absence makes every new product silently
+            inherit the default — so a restricted medicine is published to
+            everyone and is discovered only when someone not entitled to it buys it.
         """
         response = admin_client.get(reverse("v1:catalog:admin-product-options"))
         codes = {row["code"] for row in response.data["access_policies"]}
@@ -291,13 +292,13 @@ class TestFormOptions:
         assert {"public", "students", "professionals", "pharmacy_only"} <= codes
 
     def test_the_default_policy_comes_first(self, admin_client, policies):
-        """«للجميع» هو الاختيار الصحيح لمعظم المنتجات — ودفنه وسط
-        القائمة يجعل الأدمن يقيّد منتجًا عامًا بلا قصد."""
+        """"For everyone" is the right choice for most products — and burying it
+        mid-list makes the admin restrict a public product unintentionally."""
         response = admin_client.get(reverse("v1:catalog:admin-product-options"))
         assert response.data["access_policies"][0]["is_default"] is True
 
     def test_each_policy_carries_its_conditions_not_just_a_name(self, admin_client, policies):
-        """«مهنيون موثّقون» وحدها لا تقول إن الطبيب غير الموثّق ممنوع."""
+        """"Verified professionals" alone does not say that an unverified doctor is blocked."""
         response = admin_client.get(reverse("v1:catalog:admin-product-options"))
         professionals = next(
             row for row in response.data["access_policies"] if row["code"] == "professionals"
@@ -318,17 +319,17 @@ class TestFormOptions:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التعديل
+#  Editing
 # ═══════════════════════════════════════════════════════════
 
 
 class TestAudience:
     """
-    ⚠️  **«مَن يرى هذا المنتج؟» ليس حقلًا شكليًا.**
+    ⚠️  **"Who sees this product?" is not a cosmetic field.**
 
-        السياسة المختارة عند الإنشاء هي ما يفصل دواءً مقيّدًا عن
-        منتج عام. الاختبارات هنا تتبع الأثر من النموذج حتى ما يراه
-        الزائر فعلًا في الكتالوج.
+        The policy chosen at creation is what separates a restricted medicine
+        from a public product. The tests here follow the effect from the form
+        through to what a visitor actually sees in the catalogue.
     """
 
     def test_the_chosen_policy_is_saved(self, admin_client, category, policies):
@@ -343,8 +344,8 @@ class TestAudience:
 
     def test_a_restricted_product_is_invisible_to_guests(self, admin_client, category, policies):
         """
-        ⚠️  الفلترة في الـ queryset لا في العرض: المنتج المقيّد لا
-            يظهر في النتائج ولا في العدد ولا يُفتح بالرابط المباشر.
+        ⚠️  Filtering in the queryset, not in the presentation: a restricted
+            product appears in no results, in no count, and does not open by direct link.
         """
         admin_client.post(
             reverse("v1:catalog:admin-products"),
@@ -386,20 +387,20 @@ class TestAudience:
 
     def test_omitting_the_policy_falls_back_to_the_default(self, admin_client, category, policies):
         """
-        ⚠️  المنتج بلا سياسة صريحة يرث الافتراضية — ولذلك تُعرض
-            الافتراضية **باسمها** في النموذج لا كـ«بلا اختيار».
+        ⚠️  A product with no explicit policy inherits the default — which is
+            why the default is shown **by name** in the form rather than as "no selection".
         """
         admin_client.post(reverse("v1:catalog:admin-products"), draft(category), format="json")
 
         product = Product.objects.get(sku="NEW-001")
         assert product.access_policy_id is None
 
-        # والزائر يراه لأن الافتراضية «عام»
+        # and a visitor sees it because the default is "public"
         public = APIClient().get(reverse("v1:catalog:products"))
         assert {row["sku"] for row in public.data["results"]} == {"NEW-001"}
 
     def test_the_policy_can_be_tightened_after_creation(self, admin_client, category, policies):
-        """اكتشاف أن منتجًا مقيّدًا نُشر للجميع يجب أن يُصحَّح بضغطة."""
+        """Discovering that a restricted product was published to everyone must be fixable in one click."""
         admin_client.post(reverse("v1:catalog:admin-products"), draft(category), format="json")
         product = Product.objects.get(sku="NEW-001")
 
@@ -416,8 +417,8 @@ class TestAudience:
 class TestUpdate:
     def test_partial_update_leaves_untouched_fields_alone(self, admin_client, category):
         """
-        ⚠️  الشاشة ترسل الحقول المعروضة وحدها؛ وحقول SEO ليست منها.
-            الحفظ يجب ألا يمسحها.
+        ⚠️  The screen sends only the fields it displays; the SEO fields are not
+            among them. Saving must not erase them.
         """
         product = Product.objects.create(
             sku="UPD-1",

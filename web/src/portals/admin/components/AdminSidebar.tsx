@@ -1,6 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
+import { useCan } from '@/features/auth/useCan';
+
 import { AdminLogo } from './AdminLogo';
 
 import './AdminSidebar.css';
@@ -8,19 +10,22 @@ import './AdminSidebar.css';
 /**
  * قائمة لوحة الأدمن.
  *
- * ⚠️  `permission` مذكور في البيانات من اليوم الأول رغم أن الفلترة
- *     لم تُوصَل بعد.
+ * ⚠️  **كل رابط يعلن ما يفحصه الخادم بالضبط — لا ما يبدو معقولًا.**
  *
- *     إضافته لاحقًا تعني مراجعة كل عنصر ومحاولة تذكّر صلاحيته —
- *     وهو بالضبط النوع من العمل الذي يُنجَز على عجل فيترك بابًا
- *     مفتوحًا. الفلترة في الواجهة **تحسين تجربة لا أمان**: الخادم
- *     يرفض بصرف النظر عمّا يظهر هنا.
+ *     كانت اثنا عشر رابطًا تعلن صلاحية لا يفحصها الخادم إطلاقًا
+ *     (`catalog.view_product` بينما الحارس `IsAdminAccount`).
+ *     الفلترة بها كانت ستُخفي شاشات يملكها المستخدم فعلًا —
+ *     وهو أسوأ من إظهار ما لا يملك: يستنتج أن الميزة غير موجودة
+ *     ويطلبها من جديد.
+ *
+ * ⚠️  والفلترة هنا **تحسين تجربة لا أمان**: الخادم يرفض بصرف
+ *     النظر عمّا يظهر. والاثنان مطلوبان معًا.
  */
 interface AdminLink {
   to: string;
   key: string;
   end?: boolean;
-  /** يُقرأ لاحقًا لإخفاء ما لا يملكه المستخدم — الخادم هو الحارس. */
+  /** صلاحية Django التي يفحصها الخادم — أو `null` لبلا شرط. */
   permission: string | null;
 }
 
@@ -32,11 +37,11 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
   {
     key: 'commerce',
     links: [
-      { to: '/admin/orders', key: 'nav.orders', permission: 'orders.view_order' },
-      { to: '/admin/products', key: 'nav.products', permission: 'catalog.view_product' },
+      { to: '/admin/orders', key: 'nav.orders', permission: 'orders.change_order' },
+      { to: '/admin/products', key: 'nav.products', permission: 'catalog.change_product' },
       // ⚠️  تحت المنتجات لا في «النظام»: الفئة إلزامية على المنتج،
       //     فهي خطوة في إضافة صنف لا إعدادًا يُضبط مرة.
-      { to: '/admin/reference', key: 'nav.reference', permission: 'catalog.change_category' },
+      { to: '/admin/reference', key: 'nav.reference', permission: 'catalog.change_product' },
       // ⚠️  الشجرة الأكاديمية بجوار المرجعيات: كلاهما بيانات أساسية
       //     تُضبط قبل أن يعمل ما فوقها — والطالب لا يُسجَّل أصلًا
       //     قبل وجود جامعته وكليته في النظام.
@@ -49,7 +54,7 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
       //     يومي يتغيّر مع كل حملة، لا إعداد يُضبط مرة.
       { to: '/admin/pricing', key: 'nav.pricing', permission: 'pricing.change_pricelist' },
       { to: '/admin/reviews', key: 'nav.reviews', permission: 'reviews.change_review' },
-      { to: '/admin/inventory', key: 'nav.inventory', permission: 'inventory.view_stock' },
+      { to: '/admin/inventory', key: 'nav.inventory', permission: 'inventory.change_stock' },
       // ⚠️  الموردون بجوار المخزون: الشراء يغذّيه، ومن
       //     يتابع النقص هو من يُنشئ أمر الشراء.
       { to: '/admin/suppliers', key: 'suppliers.title', permission: 'suppliers.add_purchaseorder' },
@@ -90,10 +95,10 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
   {
     key: 'system',
     links: [
-      { to: '/admin/users', key: 'nav.users', permission: 'accounts.view_user' },
-      { to: '/admin/tax', key: 'admin.tax', permission: 'core.change_taxclass' },
+      { to: '/admin/users', key: 'nav.users', permission: 'accounts.change_user' },
+      { to: '/admin/tax', key: 'admin.tax', permission: 'inventory.change_stocklocation' },
       { to: '/admin/settings', key: 'nav.settings', permission: 'inventory.change_stocklocation' },
-      { to: '/admin/payments', key: 'nav.payments', permission: 'payments.view_paymentprovider' },
+      { to: '/admin/payments', key: 'nav.payments', permission: 'payments.change_paymentprovider' },
       { to: '/admin/mail', key: 'nav.mail', permission: 'mailing.change_emailaccount' },
       { to: '/admin/branding', key: 'nav.branding', permission: 'branding.change_brandprofile' },
     ],
@@ -102,13 +107,23 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
 
 export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
+  const can = useCan();
+
+  // ⚠️  **القسم الفارغ يختفي بعنوانه.**
+  //
+  //     ترشيح الروابط وحدها يترك عناوين أقسام معلّقة فوق فراغ —
+  //     فيقرأها المستخدم «هنا شيء لم يُحمَّل» لا «هنا ما لا يخصّك».
+  const sections = SECTIONS.map((section) => ({
+    ...section,
+    links: section.links.filter((link) => can(link.permission)),
+  })).filter((section) => section.links.length > 0);
 
   return (
     <div className="admin-sidebar">
       <AdminLogo />
 
       <nav className="admin-sidebar__nav">
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <ul key={section.key} className="admin-sidebar__group">
             {section.links.map((link) => (
               <li key={link.to}>

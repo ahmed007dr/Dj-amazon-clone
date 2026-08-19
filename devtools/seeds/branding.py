@@ -1,13 +1,13 @@
 """
-الهوية البصرية الافتراضية — لوحتان مكتملتان.
+The default visual identity — two complete palettes.
 
-⚠️  الألوان مختارة لتجتاز **WCAG AA** لا لتبدو جميلة في لقطة شاشة.
+⚠️  The colours are chosen to pass **WCAG AA**, not to look pretty in a screenshot.
 
-    اللوحة التي ترفضها `ThemePalette.clean()` لا يمكن تفعيلها
-    أصلًا؛ فبذرة بألوان فاشلة تعني نظامًا لا يقلع.
+    A palette that `ThemePalette.clean()` rejects cannot be activated at all; so
+    a seed with failing colours means a system that does not boot.
 
-⚠️  الأخضر الطبي هو الأساسي — مأخوذ من قالب Greeny كقيمة ابتدائية
-    كما نصّ ADR-22، والأدمن يغيّره من اللوحة بلا نشر.
+⚠️  Medical green is the primary — taken from the Greeny template as an initial
+    value, as ADR-22 states, and the admin changes it from the panel with no deployment.
 """
 
 from branding.models import BrandProfile, DefaultMode, ThemeMode, ThemePalette
@@ -49,8 +49,8 @@ LIGHT = {
 
 DARK = {
     "primary": "#66bb6a",
-    # ⚠️  نص **داكن** فوق الأخضر الفاتح.
-    #     الأبيض على #66bb6a يعطي 2.1:1 — أقل من نصف الحد المقبول.
+    # ⚠️  **Dark** text on the light green.
+    #     White on #66bb6a gives 2.1:1 — less than half the acceptable threshold.
     "on_primary": "#0b1f10",
     "secondary": "#4db6ac",
     "accent": "#ffca28",
@@ -70,12 +70,12 @@ def seed():
     payload = dict(PROFILE)
     code = payload.pop("code")
 
-    # ⚠️  لا تُفعَّل قسرًا.
+    # ⚠️  It is not activated by force.
     #
-    #     لو كان الأدمن قد فعّل هوية موسمية، فإعادة تشغيل البذرة
-    #     تعيده إلى الافتراضية بلا سؤال — وهو تدخّل في قرار حيّ.
-    #     التفعيل يقع فقط حين لا يكون هناك مفعَّل أصلًا (أو حين
-    #     يكون هو نفسه هذا الملف).
+    #     Had the admin activated a seasonal identity, re-running the seed would
+    #     return it to the default unasked — an intervention in a live decision.
+    #     Activation happens only when nothing is active (or when the active
+    #     profile is this very one).
     active = BrandProfile.objects.filter(is_active=True).first()
     payload["is_active"] = active is None or active.code == code
 

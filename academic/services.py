@@ -1,5 +1,5 @@
 """
-خدمات النطاق الأكاديمي.
+Academic domain services.
 """
 
 from __future__ import annotations
@@ -21,12 +21,13 @@ from core.errors import BusinessError, ErrorCode
 
 def bundles_for_student(student: StudentProfile):
     """
-    حزم الطالب لسنته.
+    A student's bundles for their year.
 
-    ⚠️  حزم القسم **وحزم الكلية العامة** معًا.
+    ⚠️  The department's bundles **and the faculty's general bundles** together.
 
-        الحزمة بلا قسم تخص كل أقسام الكلية — استبعادها يعني طالبًا
-        في قسم متخصص لا يرى المستلزمات المشتركة.
+        A bundle with no department belongs to every department in the faculty —
+        excluding it means a student in a specialised department never sees the
+        shared essentials.
     """
     queryset = StudyBundle.objects.filter(
         faculty=student.faculty,
@@ -55,13 +56,13 @@ def required_bundles_for_student(student: StudentProfile):
 
 def catalog_filter_for_student(student: StudentProfile | None) -> Q:
     """
-    مرشِّح كتالوج الطالب.
+    The student catalogue filter.
 
-    ⚠️  يُدمج مع مرشِّح السياسات لا يستبدله.
+    ⚠️  Combined with the policy filter, never a replacement for it.
 
-        السياق الأكاديمي يضيّق العرض تسويقيًا؛ أما الوصول فيحسمه
-        `access` وحده. الخلط بينهما يجعل تضييقًا تسويقيًا يبدو
-        كقرار أمني.
+        Academic context narrows the display for marketing reasons; access is
+        decided by `access` alone. Conflating the two makes a marketing
+        restriction look like a security decision.
     """
     if student is None:
         return Q()
@@ -77,7 +78,7 @@ def catalog_filter_for_student(student: StudentProfile | None) -> Q:
 
 @transaction.atomic
 def create_student_profile(user, **data) -> StudentProfile:
-    """إنشاء ملف أكاديمي بعد التحقق من اتساق التسلسل."""
+    """Create an academic profile after verifying hierarchy consistency."""
     if hasattr(user, "student_profile"):
         raise BusinessError(
             ErrorCode.CONFLICT, detail="لهذا الحساب ملف أكاديمي بالفعل", status_code=409
@@ -90,7 +91,7 @@ def create_student_profile(user, **data) -> StudentProfile:
 
 
 def universities_with_faculties():
-    """شجرة الجامعات — لنماذج التسجيل. استعلامان لا أكثر."""
+    """The university tree — for registration forms. Two queries, no more."""
     return University.objects.filter(is_active=True).prefetch_related(
         Prefetch(
             "faculties",
@@ -106,13 +107,14 @@ def universities_with_faculties():
 
 def promote_students(faculty: Faculty) -> int:
     """
-    ترقية طلاب كلية سنةً دراسية.
+    Promote a faculty's students by one academic year.
 
-    ⚠️  من بلغ سنة التخرّج لا يُرقّى — الترقية بلا حد تعطي طلابًا
-        في السنة السابعة بكلية من خمس سنوات، فتختفي حزمهم.
+    ⚠️  Anyone who has reached the graduation year is not promoted — unbounded
+        promotion gives seventh-year students in a five-year faculty, so their
+        bundles disappear.
 
-    يُشغَّل يدويًا في بداية العام الدراسي لا تلقائيًا: تاريخ بدء
-    العام يختلف بين الجامعات.
+    Run manually at the start of the academic year, never automatically: the
+    start date differs between universities.
     """
     from django.db.models import F
 

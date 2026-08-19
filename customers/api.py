@@ -1,11 +1,11 @@
 """
-واجهات نطاق العملاء.
+Customer domain endpoints.
 
-⚠️  **كل queryset مُصفّى بالمالك.**
+⚠️  **Every queryset is filtered by owner.**
 
-    الثغرة الأشهر في الكود القديم كانت `Order.objects.all()` بلا
-    فلترة، والهوية مأخوذة من الـ URL لا من `request.user`.
-    هنا الهوية من التوكن حصرًا.
+    The best-known hole in the legacy code was `Order.objects.all()` with no
+    filtering, and the identity taken from the URL rather than from
+    `request.user`. Here the identity comes from the token exclusively.
 """
 
 from django.http import FileResponse
@@ -23,7 +23,7 @@ from customers.models import CustomerAddress, CustomerDocument
 
 
 class MyProfileAPI(APIView):
-    """ملف العميل الحالي — يُنشأ عند أول طلب."""
+    """The current customer's profile — created on first request."""
 
     permission_classes = [IsAuthenticated]
     serializer_class = s.CustomerProfileSerializer
@@ -43,10 +43,10 @@ class MyProfileAPI(APIView):
 class AddressListCreateAPI(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = s.CustomerAddressSerializer
-    pagination_class = None  # قائمة قصيرة بطبيعتها
+    pagination_class = None  # a short list by nature
 
     def get_queryset(self):
-        # ⚠️  خط الدفاع الأول — لا كائن لغير المالك يصل أصلًا
+        # ⚠️  The first line of defence — no object belonging to someone else arrives at all
         return CustomerAddress.objects.filter(customer__user=self.request.user)
 
     def perform_create(self, serializer):
@@ -55,7 +55,7 @@ class AddressListCreateAPI(generics.ListCreateAPIView):
 
         address = serializer.save(
             customer=profile,
-            # أول عنوان يصير الافتراضي تلقائيًا
+            # The first address automatically becomes the default
             is_default=serializer.validated_data.get("is_default", False) or is_first,
         )
         if address.is_default:
@@ -83,7 +83,7 @@ class AddressSetDefaultAPI(APIView):
         address = CustomerAddress.objects.filter(pk=pk, customer__user=request.user).first()
 
         if address is None:
-            # ⚠️  404 لغير الموجود وغير المملوك معًا
+            # ⚠️  404 for both nonexistent and not-owned
             raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
 
         services.set_default_address(address)
@@ -104,10 +104,10 @@ class DocumentListCreateAPI(generics.ListCreateAPIView):
 
 class DocumentSignedUrlAPI(APIView):
     """
-    إصدار رابط موقّع بصلاحية زمنية.
+    Issue a signed URL with a time limit.
 
-    ⚠️  التوقيع يحمل معرّف المستخدم — الرابط لا يعمل لغيره.
-        مشاركته لا تمنح الوصول.
+    ⚠️  The signature carries the user id — the link does not work for anyone
+        else. Sharing it grants nothing.
     """
 
     permission_classes = [IsAuthenticated]
@@ -132,14 +132,14 @@ class DocumentSignedUrlAPI(APIView):
 
 class DocumentDownloadAPI(APIView):
     """
-    تقديم وثيقة حساسة عبر رابط موقّع.
+    Serve a sensitive document through a signed URL.
 
-    ⚠️  الملف **غير عام**، ولا يُقدَّم من `MEDIA_URL` مباشرة.
+    ⚠️  The file is **not public**, and is never served from `MEDIA_URL` directly.
 
-        الحماية ثلاث طبقات:
-          ١. اسم ملف عشوائي بمسار مجزّأ — لا يُخمَّن
-          ٢. توقيع بصلاحية ٥ دقائق — لا يُعاد استخدامه بعدها
-          ٣. فحص ملكية عند التقديم — شبكة أمان لو تسرّب التوقيع
+        Protection is three layers:
+          1. a random filename on a sharded path — unguessable
+          2. a signature valid for 5 minutes — not reusable afterwards
+          3. an ownership check at serve time — a safety net should the signature leak
     """
 
     permission_classes = [IsAuthenticated]
@@ -149,7 +149,7 @@ class DocumentDownloadAPI(APIView):
         if document_id is None:
             raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
 
-        # الطبقة الثالثة — الملكية تُفحص رغم صحة التوقيع
+        # The third layer — ownership is checked despite a valid signature
         document = CustomerDocument.objects.filter(
             pk=document_id, customer__user=request.user
         ).first()
@@ -169,7 +169,7 @@ class DocumentDeleteAPI(generics.DestroyAPIView):
     def perform_destroy(self, instance):
         from customers.models import DocumentStatus
 
-        # الوثيقة المعتمدة سند لقرار توثيق — حذفها يفسد سجل التدقيق
+        # An approved document is the basis of a verification decision — deleting it corrupts the audit trail
         if instance.status == DocumentStatus.APPROVED:
             raise BusinessError(
                 ErrorCode.CONFLICT,

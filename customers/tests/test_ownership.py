@@ -1,12 +1,12 @@
 """
-اختبارات ملكية موارد العملاء.
+Customer resource ownership tests.
 
-⚠️  هذه الاختبارات تحرس ضد الثغرة الأشهر في الكود القديم:
-    `queryset = Model.objects.all()` بلا فلترة، والهوية مأخوذة
-    من الـ URL لا من التوكن.
+⚠️  These tests guard against the best-known hole in the legacy code:
+    `queryset = Model.objects.all()` with no filtering, and the identity taken
+    from the URL rather than from the token.
 
-    كل اختبار «لا يرى/لا يعدّل مورد غيره» هنا يمثّل ثغرة كانت
-    قائمة فعلًا في `orders/api.py`.
+    Every "does not see/does not edit someone else's resource" test here
+    represents a hole that genuinely existed in `orders/api.py`.
 """
 
 import pytest
@@ -76,7 +76,7 @@ class TestProfileIsolation:
         assert "notes" not in response.data
 
     def test_segment_is_read_only(self, alice_client, alice):
-        """التصنيف التجاري يحدده النظام لا العميل."""
+        """The commercial segment is set by the system, not the customer."""
         alice_client.patch(reverse("v1:customers:me"), {"segment": "VIP"}, format="json")
         profile = CustomerProfile.objects.get(user=alice)
         assert profile.segment == "NEW"
@@ -95,7 +95,7 @@ class TestAddressOwnership:
         assert response.data[0]["label"] == "بيتي"
 
     def test_cannot_read_another_users_address(self, alice_client, bob):
-        """⚠️  404 لا 403 — الفرق بينهما أداة تعداد."""
+        """⚠️  404, not 403 — the difference between them is an enumeration tool."""
         bob_address = make_address(bob)
 
         response = alice_client.get(reverse("v1:customers:address-detail", args=[bob_address.pk]))
@@ -166,8 +166,8 @@ class TestDefaultAddress:
 
     def test_only_one_default_enforced_by_database(self, alice):
         """
-        القيد في قاعدة البيانات لا في الكود — منطق التطبيق قد
-        يُتجاوز، والقيد لا يُتجاوز.
+        The constraint lives in the database, not in the code — application
+        logic can be bypassed, and a constraint cannot.
         """
         from django.db.utils import IntegrityError
 
@@ -192,8 +192,8 @@ class TestDocumentSecurity:
 
     def test_file_path_is_never_returned(self, alice_client):
         """
-        ⚠️  المسار المباشر يُخمَّن ويُشارك بلا فحص صلاحية.
-            التقديم عبر رابط موقّع بصلاحية زمنية حصرًا.
+        ⚠️  A direct path is guessed and shared with no permission check.
+            Serving happens exclusively through a time-limited signed URL.
         """
         response = self._upload(alice_client)
 
@@ -216,7 +216,7 @@ class TestDocumentSecurity:
 
     def test_signed_url_does_not_work_for_another_user(self, alice_client, alice, bob):
         """
-        ⚠️  التوقيع يحمل معرّف المستخدم — مشاركة الرابط لا تمنح الوصول.
+        ⚠️  The signature carries the user id — sharing the link grants no access.
         """
         from customers.models import CustomerDocument
 
@@ -239,7 +239,7 @@ class TestDocumentSecurity:
 
         signature = files.sign_file_access("customer-document", document.pk, alice.pk)
 
-        # محاكاة انقضاء المدة
+        # Simulating expiry
         original_ttl = files.SIGNED_URL_TTL
         files.SIGNED_URL_TTL = -1
         try:

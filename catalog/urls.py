@@ -1,4 +1,4 @@
-"""مسارات الكتالوج — /api/v1/catalog/"""
+"""Catalogue routes — /api/v1/catalog/"""
 
 from django.urls import path
 
@@ -7,7 +7,7 @@ from catalog import api, image_api
 app_name = "catalog"
 
 urlpatterns = [
-    # المنتجات — عام. المعرّف slug لا UUID (ADR-27)
+    # Products — public. The identifier is the slug, not a UUID (ADR-27)
     path("products/", api.ProductListAPI.as_view(), name="products"),
     path("products/<slug:slug>/", api.ProductDetailAPI.as_view(), name="product-detail"),
     path(
@@ -15,17 +15,17 @@ urlpatterns = [
         api.ProductByBarcodeAPI.as_view(),
         name="product-by-barcode",
     ),
-    # التصنيف
+    # Classification
     path("categories/", api.CategoryTreeAPI.as_view(), name="categories"),
     path("categories/<slug:slug>/", api.CategoryDetailAPI.as_view(), name="category-detail"),
-    # البراندات والمصنّعون
+    # Brands and manufacturers
     path("brands/", api.BrandListAPI.as_view(), name="brands"),
     path("brands/<slug:slug>/", api.BrandDetailAPI.as_view(), name="brand-detail"),
     path("manufacturers/", api.ManufacturerListAPI.as_view(), name="manufacturers"),
-    # الأدمن — بلا فلترة سياسات
-    # ── التصنيف المرجعي — شرط إضافة أي منتج ────────────────
-    # ⚠️  الفئة إلزامية على `Product`؛ فمتجر بلا شاشة فئات لا
-    #     يستطيع إضافة صنفه الأول من لوحته.
+    # Admin — no policy filtering
+    # ── Reference classification — a precondition for adding any product ──
+    # ⚠️  The category is mandatory on `Product`; a store with no categories
+    #     screen cannot add its first item from its panel.
     path("admin/categories/", api.AdminCategoryListCreateAPI.as_view(), name="admin-categories"),
     path(
         "admin/categories/<uuid:pk>/",
@@ -48,7 +48,7 @@ urlpatterns = [
         api.AdminManufacturerDetailAPI.as_view(),
         name="admin-manufacturer-detail",
     ),
-    # خيارات نموذج الإنشاء — نداء واحد يملأ كل القوائم المنسدلة
+    # Creation form options — one call fills every dropdown
     path(
         "admin/products/options/",
         api.ProductFormOptionsAPI.as_view(),
@@ -65,7 +65,7 @@ urlpatterns = [
         api.RestoreProductAPI.as_view(),
         name="admin-product-restore",
     ),
-    # صور المنتج — الرفع والترتيب والحذف
+    # Product images — upload, ordering and deletion
     path(
         "admin/products/<uuid:pk>/images/",
         image_api.ProductImageListCreateAPI.as_view(),

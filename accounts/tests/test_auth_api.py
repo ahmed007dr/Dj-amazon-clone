@@ -1,8 +1,8 @@
 """
-اختبارات واجهات المصادقة.
+Authentication endpoint tests.
 
-تغطي دورة الحياة الكاملة: تسجيل ← تفعيل ← دخول ← نسيان ← استرجاع ← دخول
-وتحرس الخصائص الأمنية التي كانت مكسورة في الكود القديم.
+They cover the full lifecycle: register ← activate ← log in ← forgot ← recover ← log in
+and guard the security properties that were broken in the legacy code.
 """
 
 import pytest
@@ -22,7 +22,7 @@ def client():
 
 @pytest.fixture(autouse=True)
 def _clear_throttles():
-    """تحديد المعدل يُسقط اختبارات متتابعة لولا التفريغ."""
+    """Rate limiting would fail consecutive tests were the cache not cleared."""
     from django.core.cache import cache
 
     cache.clear()
@@ -40,7 +40,7 @@ def active_user(db):
 
 
 # ═══════════════════════════════════════════════════════════
-#  التسجيل والتفعيل
+#  Registration and activation
 # ═══════════════════════════════════════════════════════════
 
 
@@ -48,9 +48,9 @@ def active_user(db):
 class TestRegistration:
     def test_register_creates_inactive_user(self, client):
         """
-        ⛔ الكود القديم: `form.save()` بعد `commit=False` كان يحفظ
-           مستخدمًا نشطًا ويتجاهل `is_active=False` — فكان نظام
-           التفعيل زخرفيًا بالكامل ويمكن تجاوزه.
+        ⛔ Legacy code: `form.save()` after `commit=False` saved an active user
+           and ignored `is_active=False` — making the activation system
+           entirely decorative and trivially bypassed.
         """
         response = client.post(
             reverse("v1:accounts:register"),
@@ -66,11 +66,12 @@ class TestRegistration:
 
     def test_register_sends_verification_email(self, client, django_capture_on_commit_callbacks):
         """
-        ⚠️  التسليم يبدأ على `on_commit` — أي بعد إيداع المعاملة.
+        ⚠️  Delivery starts on `on_commit` — that is, after the transaction commits.
 
-            بريد يخرج قبل الإيداع يعني رسالة عن حساب قد تُلغى معاملته
-            فلا يوجد. والاختبار يلتقط المُستدعَيات وينفّذها ليقيس ما
-            يقع في الإنتاج فعلًا.
+            An email going out before the commit means a message about an
+            account whose transaction may be rolled back, so it does not exist.
+            The test captures the callbacks and runs them, to measure what
+            actually happens in production.
         """
         django_mail.outbox.clear()
         with django_capture_on_commit_callbacks(execute=True):
@@ -83,7 +84,7 @@ class TestRegistration:
         assert "فعّل" in django_mail.outbox[0].subject
 
     def test_register_respects_preferred_language(self, client, django_capture_on_commit_callbacks):
-        """البريد يصل بلغة المستلم لا بلغة الطلب."""
+        """The email arrives in the recipient's language, not the request's."""
         django_mail.outbox.clear()
         with django_capture_on_commit_callbacks(execute=True):
             client.post(
@@ -121,7 +122,7 @@ class TestRegistration:
         )
         user = User.objects.get(email="verify@test.local")
 
-        # الرمز الصريح لا يُخزَّن — نصدر واحدًا جديدًا للاختبار
+        # The plaintext token is not stored — we issue a fresh one for the test
         from accounts import services
 
         _, raw = services.issue_token(user, TokenPurpose.EMAIL_VERIFICATION)
@@ -145,7 +146,7 @@ class TestRegistration:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الدخول
+#  Login
 # ═══════════════════════════════════════════════════════════
 
 
@@ -183,7 +184,7 @@ class TestLogin:
         assert response.status_code == 400
 
     def test_suspended_user_cannot_login(self, client, active_user):
-        """⛔ الباكند القديم لم يفحص الحالة إطلاقًا."""
+        """⛔ The legacy backend did not check the status at all."""
         active_user.status = AccountStatus.SUSPENDED
         active_user.save()
 
@@ -196,8 +197,8 @@ class TestLogin:
 
     def test_failure_message_does_not_reveal_account_existence(self, client, active_user):
         """
-        التمييز بين «بريد غير مسجل» و«كلمة مرور خاطئة» يحوّل شاشة
-        الدخول إلى أداة لكشف الحسابات.
+        Distinguishing "email not registered" from "wrong password" turns the
+        login screen into an account discovery tool.
         """
         url = reverse("v1:accounts:login")
 
@@ -215,14 +216,14 @@ class TestLogin:
 
 
 # ═══════════════════════════════════════════════════════════
-#  استرجاع كلمة المرور
+#  Password recovery
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 class TestPasswordReset:
     def test_response_is_identical_for_unknown_email(self, client, active_user):
-        """⚠️  رد مختلف = أداة لكشف الحسابات المسجلة."""
+        """⚠️  A different response = a tool for discovering registered accounts."""
         url = reverse("v1:accounts:password-reset")
 
         known = client.post(url, {"email": "active@test.local"}, format="json")
@@ -247,7 +248,7 @@ class TestPasswordReset:
         active_user.refresh_from_db()
         assert active_user.check_password(new_password)
 
-        # الدخول بالجديدة يعمل
+        # Logging in with the new password works
         assert (
             client.post(
                 reverse("v1:accounts:login"),
@@ -258,7 +259,7 @@ class TestPasswordReset:
         )
 
     def test_reset_revokes_all_sessions(self, client, active_user):
-        """من عرف كلمة المرور القديمة يجب أن يفقد وصوله فورًا."""
+        """Anyone who knew the old password must lose access immediately."""
         from accounts import services
 
         services.open_session(active_user, session_key="session-to-kill")
@@ -283,7 +284,7 @@ class TestPasswordReset:
         assert client.post(url, payload, format="json").status_code == 400
 
     def test_token_is_stored_hashed(self, active_user):
-        """تسريب القاعدة يجب ألا يمنح القدرة على إعادة التعيين."""
+        """A database leak must not grant the ability to reset passwords."""
         from accounts import services
 
         record, raw = services.issue_token(active_user, TokenPurpose.PASSWORD_RESET)
@@ -305,7 +306,7 @@ class TestPasswordReset:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الإيقاف الفوري  (ADR-16)
+#  Immediate suspension  (ADR-16)
 # ═══════════════════════════════════════════════════════════
 
 
@@ -313,10 +314,10 @@ class TestPasswordReset:
 class TestSuspensionIsImmediate:
     def test_suspension_blocks_existing_token_at_once(self, client, active_user):
         """
-        ⚠️  جوهر ADR-16.
+        ⚠️  The heart of ADR-16.
 
-        بلا الطبقة الثالثة (مجموعة الكاش) يظل التوكن الصادر صالحًا
-        حتى انتهاء عمره — أي أن الموقوف يواصل العمل ١٠ دقائق.
+        Without the third layer (the cache set) an already-issued token stays
+        valid until it expires — meaning a suspended user keeps working for 10 minutes.
         """
         login = client.post(
             reverse("v1:accounts:login"),
@@ -332,7 +333,7 @@ class TestSuspensionIsImmediate:
 
         services.suspend_account(active_user, reason="مخالفة")
 
-        # نفس التوكن — يجب أن يُرفض فورًا
+        # The same token — must be rejected immediately
         response = client.get(reverse("v1:accounts:me"))
         assert response.status_code == 401
         assert response.data["code"] == "ACCOUNT_SUSPENDED"
@@ -368,7 +369,7 @@ class TestSuspensionIsImmediate:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الجلسات
+#  Sessions
 # ═══════════════════════════════════════════════════════════
 
 
@@ -392,8 +393,8 @@ class TestSessions:
 
     def test_cannot_revoke_another_users_session(self, client, active_user):
         """
-        ⚠️  فحص الملكية — الثغرة الأشيع في الكود القديم (IDOR).
-            و`404` لا `403` حتى لا يصير الفرق أداة تعداد.
+        ⚠️  The ownership check — the most common hole in the legacy code (IDOR).
+            And `404`, not `403`, so the difference does not become an enumeration tool.
         """
         other = User.objects.create_user(email="victim@test.local", password=PASSWORD)
         from accounts import services
@@ -409,17 +410,17 @@ class TestSessions:
 
 
 # ═══════════════════════════════════════════════════════════
-#  تفاوض اللغة
+#  Language negotiation
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 class TestLanguageNegotiation:
     """
-    ⚠️  تستخدم توكنًا حقيقيًا لا `force_authenticate`.
+    ⚠️  Uses a real token, not `force_authenticate`.
 
-        تفضيل المستخدم يُطبَّق في طبقة المصادقة، و`force_authenticate`
-        يتجاوزها — فيختبر مسارًا لا يسلكه أي طلب حقيقي.
+        The user's preference is applied in the authentication layer, and
+        `force_authenticate` bypasses it — testing a path no real request takes.
     """
 
     @staticmethod
@@ -464,7 +465,7 @@ class TestLanguageNegotiation:
 
 
 # ═══════════════════════════════════════════════════════════
-#  تغيير البريد — تأكيد من العنوانين
+#  Email change — confirmation from both addresses
 # ═══════════════════════════════════════════════════════════
 
 
@@ -476,8 +477,8 @@ class TestEmailChange:
 
     def test_requires_current_password(self, client, active_user):
         """
-        ⚠️  جهاز مفتوح بلا صاحبه يكفي لتغيير البريد ثم الاستيلاء
-            على الحساب عبر «نسيت كلمة المرور».
+        ⚠️  An unattended unlocked device is enough to change the email and then
+            take over the account through "forgot password".
         """
         self._authenticate(client, active_user)
 
@@ -494,8 +495,8 @@ class TestEmailChange:
         self, client, active_user, django_capture_on_commit_callbacks
     ):
         """
-        القديم يتلقى تحذيرًا · الجديد يتلقى رمز تأكيد.
-        الاكتفاء بالجديد يسمح بسرقة الحساب بصمت.
+        The old address receives a warning · the new one receives a confirmation code.
+        Sending to the new one alone allows a silent account takeover.
         """
         django_mail.outbox.clear()
         self._authenticate(client, active_user)
@@ -539,7 +540,7 @@ class TestEmailChange:
         active_user.refresh_from_db()
         assert active_user.email == "confirmed@test.local"
         assert active_user.is_email_verified
-        # البريد هو المعرّف — تغييره يبطل كل الجلسات
+        # Email is the identifier — changing it invalidates every session
         assert not UserSession.objects.filter(user=active_user, logout_at__isnull=True).exists()
 
     def test_cannot_take_an_email_already_registered(self, client, active_user):
@@ -556,8 +557,8 @@ class TestEmailChange:
 
     def test_race_between_request_and_confirmation_is_caught(self, client, active_user):
         """
-        شخص آخر قد يسجّل بالبريد بين الطلب والتأكيد — الفحص
-        عند الطلب وحده لا يكفي.
+        Someone else may register with the email between the request and the
+        confirmation — checking at request time alone is not enough.
         """
         from accounts import services
 

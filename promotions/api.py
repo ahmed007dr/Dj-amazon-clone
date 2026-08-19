@@ -18,13 +18,13 @@ from rest_framework import generics
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
-from core.permissions import IsAdminAccount
+from core.permissions import CanManagePricing
 from promotions import serializers as s
 from promotions.models import Coupon, CouponRedemption
 
 
 class CouponListCreateAPI(generics.ListCreateAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePricing]
     serializer_class = s.CouponSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -62,7 +62,7 @@ class CouponListCreateAPI(generics.ListCreateAPIView):
 
 
 class CouponDetailAPI(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePricing]
     serializer_class = s.CouponSerializer
     queryset = Coupon.objects.prefetch_related("products", "categories")
 
@@ -111,7 +111,7 @@ class CouponRedemptionListAPI(generics.ListAPIView):
         حساب أثر الحملة.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePricing]
     serializer_class = s.CouponRedemptionSerializer
     pagination_class = AdminPageNumberPagination
 

@@ -1,11 +1,11 @@
 """
-صور المنتجات — الرفع والفحص والترتيب.
+Product images — upload, validation and ordering.
 
-⚠️  **رفع الملفات باب دخول لا حقل بيانات.**
+⚠️  **File upload is an entry point, not a data field.**
 
-    أخطر ما في هذه الشاشة ليس ترتيب الصور بل ما يُقبل رفعه:
-    ملف يُخزَّن تحت `MEDIA_ROOT` يُقدَّم لاحقًا لأي زائر. لذلك
-    نصف الاختبارات هنا عن الرفض لا عن النجاح.
+    The most dangerous thing about this screen is not the image ordering but
+    what it accepts: a file stored under `MEDIA_ROOT` is later served to any
+    visitor. That is why half the tests here are about rejection, not success.
 """
 
 from decimal import Decimal
@@ -84,7 +84,7 @@ def post_image(client, product, name="photo.png"):
 
 
 # ═══════════════════════════════════════════════════════════
-#  فحص الملف
+#  File validation
 # ═══════════════════════════════════════════════════════════
 
 
@@ -98,11 +98,12 @@ class TestUploadValidation:
 
     def test_forged_content_type_is_rejected(self, admin_client, product):
         """
-        ⚠️  **هذا هو الهجوم الفعلي.**
+        ⚠️  **This is the actual attack.**
 
-            سكربت تنفيذي بترويسة `image/png` كان يمرّ الفحص القديم
-            بالكامل لأن الترويسة يكتبها الرافع. التوقيع في أول
-            الملف لا يملك تغييره بلا تغيير الملف.
+            An executable script with an `image/png` header used to pass the old
+            check entirely, because the header is written by the uploader. The
+            signature at the start of the file cannot be changed without
+            changing the file.
         """
         response = admin_client.post(
             images_url(product),
@@ -114,7 +115,7 @@ class TestUploadValidation:
         assert ProductImage.objects.filter(product=product).count() == 0
 
     def test_pdf_is_rejected_even_though_documents_allow_it(self, admin_client, product):
-        """صفحة منتج تعرض صورًا — قائمة الصور أضيق من قائمة الوثائق."""
+        """A product page displays images — the image list is narrower than the document list."""
         response = admin_client.post(
             images_url(product),
             {"image": upload("brochure.pdf", PDF_BYTES, "application/pdf")},
@@ -153,7 +154,7 @@ class TestUploadValidation:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الصلاحيات
+#  Permissions
 # ═══════════════════════════════════════════════════════════
 
 
@@ -167,10 +168,11 @@ class TestImagePermissions:
 
     def test_cannot_delete_image_of_another_product(self, admin_client, product, other_product):
         """
-        ⚠️  المسار يحمل معرّفين — والتصفية يجب أن تكون بهما معًا.
+        ⚠️  The path carries two ids — and filtering must use both together.
 
-            الاكتفاء بمعرّف الصورة يجعل أي أدمن يحذف صورة أي منتج
-            بمسار منتج آخر، فيضيع أثر العملية في السجل.
+            Relying on the image id alone lets any admin delete any product's
+            image through another product's path, so the operation's trace in
+            the log is lost.
         """
         post_image(admin_client, product)
         image = ProductImage.objects.get(product=product)
@@ -184,7 +186,7 @@ class TestImagePermissions:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الصورة الرئيسية
+#  The primary image
 # ═══════════════════════════════════════════════════════════
 
 
@@ -217,7 +219,7 @@ class TestPrimaryImage:
 
     def test_is_primary_cannot_be_forced_on_upload(self, admin_client, product):
         """
-        ⚠️  حقل للقراءة فقط — وإلا كسر الرفع القيد الفريد بـ ٥٠٠.
+        ⚠️  A read-only field — otherwise the upload breaks the unique constraint with a 500.
         """
         post_image(admin_client, product, "a.png")
 
@@ -232,7 +234,7 @@ class TestPrimaryImage:
 
     def test_deleting_primary_promotes_the_next(self, admin_client, product):
         """
-        ⚠️  منتج بصور بلا رئيسية يختفي بصريًا من كل قائمة.
+        ⚠️  A product with images but no primary disappears visually from every list.
         """
         post_image(admin_client, product, "a.png")
         post_image(admin_client, product, "b.png")
@@ -259,7 +261,7 @@ class TestPrimaryImage:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الترتيب
+#  Ordering
 # ═══════════════════════════════════════════════════════════
 
 
@@ -290,7 +292,7 @@ class TestReorder:
 
     def test_reorder_rejects_images_of_another_product(self, admin_client, product, other_product):
         """
-        ⚠️  معرّف غريب في القائمة كان سيعيد ترتيب صور منتج آخر بصمت.
+        ⚠️  A foreign id in the list would have silently reordered another product's images.
         """
         self._three(admin_client, product)
         post_image(admin_client, other_product, "x.png")
@@ -315,7 +317,7 @@ class TestReorder:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التخزين
+#  Storage
 # ═══════════════════════════════════════════════════════════
 
 
@@ -323,10 +325,10 @@ class TestReorder:
 class TestStorage:
     def test_stored_name_does_not_leak_the_uploaded_name(self, admin_client, product):
         """
-        ⚠️  اسم الملف الأصلي يحمل معلومات ويُخمَّن.
+        ⚠️  The original filename carries information and is guessable.
 
-            `media/products/gloves-price-list.png` يخبر الزائر بما
-            لم نقصد إخباره، والمسار التسلسلي يُجرَّب بحلقة.
+            `media/products/gloves-price-list.png` tells a visitor what we never
+            meant to tell them, and a sequential path is tried with a loop.
         """
         post_image(admin_client, product, name="internal-pricing-sheet.png")
         image = ProductImage.objects.get(product=product)

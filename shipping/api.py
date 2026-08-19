@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
-from core.permissions import IsAdminAccount
+from core.permissions import CanManageShipping
 from shipping import serializers as s
 from shipping import services
 from shipping.models import Shipment, ShippingMethod
@@ -66,7 +66,7 @@ class TrackShipmentAPI(APIView):
 
 
 class AdminShipmentListAPI(generics.ListAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageShipping]
     serializer_class = s.ShipmentSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -85,7 +85,7 @@ class AdminTransitionShipmentAPI(APIView):
         تقرير تسليم.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageShipping]
     serializer_class = s.TransitionShipmentSerializer
 
     def post(self, request, pk):

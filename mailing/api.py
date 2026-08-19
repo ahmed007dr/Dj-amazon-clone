@@ -15,7 +15,7 @@ from rest_framework.views import APIView
 
 from core.api.pagination import AdminPageNumberPagination
 from core.models.audit import AuditAction, AuditLog
-from core.permissions import IsAdminAccount
+from core.permissions import CanManageMailing
 from mailing import serializers as s
 from mailing import services
 from mailing.models import (
@@ -29,7 +29,7 @@ from mailing.templates import TEMPLATES, placeholders, render_text
 
 
 class AccountListCreateAPI(generics.ListCreateAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
     serializer_class = s.EmailAccountSerializer
     pagination_class = None
     queryset = EmailAccount.objects.prefetch_related("credentials")
@@ -46,7 +46,7 @@ class AccountListCreateAPI(generics.ListCreateAPIView):
 
 
 class AccountDetailAPI(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
     serializer_class = s.EmailAccountSerializer
     queryset = EmailAccount.objects.prefetch_related("credentials")
 
@@ -70,7 +70,7 @@ class VerifyAccountAPI(APIView):
     ⚠️  الزرّ الذي يمنع اكتشاف الخطأ عند أول عميل فقد كلمة مروره.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
 
     def post(self, request, pk):
         account = generics.get_object_or_404(EmailAccount.objects.all(), pk=pk)
@@ -79,7 +79,7 @@ class VerifyAccountAPI(APIView):
 
 
 class TestSendAPI(APIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
     serializer_class = s.TestSendSerializer
 
     def post(self, request, pk):
@@ -104,7 +104,7 @@ class TestSendAPI(APIView):
 
 
 class RouteListCreateAPI(generics.ListCreateAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
     serializer_class = s.MailRouteSerializer
     pagination_class = None
     queryset = MailRoute.objects.select_related("account")
@@ -121,7 +121,7 @@ class RouteListCreateAPI(generics.ListCreateAPIView):
 
 
 class RouteDetailAPI(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
     serializer_class = s.MailRouteSerializer
     queryset = MailRoute.objects.select_related("account")
 
@@ -135,7 +135,7 @@ class RoutingMapAPI(APIView):
         الافتراضي يومًا تحرّكت معه رسائل ظنّها مثبّتة.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
 
     def get(self, request):
         return Response(services.routing_map())
@@ -149,7 +149,7 @@ class OutboxListAPI(generics.ListAPIView):
         مصرَّح له برؤية العدد أصلًا (نفس قرار جدول الحسابات).
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
     serializer_class = s.OutboundMessageSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -175,7 +175,7 @@ class RetryMessageAPI(APIView):
         على رسالة صالحة.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
 
     def post(self, request, pk):
         message = generics.get_object_or_404(OutboundMessage.objects.all(), pk=pk)
@@ -239,7 +239,7 @@ class TemplateListAPI(APIView):
         كان يعرض قائمة فارغة على نظام يرسل ثلاثة عشر قالبًا.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
 
     def get(self, request):
         overrides = {o.key: o for o in TemplateOverride.objects.all()}
@@ -260,7 +260,7 @@ class TemplateDetailAPI(APIView):
         الذاكرة.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
     serializer_class = s.TemplateOverrideSerializer
 
     def _template(self, key):
@@ -320,7 +320,7 @@ class TemplatePreviewAPI(APIView):
         لتعرض تجعل التجربة التزامًا.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
     serializer_class = s.TemplatePreviewSerializer
 
     def post(self, request, key):
@@ -352,7 +352,7 @@ class TemplatePreviewAPI(APIView):
 class InboxListAPI(generics.ListAPIView):
     """صندوق الوارد — ما وصل ولم يُجَب عليه بعد."""
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
     serializer_class = s.InboundMessageSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -378,7 +378,7 @@ class InboxDetailAPI(generics.RetrieveUpdateAPIView):
         القابل للتغيير: الحالة · المسؤول · الربط بمرجع.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
     serializer_class = s.InboundMessageSerializer
     queryset = InboundMessage.objects.select_related("account").prefetch_related("attachments")
 
@@ -391,7 +391,7 @@ class ReplyAPI(APIView):
         دقائق وتُدرِج الدومين في القوائم السوداء.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageMailing]
     serializer_class = s.ReplySerializer
 
     def post(self, request, pk):

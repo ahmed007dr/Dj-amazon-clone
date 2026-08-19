@@ -1,19 +1,19 @@
 """
-B2B — الصيدليات وتجار الجملة.
+B2B — pharmacies and wholesalers.
 
-⚠️  **الآجل هو كل الفرق بين B2C وB2B.**
+⚠️  **Credit terms are the whole difference between B2C and B2B.**
 
-    عميل التجزئة يدفع ثم يستلم. والصيدلية تستلم ثم تدفع بعد
-    ثلاثين يومًا — وهذا يقلب المخاطرة: البضاعة تخرج والمال لم
-    يدخل. كل ما في هذا الملف يخدم سؤالًا واحدًا: **كم يدين لنا
-    هذا العميل، وهل يُسمح له بالمزيد؟**
+    A retail customer pays and then receives. A pharmacy receives and then pays
+    thirty days later — and that inverts the risk: the goods leave and the money
+    has not arrived. Everything in this file serves one question: **how much
+    does this customer owe us, and are they allowed more?**
 
-⚠️  والرصيد **يُشتق من دفتر الحركات لا يُخزَّن حقلًا**.
+⚠️  And the balance is **derived from the ledger, never stored as a field**.
 
-    حقل `balance` يُحدَّث بالجمع والطرح ينحرف عن الدفتر عند أول
-    استثناء في منتصف معاملة، أو أول تصحيح يدوي في قاعدة
-    البيانات. والانحراف في رصيد ائتماني يعني إما منع عميل ملتزم
-    أو تمديد ائتمان لمتعثّر — ولا أحد يعرف أيهما وقع.
+    A `balance` field updated by addition and subtraction drifts from the ledger
+    at the first exception mid-transaction, or the first manual correction in the
+    database. And drift in a credit balance means either blocking a customer in
+    good standing or extending credit to a defaulter — with nobody knowing which happened.
 """
 
 from __future__ import annotations
@@ -43,10 +43,11 @@ class BusinessKind(models.TextChoices):
 
 class CreditStatus(models.TextChoices):
     """
-    ⚠️  الحساب يبدأ **بلا ائتمان** لا بحدٍّ افتراضي.
+    ⚠️  An account starts with **no credit**, not with a default limit.
 
-        حدّ ائتماني تلقائي يعني بضاعة تخرج لعميل لم يراجعه أحد.
-        المنح قرار صريح بمبلغ محدَّد ومن شخص معلوم.
+        An automatic credit limit means goods leaving for a customer nobody
+        reviewed. Granting is an explicit decision, for a specific amount, by a
+        known person.
     """
 
     NONE = "NONE", _("بلا ائتمان — دفع مقدَّم")
@@ -56,14 +57,14 @@ class CreditStatus(models.TextChoices):
 
 class BusinessProfile(BaseModel):
     """
-    الملف التجاري — فوق `CustomerProfile` لا بديلًا عنه.
+    The business profile — on top of `CustomerProfile`, not a replacement for it.
 
-    ⚠️  **لا تكرار لبيانات العميل.**
+    ⚠️  **No duplication of customer data.**
 
-        الاسم والهاتف والعناوين والرقم الضريبي كلها في
-        `CustomerProfile` أصلًا. نسخها هنا ينشئ مصدرَي حقيقة
-        يتباعدان عند أول تعديل — والفاتورة تُطبَع من أيّهما صادف.
-        هذا الملف يحمل **ما لا يخصّ إلا الآجل**.
+        Name, phone, addresses and tax number all live in `CustomerProfile`
+        already. Copying them here creates two sources of truth that diverge at
+        the first edit — and the invoice gets printed from whichever came to
+        hand. This file carries **only what belongs to credit terms**.
     """
 
     customer = models.OneToOneField(
@@ -78,11 +79,11 @@ class BusinessProfile(BaseModel):
     )
     legal_name = models.CharField(_("الاسم القانوني"), max_length=250)
 
-    #: رقم ترخيص مزاولة المهنة — يُراجَع يدويًا مع الوثائق
+    #: Professional practice licence number — reviewed by hand along with the documents
     license_number = models.CharField(_("رقم الترخيص"), max_length=64, blank=True)
     license_expires_on = models.DateField(_("انتهاء الترخيص"), null=True, blank=True)
 
-    # ── الائتمان ───────────────────────────────────────────
+    # ── Credit ─────────────────────────────────────────────
     credit_status = models.CharField(
         _("حالة الائتمان"),
         max_length=16,
@@ -93,8 +94,8 @@ class BusinessProfile(BaseModel):
     credit_limit = MoneyField(
         _("الحد الائتماني"), default=ZERO, validators=[MinValueValidator(ZERO)]
     )
-    #: ⚠️  صفر = دفع مقدَّم. لا قيمة افتراضية «معقولة» هنا:
-    #:     ثلاثون يومًا تُمنَح بقرار لا تُورَث من إعداد.
+    #: ⚠️  Zero = payment in advance. There is no "reasonable" default here:
+    #:     thirty days is granted by decision, never inherited from a setting.
     payment_terms_days = models.PositiveSmallIntegerField(_("مهلة السداد (يوم)"), default=0)
 
     credit_approved_by = models.ForeignKey(
@@ -119,16 +120,17 @@ class BusinessProfile(BaseModel):
     @property
     def license_is_valid(self) -> bool:
         """
-        ⚠️  الترخيص بلا تاريخ انتهاء يُعتبر **ساريًا**.
+        ⚠️  A licence with no expiry date is treated as **valid**.
 
-            اعتبار الغياب انتهاءً كان يمنع كل عميل قديم لم يُسجَّل
-            تاريخ ترخيصه — وهو نقص بيانات لا مخالفة.
+            Treating absence as expiry blocked every long-standing customer
+            whose licence date was never recorded — which is missing data, not
+            a violation.
 
-        ⚠️  و`localdate()` لا `now().date()`.
+        ⚠️  And `localdate()`, not `now().date()`.
 
-            الثانية تُرجع تاريخ **UTC**، وهو متأخر بيوم عن القاهرة
-            بين منتصف الليل والثالثة فجرًا. فترخيص انتهى أمس يُقرأ
-            ساريًا في تلك الساعات — والآجل يُمنَح على أساسه.
+            The latter returns the **UTC** date, which is a day behind Cairo
+            between midnight and 3am. So a licence that expired yesterday reads
+            as valid during those hours — and credit is granted on that basis.
         """
         if self.license_expires_on is None:
             return True
@@ -140,17 +142,17 @@ class BusinessProfile(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
-#  دفتر الحساب
+#  The account ledger
 # ═══════════════════════════════════════════════════════════
 
 
 class LedgerKind(models.TextChoices):
     """
-    ⚠️  الإشارة جزء من المعنى لا من الحقل.
+    ⚠️  The sign is part of the meaning, not of the field.
 
-        `CHARGE` تزيد المديونية و`PAYMENT` تنقصها. تخزين مبلغ
-        سالب للسداد كان يجعل كل استعلام يحتاج معرفة الاصطلاح،
-        وأول من ينساه يقلب كشف الحساب.
+        `CHARGE` increases the debt and `PAYMENT` reduces it. Storing a negative
+        amount for a payment would have made every query need to know the
+        convention, and the first person to forget it inverts the statement.
     """
 
     CHARGE = "CHARGE", _("مديونية — طلب آجل")
@@ -159,16 +161,17 @@ class LedgerKind(models.TextChoices):
     ADJUSTMENT = "ADJUSTMENT", _("تسوية يدوية")
 
 
-#: الحركات التي **تزيد** ما على العميل
+#: The movements that **increase** what the customer owes
 DEBIT_KINDS = {LedgerKind.CHARGE, LedgerKind.ADJUSTMENT}
 
 
 class LedgerEntry(BaseModel):
     """
-    حركة في حساب العميل — **إضافة فقط**.
+    A movement on the customer's account — **append-only**.
 
-    ⚠️  لا تعديل ولا حذف: كشف الحساب مستند يُرسَل للعميل ويُبنى
-        عليه نزاع. التصحيح بحركة `ADJUSTMENT` معاكسة تحمل سببها.
+    ⚠️  No editing and no deleting: the statement is a document sent to the
+        customer and disputes are built on it. Corrections are made with an
+        opposing `ADJUSTMENT` movement carrying its reason.
     """
 
     business = models.ForeignKey(
@@ -191,7 +194,7 @@ class LedgerEntry(BaseModel):
     )
 
     occurred_on = models.DateField(_("التاريخ"), default=timezone.localdate, db_index=True)
-    #: ⚠️  تاريخ الاستحقاق للمديونية وحدها — هو أساس التقادم
+    #: ⚠️  The due date applies to debt alone — it is the basis of the ageing report
     due_on = models.DateField(_("تاريخ الاستحقاق"), null=True, blank=True, db_index=True)
 
     reference = models.CharField(_("المرجع"), max_length=64, blank=True)
@@ -214,11 +217,11 @@ class LedgerEntry(BaseModel):
             models.Index(fields=["business", "-occurred_on"]),
         ]
         constraints = [
-            # ⚠️  طلب واحد لا يُقيَّد مديونيةً مرتين.
+            # ⚠️  One order is never charged as debt twice.
             #
-            #     إعادة محاولة الإتمام أو حدث مكرر كانا سيضاعفان
-            #     ما على العميل — فيُمنَع من الشراء بحدٍّ استهلكه
-            #     مرة واحدة فقط.
+            #     A retried checkout or a duplicated event would have doubled what
+            #     the customer owes — blocking them from buying against a limit
+            #     they consumed only once.
             models.UniqueConstraint(
                 fields=["order", "kind"],
                 condition=models.Q(deleted_at__isnull=True, order__isnull=False),
@@ -235,28 +238,28 @@ class LedgerEntry(BaseModel):
 
     @property
     def signed_amount(self):
-        """المبلغ بإشارته في الرصيد — موجب على العميل، سالب له."""
+        """The amount with its sign in the balance — positive against the customer, negative for them."""
         return self.amount if self.is_debit else -self.amount
 
     def save(self, *args, **kwargs):
         """
-        ⚠️  **إضافة فقط.**
+        ⚠️  **Append-only.**
 
-            تعديل حركة يغيّر كشف حساب أُرسل للعميل بأثر رجعي،
-            فيصير النزاع بلا مرجع يُحتكَم إليه.
+            Editing a movement changes a statement already sent to the customer
+            retroactively, leaving the dispute with no reference to settle it.
         """
-        # ⚠️  `_state.adding` لا `self.pk`.
+        # ⚠️  `_state.adding`, not `self.pk`.
         #
-        #     المفتاح UUID يُولَّد في بايثون **قبل** الإدراج، فيكون
-        #     `pk` موجودًا على صفٍّ لم يُكتب بعد. الفحص به كان
-        #     يرفض كل إنشاء — أي أن الحارس يمنع ما جاء ليحرسه.
+        #     The UUID key is generated in Python **before** the insert, so `pk`
+        #     exists on a row that has not been written yet. Checking against it
+        #     rejected every creation — the guard blocking the very thing it came to guard.
         if not self._state.adding:
             raise ValueError("حركات الحساب لا تُعدَّل — سجّل تسوية معاكسة")
         super().save(*args, **kwargs)
 
 
 # ═══════════════════════════════════════════════════════════
-#  الفواتير
+#  Invoices
 # ═══════════════════════════════════════════════════════════
 
 
@@ -267,25 +270,26 @@ class InvoiceStatus(models.TextChoices):
     CANCELLED = "CANCELLED", _("ملغاة")
 
 
-#: الفواتير **القائمة** — ما زال على العميل سدادها.
+#: **Outstanding** invoices — the customer still has to pay them.
 #
-# ⚠️  `OVERDUE` حالة عرضية لا مصير.
+# ⚠️  `OVERDUE` is an incidental state, not a destination.
 #
-#     الفاتورة المتأخرة ما زالت مستحقة؛ استبعادها من استعلامات
-#     «المفتوح» يجعل تعليمها متأخرةً **يخفيها** من بوابة الائتمان
-#     ومن التقادم ومن تسوية السداد — أي أن أقدم الديون تسقط من
-#     الحساب بمجرد أن تصير أقدم. وهو انقلاب كامل في المعنى.
+#     An overdue invoice is still due; excluding it from "open" queries makes
+#     marking it overdue **hide** it from the credit gate, from the ageing
+#     report and from payment settlement — meaning the oldest debts drop out of
+#     the account the moment they become the oldest. A complete inversion of meaning.
 OPEN_INVOICE_STATUSES = [InvoiceStatus.ISSUED, InvoiceStatus.OVERDUE]
 
 
 class Invoice(BaseModel):
     """
-    فاتورة آجل.
+    A credit invoice.
 
-    ⚠️  **كل مبلغ فيها لقطة** — تُنسَخ من الطلب وقت الإصدار.
+    ⚠️  **Every amount on it is a snapshot** — copied from the order at issue time.
 
-        قراءتها من الطلب وقت العرض تجعل فاتورة مطبوعة تخالف نسختها
-        على الشاشة بعد أي تصحيح. والفاتورة مستند يُقدَّم للمحاسب.
+        Reading them from the order at display time makes a printed invoice
+        disagree with its on-screen copy after any correction. And an invoice is
+        a document handed to an accountant.
     """
 
     number = models.CharField(
@@ -335,11 +339,11 @@ class Invoice(BaseModel):
     @property
     def is_overdue(self) -> bool:
         """
-        ⚠️  التأخر يُحسب لحظيًا لا يُخزَّن.
+        ⚠️  Lateness is computed on the fly, never stored.
 
-            حقل `is_overdue` مخزَّن يحتاج مهمة دورية تحدّثه، وأي
-            تعطّل فيها يجعل فاتورة متأخرة تبدو سليمة — وهو الحقل
-            الذي تُبنى عليه قرارات المنع.
+            A stored `is_overdue` field needs a periodic task to update it, and
+            any failure there makes an overdue invoice look healthy — and it is
+            the field on which blocking decisions are built.
         """
         return self.status in OPEN_INVOICE_STATUSES and self.due_on < timezone.localdate()
 

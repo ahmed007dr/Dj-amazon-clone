@@ -20,11 +20,11 @@ repos:
 
   - repo: local
     hooks:
-      # الحدود النطاقية — التوثيق لا يفرض معمارية، فشل البناء يفرضها
+      # Domain boundaries — documentation does not enforce architecture, a failing build does
       #
-      # ⚠️  PYTHONUTF8=1 إلزامي على ويندوز:
-      #     بدونه تُقرأ ملفات المشروع بترميز cp1252 فينهار على
-      #     أول محرف عربي في تعليق أو نص.
+      # ⚠️  PYTHONUTF8=1 is mandatory on Windows:
+      #     without it project files are read as cp1252 and the run collapses on
+      #     the first Arabic character in a comment or a string.
       - id: lint-imports
         name: فرض حدود النطاقات
         entry: lint-imports

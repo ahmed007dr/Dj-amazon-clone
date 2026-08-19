@@ -1,4 +1,4 @@
-"""مسارات السلة — /api/v1/cart/"""
+"""Cart routes — /api/v1/cart/"""
 
 from django.urls import path
 

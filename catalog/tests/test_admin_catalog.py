@@ -1,14 +1,14 @@
 """
-اختبارات إدارة الكتالوج من بوابة الأدمن.
+Catalogue management from the admin portal.
 
-⚠️  `catalog` و`administration` **صنوان مستقلان** في نفس الطبقة —
-    لا يستورد أحدهما الآخر بأي اتجاه.
+⚠️  `catalog` and `administration` are **independent siblings** on the same
+    layer — neither imports the other in any direction.
 
-    الاختبار يحتاج `AdminProfile` لبناء عميل أدمن، فيصل إليه بـ
-    `apps.get_model` — بحث نصي في سجل التطبيقات لا استيراد،
-    فلا ينشئ تبعية يرصدها import-linter.
+    The test needs `AdminProfile` to build an admin client, so it reaches it
+    through `apps.get_model` — a string lookup in the app registry, not an
+    import, so it creates no dependency for import-linter to catch.
 
-    نفس التقنية المستخدمة في `core/tests/test_foundations.py`.
+    The same technique is used in `core/tests/test_foundations.py`.
 """
 
 from decimal import Decimal
@@ -69,7 +69,7 @@ def admin_client(db):
     )
     admin.is_active = True
     admin.save()
-    # مرجع نصي — لا استيراد يكسر عزل النطاقين
+    # A string reference — no import that would break the two domains' isolation
     apps.get_model("administration", "AdminProfile").objects.create(user=admin)
 
     client = APIClient()
@@ -80,7 +80,7 @@ def admin_client(db):
 @pytest.mark.django_db
 class TestAdminCatalog:
     def test_admin_sees_restricted_products(self, admin_client, catalog):
-        """الأدمن يدير كل المنتجات بما فيها المقيّدة."""
+        """The admin manages every product, including the restricted ones."""
         response = admin_client.get(reverse("v1:catalog:admin-products"))
 
         skus = {p["sku"] for p in response.data["results"]}
@@ -96,7 +96,7 @@ class TestAdminCatalog:
         assert client.get(reverse("v1:catalog:admin-products")).status_code == 403
 
     def test_delete_is_soft(self, admin_client, catalog):
-        """المنتج المباع تشير إليه طلبات تاريخية وحركات مخزون."""
+        """A sold product is referenced by historical orders and stock movements."""
         product = catalog["public"]
 
         response = admin_client.delete(
@@ -109,8 +109,8 @@ class TestAdminCatalog:
 
     def test_prescription_flag_must_match_regulatory_class(self, admin_client, category):
         """
-        ⚠️  منتج يتطلب وصفة وتصنيفه OTC تناقض صامت — يظهر عند أول
-            مراجعة تنظيمية لا قبلها.
+        ⚠️  A product requiring a prescription while classified OTC is a silent
+            contradiction — it surfaces at the first regulatory review, not before.
         """
         response = admin_client.post(
             reverse("v1:catalog:admin-products"),

@@ -1,12 +1,12 @@
 """
-الضريبة.  (ADR-30)
+Tax.  (ADR-30)
 
-قرار عمل مُعتمد: الضريبة مُفعَّلة.
+An approved business decision: tax is enabled.
 
-⚠️  النسبة **لقطة تاريخية**.
-    كل سطر طلب يخزّن النسبة المطبَّقة وقت البيع.
-    لو تغيّرت من 14% إلى 15% العام القادم، تبقى الفواتير القديمة بـ 14%.
-    حسابها لاحقًا من نسبة حالية يزوّر السجل المحاسبي.
+⚠️  The rate is **a historical snapshot**.
+    Every order line stores the rate applied at the time of sale.
+    If it changes from 14% to 15% next year, old invoices stay at 14%.
+    Computing it later from the current rate falsifies the accounting record.
 """
 
 from decimal import Decimal
@@ -23,24 +23,23 @@ from core.money import RateField
 
 def today():
     """
-    قيمة افتراضية لحقل `DateField`.
+    A default value for a `DateField`.
 
-    ⚠️  `timezone.localdate()` لا `timezone.now().date()`.
+    ⚠️  `timezone.localdate()`, not `timezone.now().date()`.
 
-        الثاني يعطي تاريخ **UTC**. مع `TIME_ZONE='Africa/Cairo'`
-        تكون الساعة ١٢:٣٠ ليلًا في القاهرة بينما UTC ما زال في
-        اليوم السابق — فتُطبَّق نسبة ضريبية قبل موعدها بيوم أو
-        تبقى سارية يومًا زائدًا.
+        The latter gives the **UTC** date. With `TIME_ZONE='Africa/Cairo'` it is
+        12:30am in Cairo while UTC is still on the previous day — so a tax rate
+        is applied a day early or stays in force a day too long.
     """
     return timezone.localdate()
 
 
 class TaxClass(BilingualNameMixin, BaseModel):
     """
-    فئة ضريبية — قياسي · معفى · صفري.
+    A tax class — standard · exempt · zero-rated.
 
-    `valid_from` / `valid_to` تسمحان بتغيير النسبة بقرار حكومي
-    مع بقاء السجل التاريخي سليمًا.
+    `valid_from` / `valid_to` allow the rate to change by government decree
+    while the historical record stays intact.
     """
 
     code = models.SlugField(_("الرمز"), max_length=50, unique=True)
@@ -74,7 +73,7 @@ class TaxClass(BilingualNameMixin, BaseModel):
 
     @property
     def is_currently_valid(self) -> bool:
-        # التاريخ المحلي لا UTC — انظر `today()` أعلاه
+        # The local date, not UTC — see `today()` above
         today = timezone.localdate()
         if self.valid_from > today:
             return False
@@ -86,20 +85,20 @@ class TaxClass(BilingualNameMixin, BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
-#  إعدادات الضريبة  →  core.SystemSetting
+#  Tax settings  →  core.SystemSetting
 # ═══════════════════════════════════════════════════════════
 #
-#   tax.enabled                 هل النظام الضريبي مفعّل؟
-#   tax.prices_include_tax      هل الأسعار المعروضة شاملة الضريبة؟
-#   tax.default_class           رمز الفئة الافتراضية
-#   tax.rounding                'line' لكل سطر · 'total' للإجمالي
-#   tax.number_required_for     أنواع الحسابات التي يلزمها رقم ضريبي
+#   tax.enabled                 is the tax system enabled?
+#   tax.prices_include_tax      are displayed prices tax-inclusive?
+#   tax.default_class           the default class code
+#   tax.rounding                'line' per line · 'total' on the total
+#   tax.number_required_for     the account types that require a tax number
 #
 # ═══════════════════════════════════════════════════════════
 
 
 class TaxSettings:
-    """قارئ مركزي لإعدادات الضريبة."""
+    """A central reader for the tax settings."""
 
     ENABLED = "tax.enabled"
     PRICES_INCLUDE_TAX = "tax.prices_include_tax"

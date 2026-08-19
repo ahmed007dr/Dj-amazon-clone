@@ -5,7 +5,7 @@ from analytics.models import TrafficBucket
 
 @admin.register(TrafficBucket)
 class TrafficBucketAdmin(admin.ModelAdmin):
-    """⚠️  للقراءة وحدها — رقم مجمَّع يُحرَّر بيدٍ يفقد معناه."""
+    """⚠️  Read-only — an aggregated number edited by hand loses its meaning."""
 
     list_display = ("bucket_start", "device_type", "requests", "guest_visitors", "known_visitors")
     list_filter = ("device_type",)

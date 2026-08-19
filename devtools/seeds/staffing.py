@@ -1,31 +1,32 @@
 """
-الموظفون وإسناد العملاء.
+Employees and customer assignment.
 
-⚠️  **مندوبان لا واحد.**
+⚠️  **Two reps, not one.**
 
-    مندوب واحد يجعل كل اختبار عزل يمرّ بالمصادفة: لا يوجد زميل
-    ليُقرأ عملاؤه بالخطأ. والحالة التي تُكسر في الإنتاج هي بالضبط
-    وجود زميل.
+    A single rep makes every isolation test pass by accident: there is no
+    colleague whose customers could be read by mistake. And the case that breaks
+    in production is precisely the existence of a colleague.
 
-⚠️  و**عميل بلا مسؤول** مقصود.
+⚠️  And **a customer with no owner** is deliberate.
 
-    شاشة «عملاء بلا مسؤول» بلا صفّ واحد تبدو معطّلة، والحالة نفسها
-    هي أكثر ما يقع فعلًا: عميل يسجّل ولا يوزّعه أحد.
+    A "customers with no owner" screen with not a single row looks broken, and
+    that state is the one that occurs most often in reality: a customer
+    registers and nobody assigns them.
 """
 
 from employees.models import EmployeeProfile, EmployeeRole
 
-#: (البريد، الرقم الوظيفي، رمز الدور)
+#: (email, employee number, role code)
 STAFF = [
     ("cashier@dev.local", "EMP-1001", "sales-rep"),
     ("warehouse@dev.local", "EMP-1002", "warehouse-staff"),
 ]
 
-#: بريد العميل → الرقم الوظيفي لمن يتابعه
+#: customer email → the employee number of whoever handles them
 ASSIGNMENTS = {
     "pharmacy@dev.local": "EMP-1001",
     "trader@dev.local": "EMP-1001",
-    # ⚠️  `customer@dev.local` و`wholesale@dev.local` بلا إسناد عمدًا
+    # ⚠️  `customer@dev.local` and `wholesale@dev.local` are deliberately unassigned
 }
 
 

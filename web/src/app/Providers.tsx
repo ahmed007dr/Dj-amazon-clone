@@ -9,17 +9,17 @@ import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { queryClient } from './queryClient';
 
 /**
- * ⚠️  الترتيب مقصود:
+ * ⚠️  The order is deliberate:
  *
- *         QueryClient  →  الجميع يجلب عبره
- *         Auth         →  يحقن معالج التجديد في طبقة النقل
- *                          قبل أن يُطلق أي مكوّن نداءً محميًّا
- *         Theme        →  الهوية نداء عام لا يحتاج مصادقة
- *         Direction    →  يضبط `dir` قبل أول رسمة مرئية
+ *         QueryClient  →  everyone fetches through it
+ *         Auth         →  injects the refresh handler into the transport layer
+ *                          before any component fires a protected call
+ *         Theme        →  branding is a public call needing no authentication
+ *         Direction    →  sets `dir` before the first visible render
  *
- *     عكس Auth وTheme غير ضار اليوم، لكن أول نداء محمي في الثيم
- *     (هوية خاصة بالمستخدم مثلًا) سيمرّ بلا توكن — والفشل حينها
- *     يبدو خطأ صلاحيات لا خطأ ترتيب.
+ *     Swapping Auth and Theme is harmless today, but the first protected call
+ *     in the theme (per-user branding, say) would go out without a token — and
+ *     the failure would look like a permissions bug rather than an ordering one.
  */
 function DirectionGate({ children }: { children: ReactNode }) {
   useDirection();

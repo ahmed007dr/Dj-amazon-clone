@@ -1,18 +1,18 @@
 """
-صلاحيات B2B.
+B2B permissions.
 
-⚠️  **العميل التجاري يرى حسابه هو — لا حساب غيره.**
+⚠️  **A business customer sees their own account — not anyone else's.**
 
-    كشف حساب صيدلية يكشف حجم مشترياتها وهامش تعاملها معنا. تسريبه
-    لصيدلية منافسة في نفس الشارع ضرر تجاري مباشر لا مجرد خرق
-    خصوصية.
+    A pharmacy's statement reveals its purchase volume and the margin we deal at.
+    Leaking it to a competing pharmacy on the same street is direct commercial
+    damage, not merely a privacy breach.
 """
 
 from rest_framework.permissions import BasePermission
 
 from accounts.models import AccountType
 
-#: أنواع الحسابات التي تشتري بالجملة — تطابق قائمة أسعار `wholesale`
+#: The account types that buy wholesale — matching the `wholesale` price list
 TRADE_ACCOUNTS = {
     AccountType.PHARMACY,
     AccountType.WAREHOUSE,
@@ -23,11 +23,11 @@ TRADE_ACCOUNTS = {
 
 class IsTradeAccount(BasePermission):
     """
-    ⚠️  الأدمن **لا يمرّ من هنا**.
+    ⚠️  Admins **do not pass through here**.
 
-        هذه النقاط تُجيب «حسابي أنا»، وهي بلا معنى لأدمن لا ملف
-        تجاري له. شاشات الأدمن لها نقاطها الخاصة التي تأخذ معرّف
-        العميل صراحةً.
+        These endpoints answer "my own account", and are meaningless to an admin
+        with no business profile. Admin screens have their own endpoints, which
+        take the customer id explicitly.
     """
 
     message = "هذه البوابة للحسابات التجارية"
@@ -41,13 +41,14 @@ class IsTradeAccount(BasePermission):
 
 class CanManageCredit(BasePermission):
     """
-    منح الائتمان وإيقافه وتسجيل السداد.
+    Granting credit, suspending it, and recording payment.
 
-    ⚠️  صلاحية صريحة لا `IsAdminAccount`.
+    ⚠️  An explicit permission, not `IsAdminAccount`.
 
-        رفع حد ائتماني قرار مالي بحجم القرض. جعله متاحًا لكل من
-        يفتح اللوحة يعني أن مدير كتالوج يمنح صيدلية مئة ألف —
-        ولا شيء يمنعه إلا أنه لم يفكّر في ذلك.
+        Raising a credit limit is a financial decision the size of a loan.
+        Making it available to everyone who opens the panel means a catalogue
+        manager grants a pharmacy a hundred thousand — with nothing stopping
+        them but the fact that it did not occur to them.
     """
 
     message = "إدارة الائتمان تحتاج صلاحية صريحة"

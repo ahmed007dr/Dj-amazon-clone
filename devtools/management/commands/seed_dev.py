@@ -1,19 +1,19 @@
 """
-بذرة بيئة التطوير — نظام قابل للتشغيل والتجربة في أمر واحد.
+Development environment seed — a runnable, explorable system in one command.
 
     python manage.py seed_dev
 
-⚠️  **غير موجود في الإنتاج.** `devtools` مُثبَّت في
-    `config/settings/dev.py` وحده، لأن البذرة تُنشئ حسابات بكلمة
-    مرور معروفة. انظر `devtools/README.md`.
+⚠️  **Not present in production.** `devtools` is installed in
+    `config/settings/dev.py` alone, because the seed creates accounts with a
+    well-known password. See `devtools/README.md`.
 
-⚠️  قابل للتشغيل مرارًا: كل وحدة تستخدم `update_or_create` بمفتاح
-    طبيعي. الاستثناء الوحيد هو المخزون والطلبات — إعادة استلام
-    دفعة أو إنشاء طلب ثانٍ تُغيّر أرصدة حقيقية، فلهما حارس صريح.
+⚠️  Re-runnable: every module uses `update_or_create` with a natural key. The
+    sole exception is stock and orders — re-receiving a batch or creating a
+    second order changes real balances, so both have an explicit guard.
 
-الخيارات:
-    --minimal   الإعدادات والبنية فقط — بلا منتجات ولا مستخدمين
-    --reset     حذف كل البيانات ثم إعادة البذر
+Options:
+    --minimal   settings and structure only — no products and no users
+    --reset     delete all data, then re-seed
 """
 
 from io import StringIO
@@ -58,10 +58,10 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        # ⚠️  حزام أمان ثانٍ فوق عدم التثبيت في الإنتاج.
+        # ⚠️  A second seatbelt on top of not being installed in production.
         #
-        #     الأول هو أن الأمر غير موجود أصلًا خارج التطوير؛ وهذا
-        #     يمسك الحالة التي يُثبَّت فيها التطبيق بالخطأ.
+        #     The first is that the command does not exist outside development;
+        #     this catches the case where the app is installed by mistake.
         if not settings.DEBUG:
             raise CommandError(
                 "seed_dev لا يعمل إلا في وضع التطوير — البذرة تُنشئ حسابات بكلمة مرور معروفة."
@@ -75,7 +75,7 @@ class Command(BaseCommand):
 
         self._report(report, minimal=options["minimal"])
 
-    # ── التنفيذ ────────────────────────────────────────────
+    # ── Execution ──────────────────────────────────────────
 
     def _seed(self, *, minimal: bool) -> dict:
         report = {}
@@ -83,33 +83,33 @@ class Command(BaseCommand):
         self._step("الإعدادات والضرائب")
         report["configuration"] = configuration.seed()["counts"]
 
-        # ⚠️  الهوية تُبذر حتى في الوضع المختصر — الواجهة بلا ألوان
-        #     تبدو معطّلة لا «غير مضبوطة بعد».
+        # ⚠️  The identity is seeded even in minimal mode — a frontend with no
+        #     colours looks broken rather than "not configured yet".
         self._step("الهوية البصرية")
         report["branding"] = branding.seed()["counts"]
 
-        # ⚠️  البريد بنية تحتية كالهوية: شاشة بلا حساب واحد تبدو
-        #     معطّلة، ولا تُظهر الفرق بين الأمان والتسويق (ADR-76).
+        # ⚠️  Email is infrastructure like the identity: a screen with not one
+        #     account looks broken, and shows no difference between security and marketing (ADR-76).
         self._step("حسابات البريد")
         report["mailing"] = mailing.seed()["counts"]
 
-        # ⚠️  الإخراج مكتوم: الأمران يطبعان تعليماتهما الخاصة، وهي
-        #     ضجيج وسط تقرير البذرة لا معلومة.
+        # ⚠️  Output is muted: the two commands print their own instructions, which
+        #     are noise in the middle of the seed report rather than information.
         self._step("سياسات الوصول")
         call_command("seed_access_policies", verbosity=0, stdout=StringIO())
 
         self._step("بوابات الدفع")
         call_command("seed_payment_providers", verbosity=0, stdout=StringIO())
 
-        # ⚠️  الأدوار بنية تحتية: بوابة الموظفين بلا دور واحد لا
-        #     تُفتح، و`EmployeeProfile.role` مفتاح إلزامي.
+        # ⚠️  Roles are infrastructure: the staff portal does not open with not one
+        #     role, and `EmployeeProfile.role` is a mandatory key.
         self._step("الأدوار الوظيفية")
         call_command("seed_employee_roles", verbosity=0, stdout=StringIO())
 
-        # ⚠️  بنود المصروفات بنية تحتية لا بيانات تجريبية.
+        # ⚠️  Expense categories are infrastructure, not sample data.
         #
-        #     شاشة المصروفات بلا بند واحد لا تقبل إدخالًا إطلاقًا،
-        #     والقائمة الفارغة تبدو عطلًا لا «لم تُضبَط بعد».
+        #     The expenses screen accepts no input at all with not one category,
+        #     and the empty list looks like a fault rather than "not configured yet".
         self._step("بنود المصروفات")
         call_command("seed_expense_categories", verbosity=0, stdout=StringIO())
 
@@ -117,16 +117,16 @@ class Command(BaseCommand):
         logistics_data = logistics.seed()
         report["logistics"] = logistics_data["counts"]
 
-        # ⚠️  الأجهزة تُبذر حتى في الوضع المختصر.
+        # ⚠️  Registers are seeded even in minimal mode.
         #
-        #     نقطة البيع بلا جهاز واحد لا تُفتح إطلاقًا: البوابة
-        #     تعرض «لا جهاز متاح» ولا سبيل لتجاوزها من الواجهة.
-        #     وهي بنية تحتية كالمواقع لا بيانات تجريبية كالمنتجات.
-        # ⚠️  برامج الولاء بنية تحتية لا بيانات تجريبية.
+        #     Point of sale does not open at all with not one register: the gate
+        #     shows "no register available" and there is no way past it from the frontend.
+        #     And it is infrastructure like locations, not sample data like products.
+        # ⚠️  Loyalty programmes are infrastructure, not sample data.
         #
-        #     شاشة الولاء بلا برنامج واحد لا تقبل ضبطًا، والقائمة
-        #     الفارغة تبدو عطلًا لا «لم يُضبَط بعد». وواحد منها
-        #     موقوف عمدًا ليُرى المفتاح وهو مُطفأ.
+        #     The loyalty screen accepts no configuration with not one programme, and
+        #     the empty list looks like a fault rather than "not configured yet". One of
+        #     them is deliberately disabled so the switch can be seen in the off position.
         self._step("برامج الولاء والإحالة")
         report["loyalty"] = loyalty.seed()["counts"]
 
@@ -157,8 +157,8 @@ class Command(BaseCommand):
         people_data = people.seed(academia_data["faculties"])
         report["people"] = people_data["counts"]
 
-        # ⚠️  الحسابات التجارية بعد المستخدمين وقبل الطلبات:
-        #     تحتاج المستخدمين، والطلبات الآجلة تحتاجها.
+        # ⚠️  Business accounts come after users and before orders:
+        #     they need the users, and credit orders need them.
         self._step("الحسابات التجارية")
         report["trade"] = trade.seed(people_data["users"])["counts"]
 
@@ -170,11 +170,11 @@ class Command(BaseCommand):
             people_data["users"], people_data["customers"], products
         )["counts"]
 
-        # ⚠️  **الأخيرة عمدًا** — توزّع ما أُنشئ قبلها على الزمن.
+        # ⚠️  **Deliberately last** — it spreads what was created before it across time.
         #
-        #     كل طلب مبذور يقع في لحظة تشغيل الأمر، فتُظهر شاشة
-        #     الضغط خلية واحدة مضيئة و١٦٧ فارغة — وهو مظهر شاشة
-        #     معطّلة لا شاشة فارغة.
+        #     Every seeded order lands at the moment the command runs, so the load
+        #     screen shows one lit cell and 167 empty ones — which looks like a
+        #     broken screen rather than an empty one.
         self._step("الحركة وتوزيع الزمن")
         report["traffic"] = traffic.seed()["counts"]
 
@@ -182,17 +182,19 @@ class Command(BaseCommand):
 
     def _reset(self):
         """
-        ⚠️  حذف **كل** البيانات لا بيانات البذرة وحدها.
+        ⚠️  It deletes **all** data, not the seeded data alone.
 
-            التمييز بينهما يحتاج علامة على كل صف؛ وبيئة التطوير لا
-            تستحق هذا التعقيد. الأمر لا يعمل خارج التطوير أصلًا.
+            Telling them apart would need a marker on every row, and the
+            development environment does not warrant that complexity. The
+            command does not run outside development anyway.
 
-        ⚠️  `hard_delete` لا `delete`.
+        ⚠️  `hard_delete`, not `delete`.
 
-            معظم النطاقات ترث `SoftDeleteModel` حيث `delete()`
-            تكتب `deleted_at` ولا تحذف صفًّا واحدًا. استخدامها هنا
-            يترك القاعدة ممتلئة بينما يقول الأمر إنه أفرغها — ثم
-            تفشل البذرة على قيود التفرّد بأخطاء لا تدل على السبب.
+            Most domains inherit `SoftDeleteModel`, where `delete()` writes
+            `deleted_at` and removes not a single row. Using it here leaves the
+            database full while the command says it emptied it — and then the
+            seed fails on uniqueness constraints with errors that give no hint
+            of the cause.
         """
         from django.apps import apps
         from django.db.models import ProtectedError, RestrictedError
@@ -209,11 +211,11 @@ class Command(BaseCommand):
                 continue
             models.extend(reversed(list(config.get_models())))
 
-        # ⚠️  فكّ الروابط الذاتية أولًا (`Category.parent`).
+        # ⚠️  Break the self-references first (`Category.parent`).
         #
-        #     الشجرة المحمية بـ PROTECT لا تُحذف دفعةً واحدة مهما
-        #     كان الترتيب: كل أب يحميه ابنه. تصفير المفتاح الذاتي
-        #     القابل للتفريغ يحوّلها إلى صفوف مستقلة.
+        #     A tree protected by PROTECT cannot be deleted in one pass whatever
+        #     the order: every parent is protected by its child. Nulling the
+        #     nullable self-key turns them into independent rows.
         for model in models:
             for field in model._meta.get_fields():
                 if (
@@ -224,11 +226,11 @@ class Command(BaseCommand):
                     manager = getattr(model, "all_objects", model.objects)
                     manager.all().update(**{field.name: None})
 
-        # ⚠️  تمريرات متكرّرة بدل ترتيب حذف مكتوب يدويًا.
+        # ⚠️  Repeated passes instead of a hand-written deletion order.
         #
-        #     ترتيب ثابت يكفي اليوم ويتعطّل عند أول مفتاح أجنبي
-        #     جديد — والفشل يظهر كخطأ `ProtectedError` غامض بعد
-        #     شهور. التكرار يحسمه بلا صيانة.
+        #     A fixed order is enough today and breaks at the first new foreign
+        #     key — and the failure shows up as an obscure `ProtectedError` months
+        #     later. Repetition settles it with no upkeep.
         remaining = models
         while remaining:
             blocked = []
@@ -246,7 +248,7 @@ class Command(BaseCommand):
 
             remaining = blocked
 
-    # ── العرض ──────────────────────────────────────────────
+    # ── Output ─────────────────────────────────────────────
 
     def _step(self, label: str):
         self.stdout.write(f"  › {label}…")

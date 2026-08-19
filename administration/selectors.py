@@ -1,8 +1,8 @@
 """
-استعلامات القراءة لشاشات الأدمن.
+Read queries for the admin screens.
 
-⚠️  كل دالة هنا تُرجع خريطة مجمّعة لمجموعة مستخدمين — **لا استعلامًا
-    لكل صف**. جدول بمئة مستخدم لا يجوز أن ينتج ٤٠٠ استعلام.
+⚠️  Every function here returns an aggregated map for a set of users — **not one
+    query per row**. A table of a hundred users must not produce 400 queries.
 """
 
 from __future__ import annotations
@@ -16,12 +16,13 @@ from core.models.audit import AuditLog
 
 def online_user_ids(user_ids=None) -> set:
     """
-    معرّفات المتصلين الآن.
+    The ids of those online now.
 
-    ⚠️  المصدر واحد — `accounts.services`.
+    ⚠️  A single source — `accounts.services`.
 
-        نسخة ثانية من نافذة التواجد هنا كانت ستقرأ القاعدة وحدها،
-        فيظهر جدول الحسابات مَن لا يظهر في «المتصلون الآن» أو العكس.
+        A second copy of the presence window here would have read the database
+        alone, so the accounts table would show people missing from "online now",
+        or the reverse.
     """
     ids = set(account_services.online_user_ids())
     if user_ids is not None:
@@ -30,7 +31,7 @@ def online_user_ids(user_ids=None) -> set:
 
 
 def last_seen_map(user_ids) -> dict:
-    """آخر ظهور لكل مستخدم — استعلام واحد مجمّع."""
+    """Last seen per user — a single aggregated query."""
     rows = (
         UserSession.objects.filter(user_id__in=user_ids)
         .values("user_id")
@@ -41,9 +42,9 @@ def last_seen_map(user_ids) -> dict:
 
 def usage_map(user_ids) -> dict:
     """
-    إجمالي مدة الاستخدام بالثواني.
+    Total time used, in seconds.
 
-    الجلسات المفتوحة لا تدخل — مدتها غير محسوبة حتى تُغلق.
+    Open sessions are excluded — their duration is not counted until they close.
     """
     rows = (
         UserSession.objects.filter(user_id__in=user_ids)
@@ -64,11 +65,11 @@ def session_count_map(user_ids) -> dict:
 
 def last_action_map(user_ids) -> dict:
     """
-    آخر عملية لكل مستخدم — من سجل التدقيق.
+    The last action per user — from the audit log.
 
-    ⚠️  «آخر ظهور» و«آخر عملية» سؤالان مختلفان:
-        الأول من `UserSession`، والثاني من `AuditLog`.
-        من يفتح التطبيق ولا يفعل شيئًا له ظهور بلا عملية.
+    ⚠️  "Last seen" and "last action" are two different questions:
+        the first comes from `UserSession`, the second from `AuditLog`.
+        Someone who opens the app and does nothing has a sighting but no action.
     """
     result = {}
     for entry in (
@@ -83,7 +84,7 @@ def last_action_map(user_ids) -> dict:
 
 
 def _supports_distinct_on() -> bool:
-    """`DISTINCT ON` متاح في PostgreSQL لا SQLite."""
+    """`DISTINCT ON` is available in PostgreSQL, not SQLite."""
     from django.db import connection
 
     return connection.vendor == "postgresql"
@@ -91,8 +92,8 @@ def _supports_distinct_on() -> bool:
 
 def enrich_context(user_ids) -> dict:
     """
-    سياق الـ serializer كاملًا — بعدد ثابت من الاستعلامات
-    مهما كبر عدد الصفوف.
+    The complete serializer context — in a fixed number of queries however many
+    rows there are.
     """
     user_ids = list(user_ids)
     return {

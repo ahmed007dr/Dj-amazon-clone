@@ -1,10 +1,10 @@
 """
-واجهات بوابة الأدمن.
+Admin portal endpoints.
 
-تغطي ما طُلب صراحةً:
-  • إيقاف أو تفعيل أي حساب في النظام
-  • من يستخدم النظام الآن
-  • آخر استخدام · آخر عملية · مدة الاستخدام
+They cover what was explicitly requested:
+  • suspend or reactivate any account in the system
+  • who is using the system right now
+  • last seen · last action · total time used
 """
 
 from django.contrib.auth import get_user_model
@@ -20,20 +20,20 @@ from administration import serializers as s
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditLog
-from core.permissions import IsAdminAccount
+from core.permissions import CanManageAccounts
 
 User = get_user_model()
 
 
 class AccountListAPI(generics.ListAPIView):
     """
-    جدول المستخدمين.
+    The users table.
 
-    ترقيم بالإزاحة عمدًا — الأدمن يحتاج «صفحة ٥ من ٤٢»، وهو
-    مصرَّح له برؤية العدد الكلي أصلًا.
+    Offset pagination on purpose — the admin needs "page 5 of 42", and is
+    authorised to see the total anyway.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAccounts]
     serializer_class = s.AccountListSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -59,7 +59,7 @@ class AccountListAPI(generics.ListAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        # ⚠️  يُثري الصفحة الحالية فقط — لا كل الجدول
+        # ⚠️  Enriches the current page only — not the whole table
         page = getattr(self, "_page_ids", None)
         if page:
             context.update(selectors.enrich_context(page))
@@ -79,7 +79,7 @@ class AccountListAPI(generics.ListAPIView):
 
 
 class AccountDetailAPI(generics.RetrieveAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAccounts]
     serializer_class = s.AccountDetailSerializer
     queryset = User.objects.all()
     lookup_field = "pk"
@@ -92,16 +92,17 @@ class AccountDetailAPI(generics.RetrieveAPIView):
 
 class OnlineNowAPI(APIView):
     """
-    من يستخدم النظام الآن.
+    Who is using the system right now.
 
-    ⚠️  **المسجَّل والمجهول رقمان منفصلان.**
+    ⚠️  **Registered and anonymous are two separate figures.**
 
-        المسجَّل له اسم وسجل ويُفتح ملفه بنقرة؛ والمجهول عدد بلا
-        هوية. جمعهما في رقم واحد يُنتج «١٧ متصلًا» لا يقابله إلا
-        ثلاثة صفوف في الجدول — تناقضٌ ظاهر يفقد الشاشة مصداقيتها.
+        A registered user has a name and a history and their profile opens with
+        a click; an anonymous one is a count with no identity. Merging them into
+        one number produces "17 online" matched by only three rows in the table
+        — a visible contradiction that costs the screen its credibility.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAccounts]
 
     def get(self, request):
         from analytics import services as analytics_services
@@ -123,9 +124,9 @@ class OnlineNowAPI(APIView):
 
 
 class AccountSessionsAPI(generics.ListAPIView):
-    """سجل جلسات مستخدم — الأجهزة وعناوين IP والمدد."""
+    """A user's session history — devices, IP addresses and durations."""
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAccounts]
     serializer_class = s.AdminSessionSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -135,12 +136,12 @@ class AccountSessionsAPI(generics.ListAPIView):
 
 class AccountActivityAPI(generics.ListAPIView):
     """
-    آخر عمليات المستخدم — من سجل التدقيق.
+    A user's most recent actions — from the audit log.
 
-    ⚠️  يجيب «ماذا فعل»، بخلاف الجلسات التي تجيب «متى ظهر».
+    ⚠️  It answers "what did they do", unlike sessions, which answer "when did they appear".
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAccounts]
     serializer_class = s.AuditLogSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -149,7 +150,7 @@ class AccountActivityAPI(generics.ListAPIView):
 
 
 class AccountStatusHistoryAPI(generics.ListAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAccounts]
     serializer_class = s.AccountStatusChangeSerializer
     pagination_class = None
 
@@ -159,13 +160,13 @@ class AccountStatusHistoryAPI(generics.ListAPIView):
 
 class SuspendAccountAPI(APIView):
     """
-    إيقاف حساب — بأثر فوري.
+    Suspend an account — with immediate effect.
 
-    الإيقاف يبطل الجلسات والتوكنات ويُدرِج المستخدم في مجموعة
-    الموقوفين التي تُفحص على كل طلب. (ADR-16)
+    Suspension revokes the sessions and tokens and adds the user to the
+    suspended set that is checked on every request. (ADR-16)
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAccounts]
     serializer_class = s.SuspendAccountSerializer
 
     def post(self, request, pk):
@@ -189,12 +190,12 @@ class SuspendAccountAPI(APIView):
             actor=request.user,
             status=serializer.validated_data["status"],
         )
-        # ⚠️  لا إرسال بريد هنا.
+        # ⚠️  No email is sent here.
         #
-        #     `suspend_account` ينشئ `AccountStatusChange`، ويستمع
-        #     له `notifications` فيرسل الإشعار والبريد معًا.
-        #     الإرسال هنا أيضًا كان يضاعف الرسالة — وقد أمسكه
-        #     الاختبار فور إضافة المستمع.
+        #     `suspend_account` creates an `AccountStatusChange`, and `notifications`
+        #     listens for it and sends both the notification and the email.
+        #     Sending here as well used to duplicate the message — the test caught it
+        #     as soon as the listener was added.
 
         return Response(
             s.AccountDetailSerializer(user, context=selectors.enrich_context([user.pk])).data
@@ -202,7 +203,7 @@ class SuspendAccountAPI(APIView):
 
 
 class ActivateAccountAPI(APIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAccounts]
     serializer_class = s.ActivateAccountSerializer
 
     def post(self, request, pk):
@@ -218,7 +219,7 @@ class ActivateAccountAPI(APIView):
             reason=serializer.validated_data.get("reason", ""),
             actor=request.user,
         )
-        # الإشعار من مستمع `AccountStatusChange` — انظر أعلاه
+        # The notification comes from the `AccountStatusChange` listener — see above
 
         return Response(
             s.AccountDetailSerializer(user, context=selectors.enrich_context([user.pk])).data
@@ -226,9 +227,9 @@ class ActivateAccountAPI(APIView):
 
 
 class AuditLogListAPI(generics.ListAPIView):
-    """سجل التدقيق العام."""
+    """The general audit log."""
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAccounts]
     serializer_class = s.AuditLogSerializer
     pagination_class = AdminPageNumberPagination
 

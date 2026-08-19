@@ -1,8 +1,8 @@
 """
-عقود الكتالوج.
+Catalogue contracts.
 
-⚠️  المحتوى يُرسَل **باللغتين دائمًا** (ADR-34) — لوحة الأدمن تعرض
-    الاثنتين، وإرسال المترجم فقط يجبر على نداء ثانٍ.
+⚠️  Content is sent **in both languages always** (ADR-34) — the admin panel
+    displays both, and sending only the translated one forces a second call.
 """
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -48,23 +48,23 @@ class ProductImageSerializer(serializers.ModelSerializer):
             "display_order",
             "is_primary",
         ]
-        # ⚠️  الترتيب و«الرئيسية» تُحدَّدان من نقاط مخصّصة لا من الرفع.
+        # ⚠️  Ordering and "primary" are set from dedicated endpoints, not on upload.
         #
-        #     السماح بإرسال `is_primary=True` مع الرفع يكسر القيد
-        #     الفريد بدل أن ينقل الرئيسية، ويخرج للأدمن كخطأ ٥٠٠.
+        #     Allowing `is_primary=True` to be sent with the upload breaks the
+        #     unique constraint instead of moving the primary, and reaches the admin as a 500.
         read_only_fields = ["display_order", "is_primary"]
 
     def validate_image(self, value):
         """
-        ⚠️  **الفحص هنا لا في الواجهة.**
+        ⚠️  **The check happens here, not in the frontend.**
 
-            حدّ الحجم في `<input accept>` تلميح للمتصفح لا حاجز؛
-            ورافع بـ curl لا يمرّ بالواجهة أصلًا.
+            A size limit in `<input accept>` is a hint to the browser, not a
+            barrier; and someone uploading with curl never passes through the frontend at all.
         """
-        # ⚠️  `ValidationError` من Django ليست نظيرتها من DRF.
+        # ⚠️  Django's `ValidationError` is not DRF's equivalent.
         #
-        #     تركها تصعد يجعل الرفض يخرج ٥٠٠ بدل ٤٠٠ برسالة —
-        #     فيبدو الملف المرفوض عطلًا في الخادم.
+        #     Letting it propagate makes the rejection come out as a 500 instead of a
+        #     400 with a message — so a rejected file looks like a server fault.
         try:
             validate_upload(
                 value,
@@ -93,10 +93,10 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
 class RatingSerializer(serializers.Serializer):
     """
-    التقييم المُجمَّع.
+    The aggregated rating.
 
-    ⚠️  يأتي من `select_related('rating')` — لا من حساب لحظي.
-        الحساب اللحظي هو ما أنتج N+1 في النموذج القديم.
+    ⚠️  It comes from `select_related('rating')` — not from an on-the-fly
+        computation. On-the-fly computation is what produced N+1 in the legacy model.
     """
 
     average = serializers.DecimalField(max_digits=3, decimal_places=2, read_only=True)
@@ -106,13 +106,13 @@ class RatingSerializer(serializers.Serializer):
 
 class ProductListSerializer(serializers.ModelSerializer):
     """
-    بطاقة المنتج في القوائم.
+    The product card in lists.
 
-    ⚠️  **بلا سعر نهائي وبلا كمية.**
+    ⚠️  **No final price and no quantity.**
 
-        السعر يحسبه `pricing` حسب العميل، والتوفر يجيب عنه
-        `inventory`. إضافتهما هنا تعني أن الكتالوج يجيب على
-        سؤالين لا يملكهما.
+        `pricing` computes the price per customer, and `inventory` answers
+        availability. Adding them here means the catalogue answering two
+        questions it does not own.
     """
 
     category = CategoryBriefSerializer(read_only=True)
@@ -142,7 +142,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         ]
 
     def get_primary_image(self, obj):
-        """يقرأ من `to_attr` الذي هيّأه الـ prefetch — بلا استعلام."""
+        """Reads from the `to_attr` the prefetch prepared — no query."""
         images = getattr(obj, "primary_images", None)
         if images:
             return ProductImageSerializer(images[0], context=self.context).data
@@ -170,7 +170,7 @@ class ProductDetailSerializer(ProductListSerializer):
             "images",
             "variants",
             "barcode",
-            # الحقول الدوائية
+            # Pharmaceutical fields
             "active_ingredient_ar",
             "active_ingredient_en",
             "strength",
@@ -218,9 +218,8 @@ class CategorySerializer(serializers.ModelSerializer):
 
     def get_children(self, obj):
         """
-        يقرأ الأبناء من الشجرة المبنية في الذاكرة — لا من قاعدة
-        البيانات. التكرار على `obj.children.all()` هنا يعني استعلامًا
-        لكل عقدة.
+        Reads the children from the tree built in memory — not from the
+        database. Iterating `obj.children.all()` here means one query per node.
         """
         node = self.context.get("tree_node")
         if node is None:
@@ -265,16 +264,16 @@ class ManufacturerSerializer(serializers.ModelSerializer):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن
+#  Admin
 # ═══════════════════════════════════════════════════════════
 
 
 class AdminProductSerializer(serializers.ModelSerializer):
     """
-    نسخة الأدمن — كل الحقول قابلة للكتابة.
+    The admin version — every field is writable.
 
-    ⚠️  `slug` للقراءة فقط: تغييره يكسر الروابط الخارجية وفهرسة
-        محركات البحث. (ADR-27)
+    ⚠️  `slug` is read-only: changing it breaks external links and search engine
+        indexing. (ADR-27)
     """
 
     class Meta:
@@ -284,11 +283,11 @@ class AdminProductSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        ⚠️  اتساق الحقول التنظيمية.
+        ⚠️  Consistency of the regulatory fields.
 
-        منتج مُعلَّم `requires_prescription` وتصنيفه `OTC` تناقض
-        صامت — أحد الحقلين خاطئ، والخطأ يظهر عند أول مراجعة
-        تنظيمية لا قبلها.
+        A product marked `requires_prescription` while classified `OTC` is a
+        silent contradiction — one of the two fields is wrong, and the error
+        surfaces at the first regulatory review, not before.
         """
         from catalog.models import ProductKind, RegulatoryClass
 
@@ -316,22 +315,22 @@ class AdminProductSerializer(serializers.ModelSerializer):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن — التصنيف المرجعي
+#  Admin — reference classification
 # ═══════════════════════════════════════════════════════════
 #
-#  ⚠️  هذه الثلاثة كانت تُدار من لوحة Django وحدها. وهي **شرط**
-#      لإضافة أي منتج: الفئة إلزامية على `Product`، فمتجر بلا
-#      شاشة فئات لا يستطيع إضافة صنفه الأول من لوحته.
+#  ⚠️  These three used to be managed from the Django panel alone. And they are
+#      **a precondition** for adding any product: the category is mandatory on
+#      `Product`, so a store with no categories screen cannot add its first item from its panel.
 
 
 class AdminCategorySerializer(serializers.ModelSerializer):
     """
-    ⚠️  `path` و`depth` و`slug` **محسوبة لا مُدخَلة**.
+    ⚠️  `path`, `depth` and `slug` are **computed, not supplied**.
 
-        المسار يُبنى من الأب وسلسلة الأسماء، ويُعاد بناؤه لكل
-        الأحفاد عند النقل. قبوله من العميل يعني شجرةً يكتبها من
-        لا يعرف قواعدها — وأول مسار خاطئ يُخفي فرعًا كاملًا من كل
-        استعلام شجري.
+        The path is built from the parent and the chain of names, and rebuilt
+        for every descendant on a move. Accepting it from the client means a
+        tree written by someone who does not know its rules — and the first
+        wrong path hides an entire branch from every tree query.
     """
 
     product_count = serializers.SerializerMethodField()
@@ -363,7 +362,7 @@ class AdminCategorySerializer(serializers.ModelSerializer):
         return obj.products.count()
 
     def get_path_label(self, obj) -> str:
-        """«أدوية ← مسكّنات» — لعرضها في قائمة اختيار مسطّحة."""
+        """"Medicines ← Painkillers" — for display in a flat select list."""
         parts, node, guard = [], obj, 0
         while node is not None and guard < 8:
             parts.append(node.name_ar)
@@ -373,10 +372,10 @@ class AdminCategorySerializer(serializers.ModelSerializer):
 
     def validate_parent(self, value):
         """
-        ⚠️  فئة لا تكون أبًا لنفسها ولا لأحد أجدادها.
+        ⚠️  A category is not a parent of itself, nor of any of its ancestors.
 
-            الدورة تجعل `_rebuild_path` تستدعي نفسها بلا نهاية،
-            فيعلّق الطلب إلى الأبد بلا أثر في أي سجل.
+            A cycle makes `_rebuild_path` call itself endlessly, hanging the
+            request forever with no trace in any log.
         """
         instance = self.instance
         if value is None or instance is None:

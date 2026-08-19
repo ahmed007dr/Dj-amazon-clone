@@ -1,7 +1,7 @@
 """
-معالج الأخطاء الموحّد.
+Unified error handler.
 
-يضمن أن **كل** استجابة خطأ تتبع نفس الشكل:
+Guarantees that **every** error response follows the same shape:
 
     { "code": ..., "message": ..., "detail": ..., "fields": ... }
 """
@@ -19,7 +19,7 @@ from core.errors import ERROR_MESSAGES, BusinessError, ErrorCode
 logger = logging.getLogger(__name__)
 
 
-#: استثناءات DRF ← أكواد الكتالوج
+#: DRF exceptions ← catalogue codes
 _DRF_CODE_MAP = {
     "not_authenticated": ErrorCode.AUTHENTICATION_REQUIRED,
     "authentication_failed": ErrorCode.INVALID_CREDENTIALS,
@@ -42,7 +42,7 @@ def _build(code: str, detail=None, fields=None) -> dict:
 
 
 def _normalise_fields(data) -> dict | None:
-    """أخطاء التحقق من DRF ← `{field: [{code, message}]}`."""
+    """DRF validation errors ← `{field: [{code, message}]}`."""
     if not isinstance(data, dict):
         return None
 
@@ -63,7 +63,7 @@ def _normalise_fields(data) -> dict | None:
 
 
 def custom_exception_handler(exc, context):
-    # أخطاء قواعد العمل — الشكل جاهز
+    # Business rule errors — the shape is already right
     if isinstance(exc, BusinessError):
         return Response(exc.to_dict(), status=exc.status_code)
 
@@ -76,7 +76,7 @@ def custom_exception_handler(exc, context):
     response = drf_exception_handler(exc, context)
 
     if response is None:
-        # خطأ غير متوقع — يُسجَّل ولا تُكشف تفاصيله للعميل
+        # Unexpected error — logged, with no details exposed to the client
         logger.exception("خطأ غير معالَج", exc_info=exc)
         return Response(
             _build(ErrorCode.INTERNAL_ERROR),

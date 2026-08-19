@@ -17,7 +17,7 @@ from rest_framework import generics
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
-from core.permissions import IsAdminAccount
+from core.permissions import CanManagePricing
 from pricing import serializers as s
 from pricing.models import PriceList, PriceOverride, PriceRule
 
@@ -25,7 +25,7 @@ from pricing.models import PriceList, PriceOverride, PriceRule
 class _PricingAdmin:
     """صلاحية الأدمن وتسجيل التدقيق — مشتركة بين كل نقاط النطاق."""
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePricing]
 
     label = ""
 

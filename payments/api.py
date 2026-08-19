@@ -19,7 +19,7 @@ from rest_framework.views import APIView
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
-from core.permissions import IsAdminAccount
+from core.permissions import CanManagePayments
 from payments import serializers as s
 from payments import services
 from payments.adapters import available_adapters
@@ -120,7 +120,7 @@ class AdapterListAPI(APIView):
         يضبطها الأدمن بلا مطوّر.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePayments]
 
     def get(self, request):
         return Response(
@@ -135,7 +135,7 @@ class AdapterListAPI(APIView):
 
 
 class ProviderListCreateAPI(generics.ListCreateAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePayments]
     serializer_class = s.PaymentProviderSerializer
     pagination_class = None
 
@@ -156,7 +156,7 @@ class ProviderListCreateAPI(generics.ListCreateAPIView):
 
 
 class ProviderDetailAPI(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePayments]
     serializer_class = s.PaymentProviderSerializer
     queryset = PaymentProvider.objects.prefetch_related("credentials")
 
@@ -202,7 +202,7 @@ class ToggleProviderAPI(APIView):
         يعني متجرًا لا يستقبل طلبات، والاكتشاف يكون بشكوى عميل.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePayments]
     serializer_class = s.ToggleProviderSerializer
 
     @transaction.atomic
@@ -249,7 +249,7 @@ class ReorderProvidersAPI(APIView):
     الأعلى يُجرَّب أولًا حين تصلح أكثر من بوابة لنفس العملية.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePayments]
     serializer_class = s.ReorderProvidersSerializer
 
     @transaction.atomic
@@ -284,7 +284,7 @@ class ProviderCredentialsAPI(generics.ListCreateAPIView):
         البوابة كله.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePayments]
     serializer_class = s.ProviderCredentialSerializer
     pagination_class = None
 
@@ -308,7 +308,7 @@ class ProviderCredentialsAPI(generics.ListCreateAPIView):
 
 
 class ProviderCredentialDetailAPI(generics.DestroyAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePayments]
     lookup_url_kwarg = "credential_pk"
 
     def get_queryset(self):
@@ -400,7 +400,7 @@ class ProviderWebhookAPI(APIView):
 
 
 class TransactionListAPI(generics.ListAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePayments]
     serializer_class = s.PaymentTransactionSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -419,7 +419,7 @@ class TransactionListAPI(generics.ListAPIView):
 
 
 class TransactionDetailAPI(generics.RetrieveAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePayments]
     serializer_class = s.PaymentTransactionSerializer
     queryset = PaymentTransaction.objects.select_related("provider")
 
@@ -434,7 +434,7 @@ class CaptureTransactionAPI(APIView):
         مالي — وهو ما يجعل المرحلة ٨ تبني على رقم خاطئ.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePayments]
 
     def post(self, request, pk):
         payment = PaymentTransaction.objects.filter(pk=pk).first()
@@ -446,7 +446,7 @@ class CaptureTransactionAPI(APIView):
 
 
 class RefundAPI(APIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManagePayments]
     serializer_class = s.CreateRefundSerializer
 
     def post(self, request, pk):

@@ -1,9 +1,10 @@
 """
-لوحة الهوية.
+Identity admin panel.
 
-⚠️  لا نضيف هنا `inline` لملفات الشخصيات (عميل · مدير · طالب).
-    `accounts` تحت `customers` و`administration` و`academic` في مخطط
-    الطبقات — واستيرادها من هنا يقلب الاتجاه ويوقفه import-linter.
+⚠️  We do not add persona-profile `inline`s here (customer · admin · student).
+    `accounts` sits below `customers`, `administration` and `academic` in the
+    layer diagram — importing them from here inverts the direction and
+    import-linter stops it.
 """
 
 from django.contrib import admin
@@ -16,7 +17,7 @@ from core.admin import LogAdmin
 
 
 class UserCreateForm(UserCreationForm):
-    """البريد هو المعرّف — لا حقل `username` أصلًا."""
+    """Email is the identifier — there is no `username` field at all."""
 
     class Meta(UserCreationForm.Meta):
         model = User
@@ -134,10 +135,11 @@ class UserSessionAdmin(LogAdmin):
 @admin.register(SecurityToken)
 class SecurityTokenAdmin(LogAdmin):
     """
-    ⚠️  `token_hash` غير معروض ولا مبحوث فيه.
+    ⚠️  `token_hash` is neither displayed nor searchable.
 
-        البصمة تكفي لانتحال إعادة تعيين كلمة مرور لو تسرّبت لقطة شاشة —
-        ولا حاجة تشغيلية لرؤيتها. المطلوب تشخيصيًا هو الصلاحية والاستهلاك.
+        The hash is enough to hijack a password reset were a screenshot to leak —
+        and there is no operational need to see it. What matters diagnostically
+        is the expiry and whether it was consumed.
     """
 
     fields = ("user", "purpose", "expires_at", "used_at", "requested_ip", "new_email", "created_at")

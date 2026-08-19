@@ -1,10 +1,10 @@
 """
-باكند المصادقة — بالبريد أو الهاتف.
+Authentication backend — by email or phone.
 
-يصلح ثلاث مشكلات في الأصل:
-  1. لم يفحص `is_active` ⟵ الموقوفون كانوا يدخلون
-  2. `get(email=...)` على حقل غير فريد ⟵ MultipleObjectsReturned
-  3. لم يقاوم هجمات التوقيت ⟵ يكشف البريد المسجل من غيره
+It fixes three problems in the original:
+  1. it never checked `is_active` ⟵ suspended users could log in
+  2. `get(email=...)` on a non-unique field ⟵ MultipleObjectsReturned
+  3. it did not resist timing attacks ⟵ revealing which emails are registered
 """
 
 from django.contrib.auth import get_user_model
@@ -23,8 +23,8 @@ class EmailOrPhoneBackend(ModelBackend):
         try:
             user = UserModel.objects.get(Q(email__iexact=identifier) | Q(phone=identifier))
         except UserModel.DoesNotExist:
-            # تجزئة وهمية بنفس التكلفة — تمنع تمييز البريد المسجل
-            # عن غيره بقياس زمن الاستجابة
+            # A dummy hash of the same cost — stops a registered email being told
+            # apart from an unregistered one by measuring response time
             UserModel().set_password(password)
             return None
         except UserModel.MultipleObjectsReturned:
@@ -33,7 +33,7 @@ class EmailOrPhoneBackend(ModelBackend):
         if not user.check_password(password):
             return None
 
-        # يفحص is_active — ويُوسَّع أدناه ليشمل حالة الحساب
+        # Checks is_active — and is extended below to cover the account status
         if not self.user_can_authenticate(user):
             return None
 
@@ -41,12 +41,12 @@ class EmailOrPhoneBackend(ModelBackend):
 
     def user_can_authenticate(self, user):
         """
-        يوسّع فحص Django ليشمل `AccountStatus`.
+        Extends Django's check to cover `AccountStatus`.
 
-        الحساب الموقوف أو المحظور لا يدخل حتى لو كان `is_active=True`.
+        A suspended or banned account cannot log in even with `is_active=True`.
         """
         return getattr(user, "can_authenticate", False)
 
 
-#: الاسم القديم — للتوافق حتى تحديث الإعدادات
+#: The legacy name — kept for compatibility until the settings are updated
 EmailOrUsernameLogin = EmailOrPhoneBackend

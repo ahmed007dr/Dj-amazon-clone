@@ -1,7 +1,8 @@
 """
-اختبارات الأساس.
+Foundation tests.
 
-تثبّت أن القرارات المعمارية مطبَّقة فعلًا في الكود، لا في الوثائق فقط.
+They establish that the architectural decisions are genuinely applied in the
+code, not only in the documentation.
 """
 
 from decimal import Decimal
@@ -22,17 +23,17 @@ from core.identifiers import (
 from core.money import ZERO, apply_rate, percentage_of, quantize, to_string
 
 # ═══════════════════════════════════════════════════════════
-#  المال —  ADR-31
+#  Money —  ADR-31
 # ═══════════════════════════════════════════════════════════
 
 
 class TestMoney:
     def test_no_float_fields_anywhere(self):
         """
-        ⛔ الخطأ الأخطر في النموذج القديم: FloatField للمال في ٩ مواضع.
+        ⛔ The most serious defect in the legacy model: FloatField for money in 9 places.
 
-        مع عمولات ومرتجعات وضرائب، فروق الفاصلة العائمة تتراكم
-        حتى تكسر أي مطابقة محاسبية.
+        With commissions, returns and taxes, floating-point discrepancies
+        accumulate until they break any accounting reconciliation.
         """
         offenders = []
         for model in apps.get_models():
@@ -45,7 +46,7 @@ class TestMoney:
         assert not offenders, f"FloatField ممنوع — وُجد في: {offenders}"
 
     def test_rounding_is_half_up_not_half_even(self):
-        """ROUND_HALF_UP هو السلوك التجاري المتوقع، لا افتراضي بايثون."""
+        """ROUND_HALF_UP is the expected commercial behaviour, not Python's default."""
         assert quantize(Decimal("0.125")) == Decimal("0.13")
         assert quantize(Decimal("0.135")) == Decimal("0.14")
 
@@ -58,70 +59,71 @@ class TestMoney:
         assert percentage_of(Decimal("50"), Decimal("200")) == Decimal("25.00")
 
     def test_money_serialises_as_string(self):
-        """JSON.parse يحوّل الأرقام إلى double فتُفقد الدقة."""
+        """JSON.parse converts numbers to double, so precision is lost."""
         assert to_string(Decimal("450.00")) == "450.00"
         assert to_string(Decimal("450")) == "450.00"
         assert isinstance(to_string(Decimal("0.1")), str)
 
 
 # ═══════════════════════════════════════════════════════════
-#  المعرّفات —  ADR-25 · ADR-26 · ADR-29
+#  Identifiers —  ADR-25 · ADR-26 · ADR-29
 # ═══════════════════════════════════════════════════════════
 
-#: نماذج داخلية عالية الحجم — لا تظهر في رابط أبدًا فتبقى BigInt (ADR-28)
+#: High-volume internal models — they never appear in a URL, so they stay BigInt (ADR-28)
 INTERNAL_BIGINT_MODELS = {
     ("core", "AuditLog"),
-    # حركة الاستخدام: صف لكل ساعة ونوع جهاز · أعداد بلا هوية ·
-    # لا يظهر معرّفه في أي رابط ولا استجابة — القراءة بالفترة وحدها
+    # Usage traffic: a row per hour and device type · counts with no identity ·
+    # its id appears in no URL and no response — it is read by period alone
     ("analytics", "TrafficBucket"),
     ("accounts", "UserSession"),
     ("accounts", "AccountStatusChange"),
     ("accounts", "SecurityToken"),
-    # تجميع مُخزَّن يُقرأ عبر select_related — لا يظهر في رابط
+    # A stored aggregate read through select_related — it appears in no URL
     ("reviews", "ProductRating"),
-    # جدول وصل — لا يُعرَّف خارجيًا
+    # A join table — never referenced externally
     ("reviews", "ReviewHelpfulVote"),
-    # أرصدة المخزون: تُقرأ بالمنتج والموقع لا بمعرّفها
+    # Stock balances: read by product and location, not by their id
     ("inventory", "Stock"),
-    # سجل الحركات: أضخم جدول في النظام ولا يظهر في رابط
+    # The movement log: the largest table in the system, and it appears in no URL
     ("inventory", "StockMovement"),
-    # سطر جرد — تابع لجلسة الجرد
+    # A stock-count line — a child of the count session
     ("inventory", "StockCountLine"),
-    # سجلات أحداث: إضافة فقط · تُقرأ بمرجع أبيها لا بمعرّفها
+    # Event logs: append-only · read by their parent's reference, not by their id
     ("shipping", "ShipmentEvent"),
     ("orders", "OrderStatusHistory"),
     ("payments", "WebhookEvent"),
     ("notifications", "NotificationLog"),
-    # حركات الصندوق: إضافة فقط · صف لكل بيعة · تُقرأ بالوردية.
+    # Cash drawer movements: append-only · a row per sale · read by shift.
     #
-    # ⚠️  معرّفها يظهر في استجابة `/pos/session/cash/` — كما يظهر
-    #     معرّف `OrderStatusHistory` في تفاصيل الطلب. المقبول هنا
-    #     أن المعرّف **لا يُبحَث به**: لا مسار يأخذه، ولا نقطة
-    #     تقبله. وقارئ الاستجابة كاشير على وردية خاصته لا غريب.
+    # ⚠️  Its id does appear in the `/pos/session/cash/` response — as does
+    #     `OrderStatusHistory`'s id in the order detail. What makes it acceptable
+    #     here is that the id **is never looked up**: no path takes it, and no
+    #     endpoint accepts it. And the reader is a cashier on their own shift, not a stranger.
     ("pos", "CashMovement"),
 }
 
-#: نماذج بمفتاح طبيعي — المفتاح نفسه هو المعنى، لا رقم تسلسلي.
-#: `tax.enabled` معرّف مقصود ومقروء، ولا يكشف حجم نشاط.
+#: Models with a natural key — the key itself is the meaning, not a sequential number.
+#: `tax.enabled` is a deliberate, readable identifier that discloses no business size.
 NATURAL_KEY_MODELS = {
     ("core", "SystemSetting"),
-    # ⚠️  الفترة المالية مفتاحها `(year, month)` — «٢٠٢٦-٠٣» يُقرأ
-    #     ويُستعلَم به. ولا مسار يأخذ معرّفها: الإقفال يُرسِل
-    #     السنة والشهر في الجسم، والقائمة بلا تفاصيل مفردة.
+    # ⚠️  The fiscal period's key is `(year, month)` — "2026-03" is read and
+    #     queried directly. And no path takes its id: closing sends the year
+    #     and month in the body, and the list has no per-item detail.
     ("finance", "FiscalPeriod"),
 }
 
 
 class TestIdentifiers:
     """
-    فحوص معمارية عبر سجل التطبيقات — بمراجع نصية لا استيراد.
+    Architectural checks through the app registry — using string references, not imports.
 
-    استيراد نطاق عمل هنا يكسر حدود `core`، وقد التقطه import-linter
-    فعلًا عند أول محاولة. `apps.get_model` بحث نصي فلا ينشئ تبعية.
+    Importing a business domain here would break `core`'s boundaries, and
+    import-linter caught it on the first attempt. `apps.get_model` is a string
+    lookup, so it creates no dependency.
     """
 
     def test_exposed_models_use_uuid_pk(self):
-        """كل نموذج يظهر في رابط أو استجابة يحمل UUIDv7. (ADR-25)"""
+        """Every model appearing in a URL or a response carries a UUIDv7. (ADR-25)"""
         offenders = []
         for model in apps.get_models():
             label = model._meta.app_label
@@ -136,7 +138,7 @@ class TestIdentifiers:
         assert not offenders, f"نماذج مكشوفة بلا UUID: {offenders}"
 
     def test_internal_high_volume_tables_stay_bigint(self):
-        """UUID على جدول لا يظهر في رابط تكلفة بلا مقابل."""
+        """A UUID on a table that appears in no URL is cost with no return."""
         for app_label, model_name in INTERNAL_BIGINT_MODELS:
             model = apps.get_model(app_label, model_name)
             assert isinstance(
@@ -145,8 +147,8 @@ class TestIdentifiers:
 
     def test_uuid7_is_time_ordered(self):
         """
-        v7 مرتّب زمنيًا فيحافظ على موضعية فهرس B-tree،
-        بخلاف v4 العشوائي بالكامل. (ADR-26)
+        v7 is time-ordered and so preserves B-tree index locality,
+        unlike the entirely random v4. (ADR-26)
         """
         from core.models.base import uuid7
 
@@ -164,12 +166,12 @@ class TestIdentifiers:
         assert len(code) == 6
 
     def test_crockford_alphabet_excludes_ambiguous_letters(self):
-        """I L O U تُربك النطق والكتابة اليدوية."""
+        """I L O U confuse pronunciation and handwriting."""
         for ch in "ILOU":
             assert ch not in CROCKFORD_ALPHABET
 
     def test_random_filename_is_not_enumerable(self):
-        """المسارات الحالية media/brand/01.jpg قابلة للتعداد."""
+        """The current media/brand/01.jpg paths are enumerable."""
         name = random_filename("photo.JPG")
         assert name.endswith(".jpg")
         assert name.count("/") == 2
@@ -177,15 +179,15 @@ class TestIdentifiers:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الرموز الأمنية
+#  Security tokens
 # ═══════════════════════════════════════════════════════════
 
 
 class TestSecurityTokens:
     def test_generator_is_cryptographically_secure(self):
         """
-        ⛔ الأصل كان يستخدم `random` (Mersenne Twister) لتوليد
-           كود تفعيل الحساب — قابل للتنبؤ.
+        ⛔ The original used `random` (Mersenne Twister) to generate the
+           account activation code — predictable.
         """
         import inspect
 
@@ -201,14 +203,14 @@ class TestSecurityTokens:
 
         assert verify_token(token, digest)
         assert not verify_token("wrong-token", digest)
-        assert token not in digest  # الرمز الصريح لا يظهر في البصمة
+        assert token not in digest  # The plaintext token does not appear in the hash
 
     def test_codes_are_unique(self):
         assert len({random_code(8) for _ in range(500)}) == 500
 
 
 # ═══════════════════════════════════════════════════════════
-#  سجل التدقيق
+#  The audit log
 # ═══════════════════════════════════════════════════════════
 
 
@@ -225,14 +227,14 @@ class TestAuditLog:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الضريبة —  ADR-30
+#  Tax —  ADR-30
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 class TestTax:
     def test_tax_class_tracks_validity_period(self):
-        """النِّسب تتغيّر بقرار حكومي — التاريخي يجب أن يبقى سليمًا."""
+        """Rates change by government decree — the historical record must stay intact."""
         from datetime import date, timedelta
 
         from core.models import TaxClass
@@ -246,8 +248,8 @@ class TestTax:
         )
         assert tax.is_currently_valid
 
-        # ⚠️  ينتهي بالأمس **ويبدأ قبله** — وإلا صار valid_from
-        #     اليوم وvalid_to الأمس، وهو مدى مقلوب لا معنى له.
+        # ⚠️  It ends yesterday **and starts before that** — otherwise valid_from
+        #     is today and valid_to yesterday, a meaningless inverted range.
         tax.valid_from = date.today() - timedelta(days=10)
         tax.valid_to = date.today() - timedelta(days=1)
         tax.save()
@@ -276,14 +278,14 @@ class TestTax:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحذف الناعم
+#  Soft deletion
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 class TestSoftDelete:
     def test_soft_delete_hides_but_keeps(self):
-        """لا يُحذف منتج بِيع فعلًا — الطلبات التاريخية تشير إليه."""
+        """A product that has actually been sold is never deleted — historical orders point at it."""
         from core.models import TaxClass
 
         tax = TaxClass.objects.create(

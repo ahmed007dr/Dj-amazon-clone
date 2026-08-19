@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 from cart import services as cart_services
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
-from core.permissions import IsAdminAccount
+from core.permissions import CanManageOrders
 from customers import services as customer_services
 from orders import serializers as s
 from orders import services
@@ -148,7 +148,7 @@ class CancelOrderAPI(APIView):
 
 
 class AdminOrderListAPI(generics.ListAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageOrders]
     serializer_class = s.AdminOrderSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -175,7 +175,7 @@ class AdminOrderListAPI(generics.ListAPIView):
 
 
 class AdminOrderDetailAPI(generics.RetrieveAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageOrders]
     serializer_class = s.AdminOrderSerializer
     queryset = Order.objects.select_related(
         "customer", "customer__user", "location"
@@ -190,7 +190,7 @@ class AdminTransitionAPI(APIView):
         لا تُكرَّر القواعد هنا.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageOrders]
     serializer_class = s.TransitionOrderSerializer
 
     def post(self, request, pk):
@@ -211,7 +211,7 @@ class AdminTransitionAPI(APIView):
 
 
 class AdminCompleteOrderAPI(APIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageOrders]
 
     def post(self, request, pk):
         order = Order.objects.filter(pk=pk).first()

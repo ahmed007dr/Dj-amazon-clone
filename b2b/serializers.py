@@ -1,4 +1,4 @@
-"""عقود B2B — المبالغ نصًا (ADR-31)."""
+"""B2B contracts — amounts as strings (ADR-31)."""
 
 from decimal import Decimal
 
@@ -18,10 +18,11 @@ class MoneySerializerField(serializers.DecimalField):
 
 class BusinessProfileSerializer(serializers.ModelSerializer):
     """
-    ⚠️  حقول الائتمان **للقراءة فقط هنا**.
+    ⚠️  The credit fields are **read-only here**.
 
-        قبولها في تحديث الملف يعني أن العميل يرفع حدّه بنفسه
-        بطلب واحد. المنح يمرّ بنقطة أدمن مخصّصة تُسجّل من منح ومتى.
+        Accepting them on a profile update means the customer raises their own
+        limit with a single request. Granting goes through a dedicated admin
+        endpoint that records who granted it and when.
     """
 
     credit_limit = MoneySerializerField(read_only=True)
@@ -52,7 +53,7 @@ class BusinessProfileSerializer(serializers.ModelSerializer):
 
 
 class AccountSummarySerializer(serializers.Serializer):
-    """لوحة الحساب — ما يراه العميل التجاري أول ما يدخل."""
+    """The account dashboard — what a business customer sees the moment they log in."""
 
     legal_name = serializers.CharField()
     credit_status = serializers.CharField()
@@ -117,7 +118,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
 
 # ═══════════════════════════════════════════════════════════
-#  مدخلات الأدمن
+#  Admin inputs
 # ═══════════════════════════════════════════════════════════
 
 
@@ -128,33 +129,33 @@ class GrantCreditSerializer(serializers.Serializer):
 
 
 class SuspendCreditSerializer(serializers.Serializer):
-    #: ⚠️  السبب إلزامي: عميل يُمنَع بلا سبب مكتوب يتصل بالدعم
-    #:     الذي لا يعرف بدوره لماذا مُنع.
+    #: ⚠️  The reason is mandatory: a customer blocked with no written reason calls
+    #:     support, who in turn do not know why they were blocked.
     reason = serializers.CharField(min_length=3, max_length=1000)
 
 
 class RecordPaymentSerializer(serializers.Serializer):
-    # ⚠️  `Decimal` لا `float` في `min_value`.
+    # ⚠️  `Decimal`, not `float`, in `min_value`.
     #
-    #     `0.01` العائم يُقارَن بقيمة عشرية فيحذّر DRF، والمقارنة
-    #     نفسها تمرّ عبر تحويل يفقد الدقة — في حقل مالي.
+    #     A floating `0.01` compared against a decimal makes DRF warn, and the
+    #     comparison itself passes through a conversion that loses precision — in a money field.
     amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
     reference = serializers.CharField(required=False, allow_blank=True, max_length=64)
     note = serializers.CharField(required=False, allow_blank=True, max_length=1000)
 
 
 class CreditCheckSerializer(serializers.Serializer):
-    """فحص مسبق قبل الإتمام — ليعرف العميل قبل أن يبني سلة."""
+    """A pre-check before checkout — so the customer knows before building a cart."""
 
     amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0"))
 
 
 class CreditCheckoutSerializer(serializers.Serializer):
     """
-    ⚠️  **بلا `payment_method`** — النقطة نفسها هي الطريقة.
+    ⚠️  **No `payment_method`** — the endpoint itself is the method.
 
-        قبول حقل طريقة دفع هنا يفتح بابًا لإرسال «بطاقة» إلى مسار
-        الآجل، فيُقيَّد على الحساب ما دُفع نقدًا.
+        Accepting a payment-method field here opens a door to sending "card"
+        down the credit path, charging to the account what was paid in cash.
     """
 
     address_id = serializers.UUIDField(required=False, allow_null=True)

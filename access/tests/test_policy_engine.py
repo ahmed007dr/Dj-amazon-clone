@@ -1,11 +1,11 @@
 """
-اختبارات محرك سياسات الوصول.
+Access policy engine tests.
 
-⚠️  **مصفوفة الأمان الكاملة**: كل نوع حساب × كل سياسة.
+⚠️  **The full security matrix**: every account type × every policy.
 
-    هذه ليست تغطية شكلية — كل خانة في المصفوفة قرار أمني.
-    خانة واحدة خاطئة تعني منتجًا مقيّدًا يظهر لمن لا يحق له،
-    أو منتجًا عامًا يختفي عن عميل حقيقي.
+    This is not coverage for its own sake — every cell in the matrix is a
+    security decision. One wrong cell means a restricted product visible to
+    someone not entitled to it, or a public product invisible to a real customer.
 """
 
 import pytest
@@ -34,7 +34,7 @@ def make_user(email: str, account_type: str, *, verified: bool = False) -> User:
 
 @pytest.fixture
 def policies(db):
-    """السياسات القياسية."""
+    """The standard policies."""
     from django.core.management import call_command
 
     call_command("seed_access_policies", verbosity=0)
@@ -51,39 +51,39 @@ class Anonymous:
 
 
 # ═══════════════════════════════════════════════════════════
-#  مصفوفة الأمان
+#  The security matrix
 # ═══════════════════════════════════════════════════════════
 
-#: (رمز السياسة, نوع الحساب, موثّق؟, مسموح؟)
+#: (policy code, account type, verified?, allowed?)
 MATRIX = [
-    # ── عام: الجميع ────────────────────────────────────────
-    ("public", None, False, True),  # زائر
+    # ── Public: everyone ───────────────────────────────────
+    ("public", None, False, True),  # guest
     ("public", AccountType.STUDENT, False, True),
     ("public", AccountType.PHARMACY, True, True),
-    # ── يتطلب تسجيل: أي مسجّل، لا الزائر ──────────────────
+    # ── Requires registration: any registered user, not a guest ──
     ("registered", None, False, False),
     ("registered", AccountType.STUDENT, False, True),
     ("registered", AccountType.DOCTOR, False, True),
     ("registered", AccountType.PHARMACY, False, True),
-    # ── طلاب فقط ──────────────────────────────────────────
+    # ── Students only ──────────────────────────────────────
     ("students", None, False, False),
     ("students", AccountType.STUDENT, False, True),
     ("students", AccountType.DOCTOR, True, False),
     ("students", AccountType.PHARMACY, True, False),
-    # ── مهنيون موثّقون: النوع **و** التوثيق معًا ──────────
+    # ── Verified professionals: the type **and** the verification together ──
     ("professionals", None, False, False),
-    ("professionals", AccountType.STUDENT, True, False),  # موثّق لكن نوعه خطأ
-    ("professionals", AccountType.DOCTOR, False, False),  # نوعه صحيح لكن غير موثّق
+    ("professionals", AccountType.STUDENT, True, False),  # verified but the wrong type
+    ("professionals", AccountType.DOCTOR, False, False),  # the right type but unverified
     ("professionals", AccountType.DOCTOR, True, True),
     ("professionals", AccountType.PHARMACIST, True, True),
     ("professionals", AccountType.PHARMACY, True, True),
     ("professionals", AccountType.WAREHOUSE, True, False),
-    # ── صيدليات فقط ───────────────────────────────────────
+    # ── Pharmacies only ────────────────────────────────────
     ("pharmacy_only", AccountType.PHARMACY, True, True),
     ("pharmacy_only", AccountType.PHARMACY, False, False),
     ("pharmacy_only", AccountType.DOCTOR, True, False),
     ("pharmacy_only", AccountType.STUDENT, False, False),
-    # ── جملة ──────────────────────────────────────────────
+    # ── Wholesale ──────────────────────────────────────────
     ("wholesale", AccountType.WAREHOUSE, True, True),
     ("wholesale", AccountType.TRADER, True, True),
     ("wholesale", AccountType.SUPPLIER, True, True),
@@ -91,7 +91,7 @@ MATRIX = [
     ("wholesale", AccountType.TRADER, False, False),
     ("wholesale", AccountType.STUDENT, False, False),
     ("wholesale", AccountType.DOCTOR, True, False),
-    # ── دواء OTC ──────────────────────────────────────────
+    # ── OTC medicine ───────────────────────────────────────
     ("otc_regulated", None, False, False),
     ("otc_regulated", AccountType.STUDENT, False, True),
     ("otc_regulated", AccountType.PHARMACY, True, True),
@@ -122,7 +122,7 @@ def test_access_matrix(policies, policy_code, account_type, verified, expected):
 
 
 # ═══════════════════════════════════════════════════════════
-#  أسباب المنع
+#  Denial reasons
 # ═══════════════════════════════════════════════════════════
 
 
@@ -154,7 +154,7 @@ class TestDenialReasons:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الافتراضات الآمنة
+#  Safe defaults
 # ═══════════════════════════════════════════════════════════
 
 
@@ -162,10 +162,10 @@ class TestDenialReasons:
 class TestSafeDefaults:
     def test_inactive_policy_denies_not_allows(self, policies):
         """
-        ⚠️  تعطيل سياسة بالخطأ يجب ألا يكشف موارد.
+        ⚠️  Disabling a policy by mistake must not expose resources.
 
-        «معطّلة ⟵ مسموح» افتراض كارثي: من يعطّل سياسة الأدوية
-        المقيّدة يفتحها للجميع بدل إخفائها.
+        "disabled ⟵ allowed" is a catastrophic assumption: whoever disables the
+        restricted-medicines policy opens it to everyone instead of hiding it.
         """
         policy = policies["pharmacy_only"]
         policy.is_active = False
@@ -179,16 +179,16 @@ class TestSafeDefaults:
 
     def test_no_policy_falls_back_to_default(self, policies):
         user = make_user("nopolicy@test.local", AccountType.STUDENT)
-        # الافتراضية هي «عام»
+        # The default is "public"
         assert evaluate(user, None).allowed
 
     def test_no_policies_at_all_means_public(self, db):
-        """نظام بلا سياسات = كتالوج عام. لا تعطيل كامل."""
+        """A system with no policies = a public catalogue. Not a total lockout."""
         assert evaluate(Anonymous(), None).allowed
 
 
 # ═══════════════════════════════════════════════════════════
-#  الصلاحية المطلوبة
+#  The required permission
 # ═══════════════════════════════════════════════════════════
 
 
@@ -208,12 +208,12 @@ class TestPermissionRequirement:
         assert evaluate(user, policy).reason is DenialReason.PERMISSION_REQUIRED
 
         user.user_permissions.add(Permission.objects.get(codename="view_accesspolicy"))
-        user = User.objects.get(pk=user.pk)  # إعادة تحميل — الصلاحيات مُخزَّنة
+        user = User.objects.get(pk=user.pk)  # Reload — permissions are cached
         assert evaluate(user, policy).allowed
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأداء
+#  Performance
 # ═══════════════════════════════════════════════════════════
 
 
@@ -221,9 +221,9 @@ class TestPermissionRequirement:
 class TestQueryEfficiency:
     def test_accessible_ids_computed_once(self, policies, django_assert_max_num_queries):
         """
-        ⚠️  القرار يُحسب مرة لكل مستخدم، لا مرة لكل منتج.
+        ⚠️  The decision is computed once per user, not once per product.
 
-        تقييم كل صف يعني عشرات الآلاف من التقييمات في صفحة واحدة.
+        Evaluating each row means tens of thousands of evaluations on one page.
         """
         user = make_user("perf@test.local", AccountType.PHARMACY, verified=True)
 

@@ -1,4 +1,4 @@
-"""مسارات نطاق الهوية — /api/v1/auth/"""
+"""Identity domain routes — /api/v1/auth/"""
 
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -8,15 +8,15 @@ from accounts import api
 app_name = "accounts"
 
 urlpatterns = [
-    # التسجيل والتفعيل
+    # Registration and activation
     path("register/", api.RegisterAPI.as_view(), name="register"),
     path("verify-email/", api.VerifyEmailAPI.as_view(), name="verify-email"),
     path("resend-verification/", api.ResendVerificationAPI.as_view(), name="resend-verification"),
-    # الدخول والخروج
+    # Login and logout
     path("login/", api.LoginAPI.as_view(), name="login"),
     path("logout/", api.LogoutAPI.as_view(), name="logout"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
-    # كلمة المرور
+    # Password
     path("password/reset/", api.PasswordResetRequestAPI.as_view(), name="password-reset"),
     path(
         "password/reset/confirm/",
@@ -24,14 +24,14 @@ urlpatterns = [
         name="password-reset-confirm",
     ),
     path("password/change/", api.PasswordChangeAPI.as_view(), name="password-change"),
-    # تغيير البريد — تأكيد من العنوانين
+    # Email change — confirmation from both addresses
     path("email/change/", api.EmailChangeRequestAPI.as_view(), name="email-change"),
     path(
         "email/change/confirm/",
         api.EmailChangeConfirmAPI.as_view(),
         name="email-change-confirm",
     ),
-    # الحساب الحالي
+    # The current account
     path("me/", api.MeAPI.as_view(), name="me"),
     path("sessions/", api.SessionListAPI.as_view(), name="sessions"),
     path(

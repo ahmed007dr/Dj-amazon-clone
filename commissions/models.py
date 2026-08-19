@@ -1,18 +1,18 @@
 """
-العمولات.
+Commissions.
 
-⚠️  **كل نتيجة عمولة قابلة للتفسير — لا حساب صندوق أسود.**
+⚠️  **Every commission result is explainable — no black-box calculation.**
 
-    المندوب يقرأ مبلغًا سيُصرَف له ويسأل «كيف؟». والجواب يجب أن
-    يكون صفًّا يحمل: الطلبات المشمولة · الإجمالي · المرتجعات ·
-    الصافي · التكلفة · الربح · التحقيق · القاعدة المطبَّقة ·
-    النسبة · المبلغ. إعادة الحساب عند العرض تعني أن الجواب يتغيّر
-    كلما تغيّرت البيانات — والمبلغ صُرف.
+    A rep reads an amount that will be paid to them and asks "how?". And the
+    answer has to be a row carrying: the orders covered · the total · the
+    returns · the net · the cost · the profit · the achievement · the rule
+    applied · the rate · the amount. Recomputing on display means the answer
+    changes whenever the data changes — and the money has already been paid.
 
-⚠️  و**قواعد العمولة بيانات لا كود**.
+⚠️  And **commission rules are data, not code**.
 
-    «٣٪ فوق ١٠٠٪ تحقيق» قرار إداري يتغيّر كل موسم. تثبيته في
-    الكود يجعل تعديله نشرًا.
+    "3% above 100% achievement" is a management decision that changes every
+    season. Fixing it in code makes editing it a deployment.
 """
 
 from __future__ import annotations
@@ -29,10 +29,10 @@ from core.money import ZERO, MoneyField, RateField
 
 class CommissionBase(models.TextChoices):
     """
-    ما الذي تُحسب النسبة عليه.
+    What the rate is calculated on.
 
-    ⚠️  الفارق جوهري لا شكلي: ٣٪ من المبيعات قد تفوق ١٠٪ من
-        الربح أو تقلّ عنها بأضعاف — حسب هامش الصنف المباع.
+    ⚠️  The difference is substantive, not cosmetic: 3% of sales may exceed 10%
+        of profit or fall many times below it — depending on the margin of the item sold.
     """
 
     NET_SALES = "NET_SALES", _("صافي المبيعات")
@@ -41,12 +41,14 @@ class CommissionBase(models.TextChoices):
 
 class CommissionScheme(BaseModel):
     """
-    خطة عمولة — حزمة شرائح.
+    A commission scheme — a bundle of tiers.
 
-    ⚠️  **الخطة تُسنَد للدور لا للفرد** ما لم يُخصَّص.
+    ⚠️  **The scheme is assigned to the role, not the individual**, unless
+        specifically overridden.
 
-        منحها فردًا يجعل كل تعيين جديد يحتاج ضبطًا يدويًا، ويجعل
-        سؤال «ما عمولة المندوبين؟» يحتاج مسح كل الحسابات.
+        Granting it to an individual makes every new appointment need manual
+        configuration, and makes "what commission do the reps get?" require
+        scanning every account.
     """
 
     code = models.SlugField(_("الرمز"), max_length=64, unique=True)
@@ -84,18 +86,19 @@ class CommissionScheme(BaseModel):
 
 class CommissionTier(BaseModel):
     """
-    شريحة: «من نسبة تحقيق كذا إلى كذا ⟵ نسبة عمولة كذا».
+    A tier: "from achievement X to Y ⟵ commission rate Z".
 
-    ⚠️  **الحدود شاملة من الأسفل حصرية من الأعلى** — `[from, to)`.
+    ⚠️  **The bounds are inclusive below and exclusive above** — `[from, to)`.
 
-        تداخل الحدود يجعل تحقيق ٨٠٪ يطابق شريحتين، ويصير المبلغ
-        تابعًا لترتيب الاستعلام. والاصطلاح مكتوب هنا لأن نصفه
-        في الرأس ونصفه في الكود هو ما يُنتج فجوة عند ٨٠ بالضبط.
+        Overlapping bounds make 80% achievement match two tiers, and the amount
+        then depends on query ordering. The convention is written down here
+        because keeping half of it in someone's head and half in the code is
+        exactly what produces a gap at precisely 80.
 
-    ⚠️  والشريحة العليا **بلا سقف** (`to_percent = null`).
+    ⚠️  And the top tier has **no ceiling** (`to_percent = null`).
 
-        سقف مكتوب يعني أن من حقّق ٥٠٠٪ لا يطابق أي شريحة —
-        فيخرج بعمولة صفر مكافأةً على أفضل شهر في حياته.
+        A written ceiling means someone who achieved 500% matches no tier — so
+        they come out with zero commission as a reward for the best month of their life.
     """
 
     scheme = models.ForeignKey(
@@ -137,10 +140,10 @@ class CommissionTier(BaseModel):
 
 class CommissionStatus(models.TextChoices):
     """
-    ⚠️  العمولة تبدأ **محسوبة** لا معتمدة.
+    ⚠️  A commission starts **calculated**, not approved.
 
-        الاعتماد التلقائي يجعل خطأ في هدف أو مرتجعًا متأخرًا
-        يتحوّل إلى مبلغ مصروف قبل أن يراجعه أحد.
+        Automatic approval turns an error in a target, or a late return, into
+        money paid out before anyone reviews it.
     """
 
     CALCULATED = "CALCULATED", _("محسوبة")
@@ -151,15 +154,16 @@ class CommissionStatus(models.TextChoices):
 
 class CommissionRecord(BaseModel):
     """
-    نتيجة عمولة شهر — **بكل مدخلاتها مخزَّنة**.
+    A month's commission result — **with all of its inputs stored**.
 
-    ⚠️  **لا حقل هنا يُعاد حسابه عند العرض.**
+    ⚠️  **No field here is recomputed on display.**
 
-        المبلغ يُصرَف، ثم يقع مرتجع في الشهر التالي. إعادة الحساب
-        عند فتح الشاشة تُظهر رقمًا يخالف ما صُرف — فيبدو النظام
-        كاذبًا أو المحاسب مخطئًا، ولا سبيل لحسم أيّهما.
+        The amount is paid out, and then a return lands the following month.
+        Recomputing when the screen opens shows a number disagreeing with what
+        was paid — so either the system looks dishonest or the accountant looks
+        wrong, with no way to settle which.
 
-        التصحيح يكون بسجل جديد لا بتعديل هذا.
+        Corrections are made with a new record, never by editing this one.
     """
 
     employee = models.ForeignKey(
@@ -184,7 +188,7 @@ class CommissionRecord(BaseModel):
     year = models.PositiveIntegerField(_("السنة"))
     month = models.PositiveSmallIntegerField(_("الشهر"))
 
-    # ── المدخلات — لقطة لا تُعاد حسابها ────────────────────
+    # ── Inputs — a snapshot, never recomputed ──────────────
     orders_count = models.PositiveIntegerField(_("عدد الطلبات"), default=0)
     gross_sales = MoneyField(_("إجمالي المبيعات"), default=ZERO)
     returns_total = MoneyField(_("المرتجعات"), default=ZERO)
@@ -196,11 +200,11 @@ class CommissionRecord(BaseModel):
     achieved_value = models.DecimalField(_("المُحقَّق"), max_digits=14, decimal_places=2)
     achievement_percent = RateField(_("نسبة التحقيق ٪"))
 
-    # ── القاعدة المطبَّقة ──────────────────────────────────
+    # ── The rule applied ───────────────────────────────────
     base = models.CharField(_("أساس الحساب"), max_length=16, choices=CommissionBase.choices)
     base_amount = MoneyField(_("المبلغ الأساس"), default=ZERO)
-    #: ⚠️  وصف الشريحة نصًّا: حذفها من الخطة لاحقًا يجب ألا يمحو
-    #:     تفسير عمولة صُرفت.
+    #: ⚠️  The tier description as text: deleting it from the scheme later must not
+    #:     erase the explanation of a commission already paid.
     tier_label = models.CharField(_("الشريحة المطبَّقة"), max_length=64, blank=True)
     rate = RateField(_("نسبة العمولة ٪"), default=ZERO)
 
@@ -231,10 +235,10 @@ class CommissionRecord(BaseModel):
         verbose_name_plural = _("سجلات العمولة")
         ordering = ["-year", "-month"]
         constraints = [
-            # ⚠️  سجل واحد لكل موظف في الشهر.
+            # ⚠️  One record per employee per month.
             #
-            #     إعادة الحساب تُحدّث القائم ولا تُنشئ ثانيًا؛ ولولا
-            #     القيد لصُرفت عمولتان عن شهر واحد.
+            #     Recalculation updates the existing one rather than creating a
+            #     second; without the constraint, two commissions would be paid for one month.
             models.UniqueConstraint(
                 fields=["employee", "year", "month"],
                 condition=models.Q(deleted_at__isnull=True),
@@ -251,9 +255,9 @@ class CommissionRecord(BaseModel):
     @property
     def is_locked(self) -> bool:
         """
-        ⚠️  المعتمدة والمصروفة **لا تُعاد حسابها**.
+        ⚠️  Approved and paid records are **never recomputed**.
 
-            إعادة حساب مبلغ خرج من الخزينة تجعل السجل يخالف
-            القيد المحاسبي.
+            Recomputing an amount that has left the treasury makes the record
+            disagree with the accounting entry.
         """
         return self.status in (CommissionStatus.APPROVED, CommissionStatus.PAID)

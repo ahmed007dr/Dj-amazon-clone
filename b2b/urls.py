@@ -1,4 +1,4 @@
-"""مسارات B2B — /api/v1/b2b/"""
+"""B2B routes — /api/v1/b2b/"""
 
 from django.urls import path
 
@@ -7,7 +7,7 @@ from b2b import api
 app_name = "b2b"
 
 urlpatterns = [
-    # ── بوابة العميل التجاري — «حسابي أنا» بلا معرّف ────────
+    # ── Business customer portal — "my own account", no id ──
     path("account/", api.MyAccountAPI.as_view(), name="account"),
     path("profile/", api.MyProfileAPI.as_view(), name="profile"),
     path("statement/", api.MyStatementAPI.as_view(), name="statement"),
@@ -15,7 +15,7 @@ urlpatterns = [
     path("credit-check/", api.CreditCheckAPI.as_view(), name="credit-check"),
     path("reorder/", api.QuickReorderAPI.as_view(), name="reorder"),
     path("checkout/", api.CreditCheckoutAPI.as_view(), name="checkout"),
-    # ── الأدمن — المعرّف صريح خلف صلاحية أخرى ───────────────
+    # ── Admin — the id is explicit, behind a different permission ──
     path("admin/businesses/", api.AdminBusinessListAPI.as_view(), name="admin-businesses"),
     path(
         "admin/businesses/<uuid:pk>/",

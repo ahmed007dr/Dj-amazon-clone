@@ -1,4 +1,4 @@
-"""مسارات العمولات — /api/v1/commissions/"""
+"""Commission routes — /api/v1/commissions/"""
 
 from django.urls import path
 

@@ -155,6 +155,17 @@ notifications يستمع
 | `customer_verified` / `customer_rejected` | `customers` | `notifications` |
 | `branding_updated` | `branding` | إبطال الكاش |
 
+⚠️  **و`mailing` ليس مستمعًا ولا باعثًا — إنه أداة يستدعيها `notifications`.**
+
+    الحدّ بينهما سؤالان مختلفان:
+
+        notifications → **متى** يُرسَل و**لمن** (تصنيف · تفضيل · سجل)
+        mailing       → **كيف** يُرسَل و**من أي حساب** (نقل · هوية · طابور)
+
+    ولذلك `notifications` يستورد `mailing` ولا عكس: الأول يقرّر والثاني
+    ينفّذ. ودمجهما كان يجعل «أوقف إشعارات العروض» و«غيّر خادم SMTP»
+    إعدادين في نطاق واحد.
+
 ---
 
 # ٥. فرض القواعد آليًا
@@ -225,6 +236,25 @@ name = POS must create orders through the orders service, never its own model
 type = forbidden
 source_modules = pos
 forbidden_modules = orders.models
+
+[importlinter:contract:mailing-independent]
+name = Mailing is independent of business domains
+; ⚠️  `send_to_user(user)` يقبل الكائن ولا يستورد نوعه.
+;
+;     أول استيراد لـ`accounts.User` هنا يقلب الاتجاه: البريد يصير فوق
+;     الهوية بينما الهوية تستدعيه — دائرة لا يكسرها إلا استيراد داخل
+;     دالة، أي إخفاء للدائرة لا حلّ لها.
+type = forbidden
+source_modules = mailing
+forbidden_modules =
+    accounts
+    customers
+    catalog
+    orders
+    cart
+    inventory
+    notifications
+    payments
 
 [importlinter:contract:notifications-isolated]
 name = Nothing may import notifications

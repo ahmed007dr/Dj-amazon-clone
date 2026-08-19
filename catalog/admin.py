@@ -1,9 +1,9 @@
 """
-لوحة الكتالوج.
+Catalogue admin panel.
 
-⚠️  حدود النطاق تسري على اللوحة كما تسري على النماذج: لا كمية هنا
-    (المخزون) ولا سعر نهائي (التسعير) ولا متوسط تقييم (المراجعات).
-    `base_price` سعر القائمة الأساس لا ما يدفعه العميل.
+⚠️  Domain boundaries apply to the panel exactly as they apply to the models: no
+    quantity here (inventory), no final price (pricing), no average rating
+    (reviews). `base_price` is the base list price, not what the customer pays.
 """
 
 from django.contrib import admin
@@ -43,7 +43,7 @@ class CategoryAdmin(SlugAdminMixin, DomainModelAdmin):
     search_fields = ("name_ar", "name_en", "slug", "path")
     autocomplete_fields = ("parent",)
 
-    # ⚠️  `path` و`depth` مشتقان من الأب — تحسبهما الخدمة عند الحفظ.
+    # ⚠️  `path` and `depth` are derived from the parent — the service computes them on save.
     readonly_fields = ("id", "created_at", "updated_at", "deleted_at", "path", "depth")
 
     fieldsets = (

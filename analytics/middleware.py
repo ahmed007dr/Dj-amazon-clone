@@ -1,10 +1,11 @@
 """
-وسيط قياس الحركة.
+Traffic measurement middleware.
 
-⚠️  **وسيطٌ لا طبقة مصادقة** — بخلاف نبضة المستخدم المسجَّل.
+⚠️  **Middleware, not an authentication layer** — unlike the registered user's heartbeat.
 
-    الزائر المجهول لا يمرّ بطبقة مصادقة إطلاقًا، فقياسه هناك كان
-    يعني ألا يُقاس أبدًا — وهو **معظم من يتصفّح متجرًا**.
+    An anonymous visitor never passes through an authentication layer at all, so
+    measuring them there would have meant never measuring them — and they are
+    **most of everyone browsing a store**.
 """
 
 from __future__ import annotations
@@ -15,11 +16,11 @@ from django.utils.deprecation import MiddlewareMixin
 
 logger = logging.getLogger(__name__)
 
-#: ⚠️  يُقاس المتجر وحده لا لوحة الإدارة.
+#: ⚠️  The store alone is measured, not the admin panel.
 #
-#     السؤال «متى الضغط على المتجر؟»، ولوحة تُحدِّث نفسها كل ثلاثين
-#     ثانية كانت ستُنتج ذروةً ثابتة طوال دوام الأدمن تخفي ذروة
-#     العملاء الحقيقية تحتها.
+#     The question is "when is the store busy?", and a panel refreshing itself
+#     every thirty seconds would have produced a flat peak lasting the admin's
+#     whole shift, hiding the real customer peak underneath it.
 EXCLUDED_PREFIXES = (
     "/api/v1/administration/",
     "/api/v1/reports/",
@@ -29,16 +30,16 @@ EXCLUDED_PREFIXES = (
     "/media/",
 )
 
-#: ما لا يبدأ بهذا ليس استخدامًا للمتجر (فحوص صحة · ملفات · جذر)
+#: Anything not starting with this is not store usage (health checks · files · the root)
 MEASURED_PREFIX = "/api/"
 
 
 def client_ip(request) -> str | None:
     """
-    ⚠️  `X-Forwarded-For` يُقرأ **من اليسار** ويُثق به خلف وكيل فقط.
+    ⚠️  `X-Forwarded-For` is read **from the left** and trusted only behind a proxy.
 
-        خلف Nginx يكون `REMOTE_ADDR` هو الوكيل نفسه، فبدونه يصير
-        كل الزوار بصمةً واحدة ويصير «الزوار الفريدون» دائمًا ١.
+        Behind Nginx, `REMOTE_ADDR` is the proxy itself, so without this every
+        visitor becomes a single fingerprint and "unique visitors" is forever 1.
     """
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
     if forwarded:
@@ -48,22 +49,23 @@ def client_ip(request) -> str | None:
 
 class TrafficMiddleware(MiddlewareMixin):
     """
-    ⚠️  القياس على **الاستجابة** لا الطلب.
+    ⚠️  Measurement happens on the **response**, not the request.
 
-        الطلب المرفوض (٤٠١ · ٤٠٤ · حدّ معدّل) ليس استخدامًا، وعدّه
-        يجعل محاولة اقتحام تبدو ذروة تصفّح.
+        A rejected request (401 · 404 · rate limit) is not usage, and counting
+        it makes a break-in attempt look like a browsing peak.
 
-    ⚠️  ولا يُسقِط الاستجابة أبدًا مهما فشل.
+    ⚠️  And it never drops the response, however it fails.
 
-        قياسٌ يمنع صفحة منتج من الوصول أسوأ ألف مرة من قياس ناقص.
+        Measurement that stops a product page loading is a thousand times worse
+        than measurement with a gap in it.
     """
 
     def process_response(self, request, response):
         try:
             self._record(request, response)
         except Exception:
-            # ⚠️  يُسجَّل ولا يُرفَع: قياسٌ يمنع صفحة منتج من الوصول
-            #     أسوأ ألف مرة من قياس ناقص.
+            # ⚠️  Logged, never raised: measurement that stops a product page loading
+            #     is a thousand times worse than measurement with a gap in it.
             logger.exception("فشل قياس الحركة")
         return response
 
@@ -82,8 +84,8 @@ class TrafficMiddleware(MiddlewareMixin):
         services.record_visit(
             ip=client_ip(request),
             user_agent=request.META.get("HTTP_USER_AGENT", ""),
-            # ⚠️  وجود الترويسة لا هوية المستخدم: المصادقة تقع في
-            #     طبقة DRF بعد كل الوسائط، فـ`request.user` هنا
-            #     مجهول دائمًا مع JWT (نفس سبب `LanguageMiddleware`).
+            # ⚠️  The presence of the header, not the user's identity: authentication
+            #     happens in the DRF layer after all middleware, so `request.user` here
+            #     is always anonymous with JWT (the same reason as `LanguageMiddleware`).
             authenticated=bool(request.META.get("HTTP_AUTHORIZATION")),
         )

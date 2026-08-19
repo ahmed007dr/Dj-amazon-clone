@@ -1,7 +1,7 @@
 """
-خدمات الهوية — الواجهة العامة الوحيدة لهذا النطاق.
+Identity services — the only public interface to this domain.
 
-النطاقات الأخرى تستدعي هذه الدوال ولا تلمس `models.py` مطلقًا.
+Other domains call these functions and never touch `models.py`.
 """
 
 from __future__ import annotations
@@ -34,26 +34,26 @@ from core.presence import PresenceRegistry
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════
-#  إبطال الجلسة عند الإيقاف  (ADR-16)
+#  Session revocation on suspension  (ADR-16)
 # ═══════════════════════════════════════════════════════════
 #
-#  ⚠️  المشكلة: التوكن الصادر يبقى صالحًا حتى انتهاء عمره.
-#      بلا معالجة، الموقوف يواصل العمل حتى ١٠ دقائق كاملة.
+#  ⚠️  The problem: an already-issued token stays valid until it expires.
+#      Untreated, a suspended user keeps working for a full 10 minutes.
 #
-#  الحل ثلاثي الطبقات:
-#      ١. عمر قصير للـ Access Token (١٠ دقائق) — في الإعدادات
-#      ٢. قائمة سوداء للـ Refresh — تمنع التجديد
-#      ٣. مجموعة الموقوفين في الكاش — تُفحص على كل طلب فالأثر **فوري**
+#  The solution has three layers:
+#      1. A short-lived access token (10 minutes) — in the settings
+#      2. A blacklist for the refresh token — preventing renewal
+#      3. The suspended set in the cache — checked on every request, so the effect is **immediate**
 #
-#  الطبقة ٣ هي التي تجعل زر «إيقاف الحساب» حقيقيًا لا زخرفيًا.
+#  Layer 3 is what makes the "suspend account" button real rather than decorative.
 
 SUSPENDED_CACHE_PREFIX = "suspended_user:"
 SUSPENDED_CACHE_TTL = 60 * 60 * 24 * 7
 
-#: مدة اعتبار المستخدم متصلًا — قابلة للضبط (قاعدة عمل ٣)
+#: How long a user counts as online — configurable (business rule 3)
 PRESENCE_WINDOW = timedelta(minutes=5)
 
-#: صلاحية رموز الأمان
+#: Security token lifetime
 EMAIL_VERIFICATION_TTL = timedelta(hours=24)
 PASSWORD_RESET_TTL = timedelta(minutes=45)
 
@@ -64,9 +64,9 @@ def _suspended_key(user_id) -> str:
 
 def is_suspended_cached(user_id) -> bool:
     """
-    فحص O(1) يُستدعى في طبقة المصادقة على كل طلب.
+    An O(1) check called in the authentication layer on every request.
 
-    الكاش هو مصدر الحقيقة السريع؛ قاعدة البيانات هي الدائم.
+    The cache is the fast source of truth; the database is the durable one.
     """
     return cache.get(_suspended_key(user_id)) is not None
 
@@ -81,10 +81,11 @@ def _clear_suspended(user_id) -> None:
 
 def revoke_all_tokens(user: User) -> int:
     """
-    إبطال كل Refresh Tokens للمستخدم. يعيد عدد ما أُبطل.
+    Revoke all of the user's refresh tokens. Returns how many were revoked.
 
-    الفشل على توكن واحد لا يوقف الباقي — توكن منتهٍ أو مُبطَل مسبقًا
-    حالة متوقعة، والمهم أن يُبطَل كل ما هو صالح.
+    A failure on one token does not stop the rest — an expired or
+    already-revoked token is an expected state, and what matters is that
+    everything still valid gets revoked.
     """
     revoked = 0
     for token in OutstandingToken.objects.filter(user=user):
@@ -107,10 +108,10 @@ def suspend_account(
     status: str = AccountStatus.SUSPENDED,
 ) -> User:
     """
-    إيقاف حساب — بأثر فوري.
+    Suspend an account — with immediate effect.
 
-    المالك (`AdminProfile.is_owner`) لا يُوقَف — وإلا أمكن قفل
-    النظام على الجميع.
+    The owner (`AdminProfile.is_owner`) is never suspended — otherwise the
+    system could be locked away from everyone.
     """
     if status not in (AccountStatus.SUSPENDED, AccountStatus.BLOCKED):
         raise ValueError("الحالة يجب أن تكون SUSPENDED أو BLOCKED")
@@ -137,8 +138,8 @@ def suspend_account(
         changed_by=actor,
     )
 
-    _mark_suspended(user.pk)  # الطبقة ٣ — أثر فوري
-    revoke_all_tokens(user)  # الطبقة ٢ — يمنع التجديد
+    _mark_suspended(user.pk)  # Layer 3 — immediate effect
+    revoke_all_tokens(user)  # Layer 2 — prevents renewal
     close_all_sessions(user, revoked=True)
 
     AuditLog.objects.create(
@@ -179,16 +180,16 @@ def activate_account(user: User, *, reason: str = "", actor: User | None = None)
 
 
 # ═══════════════════════════════════════════════════════════
-#  الجلسات
+#  Sessions
 # ═══════════════════════════════════════════════════════════
 
 
 def device_type_from_user_agent(user_agent: str) -> str:
     """
-    ⚠️  عامّة لا خاصة — `analytics` يصنّف أجهزة الزوار بها.
+    ⚠️  Public rather than private — `analytics` uses it to classify visitor devices.
 
-        نسخة ثانية من التصنيف كانت ستجعل جهازًا يُحسب «لوحيًا» في
-        الجلسات و«هاتفًا» في تقرير الحركة.
+        A second copy of the classification would have made one device count as
+        a "tablet" in sessions and a "phone" in the traffic report.
     """
     from accounts.models import DeviceType
 
@@ -225,9 +226,9 @@ def close_session(session: UserSession, *, revoked: bool = False) -> UserSession
     session.duration_seconds = int((now - session.login_at).total_seconds())
     session.save(update_fields=["logout_at", "revoked_at", "duration_seconds"])
 
-    # ⚠️  الخروج يُسقط النبضة — وإلا بقي الخارج «متصلًا» حتى تنتهي
-    #     النافذة، فيرى الأدمن خمسة متصلين وقد خرج ثلاثة منهم.
-    #     والشرط مقصود: جهاز ثانٍ ما زال مفتوحًا يعني أن صاحبه متصل.
+    # ⚠️  Logging out drops the heartbeat — otherwise the departed user stays
+    #     "online" until the window expires, so the admin sees five people connected when three have left.
+    #     The condition is deliberate: a second device still open means its owner is online.
     if not UserSession.objects.filter(user_id=session.user_id, logout_at__isnull=True).exists():
         drop_presence(session.user_id)
 
@@ -243,39 +244,39 @@ def close_all_sessions(user: User, *, revoked: bool = False) -> int:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التواجد اللحظي  (ADR-17)
+#  Live presence  (ADR-17)
 # ═══════════════════════════════════════════════════════════
 
 PRESENCE_KEY = "presence:live"
 
-#: النبضة لا تُكتب على كل طلب — مرة كل نصف دقيقة تكفي لنافذة الخمس.
+#: The heartbeat is not written on every request — once every half minute is enough for the five-minute window.
 PRESENCE_HEARTBEAT = timedelta(seconds=30)
 
-#: السجل نفسه يخدم الزوار المجهولين في `analytics` — انظر `core.presence`.
+#: The same record serves anonymous visitors in `analytics` — see `core.presence`.
 presence = PresenceRegistry(PRESENCE_KEY, window=PRESENCE_WINDOW, heartbeat=PRESENCE_HEARTBEAT)
 
 
 def touch_activity(user_id) -> None:
     """
-    نبضة تواجد — **في الكاش لا في قاعدة البيانات**.
+    A presence heartbeat — **in the cache, not in the database**.
 
-    ⚠️  كتابة `last_activity` على كل طلب تقتل القاعدة (ADR-17).
-        `flush_presence` تفرّغ السجل إلى الجلسات كل دقيقة.
+    ⚠️  Writing `last_activity` on every request kills the database (ADR-17).
+        `flush_presence` drains the record into the sessions every minute.
 
-    ⚠️  والمفتاح **المستخدم لا الجلسة**: توكن الوصول لا يحمل معرّف
-        جلسة الدخول، وربطه بها يحتاج ادعاءً جديدًا في التوكن —
-        و«من متصل الآن» سؤال عن المستخدم أصلًا.
+    ⚠️  And the key is **the user, not the session**: the access token carries
+        no login-session id, and tying it to one would need a new claim in the
+        token — while "who is online now" is a question about the user anyway.
     """
     presence.touch(user_id)
 
 
 def drop_presence(user_id) -> None:
-    """إسقاط النبضة — عند الخروج أو الإبطال."""
+    """Drop the heartbeat — on logout or revocation."""
     presence.drop(user_id)
 
 
 def live_user_ids() -> set:
-    """المتصلون من الكاش وحده — قبل أي تفريغ."""
+    """Those online from the cache alone — before any flush."""
     result = set()
     for identity in presence.identities():
         try:
@@ -287,13 +288,13 @@ def live_user_ids() -> set:
 
 def online_user_ids() -> list:
     """
-    من متصل الآن — **اتحاد** الكاش وقاعدة البيانات.
+    Who is online now — the **union** of the cache and the database.
 
-    ⚠️  المصدران ليسا تكرارًا:
+    ⚠️  The two sources are not redundant:
 
-        الكاش يعرف النبضة التي لم تُفرَّغ بعد، والقاعدة تعرف جلسةً
-        فُتحت قبل وصول أول نبضة (وتنجو من إعادة تشغيل الكاش).
-        الاكتفاء بأحدهما يُسقط إحدى الحالتين.
+        the cache knows about a heartbeat not yet flushed, and the database
+        knows about a session opened before the first heartbeat arrived (and it
+        survives a cache restart). Using either alone drops one of those cases.
     """
     cutoff = timezone.now() - PRESENCE_WINDOW
     from_db = set(
@@ -306,12 +307,13 @@ def online_user_ids() -> list:
 
 def flush_presence() -> int:
     """
-    تفريغ سجل التواجد إلى `UserSession.last_activity` — مهمة كل دقيقة.
+    Flush the presence record into `UserSession.last_activity` — a per-minute task.
 
-    ⚠️  الطوابع تُجمَّع بالدقيقة لا تُكتب فرديًا.
+    ⚠️  Timestamps are grouped by minute rather than written individually.
 
-        دقة الثانية في «آخر ظهور» لا يقرأها أحد، والتجميع يجعل
-        عدد التحديثات = عدد الدقائق المتميّزة لا عدد المتصلين.
+        Second-level precision in "last seen" is read by nobody, and grouping
+        makes the number of updates equal the number of distinct minutes rather
+        than the number of people online.
     """
     alive = presence.alive()
     if not alive:
@@ -327,7 +329,7 @@ def flush_presence() -> int:
 
     updated = 0
     for stamp, user_ids in groups.items():
-        # ⚠️  `last_activity__lt` يمنع إرجاع طابع أحدث إلى الوراء
+        # ⚠️  `last_activity__lt` prevents moving a newer timestamp backwards
         updated += UserSession.objects.filter(
             user_id__in=user_ids, logout_at__isnull=True, last_activity__lt=stamp
         ).update(last_activity=stamp)
@@ -336,7 +338,7 @@ def flush_presence() -> int:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الرموز الأمنية
+#  Security tokens
 # ═══════════════════════════════════════════════════════════
 
 
@@ -349,18 +351,18 @@ def issue_token(
     new_email: str = "",
 ) -> tuple[SecurityToken, str]:
     """
-    يعيد `(السجل, الرمز الصريح)`.
+    Returns `(the record, the plaintext token)`.
 
-    ⚠️  الرمز الصريح يُرسَل للمستخدم مرة واحدة **ولا يُخزَّن أبدًا**.
-        المخزَّن بصمته فقط — تسريب القاعدة لا يمنح القدرة على
-        إعادة تعيين كلمات المرور.
+    ⚠️  The plaintext token is sent to the user once and is **never stored**.
+        Only its hash is kept — a database leak grants nobody the ability to
+        reset passwords.
     """
     if ttl is None:
         ttl = (
             PASSWORD_RESET_TTL if purpose == TokenPurpose.PASSWORD_RESET else EMAIL_VERIFICATION_TTL
         )
 
-    # رمز واحد صالح لكل غرض — إصدار جديد يُبطل السابق
+    # One valid token per purpose — issuing a new one revokes the previous
     SecurityToken.objects.filter(user=user, purpose=purpose, used_at__isnull=True).update(
         used_at=timezone.now()
     )
@@ -378,7 +380,7 @@ def issue_token(
 
 
 def consume_token(raw_token: str, purpose: str) -> SecurityToken:
-    """يتحقق ويستهلك. يرفع `BusinessError` عند الفشل."""
+    """Verifies and consumes. Raises `BusinessError` on failure."""
     record = SecurityToken.objects.filter(token_hash=hash_token(raw_token), purpose=purpose).first()
 
     if record is None or not record.is_valid:
@@ -410,10 +412,10 @@ def verify_email(raw_token: str) -> User:
 @transaction.atomic
 def reset_password(raw_token: str, new_password: str) -> User:
     """
-    تعيين كلمة مرور جديدة.
+    Set a new password.
 
-    **إبطال كل الجلسات إجباري** — من عرف كلمة المرور القديمة
-    يجب أن يفقد وصوله فورًا.
+    **Revoking every session is mandatory** — anyone who knew the old password
+    must lose access immediately.
     """
     record = consume_token(raw_token, TokenPurpose.PASSWORD_RESET)
     user = record.user
@@ -436,16 +438,16 @@ def reset_password(raw_token: str, new_password: str) -> User:
 @transaction.atomic
 def confirm_email_change(raw_token: str) -> User:
     """
-    إتمام تغيير البريد.
+    Complete an email change.
 
-    ⚠️  التأكيد من العنوانين معًا:
+    ⚠️  Confirmation from both addresses together:
 
-        ١. رسالة تحذير للعنوان **القديم** — من اختُرق حسابه يعلم
-           بالمحاولة ويستطيع التصرف.
-        ٢. رمز تأكيد للعنوان **الجديد** — يثبت أن الطالب يملكه.
+        1. A warning message to the **old** address — someone whose account was
+           compromised learns of the attempt and can act.
+        2. A confirmation code to the **new** address — proving the requester owns it.
 
-        الاكتفاء بالجديد يعني أن مهاجمًا يسرق الحساب بتغيير بريده
-        بصمت ثم إعادة تعيين كلمة المرور.
+        Sending to the new one alone means an attacker steals the account by
+        silently changing its email and then resetting the password.
     """
     record = consume_token(raw_token, TokenPurpose.EMAIL_CHANGE)
     user = record.user
@@ -454,7 +456,7 @@ def confirm_email_change(raw_token: str) -> User:
     if not new_email:
         raise BusinessError(ErrorCode.TOKEN_INVALID)
 
-    # قد يكون شخص آخر سجّل بهذا البريد بين الطلب والتأكيد
+    # Someone else may have registered with this email between the request and the confirmation
     if User.objects.filter(email__iexact=new_email).exclude(pk=user.pk).exists():
         raise BusinessError(
             ErrorCode.UNIQUE,
@@ -467,7 +469,7 @@ def confirm_email_change(raw_token: str) -> User:
     user.email_verified_at = timezone.now()
     user.save(update_fields=["email", "email_verified_at"])
 
-    # البريد هو المعرّف — تغييره يبطل كل الجلسات
+    # Email is the identifier — changing it invalidates every session
     revoke_all_tokens(user)
     close_all_sessions(user, revoked=True)
 

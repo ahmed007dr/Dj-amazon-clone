@@ -1,66 +1,66 @@
 # ═══════════════════════════════════════════════════════════
-#  اعتماديات المشروع — مباشرة فقط
+#  Project dependencies — direct ones only
 #
-#  ⚠️  **لا تُولّد هذا الملف بـ `pip freeze`.**
+#  ⚠️  **Do not generate this file with `pip freeze`.**
 #
-#      الأمر يكتب كل ما في البيئة بما فيه التبعيات غير المباشرة
-#      وبقايا حزم قديمة، فيعيد التلوّث الذي نُظّف في المرحلة 0.1
+#      That command writes everything in the environment, including transitive
+#      dependencies and leftovers of old packages, reintroducing the pollution cleaned up in phase 0.1
 #      (PyQt5 · allauth · taggit …).
 #
-#      أضف الحزمة الجديدة هنا يدويًا في قسمها.
+#      Add a new package here by hand, in its own section.
 #
-#  التثبيت:
+#  Installation:
 #      python -m venv .venv
-#      .venv\Scripts\activate      (ويندوز)
+#      .venv\Scripts\activate      (Windows)
 #      pip install -r requirements.txt
 # ═══════════════════════════════════════════════════════════
 
-# ── الإطار ─────────────────────────────────────────────────
+# ── Framework ──────────────────────────────────────────────
 Django==5.2
 
-# ── الإعدادات والبيئة ──────────────────────────────────────
+# ── Configuration and environment ──────────────────────────
 django-environ==0.11.2
 
-# ── واجهات REST ────────────────────────────────────────────
+# ── REST interfaces ────────────────────────────────────────
 djangorestframework==3.16.0
 djangorestframework-simplejwt==5.5.0
 django-filter==25.1
 drf-yasg==1.21.10
 django-cors-headers==4.7.0
 
-# ── بوابات الدفع الخارجية ──────────────────────────────────
-# ⚠️  كل نداء بوابة له مهلة إلزامية — انظر payments/gateways/transport.py
-#     النداء بلا مهلة يعلّق عامل ويب إلى الأبد حين تتوقف البوابة عن الرد.
+# ── External payment gateways ──────────────────────────────
+# ⚠️  Every gateway call has a mandatory timeout — see payments/gateways/transport.py
+#     A call without one pins a web worker forever once the gateway stops responding.
 requests==2.32.3
 
-# ── التشفير ────────────────────────────────────────────────
-# ⚠️  مفاتيح البوابات تُخزَّن مشفّرة — انظر core/encryption.py
-#     كانت نصًّا صريحًا في قاعدة البيانات: نسخة احتياطية مسرَّبة
-#     تكفي لسحب أموال حقيقية.
+# ── Encryption ─────────────────────────────────────────────
+# ⚠️  Gateway keys are stored encrypted — see core/encryption.py
+#     They used to be plaintext in the database: one leaked backup was enough
+#     to move real money.
 cryptography==50.0.0
 
-# ── المعرّفات ──────────────────────────────────────────────
+# ── Identifiers ────────────────────────────────────────────
 uuid-utils==0.10.0
 
-# ── قاعدة البيانات ─────────────────────────────────────────
-# PostgreSQL هو المحرك المعتمد — SQLite لا ينفّذ select_for_update
+# ── Database ───────────────────────────────────────────────
+# PostgreSQL is the supported engine — SQLite does not implement select_for_update
 psycopg2-binary==2.9.9
 
-# ── الكاش ──────────────────────────────────────────────────
+# ── Cache ──────────────────────────────────────────────────
 redis==5.0.1
 
-# ── الوسائط ────────────────────────────────────────────────
+# ── Media ──────────────────────────────────────────────────
 Pillow==11.2.1
 
-# ── الترجمة ────────────────────────────────────────────────
-# بديل GNU gettext على ويندوز — ينتج .po و .mo قياسية
+# ── Translation ────────────────────────────────────────────
+# A GNU gettext substitute on Windows — produces standard .po and .mo files
 babel==2.18.0
 
-# ── أدوات التطوير ──────────────────────────────────────────
+# ── Development tools ──────────────────────────────────────
 django-debug-toolbar==4.4.6
 Faker==20.1.0
 
-# ── الجودة والاختبارات ─────────────────────────────────────
+# ── Quality and testing ────────────────────────────────────
 ruff==0.6.9
 pytest==8.3.3
 pytest-django==4.9.0
@@ -69,14 +69,14 @@ import-linter==2.1
 pre-commit==4.0.1
 
 # ═══════════════════════════════════════════════════════════
-#  سجل الحذف
+#  Removal log
 # ═══════════════════════════════════════════════════════════
 #  django-allauth · dj-rest-auth
-#      كانا مكسورين: AUTHENTICATION_BACKENDS يستبدلهما بالكامل.
-#      استُبدلا بمصادقة مخصصة في المرحلة ١.
+#      Both were broken: AUTHENTICATION_BACKENDS replaces them entirely.
+#      Replaced by custom authentication in phase 1.
 #
-#  django-taggit          الوسوم تُعاد في catalog عند الحاجة
-#  django-bootstrap5      طبقة القوالب حُذفت (قرار SPA)
-#  PyQt5 وتوابعه          لا علاقة لها بمشروع ويب — تلوّث pip freeze
-#  django-context-cache   وسيطها مُشار إليه في إعدادات ميتة
+#  django-taggit          tags will be reintroduced in catalog when needed
+#  django-bootstrap5      the template layer was removed (SPA decision)
+#  PyQt5 and friends      unrelated to a web project — pip freeze pollution
+#  django-context-cache   its middleware was referenced from dead settings
 # ═══════════════════════════════════════════════════════════

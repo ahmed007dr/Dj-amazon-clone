@@ -1,10 +1,10 @@
 """
-مهجور — يُحذف مع إزالة النماذج القديمة.
+Deprecated — to be deleted along with the legacy forms.
 
-الاستبدال: core.identifiers
+Replacement: core.identifiers
 
-الأصل كان يستخدم `random` (Mersenne Twister) لتوليد كود تفعيل
-الحساب — قابل للتنبؤ من يراقب مخرجات كافية.
+The original used `random` (Mersenne Twister) to generate the account
+activation code — predictable to anyone who observes enough output.
 """
 
 import warnings

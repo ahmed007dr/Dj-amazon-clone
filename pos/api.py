@@ -18,7 +18,7 @@ from catalog.models import Product, ProductVariant
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
-from core.permissions import IsAdminAccount
+from core.permissions import CanViewPOSSessions
 from pos import serializers as s
 from pos import services
 from pos.models import POSSession, Register, SessionStatus
@@ -102,7 +102,7 @@ class RegisterListAPI(generics.ListAPIView):
 
 
 class AdminRegisterListCreateAPI(generics.ListCreateAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanViewPOSSessions]
     serializer_class = s.RegisterSerializer
     pagination_class = None
     queryset = Register.objects.select_related("location")
@@ -126,7 +126,7 @@ class AdminRegisterDetailAPI(generics.RetrieveUpdateAPIView):
         آخر — ولا شيء في الدفتر يقول أين وقع الانقسام.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanViewPOSSessions]
     serializer_class = s.RegisterSerializer
     queryset = Register.objects.select_related("location")
 
@@ -481,7 +481,7 @@ class POSProductSearchAPI(generics.ListAPIView):
 class AdminSessionListAPI(generics.ListAPIView):
     """كل الورديات — لمراجعة الفروق النقدية."""
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanViewPOSSessions]
     serializer_class = s.SessionSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -500,6 +500,6 @@ class AdminSessionListAPI(generics.ListAPIView):
 
 
 class AdminSessionDetailAPI(generics.RetrieveAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanViewPOSSessions]
     serializer_class = s.SessionSerializer
     queryset = POSSession.objects.select_related("register", "cashier", "closed_by")

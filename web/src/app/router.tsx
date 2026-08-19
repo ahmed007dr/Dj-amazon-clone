@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
+import { RequirePermission } from '@/features/auth/components/RequirePermission';
 import { RequireAuth } from '@/features/auth/components/RequireAuth';
 import { isAdmin, isStaff } from '@/features/auth/permissions';
 import { AccountShell } from '@/portals/account/AccountShell';
@@ -34,11 +35,11 @@ import { ProductsPage } from '@/portals/store/pages/ProductsPage';
 import { Spinner } from '@/shared/ui/Spinner';
 
 /**
- * ⚠️  كل بوابة حزمة منفصلة.
+ * ⚠️  Every portal is a separate bundle.
  *
- *     العميل الذي يتصفّح المتجر لا يحمّل كود لوحة الأدمن ولا نقطة
- *     البيع. الحزمة الواحدة تجعل طالبًا على شبكة ضعيفة ينتظر كودًا
- *     لن يفتحه أبدًا — وبوابة الأدمن هي الأثقل بطبيعتها.
+ *     A customer browsing the store does not download the admin panel code or
+ *     the point of sale. A single bundle makes a student on a weak connection
+ *     wait for code they will never open — and the admin portal is the heaviest by nature.
  */
 const AdminShell = lazy(() =>
   import('@/portals/admin/AdminShell').then((module) => ({ default: module.AdminShell })),
@@ -104,11 +105,11 @@ const AdminTaxPage = lazy(() =>
   })),
 );
 /**
- * ⚠️  نقطة البيع حزمة مستقلة تمامًا.
+ * ⚠️  Point of sale is a fully independent bundle.
  *
- *     جهاز الكاونتر يفتح شاشة واحدة طوال اليوم على شبكة الفرع؛
- *     تحميله كود لوحة الأدمن وصفحات المتجر معه يؤخّر أول بيعة في
- *     الصباح بلا مقابل.
+ *     The counter machine keeps one screen open all day on the branch network;
+ *     making it download the admin panel and the store pages too delays the
+ *     first sale of the morning for nothing.
  */
 const PosShell = lazy(() =>
   import('@/portals/pos/PosShell').then((module) => ({ default: module.PosShell })),
@@ -123,10 +124,10 @@ const ShiftPage = lazy(() =>
 );
 
 /**
- * ⚠️  بوابة الموظفين حزمة مستقلة.
+ * ⚠️  The staff portal is an independent bundle.
  *
- *     المندوب يفتح شاشتين ولا يحتاج كود لوحة الأدمن ولا نقطة
- *     البيع — وكثير منهم يعمل من الطريق على شبكة هاتف.
+ *     A rep opens two screens and needs neither the admin panel code nor the
+ *     point of sale — and many of them work on the road over a phone network.
  */
 const StaffShell = lazy(() =>
   import('@/portals/staff/StaffShell').then((module) => ({ default: module.StaffShell })),
@@ -216,35 +217,35 @@ function Lazy({ children }: { children: React.ReactNode }) {
 
 const router = createBrowserRouter([
   {
-    // ── بوابة المتجر — عامة ───────────────────────────────
+    // ── Store portal — public ─────────────────────────────
     path: '/',
     element: <StoreShell />,
     children: [
       { index: true, element: <HomePage /> },
       { path: 'products', element: <ProductsPage /> },
-      // ⚠️  `slug` لا UUID — الرابط يُشارَك ويُفهرَس (ADR-27)
+      // ⚠️  `slug`, not UUID — the link gets shared and indexed (ADR-27)
       { path: 'products/:slug', element: <ProductDetailPage /> },
-      // ⚠️  صفحات عامة بلا حارس: الماركة والفئة مدخلا بحث خارجي
-      //     (ADR-37) — وإخفاؤها خلف تسجيل دخول يقطع الطريق الذي
-      //     يصل منه أغلب الزوار.
+      // ⚠️  Public pages with no guard: brand and category are entry points from
+      //     external search (ADR-37) — and hiding them behind a login cuts off the
+      //     route most visitors arrive by.
       { path: 'brands', element: <BrandsPage /> },
       { path: 'brands/:slug', element: <BrandDetailPage /> },
       { path: 'categories/:slug', element: <CategoryPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
 
-      // ⚠️  مسارات `/auth/*` **تطابق ما يرسله الخادم في البريد**
-      //     حرفيًا (accounts/api.py). تغيير أيٍّ منها يكسر كل رابط
-      //     أُرسل فعلًا — بما فيها روابط في بُرُد وصلت أمس.
+      // ⚠️  The `/auth/*` paths **match what the server sends by email**
+      //     literally (accounts/api.py). Changing any of them breaks every link
+      //     already sent — including links in mail that landed yesterday.
       { path: 'auth/verify-email', element: <VerifyEmailPage /> },
       { path: 'auth/reset-password', element: <ResetPasswordPage /> },
       { path: 'auth/forgot-password', element: <ForgotPasswordPage /> },
 
-      // ⚠️  السلة **عامة**: الزائر يتسوّق قبل أن يسجّل، وإجباره على
-      //     التسجيل ليضيف صنفًا يفقد المبيعة عند أعلى نقطة نية شراء.
+      // ⚠️  The cart is **public**: a visitor shops before registering, and forcing
+      //     them to register to add an item loses the sale at peak purchase intent.
       { path: 'cart', element: <CartPage /> },
 
-      // إتمام الشراء وحده يحتاج حسابًا — الطلب يلزمه مالك
+      // Checkout alone needs an account — an order requires an owner
       {
         path: 'checkout',
         element: (
@@ -270,16 +271,16 @@ const router = createBrowserRouter([
         ),
       },
 
-      // ── فئات الطلاب ────────────────────────────────────────
-      // ⚠️  القائمة عامة والمحتوى يتكيّف: الزائر يرى دعوة للدخول،
-      //     وغير الطالب يرى شرحًا. إخفاء المسار كليًا يجعل رابط
-      //     الحزمة المُشارَك يعطي «الصفحة غير موجودة».
+      // ── Student bundles ─────────────────────────────────
+      // ⚠️  The list is public and the content adapts: a visitor sees an invitation
+      //     to log in, and a non-student sees an explanation. Hiding the route
+      //     entirely would make a shared bundle link show "page not found".
       { path: 'bundles', element: <BundlesPage /> },
       { path: 'bundles/:slug', element: <BundleDetailPage /> },
 
-      // ── بوابة الحساب — داخل قشرة المتجر ───────────────────
-      // ⚠️  الحارس حول القشرة لا حول كل صفحة: صفحة منسيّة واحدة
-      //     تكون بابًا مفتوحًا ولا شيء ينبّه إليها.
+      // ── Account portal — inside the store shell ─────────
+      // ⚠️  The guard wraps the shell, not each page: one forgotten page becomes an
+      //     open door and nothing draws attention to it.
       {
         path: 'account',
         element: (
@@ -292,18 +293,18 @@ const router = createBrowserRouter([
           { path: 'orders', element: <OrdersPage /> },
           { path: 'addresses', element: <AddressesPage /> },
           { path: 'documents', element: <DocumentsPage /> },
-          // ⚠️  الملف الأكاديمي قبل الحزم في الترتيب عمدًا: الحزم
-          //     تُشتق منه، وطالب بلا ملف يرى قائمة فارغة لا يعرف
-          //     سببها ما لم يمرّ بهذه الشاشة أولًا.
+          // ⚠️  The academic profile comes before bundles in the order on purpose:
+          //     bundles are derived from it, and a student without a profile sees an
+          //     empty list with no idea why unless they pass through this screen first.
           { path: 'academic', element: <AcademicPage /> },
           { path: 'bundles', element: <BundlesPage /> },
-          // ⚠️  المسار موجود لكل حساب؛ والشاشة نفسها تُظهر
-          //     «لا ملف تجاري» لغير التجاري. إخفاء المسار كان
-          //     يجعل رابطًا مُشارَكًا يعطي «غير موجودة».
+          // ⚠️  The route exists for every account; the screen itself shows
+          //     "no business profile" for non-business users. Hiding the route made
+          //     a shared link show "not found".
           { path: 'trade', element: <TradeAccountPage /> },
-          // ⚠️  المسار موجود لكل حساب؛ والشاشة تقول «غير متاح»
-          //     لمن لا يشمله البرنامج. إخفاء المسار كان يجعل
-          //     رابطًا مُشارَكًا يعطي «غير موجودة» بدل تفسير.
+          // ⚠️  The route exists for every account; the screen says "not available"
+          //     to anyone the programme does not cover. Hiding the route made a
+          //     shared link show "not found" instead of an explanation.
           { path: 'loyalty', element: <LoyaltyPage /> },
           { path: 'notifications', element: <NotificationsPage /> },
           { path: 'security', element: <SecurityPage /> },
@@ -314,11 +315,11 @@ const router = createBrowserRouter([
     ],
   },
   {
-    // ── بوابة الأدمن ──────────────────────────────────────
-    // ⚠️  الحارس **حول القشرة** لا داخل كل صفحة.
+    // ── Admin portal ──────────────────────────────────────
+    // ⚠️  The guard wraps **the shell**, not the inside of each page.
     //
-    //     وضعه في كل صفحة يجعل صفحة واحدة منسيّة بابًا مفتوحًا —
-    //     ولا شيء ينبّه إليها لأن الشاشة تعمل.
+    //     Putting it on each page makes one forgotten page an open door —
+    //     and nothing draws attention to it, because the screen works.
     path: '/admin',
     element: (
       <RequireAuth allow={isAdmin}>
@@ -329,36 +330,234 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Lazy><AdminDashboardPage /></Lazy> },
-      { path: 'orders', element: <Lazy><AdminOrdersPage /></Lazy> },
-      { path: 'orders/:id', element: <Lazy><AdminOrderDetailPage /></Lazy> },
-      { path: 'products', element: <Lazy><AdminProductsPage /></Lazy> },
-      { path: 'inventory', element: <Lazy><AdminInventoryPage /></Lazy> },
-      { path: 'users', element: <Lazy><AdminAccountsPage /></Lazy> },
-      { path: 'reference', element: <Lazy><AdminReferencePage /></Lazy> },
-      { path: 'pricing', element: <Lazy><AdminPricingPage /></Lazy> },
-      { path: 'reviews', element: <Lazy><AdminReviewsPage /></Lazy> },
-      { path: 'settings', element: <Lazy><AdminSettingsPage /></Lazy> },
-      { path: 'tax', element: <Lazy><AdminTaxPage /></Lazy> },
-      { path: 'payments', element: <Lazy><AdminPaymentsPage /></Lazy> },
+      {
+        path: 'orders',
+        element: (
+          <RequirePermission permission="orders.change_order" screen="nav.orders">
+            <Lazy>
+              <AdminOrdersPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'orders/:id',
+        element: (
+          <RequirePermission permission="orders.change_order" screen="nav.orders">
+            <Lazy>
+              <AdminOrderDetailPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'products',
+        element: (
+          <RequirePermission permission="catalog.change_product" screen="nav.products">
+            <Lazy>
+              <AdminProductsPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'inventory',
+        element: (
+          <RequirePermission permission="inventory.change_stock" screen="nav.inventory">
+            <Lazy>
+              <AdminInventoryPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'users',
+        element: (
+          <RequirePermission permission="accounts.change_user" screen="nav.users">
+            <Lazy>
+              <AdminAccountsPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'reference',
+        element: (
+          <RequirePermission permission="catalog.change_product" screen="nav.reference">
+            <Lazy>
+              <AdminReferencePage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'pricing',
+        element: (
+          <RequirePermission permission="pricing.change_pricelist" screen="nav.pricing">
+            <Lazy>
+              <AdminPricingPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'reviews',
+        element: (
+          <RequirePermission permission="reviews.change_review" screen="nav.reviews">
+            <Lazy>
+              <AdminReviewsPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'settings',
+        element: (
+          <RequirePermission permission="inventory.change_stocklocation" screen="nav.settings">
+            <Lazy>
+              <AdminSettingsPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'tax',
+        element: (
+          <RequirePermission permission="inventory.change_stocklocation" screen="admin.tax">
+            <Lazy>
+              <AdminTaxPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'payments',
+        element: (
+          <RequirePermission permission="payments.change_paymentprovider" screen="nav.payments">
+            <Lazy>
+              <AdminPaymentsPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
       { path: 'mail', element: <Lazy><AdminMailPage /></Lazy> },
-      { path: 'pos-sessions', element: <Lazy><AdminPosSessionsPage /></Lazy> },
-      { path: 'finance', element: <Lazy><AdminFinancePage /></Lazy> },
-      { path: 'expenses', element: <Lazy><AdminExpensesPage /></Lazy> },
-      { path: 'businesses', element: <Lazy><AdminBusinessesPage /></Lazy> },
-      { path: 'staff', element: <Lazy><AdminStaffPage /></Lazy> },
-      { path: 'targets', element: <Lazy><AdminTargetsPage /></Lazy> },
-      { path: 'loyalty', element: <Lazy><AdminLoyaltyPage /></Lazy> },
-      { path: 'academic', element: <Lazy><AdminAcademicPage /></Lazy> },
-      { path: 'reports', element: <Lazy><AdminReportsPage /></Lazy> },
+      {
+        path: 'pos-sessions',
+        element: (
+          <RequirePermission permission="pos.view_possession" screen="pos.sessions">
+            <Lazy>
+              <AdminPosSessionsPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'finance',
+        element: (
+          <RequirePermission permission="finance.view_revenueentry" screen="finance.title">
+            <Lazy>
+              <AdminFinancePage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'expenses',
+        element: (
+          <RequirePermission permission="finance.add_expense" screen="finance.expensesTitle">
+            <Lazy>
+              <AdminExpensesPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'businesses',
+        element: (
+          <RequirePermission permission="b2b.change_businessprofile" screen="b2b.businesses">
+            <Lazy>
+              <AdminBusinessesPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'staff',
+        element: (
+          <RequirePermission permission="employees.change_customerassignment" screen="staff.staffTitle">
+            <Lazy>
+              <AdminStaffPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'targets',
+        element: (
+          <RequirePermission permission="commissions.change_commissionrecord" screen="targets.title">
+            <Lazy>
+              <AdminTargetsPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'loyalty',
+        element: (
+          <RequirePermission permission="loyalty.change_loyaltyprogram" screen="loyalty.title">
+            <Lazy>
+              <AdminLoyaltyPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'academic',
+        element: (
+          <RequirePermission permission="academic.change_university" screen="academic.adminTitle">
+            <Lazy>
+              <AdminAcademicPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'reports',
+        element: (
+          <RequirePermission permission="finance.view_revenueentry" screen="reports.title">
+            <Lazy>
+              <AdminReportsPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
       { path: 'traffic', element: <Lazy><AdminTrafficPage /></Lazy> },
-      { path: 'suppliers', element: <Lazy><AdminSuppliersPage /></Lazy> },
-      { path: 'branding', element: <Lazy><AdminBrandingPage /></Lazy> },
+      {
+        path: 'suppliers',
+        element: (
+          <RequirePermission permission="suppliers.add_purchaseorder" screen="suppliers.title">
+            <Lazy>
+              <AdminSuppliersPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'branding',
+        element: (
+          <RequirePermission permission="branding.change_brandprofile" screen="nav.branding">
+            <Lazy>
+              <AdminBrandingPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
     ],
   },
   {
-    // ── بوابة الموظفين ────────────────────────────────────
-    // ⚠️  `isStaff` يطابق `IsEmployee` على الخادم (موظف أو أدمن).
-    //     والقشرة نفسها تصدّ من لا ملف موظف نشط له.
+    // ── Staff portal ──────────────────────────────────────
+    // ⚠️  `isStaff` matches `IsEmployee` on the server (employee or admin).
+    //     The shell itself turns away anyone without an active employee profile.
     path: '/staff',
     element: (
       <RequireAuth allow={isStaff}>
@@ -373,10 +572,10 @@ const router = createBrowserRouter([
     ],
   },
   {
-    // ── بوابة نقطة البيع ──────────────────────────────────
-    // ⚠️  `isStaff` يطابق `CanOperatePOS` على الخادم بالضبط
-    //     (موظف أو أدمن). فحص أوسع هنا يُظهر شاشة ترفضها كل نقطة
-    //     خلفها؛ وأضيق يحجب الكاشير عن أداة عمله.
+    // ── Point-of-sale portal ──────────────────────────────
+    // ⚠️  `isStaff` matches `CanOperatePOS` on the server exactly
+    //     (employee or admin). A broader check here shows a screen that every
+    //     endpoint behind it rejects; a narrower one locks the cashier out of their tool.
     path: '/pos',
     element: (
       <RequireAuth allow={isStaff}>

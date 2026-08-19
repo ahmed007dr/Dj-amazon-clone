@@ -1,9 +1,9 @@
 """
-لوحة السلة.
+Cart admin panel.
 
-السلة كيان عابر — اللوحة هنا للتشخيص («لماذا لم يُحوَّل هذا العميل؟»)
-لا للتحرير. أي تعديل يدوي على السطور يتجاوز `cart.services` وما فيه من
-تحقّق من الإتاحة والصلاحية.
+The cart is a transient entity — the panel here is for diagnosis ("why did this
+customer not convert?"), not for editing. Any manual edit to the lines bypasses
+`cart.services` and the availability and permission checks inside it.
 """
 
 from django.contrib import admin

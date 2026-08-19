@@ -1,14 +1,14 @@
 """
-صور المنتجات — الرفع والترتيب والحذف.
+Product images — upload, ordering and deletion.
 
-⚠️  **الفحص على توقيع الملف لا على ترويسته.**
+⚠️  **The check is on the file signature, not on its header.**
 
-    `core.files.validate_upload` يقرأ أول بايتات الملف. رفع
-    `shell.php` بترويسة `image/png` كان يمرّ الفحص السطحي بالكامل.
+    `core.files.validate_upload` reads the file's first bytes. Uploading
+    `shell.php` with an `image/png` header used to pass a surface check entirely.
 
-⚠️  و«الصورة الرئيسية» واحدة لكل منتج — يفرضه قيد في قاعدة
-    البيانات. تعيين ثانية يجب أن يُنزع الأولى في نفس المعاملة،
-    وإلا رفض القيد العملية برسالة تكامل لا يفهمها أحد.
+⚠️  And there is one "primary image" per product — enforced by a database
+    constraint. Setting a second must unset the first in the same transaction,
+    or the constraint rejects the operation with an integrity message nobody understands.
 """
 
 from django.db import transaction
@@ -22,18 +22,18 @@ from catalog.models import Product, ProductImage
 from catalog.serializers import ProductImageSerializer
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
-from core.permissions import IsAdminAccount
+from core.permissions import CanManageCatalog
 
-#: ⚠️  حد أعلى لعدد الصور.
+#: ⚠️  An upper bound on the number of images.
 #:
-#:     منتج بمئة صورة يجعل صفحته تُحمّل عشرات الميجابايت على هاتف،
-#:     ويجعل استعلام القائمة يجرّ صفوفًا لا تُعرض. ثمانية تكفي لأي
-#:     منتج طبي.
+#:     A product with a hundred images makes its page download tens of megabytes
+#:     on a phone, and makes the list query drag rows that are never displayed.
+#:     Eight is enough for any medical product.
 MAX_IMAGES_PER_PRODUCT = 8
 
 
 class ProductImageListCreateAPI(generics.ListCreateAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageCatalog]
     serializer_class = ProductImageSerializer
     pagination_class = None
 
@@ -55,10 +55,10 @@ class ProductImageListCreateAPI(generics.ListCreateAPIView):
                 status_code=409,
             )
 
-        # ⚠️  أول صورة تصير الرئيسية تلقائيًا.
+        # ⚠️  The first image automatically becomes the primary.
         #
-        #     منتج بصور بلا رئيسية يظهر بلا صورة في كل قائمة —
-        #     والأدمن يرى صوره مرفوعة فلا يفهم السبب.
+        #     A product with images but no primary shows up with no image in every
+        #     list — and the admin, seeing their images uploaded, cannot work out why.
         is_first = existing == 0
 
         image = serializer.save(
@@ -76,21 +76,21 @@ class ProductImageListCreateAPI(generics.ListCreateAPIView):
 
 
 class ProductImageDetailAPI(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageCatalog]
     serializer_class = ProductImageSerializer
     lookup_url_kwarg = "image_pk"
 
     def get_queryset(self):
-        # ⚠️  مُصفّى بالمنتج — لا تُحذف صورة منتج آخر بتخمين معرّفها
+        # ⚠️  Filtered by product — no deleting another product's image by guessing its id
         return ProductImage.objects.filter(product_id=self.kwargs["pk"])
 
     @transaction.atomic
     def perform_destroy(self, instance):
         """
-        ⚠️  حذف الصورة الرئيسية يرقّي التالية.
+        ⚠️  Deleting the primary image promotes the next one.
 
-            تركه يجعل المنتج بلا صورة رئيسية رغم امتلاكه صورًا،
-            فيختفي من كل قائمة بصريًا بلا سبب ظاهر.
+            Leaving it leaves the product with no primary image despite having
+            images, so it disappears visually from every list for no evident reason.
         """
         was_primary = instance.is_primary
         product_id = instance.product_id
@@ -107,15 +107,15 @@ class ProductImageDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
 class SetPrimaryImageAPI(APIView):
     """
-    تعيين الصورة الرئيسية.
+    Set the primary image.
 
-    ⚠️  النزع والتعيين في **معاملة واحدة**.
+    ⚠️  Unset and set in **a single transaction**.
 
-        القيد الفريد يمنع صورتين رئيسيتين؛ والتعيين قبل النزع
-        يرفضه بخطأ تكامل خام يظهر للأدمن كـ ٥٠٠.
+        The unique constraint forbids two primary images; setting before
+        unsetting is rejected with a raw integrity error that reaches the admin as a 500.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageCatalog]
 
     @transaction.atomic
     def post(self, request, pk, image_pk):
@@ -133,13 +133,13 @@ class SetPrimaryImageAPI(APIView):
 
 class ReorderImagesAPI(APIView):
     """
-    إعادة ترتيب صور المنتج.
+    Reorder a product's images.
 
-    ⚠️  الترتيب يحدد ما يظهر في المعرض أولًا بعد الرئيسية — وهو
-        قرار عرض لا تفصيل تقني.
+    ⚠️  The order determines what appears first in the gallery after the primary
+        — a presentation decision, not a technical detail.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageCatalog]
 
     @transaction.atomic
     def post(self, request, pk):
@@ -153,11 +153,11 @@ class ReorderImagesAPI(APIView):
             for image_id in ProductImage.objects.filter(product_id=pk).values_list("id", flat=True)
         }
 
-        # ⚠️  **الفحص قبل التعديل لا بعده.**
+        # ⚠️  **Validate before mutating, not after.**
         #
-        #     الترتيب المعكوس كان يكتب ثم يرفع، معتمدًا على المعاملة
-        #     في التراجع. يعمل اليوم — ويتحوّل إلى كتابة جزئية صامتة
-        #     في اليوم الذي يُنزع فيه `@transaction.atomic` لسبب آخر.
+        #     The reverse order used to write and then raise, relying on the
+        #     transaction to roll back. That works today — and turns into a silent
+        #     partial write the day `@transaction.atomic` is removed for another reason.
         unknown = [str(image_id) for image_id in order if str(image_id) not in owned]
         if unknown:
             raise BusinessError(
@@ -166,8 +166,8 @@ class ReorderImagesAPI(APIView):
             )
 
         for index, image_id in enumerate(order):
-            # ⚠️  التصفية بالمنتج باقية رغم الفحص أعلاه — حاجز ثانٍ
-            #     رخيص عند نقطة الكتابة نفسها.
+            # ⚠️  Filtering by product remains despite the check above — a cheap
+            #     second barrier at the point of writing itself.
             ProductImage.objects.filter(pk=image_id, product_id=pk).update(display_order=index * 10)
 
         return Response(

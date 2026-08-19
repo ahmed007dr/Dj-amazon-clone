@@ -5,38 +5,39 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 /**
- * ⚠️  **لا ملف بيئة في `web/`.** الإعداد يأتي من `../.env.public` —
- *     نفس الملف الذي يقرأه Django. (ADR-73 · ADR-74)
+ * ⚠️  **No environment file inside `web/`.** Configuration comes from
+ *     `../.env.public` — the very same file Django reads. (ADR-73 · ADR-74)
  *
- *     كان هنا `web/.env` يحمل `VITE_API_BASE_URL` بينما `src/.env`
- *     يحمل `CORS_ALLOWED_ORIGINS` و`FRONTEND_BASE_URL`: نفس الدومين
- *     مكتوبًا بأربعة أشكال في ملفين. وتبديل بيئة يصيب أحدهما وينسى
- *     الآخر ينتج فشلًا **صامتًا** — المتصفح يحجب الاستجابة ولا يظهر
- *     شيء في سجل الخادم.
+ *     There used to be a `web/.env` holding `VITE_API_BASE_URL` while `src/.env`
+ *     held `CORS_ALLOWED_ORIGINS` and `FRONTEND_BASE_URL`: the same domain
+ *     written in four shapes across two files. Switching environment in one and
+ *     forgetting the other produces a **silent** failure — the browser blocks
+ *     the response and nothing appears in the server log.
  */
 
 /**
- * قراءة الإعداد المشترك.
+ * Reading the shared configuration.
  *
- * ⚠️  **بالاسم الصريح لا بمسح مجلد.**
+ * ⚠️  **By explicit name, never by scanning a directory.**
  *
- *     `loadEnv` من Vite كان سيقرأ `../.env` أيضًا — وهو ملف الأسرار:
- *     المفتاح السري وكلمة مرور قاعدة البيانات ومفتاح تشفير بيانات
- *     اعتماد بوابات الدفع. صحيح أنه لا يُصدِّر إلا ما يحمل البادئة،
- *     لكن فتح ملف الأسرار داخل أداة تبني حزمة المتصفح مخاطرة بلا
- *     مقابل: بادئة واحدة خاطئة تشحنه كله إلى كل زائر.
+ *     Vite's `loadEnv` would have read `../.env` too — the secrets file: the
+ *     secret key, the database password and the encryption key for payment
+ *     gateway credentials. It only exports prefixed values, true, but opening
+ *     the secrets file inside the tool that builds the browser bundle is risk
+ *     with no upside: one wrong prefix ships all of it to every visitor.
  *
- * ⚠️  والمحدِّد أدناه يقبل `PUBLIC_` وحدها.
+ * ⚠️  And the matcher below accepts `PUBLIC_` alone.
  *
- *     فحتى لو وُجّه هذا القارئ يومًا إلى الملف الخطأ، لا يخرج منه
- *     مفتاح واحد لا يحمل البادئة. الضمان بنيوي لا اعتماد على انتباه.
+ *     So even if this reader were ever pointed at the wrong file, not one
+ *     unprefixed key could escape. The guarantee is structural, not a matter of
+ *     staying alert.
  */
 const PUBLIC_KEY = /^\s*(?:export\s+)?(PUBLIC_[A-Z0-9_]+)\s*=\s*(.*)$/;
 
 function readPublicEnv(): Record<string, string> {
   const values: Record<string, string> = {};
 
-  // `.env.public.local` تجاوز محلي للمطوّر — غير مرفوع، ويعلو المشترك
+  // `.env.public.local` is a local developer override — not committed, and outranks the shared file
   for (const name of ['.env.public', '.env.public.local']) {
     let content: string;
     try {
@@ -53,8 +54,8 @@ function readPublicEnv(): Record<string, string> {
     }
   }
 
-  // ⚠️  بيئة التشغيل الحقيقية تعلو الملفين — نفس سلّم أسبقية Django.
-  //     الحاوية ومنصّة النشر تضبطان متغيّرًا لا ملفًا.
+  // ⚠️  The real process environment outranks both files — the same precedence ladder as Django.
+  //     Containers and deployment platforms set a variable, not a file.
   for (const [key, value] of Object.entries(process.env)) {
     if (key.startsWith('PUBLIC_') && value) {
       values[key] = value;
@@ -69,11 +70,11 @@ const publicEnv = readPublicEnv();
 function required(name: string): string {
   const value = publicEnv[name];
   if (!value) {
-    // ⚠️  فشل صريح وقت البناء لا سقوط إلى قيمة افتراضية.
+    // ⚠️  Fail loudly at build time rather than falling back to a default.
     //
-    //     الافتراضي الصامت ينتج نشرًا يبدو ناجحًا ثم يفشل كل نداء
-    //     عند أول مستخدم — وهو ما تحرسه `shared/http/config.ts`
-    //     وقت التشغيل. الحراسة هنا تسبقه بخطوة: قبل بناء الحزمة.
+    //     A silent default produces a deployment that looks successful and then
+    //     fails every call for the first user — which is what `shared/http/config.ts`
+    //     guards at runtime. The guard here comes one step earlier: before the bundle is built.
     throw new Error(`${name} غير مضبوط. انسخ .env.public.example إلى .env.public واضبطه.`);
   }
   return value;
@@ -83,15 +84,15 @@ const scheme = publicEnv.PUBLIC_SCHEME ?? 'http';
 const apiOrigin = `${scheme}://${required('PUBLIC_API_DOMAIN')}`;
 const apiPrefix = (publicEnv.PUBLIC_API_PREFIX ?? '/api/v1').replace(/\/+$/, '');
 
-/** ⚠️  فارغ = يتبع الخادم. يُضبط صراحةً حين تنتقل الوسائط إلى CDN. */
+/** ⚠️  Empty = follows the server. Set explicitly when media moves to a CDN. */
 const mediaOrigin = publicEnv.PUBLIC_MEDIA_ORIGIN || apiOrigin;
 
 /**
- * منفذ خادم التطوير — من دومين الموقع نفسه.
+ * Dev server port — taken from the site domain itself.
  *
- * ⚠️  كان `5173` مكتوبًا هنا بينما يذكره `.env` مرة أخرى في أصول
- *     CORS. ومنفذ يتغيّر في أحدهما دون الآخر يجعل المتصفح يحجب كل
- *     نداء. الإنتاج بلا منفذ في الدومين، فيبقى الافتراضي للتطوير.
+ * ⚠️  `5173` used to be written here while `.env` named it again in the CORS
+ *     origins. A port changed in one and not the other makes the browser block
+ *     every call. Production has no port in the domain, so the default stays for development.
  */
 const sitePort = Number(publicEnv.PUBLIC_SITE_DOMAIN?.split(':')[1] ?? 5173);
 
@@ -105,12 +106,12 @@ export default defineConfig({
   },
 
   /**
-   * ⚠️  الحقن هنا **قائمة بيضاء مكتوبة بالاسم** لا تمريرًا تلقائيًا.
+   * ⚠️  Injection here is an **allowlist written out by name**, not automatic pass-through.
    *
-   *     ما لا يُذكر في هذه الأسطر لا يصل إلى المتصفح مهما كان في
-   *     الملف. و`shared/http/config.ts` يبقى المستهلك الوحيد لها —
-   *     لم يتغيّر منه سطر، وقاعدة ESLint التي تحصر `import.meta`
-   *     فيه ما تزال قائمة.
+   *     Anything not named in these lines never reaches the browser, whatever
+   *     the file contains. And `shared/http/config.ts` remains their only
+   *     consumer — not a line of it changed, and the ESLint rule confining
+   *     `import.meta` to it still stands.
    */
   define: {
     'import.meta.env.VITE_API_BASE_URL': JSON.stringify(`${apiOrigin}${apiPrefix}`),
@@ -122,19 +123,19 @@ export default defineConfig({
 
   server: {
     port: sitePort,
-    // ⚠️  لا وكيل (proxy) للـ API.
+    // ⚠️  No proxy for the API.
     //
-    //     الوكيل يجعل التطوير يعمل بمسار نسبي بينما الإنتاج يحتاج
-    //     عنوانًا كاملًا — ففرق البيئتين يظهر أول مرة بعد النشر.
-    //     العنوان يأتي من الإعداد المشترك في الحالتين.
+    //     A proxy makes development work off a relative path while production needs
+    //     a full address — so the difference between the two environments first
+    //     shows up after deployment. The address comes from the shared configuration in both cases.
   },
 
   build: {
-    // ⚠️  تقسيم الكود على مستوى البوابة.
+    // ⚠️  Code splitting at the portal level.
     //
-    //     العميل الذي يتصفّح المتجر لا يحمّل شاشات الأدمن ولا نقطة
-    //     البيع. الحزمة الواحدة تجعل زائرًا على شبكة ضعيفة ينتظر
-    //     كودًا لن يراه أبدًا.
+    //     A customer browsing the store does not download the admin screens or the
+    //     point of sale. A single bundle makes a visitor on a weak connection wait
+    //     for code they will never see.
     rollupOptions: {
       output: {
         manualChunks: {

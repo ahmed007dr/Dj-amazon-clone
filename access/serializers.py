@@ -1,4 +1,4 @@
-"""عقود سياسات الوصول."""
+"""Access policy contracts."""
 
 from rest_framework import serializers
 
@@ -29,8 +29,8 @@ class AccessPolicySerializer(serializers.ModelSerializer):
 
     def validate_allowed_account_types(self, value):
         """
-        ⚠️  قيمة غير صالحة هنا تعني سياسة لا تنطبق على أحد —
-            منتج يختفي عن الجميع بصمت بلا رسالة خطأ.
+        ⚠️  An invalid value here means a policy that applies to nobody —
+            a product silently disappearing for everyone with no error message.
         """
         if not isinstance(value, list):
             raise serializers.ValidationError("يجب أن تكون قائمة")

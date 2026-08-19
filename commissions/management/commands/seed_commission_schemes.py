@@ -1,18 +1,18 @@
 """
-بذر خطط العمولة القياسية.
+Seed the standard commission schemes.
 
     python manage.py seed_commission_schemes
 
-⚠️  **توصية لا قرار — قاعدة العمل ١٥ لم تُحسم.**
+⚠️  **A recommendation, not a decision — business rule 15 is not settled.**
 
-    النسب أدناه شرائح متدرّجة على صافي المبيعات، وهي التوصية
-    المكتوبة في سجل القرارات. ما يهمّ معماريًا أنها **بيانات**:
-    تعديلها من اللوحة بلا نشر.
+    The rates below are graduated tiers on net sales, and they are the
+    recommendation written in the decision log. What matters architecturally is
+    that they are **data**: editable from the panel with no deployment.
 
-⚠️  والشريحة العليا **بلا سقف**.
+⚠️  And the top tier has **no ceiling**.
 
-    سقف مكتوب يجعل من حقّق ٥٠٠٪ لا يطابق أي شريحة، فيخرج بعمولة
-    صفر مكافأةً على أفضل شهر في حياته.
+    A written ceiling makes someone who achieved 500% match no tier at all, so
+    they come out with zero commission as a reward for the best month of their life.
 """
 
 from decimal import Decimal
@@ -22,7 +22,7 @@ from django.db import transaction
 
 from commissions.models import CommissionBase, CommissionScheme, CommissionTier
 
-#: (من ٪، إلى ٪ أو None، نسبة العمولة ٪)
+#: (from %, to % or None, commission rate %)
 TIERS = [
     (Decimal("0"), Decimal("50"), Decimal("0")),
     (Decimal("50"), Decimal("80"), Decimal("1")),
@@ -39,10 +39,10 @@ SCHEMES = [
         "role_code": "sales-rep",
     },
     {
-        # ⚠️  المندوب الأول على **الربح** لا المبيعات.
+        # ⚠️  The senior rep is paid on **profit**, not sales.
         #
-        #     مندوب يُكافأ على المبيعات وحدها يبيع الأصناف رخيصة
-        #     الهامش بخصومات — فيرتفع رقمه وينخفض ربح المتجر.
+        #     A rep rewarded on sales alone sells the low-margin items at a
+        #     discount — their number rises and the store's profit falls.
         "code": "senior-profit",
         "name_ar": "عمولة المندوب الأول — على الربح",
         "name_en": "Senior commission — on profit",
@@ -75,10 +75,10 @@ class Command(BaseCommand):
             )
             created += int(was_created)
 
-            # ⚠️  الشرائح تُستبدَل كاملةً لا تُضاف.
+            # ⚠️  The tiers are replaced wholesale, never appended to.
             #
-            #     الإضافة على تشغيل ثانٍ تُنتج شرائح متداخلة، فيصير
-            #     المبلغ تابعًا لترتيب الاستعلام لا للقاعدة.
+            #     Appending on a second run produces overlapping tiers, so the
+            #     amount depends on query ordering rather than on the rule.
             scheme.tiers.all().delete()
             for low, high, rate in TIERS:
                 CommissionTier.objects.create(

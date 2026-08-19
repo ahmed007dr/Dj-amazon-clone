@@ -1,8 +1,8 @@
 """
-واجهات إدارة الضريبة.
+Tax administration endpoints.
 
-⚠️  التحكم الكامل من اللوحة: النسبة · فترة السريان · الفئات المعفاة ·
-    إيقاف الضريبة كليًا — بلا تعديل كود ولا إعادة نشر.
+⚠️  Full control from the panel: the rate · the validity period · exempt classes ·
+    disabling tax entirely — with no code change and no redeployment.
 """
 
 from django.utils.translation import gettext as _
@@ -14,11 +14,11 @@ from administration import tax_serializers as s
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
 from core.models.tax import TaxClass
-from core.permissions import IsAdminAccount
+from core.permissions import CanManageSettings
 
 
 class TaxClassListCreateAPI(generics.ListCreateAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageSettings]
     serializer_class = s.TaxClassSerializer
     pagination_class = None
     queryset = TaxClass.objects.all()
@@ -38,17 +38,18 @@ class TaxClassListCreateAPI(generics.ListCreateAPIView):
 
 
 class TaxClassDetailAPI(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageSettings]
     serializer_class = s.TaxClassSerializer
     queryset = TaxClass.objects.all()
 
     def perform_update(self, serializer):
         """
-        ⚠️  تغيير النسبة **لا يمسّ الطلبات الصادرة**.
+        ⚠️  Changing the rate **does not touch orders already issued**.
 
-            كل سطر يحمل نسبته وقت البيع (ADR-30). الأثر يبدأ من
-            الطلب التالي — والتدقيق يسجّل القديمة والجديدة معًا
-            ليُفسَّر أي فرق في التقارير لاحقًا.
+            Every line carries its rate at the time of sale (ADR-30). The effect
+            starts with the next order — and the audit records the old and the
+            new rate together, so any later discrepancy in the reports can be
+            explained.
         """
         previous = TaxClass.objects.get(pk=self.get_object().pk).rate
         tax_class = serializer.save()
@@ -63,11 +64,12 @@ class TaxClassDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_destroy(self, instance):
         """
-        ⚠️  الفئة المستخدمة أو الافتراضية **لا تُحذف**.
+        ⚠️  A class that is in use, or is the default, is **never deleted**.
 
-            حذف فئة مسنَدة يترك منتجات تسقط إلى الافتراضية بنسبة
-            مختلفة بلا أن يقصد أحد ذلك؛ وحذف الافتراضية يترك النظام
-            بلا مرجع فيبيع بلا ضريبة.
+            Deleting an assigned class leaves products falling back to the
+            default at a different rate with nobody intending it; and deleting
+            the default leaves the system with no reference, so it sells
+            without tax.
         """
         from django.apps import apps
 
@@ -92,9 +94,9 @@ class TaxClassDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
 
 class SetDefaultTaxClassAPI(APIView):
-    """⚠️  واحدة افتراضية فقط — يفرضه قيد في قاعدة البيانات."""
+    """⚠️  Exactly one default — enforced by a database constraint."""
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageSettings]
 
     def post(self, request, pk):
         tax_class = TaxClass.objects.filter(pk=pk).first()
@@ -131,13 +133,13 @@ class SetDefaultTaxClassAPI(APIView):
 
 class TaxSettingsAPI(APIView):
     """
-    إعدادات الضريبة العامة.
+    General tax settings.
 
-    ⚠️  إيقافها يسري على **كل** المنتجات فورًا — والتدقيق إلزامي
-        لأنها أكثر إعداد أثرًا ماليًا في النظام.
+    ⚠️  Disabling it applies to **every** product immediately — and auditing is
+        mandatory because it is the most financially consequential setting in the system.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageSettings]
     serializer_class = s.TaxSettingsSerializer
 
     def get(self, request):

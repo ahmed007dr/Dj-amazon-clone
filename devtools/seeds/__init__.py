@@ -1,6 +1,6 @@
 """
-وحدات البذر — كل وحدة تبذر نطاقًا وتُعيد ما أنشأته.
+Seed modules — each one seeds a domain and returns what it created.
 
-كلها **قابلة للتشغيل مرارًا**: `update_or_create` بمفتاح طبيعي
-(`code` · `sku` · `email`)، فتشغيلها عشر مرات كتشغيلها مرة.
+All of them are **re-runnable**: `update_or_create` with a natural key
+(`code` · `sku` · `email`), so running them ten times is the same as once.
 """

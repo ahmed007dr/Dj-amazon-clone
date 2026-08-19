@@ -1,14 +1,14 @@
 """
-عقود إدارة الضريبة.
+Tax administration contracts.
 
-⚠️  الضريبة **متغيّرة وقد لا توجد أصلًا** — قرار عمل مُعتمد
-    (البند ١ب، 2026-08-14):
+⚠️  Tax is **variable and may not exist at all** — an approved business decision
+    (item 1b, 2026-08-14):
 
-      · النسبة تتغيّر بقرار حكومي        ⟵ `valid_from` / `valid_to`
-      · بعض المنتجات بلا ضريبة          ⟵ فئة نسبتها صفر تُسنَد للمنتج
-      · وقد تُوقَف على كل المنتجات       ⟵ `tax.enabled = false`
+      · the rate changes by government decree  ⟵ `valid_from` / `valid_to`
+      · some products carry no tax             ⟵ a zero-rate class assigned to the product
+      · and it may be disabled on everything   ⟵ `tax.enabled = false`
 
-    الثلاثة مضبوطة من اللوحة بلا نشر.
+    All three are configured from the panel with no deployment.
 """
 
 from decimal import Decimal
@@ -21,10 +21,10 @@ from core.models.tax import TaxClass
 
 class TaxClassSerializer(serializers.ModelSerializer):
     """
-    ⚠️  `product_count` يجعل أثر التعديل مرئيًا **قبل** وقوعه.
+    ⚠️  `product_count` makes the impact of an edit visible **before** it happens.
 
-        تغيير نسبة فئة يمسّ كل منتج مسنَد إليها؛ ورؤية العدد قبل
-        الحفظ تحوّل القرار من تخمين إلى معرفة.
+        Changing a class's rate touches every product assigned to it; seeing the
+        count before saving turns the decision from a guess into knowledge.
     """
 
     product_count = serializers.SerializerMethodField()
@@ -48,8 +48,8 @@ class TaxClassSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "is_currently_valid", "product_count"]
 
     def get_product_count(self, obj) -> int:
-        # ⚠️  بحث نصي لا استيراد: `core.TaxClass` لا يعرف الكتالوج،
-        #     و`administration` لا يجوز أن يُدخِله في العلاقة.
+        # ⚠️  A string lookup rather than an import: `core.TaxClass` does not know the catalogue,
+        #     and `administration` must not drag it into the relationship.
         from django.apps import apps
 
         product = apps.get_model("catalog", "Product")
@@ -62,8 +62,8 @@ class TaxClassSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        ⚠️  فترة سريان مقلوبة تجعل الفئة غير سارية أبدًا — والنتيجة
-            منتجات بلا ضريبة بصمت. الرفض هنا يمنعها من الوجود.
+        ⚠️  An inverted validity period makes the class never effective — and
+            the result is products silently untaxed. Rejecting it here stops it existing.
         """
         instance = self.instance
         valid_from = attrs.get("valid_from", getattr(instance, "valid_from", None))
@@ -76,12 +76,13 @@ class TaxClassSerializer(serializers.ModelSerializer):
 
 class TaxSettingsSerializer(serializers.Serializer):
     """
-    إعدادات الضريبة العامة.
+    General tax settings.
 
-    ⚠️  `enabled = false` يوقف الضريبة على **كل** المنتجات فورًا.
+    ⚠️  `enabled = false` stops tax on **every** product immediately.
 
-        لا يمسّ الطلبات الصادرة: كل سطر يحمل نسبته المسجَّلة وقت
-        البيع (ADR-30)، وإعادة حسابها من إعداد اليوم تزوير للسجل.
+        It does not touch orders already issued: every line carries the rate
+        recorded at the time of sale (ADR-30), and recomputing them from today's
+        setting would falsify the record.
     """
 
     enabled = serializers.BooleanField()

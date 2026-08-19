@@ -1,11 +1,11 @@
 """
-الترقيم.
+Pagination.
 
-الافتراضي **بالمؤشر بلا `count`** — كشف العدد الكلي تسريب معلومة
-تجارية (المنافس يعرف حجم نشاطك). (ADR-32)
+The default is **cursor-based with no `count`** — exposing the total is a
+commercial information leak (a competitor learns the size of your business). (ADR-32)
 
-الترقيم بالإزاحة مسموح فقط لشاشات الأدمن التي تحتاج «صفحة ٥ من ٤٢»،
-وحيث يملك المستخدم صلاحية رؤية العدد الكلي أصلًا.
+Offset pagination is allowed only for admin screens that need "page 5 of 42",
+and where the user already has permission to see the total.
 """
 
 from collections import OrderedDict
@@ -15,7 +15,7 @@ from rest_framework.response import Response
 
 
 class DefaultCursorPagination(CursorPagination):
-    """الافتراضي لكل القوائم."""
+    """The default for every list."""
 
     page_size = 20
     max_page_size = 100
@@ -37,9 +37,9 @@ class DefaultCursorPagination(CursorPagination):
 
 class AdminPageNumberPagination(PageNumberPagination):
     """
-    للوحات الأدمن فقط — يكشف `count`.
+    Admin panels only — exposes `count`.
 
-    لا يُستخدم على قوائم عامة ولا على قوائم مملوكة للمستخدم.
+    Never used on public lists, nor on lists owned by the user.
     """
 
     page_size = 25

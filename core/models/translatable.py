@@ -1,11 +1,11 @@
 """
-ترجمة المحتوى — عربي وإنجليزي.
+Content translation — Arabic and English.
 
-نميّز بين نوعين:
-  • ترجمات الواجهة    → gettext / ملفات .po
-  • ترجمات المحتوى    → حقلان في قاعدة البيانات  ← هذا الملف
+We distinguish two kinds:
+  • interface translations  → gettext / .po files
+  • content translations    → two database fields  ← this file
 
-المحتوى الذي يراه العميل يُخزَّن باللغتين ويُرسَل بهما معًا (ADR-34).
+Content the customer sees is stored in both languages and sent in both (ADR-34).
 """
 
 from django.db import models
@@ -15,15 +15,15 @@ from django.utils.translation import gettext_lazy as _
 
 class TranslatedFieldMixin:
     """
-    يوفّر خاصية `<field>` تُرجع النسخة المطابقة للغة الحالية.
+    Provides a `<field>` property returning the version matching the current language.
 
         class Product(TranslatedFieldMixin, BaseModel):
             TRANSLATED_FIELDS = ['name', 'description']
             name_ar = models.CharField(max_length=200)
             name_en = models.CharField(max_length=200)
 
-        product.name        # حسب لغة الطلب، مع رجوع للعربية
-        product.name_ar     # صريح
+        product.name        # per the request language, falling back to Arabic
+        product.name_ar     # explicit
     """
 
     TRANSLATED_FIELDS: list[str] = []
@@ -37,7 +37,7 @@ class TranslatedFieldMixin:
         return value
 
     def __getattr__(self, name):
-        # يُستدعى فقط عند فشل البحث المعتاد
+        # Called only when the ordinary lookup fails
         translated_fields = type(self).__dict__.get("TRANSLATED_FIELDS")
         if translated_fields and name in translated_fields:
             return self.translated(name)
@@ -45,13 +45,13 @@ class TranslatedFieldMixin:
 
 
 def TranslatedCharField(verbose_name, **kwargs):  # noqa: N802
-    """مساعد لتقليل التكرار عند تعريف حقلَي لغة."""
+    """A helper that reduces repetition when defining a pair of language fields."""
     kwargs.setdefault("max_length", 200)
     return models.CharField(verbose_name, **kwargs)
 
 
 class BilingualNameMixin(TranslatedFieldMixin, models.Model):
-    """اسم ثنائي اللغة — النمط الأكثر تكرارًا."""
+    """A bilingual name — the most frequently repeated pattern."""
 
     TRANSLATED_FIELDS = ["name"]
 

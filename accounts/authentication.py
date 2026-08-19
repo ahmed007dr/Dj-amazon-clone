@@ -1,10 +1,11 @@
 """
-مصادقة JWT مع فحص حالة الحساب.
+JWT authentication with an account status check.
 
-⚠️  الطبقة الثالثة من آلية الإبطال الفوري (ADR-16).
+⚠️  The third layer of the immediate revocation mechanism (ADR-16).
 
-    بدونها، إيقاف حساب لا يقطع وصوله فورًا — التوكن الصادر يبقى
-    صالحًا حتى انتهاء عمره. زر «إيقاف الحساب» يصير زخرفيًا.
+    Without it, suspending an account does not cut off access immediately — an
+    already-issued token stays valid until it expires. The "suspend account"
+    button becomes decorative.
 """
 
 from django.utils import translation
@@ -18,19 +19,19 @@ from core.middleware import EXPLICIT_FLAG, supported_languages
 
 def apply_user_language(request, user) -> None:
     """
-    المرحلة الثانية من تفاوض اللغة.
+    The second stage of language negotiation.
 
-    تُطبَّق فور معرفة المستخدم — وهي مع JWT لحظة لا تقع إلا بعد
-    انتهاء كل الوسائط. انظر `core.middleware.LanguageMiddleware`.
+    Applied as soon as the user is known — a moment that, with JWT, only occurs
+    after all middleware has finished. See `core.middleware.LanguageMiddleware`.
 
-    ⚠️  الترويسة الصريحة لا تُدهَس أبدًا.
+    ⚠️  An explicit header is never overridden.
     """
     if request is None:
         return
 
-    # ⚠️  DRF يغلّف HttpRequest في Request خاص به.
-    #     `process_response` في الوسيط يقرأ الأصلي، فالإسناد على
-    #     الغلاف وحده لا يصل إليه.
+    # ⚠️  DRF wraps HttpRequest in its own Request.
+    #     `process_response` in the middleware reads the original, so assigning to
+    #     the wrapper alone never reaches it.
     http_request = getattr(request, "_request", request)
 
     if getattr(http_request, EXPLICIT_FLAG, False):
@@ -44,11 +45,11 @@ def apply_user_language(request, user) -> None:
 
 class StatefulJWTAuthentication(JWTAuthentication):
     """
-    ترتيب الفحص مقصود — الأرخص أولًا:
+    The check order is deliberate — cheapest first:
 
-        1. مجموعة الموقوفين في الكاش   O(1) بلا استعلام
-        2. حالة الحساب في القاعدة       المستخدم محمَّل أصلًا
-        3. is_active                    الشرط الأساسي
+        1. the suspended set in the cache   O(1), no query
+        2. the account status in the DB     the user is already loaded
+        3. is_active                        the baseline condition
     """
 
     def authenticate(self, request):
@@ -57,13 +58,13 @@ class StatefulJWTAuthentication(JWTAuthentication):
             user = result[0]
             apply_user_language(request, user)
 
-            # ⚠️  نبضة التواجد **هنا** لا في وسيط.
+            # ⚠️  The presence heartbeat lives **here**, not in middleware.
             #
-            #     مع JWT تقع المصادقة في طبقة DRF، أي بعد كل الوسائط؛
-            #     فـ `request.user` في أيّ منها مجهول دائمًا. وهذا هو
-            #     الموضع الوحيد الذي يمرّ به كل طلب مُصادَق ويعرف صاحبه.
+            #     With JWT, authentication happens in the DRF layer — that is, after all
+            #     middleware; so `request.user` is always anonymous in any of them. This is
+            #     the only point every authenticated request passes through knowing its owner.
             #
-            #     والنبضة في الكاش لا القاعدة — انظر `touch_activity`.
+            #     And the heartbeat goes to the cache, not the database — see `touch_activity`.
             touch_activity(user.pk)
         return result
 

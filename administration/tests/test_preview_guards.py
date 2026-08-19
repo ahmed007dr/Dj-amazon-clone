@@ -1,18 +1,17 @@
 """
-اختبارات وضع معاينة الأدمن.
+Admin preview mode tests.
 
-⚠️  المعاينة أداة خطرة بطبيعتها — تسمح لمستخدم بأن يُقيَّم كنوع
-    حساب آخر. هذه الاختبارات تحرس القيود التي تمنعها من أن تصير
-    جسرًا لانتحال الهوية.
+⚠️  Preview is a dangerous tool by nature — it lets a user be evaluated as
+    another account type. These tests guard the constraints that stop it
+    becoming a bridge to impersonation.
 
-⚠️  تسكن في `administration/` لا `access/`.
+⚠️  They live in `administration/`, not `access/`.
 
-    المعاينة تشترط `AdminProfile`، فاختبارها يستورد
-    `administration.models`. و`access` في L1.5 بينما
-    `administration` في L2 — الاستيراد صاعد، وقد أمسكه
-    import-linter فورًا.
+    Preview requires an `AdminProfile`, so testing it imports
+    `administration.models`. And `access` is in L1.5 while `administration`
+    is in L2 — the import is upward, and import-linter caught it immediately.
 
-    القاعدة الثابتة: **الاختبار يسكن في النطاق الأعلى بين ما يلمسه.**
+    The standing rule: **a test lives in the highest domain among those it touches.**
 """
 
 import pytest
@@ -73,7 +72,7 @@ def policies(db):
 @pytest.mark.django_db
 class TestPreviewGuards:
     def test_non_admin_cannot_preview(self, customer):
-        """⚠️  أخطر اختبار هنا — بدونه المعاينة انتحال هوية."""
+        """⚠️  The most critical test here — without it, preview is impersonation."""
         request = FakeRequest(customer, **{PREVIEW_HEADER: AccountType.PHARMACY})
         assert resolve_preview(request) is None
 
@@ -85,10 +84,10 @@ class TestPreviewGuards:
 
     def test_write_methods_ignore_preview(self, admin):
         """
-        ⚠️  المعاينة للقراءة فقط.
+        ⚠️  Preview is read-only.
 
-        السماح بالكتابة تحتها يعني أدمن ينشئ طلبات باسم نوع حساب
-        آخر — ونسبة تجارية خاطئة في كل تقرير بعدها.
+        Allowing writes under it means an admin creating orders in the name of
+        another account type — and a wrong commercial ratio in every report after that.
         """
         for method in ("POST", "PATCH", "PUT", "DELETE"):
             request = FakeRequest(admin, method=method, **{PREVIEW_HEADER: AccountType.PHARMACY})
@@ -103,8 +102,9 @@ class TestPreviewGuards:
 
     def test_preview_user_has_no_permissions(self, admin):
         """
-        الأدمن لا «يستعير» صلاحياته للنوع الذي يعاينه — وإلا رأى
-        ما لا يراه ذلك النوع فعلًا، فبطل معنى المعاينة.
+        The admin does not "lend" their permissions to the type being previewed
+        — otherwise they would see what that type genuinely cannot, and the
+        point of the preview would be lost.
         """
         preview = build_preview_user(AccountType.PHARMACY, verified=True)
         assert preview.has_perm("access.view_accesspolicy") is False
@@ -136,10 +136,10 @@ class TestPreviewEvaluation:
 
     def test_admin_previewing_narrows_never_widens(self, admin, policies):
         """
-        المعاينة **تُضيّق** الرؤية ولا توسّعها.
+        Preview **narrows** what is visible and never widens it.
 
-        الأدمن يرى كل شيء بصفته؛ وتحت المعاينة يرى ما يراه النوع
-        المُعايَن فقط.
+        The admin sees everything in their own right; under preview they see
+        only what the previewed type sees.
         """
         admin.verification_status = VerificationStatus.VERIFIED
         admin.save()

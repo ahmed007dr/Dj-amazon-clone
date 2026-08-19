@@ -1,13 +1,13 @@
 """
-اختبارات إضافة الحزم الدراسية إلى السلة.
+Tests for adding study bundles to the cart.
 
-⚠️  تسكن في `cart/` لا `academic/`.
+⚠️  These live in `cart/`, not `academic/`.
 
-    `academic` في L2 و`cart` في L5 — والاختبار يلمس الاثنين.
-    القاعدة الثابتة: **الاختبار يسكن في النطاق الأعلى بين ما يلمسه**،
-    فتبقى التبعية نازلة.
+    `academic` is in L2 and `cart` in L5 — and the test touches both.
+    The standing rule: **a test lives in the highest domain among those it
+    touches**, so the dependency stays downward.
 
-    وقد أمسك `import-linter` وضعه في `academic` فور كتابته.
+    And `import-linter` caught it being placed in `academic` the moment it was written.
 """
 
 from decimal import Decimal
@@ -90,10 +90,11 @@ def stocked_bundle(faculty, products, location):
 class TestBundleToCart:
     def test_bundle_expands_into_separate_lines(self, student_user, stocked_bundle, products):
         """
-        ⚠️  الحزمة ليست منتجًا.
+        ⚠️  A bundle is not a product.
 
-        إضافتها كصنف واحد يعني مخزونًا وهميًا لا يعكس توفر
-        مكوّناتها، وتسعيرًا لا يحترم قائمة أسعار العميل.
+        Adding it as a single item means phantom stock that does not reflect
+        its components' availability, and pricing that ignores the customer's
+        price list.
         """
         cart = cart_services.get_active_cart(user=student_user)
         result = cart_services.add_bundle(cart, stocked_bundle, user=student_user)
@@ -107,9 +108,9 @@ class TestBundleToCart:
         self, student_user, stocked_bundle, products, location
     ):
         """
-        ⚠️  صنف نافد من ثلاثة يجب ألا يمنع الاثنين الباقيين.
+        ⚠️  One item out of three being out of stock must not block the other two.
 
-        رفض الحزمة كاملة لأجل صنف واحد يفقد المبيعة كلها.
+        Rejecting the whole bundle over one item loses the entire sale.
         """
         inventory_services.sell_immediately(products[0], 10, location=location)
 
@@ -141,10 +142,10 @@ class TestBundleToCart:
 class TestProfileSeparation:
     def test_student_profile_is_separate_from_customer_profile(self):
         """
-        ⚠️  كون المستخدم طالبًا سياق **إضافي** ينتهي بتخرّجه؛
-            وملفه كعميل يبقى.
+        ⚠️  Being a student is **additional** context that ends at graduation;
+            their customer profile remains.
 
-        دمجهما يعني حقولًا أكاديمية ميتة في ملف كل عميل غير طالب.
+        Merging them means dead academic fields on every non-student customer's profile.
         """
         customer_fields = {f.name for f in CustomerProfile._meta.get_fields()}
 

@@ -1,14 +1,16 @@
 """
-المستخدمون وملفاتهم: أدمن · موظفون · عملاء · طلاب · مهنيون.
+Users and their profiles: admins · employees · customers · students · professionals.
 
-⚠️  **كلمة المرور واحدة ومعروفة ومنشورة.**
+⚠️  **The password is a single, well-known, published one.**
 
-    وهذا هو سبب عدم تثبيت `devtools` خارج بيئة التطوير: الأمر غير
-    موجود في الإنتاج فلا يُشغَّل هناك بأي حال. انظر `devtools/README.md`.
+    And that is why `devtools` is not installed outside the development
+    environment: the command does not exist in production, so it cannot be run
+    there in any case. See `devtools/README.md`.
 
-⚠️  الحسابات مختارة لتغطية **الحالات التي تكسر الواجهات**:
-    حساب موقوف · حساب ينتظر التوثيق · حساب رُفض توثيقه · حساب
-    بلا طلبات. عرض «كل شيء مثالي» يخفي نصف الشاشات.
+⚠️  The accounts are chosen to cover **the cases that break interfaces**:
+    a suspended account · an account awaiting verification · an account whose
+    verification was rejected · an account with no orders. Showing "everything
+    is perfect" hides half the screens.
 """
 
 from django.utils import timezone
@@ -18,7 +20,7 @@ from accounts.models import AccountStatus, AccountType, User, VerificationStatus
 from administration.models import AdminProfile, AdminRole, AdminRoleAssignment
 from customers.models import CustomerAddress, CustomerProfile, CustomerSegment
 
-#: ⚠️  للتطوير وحده — انظر رأس الملف
+#: ⚠️  Development only — see the top of this file
 PASSWORD = "Dev-Pass!2026"  # noqa: S105
 
 ADMIN_ROLES = [
@@ -30,7 +32,7 @@ ADMIN_ROLES = [
     ("auditor", "مدقّق", "Auditor", "قراءة فقط — لكل شيء"),
 ]
 
-#: (البريد، الاسم الأول، الأخير، النوع، الحالة، التوثيق)
+#: (email, first name, last name, type, status, verification)
 STAFF = [
     ("owner@dev.local", "أحمد", "المالك", AccountType.ADMIN, "owner"),
     ("catalog@dev.local", "منى", "عبد الله", AccountType.ADMIN, "catalog-manager"),
@@ -43,7 +45,7 @@ EMPLOYEES = [
     ("cashier@dev.local", "ياسمين", "طارق", AccountType.EMPLOYEE),
 ]
 
-#: (البريد، الأول، الأخير، النوع، التصنيف، الحالة، التوثيق، الهاتف)
+#: (email, first, last, type, segment, status, verification, phone)
 CUSTOMERS = [
     (
         "customer@dev.local",
@@ -66,8 +68,8 @@ CUSTOMERS = [
         "01007654321",
     ),
     (
-        # ⚠️  حساب موقوف — يجعل شاشة الإيقاف ومنع الدخول قابلَين
-        #     للتجربة بلا تجهيز يدوي
+        # ⚠️  A suspended account — it makes the suspension screen and the login
+        #     block testable with no manual setup
         "suspended@dev.local",
         "عمرو",
         "زكي",
@@ -88,7 +90,7 @@ CUSTOMERS = [
         "01112223344",
     ),
     (
-        # ⚠️  ينتظر التوثيق — طابور المراجعة اليدوية (قاعدة العمل ٢)
+        # ⚠️  Awaiting verification — the manual review queue (business rule 2)
         "pharmacist@dev.local",
         "أ. كريم",
         "نبيل",
@@ -99,7 +101,7 @@ CUSTOMERS = [
         "01115556677",
     ),
     (
-        # ⚠️  توثيق مرفوض — رسالة الرفض مسار لا يُختبر عادةً
+        # ⚠️  Verification rejected — the rejection message is a path not normally exercised
         "rejected@dev.local",
         "سامي",
         "لطفي",
@@ -129,8 +131,8 @@ CUSTOMERS = [
         VerificationStatus.VERIFIED,
         "01226667788",
     ),
-    # ⚠️  حساب جملة **بلا ائتمان** — الحالة الافتراضية لأي حساب
-    #     جديد، وهي التي لا تُرى في التطوير إن لم تُبذَر.
+    # ⚠️  A wholesale account **with no credit** — the default state of any new
+    #     account, and the one never seen in development unless it is seeded.
     (
         "wholesale@dev.local",
         "مخزن الدلتا",
@@ -143,15 +145,15 @@ CUSTOMERS = [
     ),
 ]
 
-#: (البريد، الأول، الأخير، رمز الكلية، السنة، رقم الطالب، موثّق؟)
+#: (email, first, last, faculty code, year, student number, verified?)
 STUDENTS = [
     ("student@dev.local", "يوسف", "إبراهيم", "cairo-med", 1, "20240118", True),
     ("student2@dev.local", "مريم", "سعيد", "cairo-pharm", 2, "20230451", True),
-    # ⚠️  طالب غير موثّق — أسعار الطلاب يجب ألا تنطبق عليه
+    # ⚠️  An unverified student — student pricing must not apply to them
     ("student3@dev.local", "عبد الرحمن", "جمال", "asu-pharm", 1, "20240987", False),
 ]
 
-#: (بريد العميل، التسمية، المستلم، الهاتف، المحافظة، المدينة، الشارع، افتراضي؟)
+#: (customer email, label, recipient, phone, governorate, city, street, default?)
 ADDRESSES = [
     (
         "customer@dev.local",
@@ -204,7 +206,7 @@ ADDRESSES = [
         True,
     ),
     (
-        # ⚠️  محافظة نائية — تكشف رسوم المنطقة الافتراضية
+        # ⚠️  A remote governorate — it reveals the default zone's fees
         "trader@dev.local",
         "المخزن",
         "مؤسسة النيل",
@@ -219,8 +221,8 @@ ADDRESSES = [
 
 def _upsert_user(email, first_name, last_name, account_type, **extra):
     """
-    ⚠️  `create_user` تُلزم كلمة مرور مُجزّأة — `update_or_create`
-        وحدها تكتب النص الخام فلا يعمل تسجيل الدخول.
+    ⚠️  `create_user` is required so the password is hashed —
+        `update_or_create` alone writes the raw text, so login does not work.
     """
     user = User.objects.filter(email=email).first()
 
@@ -264,7 +266,7 @@ def seed(faculties: dict):
 
     users = {}
 
-    # ── الأدمن ─────────────────────────────────────────────
+    # ── Admins ─────────────────────────────────────────────
     for email, first_name, last_name, account_type, role_code in STAFF:
         user = _upsert_user(
             email,
@@ -286,7 +288,7 @@ def seed(faculties: dict):
         AdminRoleAssignment.objects.get_or_create(admin=profile, role=roles[role_code])
         users[email] = user
 
-    # ── الموظفون ───────────────────────────────────────────
+    # ── Employees ──────────────────────────────────────────
     for email, first_name, last_name, account_type in EMPLOYEES:
         users[email] = _upsert_user(
             email,
@@ -297,7 +299,7 @@ def seed(faculties: dict):
             verification_status=VerificationStatus.NOT_REQUIRED,
         )
 
-    # ── العملاء ────────────────────────────────────────────
+    # ── Customers ──────────────────────────────────────────
     customers = {}
     for (
         email,
@@ -329,7 +331,7 @@ def seed(faculties: dict):
         users[email] = user
         customers[email] = profile
 
-    # ── الطلاب ─────────────────────────────────────────────
+    # ── Students ───────────────────────────────────────────
     students = {}
     for email, first_name, last_name, faculty_code, year, number, verified in STUDENTS:
         faculty = faculties.get(faculty_code)
@@ -367,7 +369,7 @@ def seed(faculties: dict):
         students[email] = profile
         customers[email] = user.customer_profile
 
-    # ── العناوين ───────────────────────────────────────────
+    # ── Addresses ──────────────────────────────────────────
     address_count = 0
     for (
         email,

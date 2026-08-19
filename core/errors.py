@@ -1,15 +1,16 @@
 """
-أكواد الأخطاء الموحّدة.
+Unified error codes.
 
-القاعدة: **الكود ثابت إنجليزي مقروء آليًا · الرسالة مترجمة للعرض.**
+The rule: **the code is a stable, machine-readable English constant · the
+message is translated for display.**
 
-ممنوع أن يعتمد منطق الفرونت إند على نص الرسالة — النص يتغيّر ويُترجم،
-أما الكود فعقد ثابت.
+Frontend logic must never depend on the message text — the text changes and
+gets translated, while the code is a fixed contract.
 
     {
       "code":    "INSUFFICIENT_STOCK",
-      "message": "الكمية المطلوبة غير متوفرة",
-      "detail":  "المتاح: 3 · المطلوب: 10",
+      "message": "The requested quantity is unavailable",   # localised for display
+      "detail":  "available: 3 · requested: 10",
       "fields":  null
     }
 """
@@ -20,9 +21,9 @@ from rest_framework.exceptions import APIException
 
 
 class ErrorCode:
-    """كتالوج الأكواد. كل كود جديد يُضاف هنا."""
+    """The code catalogue. Every new code is added here."""
 
-    # ── المصادقة ───────────────────────────────────────────
+    # ── Authentication ─────────────────────────────────────
     AUTHENTICATION_REQUIRED = "AUTHENTICATION_REQUIRED"
     INVALID_CREDENTIALS = "INVALID_CREDENTIALS"
     TOKEN_EXPIRED = "TOKEN_EXPIRED"
@@ -31,12 +32,12 @@ class ErrorCode:
     ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED"
     EMAIL_NOT_VERIFIED = "EMAIL_NOT_VERIFIED"
 
-    # ── الصلاحيات ──────────────────────────────────────────
+    # ── Permissions ────────────────────────────────────────
     PERMISSION_DENIED = "PERMISSION_DENIED"
     VERIFICATION_REQUIRED = "VERIFICATION_REQUIRED"
     PRODUCT_ACCESS_DENIED = "PRODUCT_ACCESS_DENIED"
 
-    # ── التحقق ─────────────────────────────────────────────
+    # ── Validation ─────────────────────────────────────────
     VALIDATION_ERROR = "VALIDATION_ERROR"
     REQUIRED = "REQUIRED"
     INVALID_FORMAT = "INVALID_FORMAT"
@@ -44,38 +45,38 @@ class ErrorCode:
     MIN_VALUE = "MIN_VALUE"
     MAX_VALUE = "MAX_VALUE"
 
-    # ── المخزون ────────────────────────────────────────────
+    # ── Inventory ──────────────────────────────────────────
     INSUFFICIENT_STOCK = "INSUFFICIENT_STOCK"
     PRODUCT_UNAVAILABLE = "PRODUCT_UNAVAILABLE"
     BATCH_EXPIRED = "BATCH_EXPIRED"
 
-    # ── السلة والطلب ───────────────────────────────────────
+    # ── Cart and order ─────────────────────────────────────
     CART_EMPTY = "CART_EMPTY"
     PRICE_CHANGED = "PRICE_CHANGED"
     INVALID_STATE_TRANSITION = "INVALID_STATE_TRANSITION"
     ORDER_ALREADY_PAID = "ORDER_ALREADY_PAID"
     ORDER_CANNOT_BE_CANCELLED = "ORDER_CANNOT_BE_CANCELLED"
 
-    # ── الكوبونات ──────────────────────────────────────────
+    # ── Coupons ────────────────────────────────────────────
     COUPON_NOT_FOUND = "COUPON_NOT_FOUND"
     COUPON_EXPIRED = "COUPON_EXPIRED"
     COUPON_LIMIT_REACHED = "COUPON_LIMIT_REACHED"
     COUPON_NOT_APPLICABLE = "COUPON_NOT_APPLICABLE"
     MINIMUM_ORDER_NOT_MET = "MINIMUM_ORDER_NOT_MET"
 
-    # ── الدفع ──────────────────────────────────────────────
+    # ── Payment ────────────────────────────────────────────
     PAYMENT_FAILED = "PAYMENT_FAILED"
     PAYMENT_GATEWAY_ERROR = "PAYMENT_GATEWAY_ERROR"
     PAYMENT_METHOD_UNAVAILABLE = "PAYMENT_METHOD_UNAVAILABLE"
 
-    # ── عام ────────────────────────────────────────────────
+    # ── General ────────────────────────────────────────────
     NOT_FOUND = "NOT_FOUND"
     CONFLICT = "CONFLICT"
     RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
-#: الرسائل الافتراضية — مترجمة عبر gettext
+#: Default messages — translated through gettext
 ERROR_MESSAGES = {
     ErrorCode.AUTHENTICATION_REQUIRED: _("يلزم تسجيل الدخول"),
     ErrorCode.INVALID_CREDENTIALS: _("بيانات الدخول غير صحيحة"),
@@ -113,11 +114,11 @@ ERROR_MESSAGES = {
 
 class BusinessError(APIException):
     """
-    خطأ قاعدة عمل.
+    A business rule error.
 
         raise BusinessError(
             ErrorCode.INSUFFICIENT_STOCK,
-            detail='المتاح: 3 · المطلوب: 10',
+            detail='available: 3 · requested: 10',
         )
     """
 
@@ -141,10 +142,11 @@ class BusinessError(APIException):
 
 class NotFoundError(BusinessError):
     """
-    ⚠️  يُستخدم أيضًا للمورد الموجود وغير المملوك.
+    ⚠️  Also used for a resource that exists but is not owned by the caller.
 
-    رد `403` للمملوك لغيرك و`404` لغير الموجود يجعل الفرق بينهما
-    أداة تعداد. الردّان متطابقان عمدًا.
+    Answering `403` for someone else's resource and `404` for a nonexistent one
+    turns the difference between them into an enumeration tool. The two
+    responses are identical on purpose.
     """
 
     status_code = status.HTTP_404_NOT_FOUND
@@ -154,7 +156,7 @@ class NotFoundError(BusinessError):
 
 
 class PermissionDeniedError(BusinessError):
-    """لغياب صلاحية على **نوع** العملية — لا على مورد بعينه."""
+    """For a missing permission on a **type** of operation — not on a specific resource."""
 
     status_code = status.HTTP_403_FORBIDDEN
 

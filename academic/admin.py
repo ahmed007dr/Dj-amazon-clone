@@ -1,4 +1,4 @@
-"""لوحة النطاق الأكاديمي."""
+"""Admin panel for the academic domain."""
 
 from django.contrib import admin
 

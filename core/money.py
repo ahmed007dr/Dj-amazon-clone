@@ -1,11 +1,11 @@
 """
-المال.
+Money.
 
-⚠️  ممنوع `float` في أي حساب مالي. `Decimal` حصرًا.
-    الخطأ الحالي في النموذج القديم: FloatField في ٩ مواضع.
+⚠️  `float` is forbidden in any financial calculation. `Decimal` exclusively.
+    The existing defect in the legacy model: FloatField in 9 places.
 
-مع عمولات ومرتجعات وضرائب، فروق الفاصلة العائمة تتراكم
-حتى تكسر أي مطابقة محاسبية.
+With commissions, returns and taxes, floating-point discrepancies accumulate
+until they break any accounting reconciliation.
 """
 
 from decimal import ROUND_HALF_UP, Decimal
@@ -15,48 +15,48 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 # ═══════════════════════════════════════════════════════════
-#  الثوابت
+#  Constants
 # ═══════════════════════════════════════════════════════════
 
-MONEY_MAX_DIGITS = 12  # حتى 9,999,999,999.99
+MONEY_MAX_DIGITS = 12  # up to 9,999,999,999.99
 MONEY_DECIMAL_PLACES = 2
 
-RATE_MAX_DIGITS = 5  # حتى 999.99 %
+RATE_MAX_DIGITS = 5  # up to 999.99 %
 RATE_DECIMAL_PLACES = 2
 
 ZERO = Decimal("0.00")
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحقول
+#  Fields
 # ═══════════════════════════════════════════════════════════
 
 
 def MoneyField(verbose_name=None, **kwargs):  # noqa: N802
-    """حقل مبلغ مالي."""
+    """A monetary amount field."""
     kwargs.setdefault("max_digits", MONEY_MAX_DIGITS)
     kwargs.setdefault("decimal_places", MONEY_DECIMAL_PLACES)
     return models.DecimalField(verbose_name, **kwargs)
 
 
 def RateField(verbose_name=None, **kwargs):  # noqa: N802
-    """حقل نسبة مئوية — ضريبة · خصم · عمولة."""
+    """A percentage field — tax · discount · commission."""
     kwargs.setdefault("max_digits", RATE_MAX_DIGITS)
     kwargs.setdefault("decimal_places", RATE_DECIMAL_PLACES)
     return models.DecimalField(verbose_name, **kwargs)
 
 
 # ═══════════════════════════════════════════════════════════
-#  العمليات
+#  Operations
 # ═══════════════════════════════════════════════════════════
 
 
 def quantize(amount: Decimal) -> Decimal:
     """
-    تقريب إلى دقة العملة.
+    Round to the currency's precision.
 
-    ROUND_HALF_UP هو السلوك المتوقع تجاريًا (0.125 → 0.13)،
-    بخلاف افتراضي بايثون ROUND_HALF_EVEN (0.125 → 0.12).
+    ROUND_HALF_UP is the commercially expected behaviour (0.125 → 0.13), unlike
+    Python's ROUND_HALF_EVEN default (0.125 → 0.12).
     """
     exponent = Decimal(1).scaleb(-MONEY_DECIMAL_PLACES)
     return Decimal(amount).quantize(exponent, rounding=ROUND_HALF_UP)
@@ -64,7 +64,7 @@ def quantize(amount: Decimal) -> Decimal:
 
 def apply_rate(amount: Decimal, rate: Decimal) -> Decimal:
     """
-    تطبيق نسبة مئوية.
+    Apply a percentage rate.
 
         apply_rate(Decimal('100.00'), Decimal('14.00'))  →  Decimal('14.00')
     """
@@ -72,7 +72,7 @@ def apply_rate(amount: Decimal, rate: Decimal) -> Decimal:
 
 
 def percentage_of(part: Decimal, whole: Decimal) -> Decimal:
-    """نسبة الجزء إلى الكل. يعيد صفرًا عند القسمة على صفر."""
+    """The part as a percentage of the whole. Returns zero on division by zero."""
     whole = Decimal(whole)
     if whole == 0:
         return ZERO
@@ -82,11 +82,11 @@ def percentage_of(part: Decimal, whole: Decimal) -> Decimal:
 
 def to_string(amount: Decimal) -> str:
     """
-    التمثيل في JSON — **نص لا رقم**.
+    The JSON representation — **a string, not a number**.
 
-    JSON.parse في جافاسكربت يحوّل الأرقام إلى double فتُفقد الدقة:
-    450.00 تصير 450، و0.1+0.2 تصير 0.30000000000000004.
-    النص يعبر بلا تشويه. (ADR-31)
+    JavaScript's JSON.parse converts numbers to double, so precision is lost:
+    450.00 becomes 450, and 0.1+0.2 becomes 0.30000000000000004.
+    A string crosses undistorted. (ADR-31)
     """
     return str(quantize(amount))
 
@@ -96,7 +96,7 @@ def get_currency() -> str:
 
 
 # ═══════════════════════════════════════════════════════════
-#  العملات
+#  Currencies
 # ═══════════════════════════════════════════════════════════
 
 

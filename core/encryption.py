@@ -1,39 +1,40 @@
 """
-تشفير الحقول الحسّاسة عند التخزين.
+Encryption of sensitive fields at rest.
 
-⚠️  **المشكلة التي يحلّها**: مفتاح بوابة الدفع نصٌّ صريح في قاعدة
-    البيانات. الكود لا يحويه — وهذا صحيح ولا يكفي. أي نسخة احتياطية
-    أو تسريب SQL أو عين على شاشة `psql` تكفي لسحب أموال حقيقية.
+⚠️  **The problem this solves**: the payment gateway key is plaintext in the
+    database. The code does not contain it — which is correct and not enough.
+    Any backup, any SQL leak, or one glance at a `psql` screen is enough to move
+    real money.
 
-⚠️  **التشفير عشوائي لا حتمي** — Fernet يحقن IV وطابعًا زمنيًا، فنفس
-    القيمة تُنتج نصًّا مشفّرًا مختلفًا في كل مرة.
+⚠️  **The encryption is randomised, not deterministic** — Fernet injects an IV
+    and a timestamp, so the same value produces different ciphertext every time.
 
-    ولذلك **لا يُبحَث في الحقل ولا يُقارَن**: `filter(value="k")` كان
-    سيعيد صفرًا دائمًا بلا خطأ — وهو أسوأ سلوك ممكن. الحقل يرفض
-    الاستعلام صراحةً بدلًا من ذلك.
+    The field is therefore **never searched and never compared**:
+    `filter(value="k")` would have returned zero rows forever with no error —
+    the worst possible behaviour. The field explicitly refuses to be queried instead.
 
-⚠️  **بادئة صريحة لا تخمين**: الصف المشفّر يبدأ بـ `PREFIX`.
+⚠️  **An explicit prefix, never guessing**: an encrypted row starts with `PREFIX`.
 
-    التمييز بـ `try: decrypt() except: هو نص صريح` يبتلع مفتاحًا
-    تالفًا ويعامله كنص صريح — فيُرسَل إلى البوابة كما هو. والبادئة
-    تجعل السؤال «هل شُفِّر؟» جوابًا لا احتمالًا، وتسمح بقراءة الصفوف
-    القديمة أثناء الترحيل.
+    Distinguishing with `try: decrypt() except: it is plaintext` swallows a
+    corrupt key and treats it as plaintext — sending it to the gateway as-is.
+    The prefix turns "is this encrypted?" into an answer rather than a
+    probability, and allows old rows to be read during the data migration.
 
-الضبط:
+Configuration:
 
-    FIELD_ENCRYPTION_KEY=<مفتاح>
+    FIELD_ENCRYPTION_KEY=<key>
 
-    ولّده:
+    Generate it with:
         python -c "from cryptography.fernet import Fernet; \
                    print(Fernet.generate_key().decode())"
 
-⚠️  **تدوير المفتاح**: القيمة تقبل مفاتيح مفصولة بفواصل.
+⚠️  **Key rotation**: the value accepts comma-separated keys.
 
-        FIELD_ENCRYPTION_KEY=<الجديد>,<القديم>
+        FIELD_ENCRYPTION_KEY=<new>,<old>
 
-    الأول يُشفّر، وكلها تفكّ. تُضاف قيمة جديدة في المقدمة، ثم يُعاد
-    حفظ الصفوف، ثم يُحذف القديم. وبلا هذا، مفتاح مسرَّب يعني قاعدة
-    بيانات لا يمكن إنقاذها بلا توقّف.
+    The first encrypts, all of them decrypt. Add a new value at the front, then
+    re-save the rows, then drop the old one. Without this, a leaked key means a
+    database that cannot be rescued without downtime.
 """
 
 from __future__ import annotations
@@ -49,8 +50,8 @@ from django.dispatch import receiver
 
 logger = logging.getLogger(__name__)
 
-#: علامة الصف المشفّر. اخترناها بمحارف لا تبدأ بها مفاتيح البوابات
-#: (وهي base64 أو hex أو UUID) — فلا تلتبس قيمة حقيقية بعلامة.
+#: Marker for an encrypted row. Chosen from characters gateway keys never start
+#: with (they are base64, hex or UUID) — so no real value can be mistaken for the marker.
 PREFIX = "enc$fernet$"
 
 _cipher: MultiFernet | None = None
@@ -62,7 +63,7 @@ def _configured_keys() -> list[str]:
 
 
 def _get_cipher() -> MultiFernet | None:
-    """يُبنى مرة ويُحفظ — اشتقاق المفتاح ليس مجانيًا لكل صف."""
+    """Built once and cached — key derivation is not free per row."""
     global _cipher
 
     if _cipher is not None:
@@ -75,11 +76,11 @@ def _get_cipher() -> MultiFernet | None:
     try:
         _cipher = MultiFernet([Fernet(key.encode()) for key in keys])
     except (ValueError, TypeError) as exc:
-        # ⚠️  مفتاح مشوّه يجب أن يقول ذلك بوضوح.
+        # ⚠️  A malformed key must say so clearly.
         #
-        #     الرسالة الأصلية من Fernet («Fernet key must be 32
-        #     url-safe base64-encoded bytes») لا تذكر اسم المتغيّر،
-        #     فيبحث المشغّل عنها في الكود لا في ملف البيئة.
+        #     Fernet's original message ("Fernet key must be 32
+        #     url-safe base64-encoded bytes") does not name the variable,
+        #     so the operator hunts for it in the code rather than the environment file.
         raise ImproperlyConfigured(
             "FIELD_ENCRYPTION_KEY غير صالح — يجب أن يكون مفتاح Fernet. ولّده بـ: "
             'python -c "from cryptography.fernet import Fernet; '
@@ -91,7 +92,7 @@ def _get_cipher() -> MultiFernet | None:
 
 @receiver(setting_changed)
 def _reset_cipher(sender, setting, **kwargs):
-    """اختبار يبدّل المفتاح يجب ألا يرث شفرةً مبنيّة بالقديم."""
+    """A test that swaps the key must not inherit a cipher built with the old one."""
     if setting == "FIELD_ENCRYPTION_KEY":
         global _cipher
         _cipher = None
@@ -103,19 +104,19 @@ def is_encrypted(value: str | None) -> bool:
 
 def encrypt(value: str | None) -> str | None:
     """
-    نص صريح ← نص مشفّر بعلامته.
+    Plaintext ← ciphertext with its marker.
 
-    ⚠️  **يرفض الكتابة بلا مفتاح** — لا يسقط إلى نص صريح.
+    ⚠️  **Refuses to write without a key** — it never falls back to plaintext.
 
-        السقوط الصامت هو بالضبط الحالة التي نصلحها: حقل موصوف
-        بأنه «مشفّر» ومحتواه صريح. الفشل هنا يظهر وقت الضبط، لا
-        بعد شهر في نسخة احتياطية مسرَّبة.
+        Silent fallback is exactly the situation we are fixing: a field
+        described as "encrypted" whose contents are in the clear. Failing here
+        surfaces at configuration time, not a month later in a leaked backup.
     """
     if value is None or value == "":
         return value
     if is_encrypted(value):
-        # ⚠️  مُعاد التشفير = مطابق للأصل. يجعل ترحيل البيانات
-        #     قابلًا لإعادة التشغيل بلا تشفير مزدوج.
+        # ⚠️  Re-encrypting is a no-op on already-encrypted values. This makes the data
+        #     migration re-runnable without double encryption.
         return value
 
     cipher = _get_cipher()
@@ -130,17 +131,17 @@ def encrypt(value: str | None) -> str | None:
 
 def decrypt(value: str | None) -> str | None:
     """
-    نص مشفّر ← نص صريح.
+    Ciphertext ← plaintext.
 
-    ⚠️  القيمة بلا علامة تُعاد كما هي — صفوف ما قبل التشفير تبقى
-        مقروءة حتى يمرّ عليها ترحيل البيانات.
+    ⚠️  A value with no marker is returned as-is — rows predating encryption
+        stay readable until the data migration reaches them.
 
-    ⚠️  وفشل الفكّ يُسجَّل ويعيد `""` ولا يرفع استثناءً.
+    ⚠️  And a decryption failure is logged, returns `""`, and raises nothing.
 
-        المفتاح الخاطئ أو الصف التالف يقع على **قوائم** — رفع
-        الاستثناء يُسقط شاشة البوابات كلها بدل صف واحد. والقيمة
-        الفارغة تجعل المحوّل يفشل بـ «بيانات اعتماد ناقصة: api_key»
-        وهو فشل آمن ومفهوم: لا تحصيل بمفتاح لم نستطع قراءته.
+        A wrong key or a corrupt row happens on **lists** — raising would take
+        down the whole gateways screen instead of one row. The empty value
+        makes the adapter fail with "incomplete credentials: api_key", a safe
+        and comprehensible failure: no charging with a key we could not read.
     """
     if not is_encrypted(value):
         return value
@@ -159,15 +160,16 @@ def decrypt(value: str | None) -> str | None:
 
 class EncryptedTextField(models.TextField):
     """
-    نص يُشفَّر عند الكتابة ويُفكّ عند القراءة — بشفافية تامة للكود.
+    Text encrypted on write and decrypted on read — fully transparent to the code.
 
-    ⚠️  **لا يُستعلَم عنه.** انظر شرح العشوائية في رأس الوحدة.
+    ⚠️  **Never queried.** See the randomness note at the top of this module.
 
-    ⚠️  ولا يصلح لحقل يحتاج فهرسًا أو قيدَ تفرّد: القيم المشفّرة
-        لنفس النص مختلفة، فالقيد لا يمنع التكرار والفهرس لا يُستخدم.
+    ⚠️  And unfit for a field needing an index or a uniqueness constraint: the
+        ciphertext for the same text differs each time, so the constraint does
+        not prevent duplicates and the index is never used.
     """
 
-    #: مسموح وحده — يعمل على مستوى `NULL` لا على المحتوى
+    #: The only one allowed — it works at the `NULL` level, not on the content
     ALLOWED_LOOKUPS = frozenset({"isnull"})
 
     def from_db_value(self, value, expression, connection):

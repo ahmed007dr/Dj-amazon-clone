@@ -1,12 +1,12 @@
 """
-مديرو النظام والأدوار الإدارية.
+System administrators and administrative roles.
 
-⚠️  **«أدمن» ليست صلاحية واحدة.**
-    رؤية الأرباح صلاحية منفصلة عن إدارة المنتجات، وتعديل بوابات
-    الدفع منفصل عن إدارة الطلبات.
+⚠️  **"Admin" is not a single permission.**
+    Seeing profits is a permission separate from managing products, and editing
+    payment gateways is separate from managing orders.
 
-هذا النطاق لا يعتمد على `customers` ولا `employees` — إدارة النظام
-مستقلة عن بيانات البيع. (ADR-11)
+This domain depends on neither `customers` nor `employees` — system
+administration is independent of sales data. (ADR-11)
 """
 
 from django.contrib.auth.models import Permission
@@ -63,10 +63,10 @@ class AdminProfile(BaseModel):
 
 class AdminRole(BilingualNameMixin, BaseModel):
     """
-    دور إداري = حزمة صلاحيات.
+    An administrative role = a bundle of permissions.
 
-    الأدوار المتوقعة: مدير عام · مدير مالي · مدير مخزون ·
-    مدير كتالوج · خدمة عملاء · مدقّق (قراءة فقط).
+    The expected roles: general manager · finance manager · inventory manager ·
+    catalogue manager · customer service · auditor (read-only).
     """
 
     code = models.SlugField(_("الرمز"), max_length=50, unique=True)
@@ -98,10 +98,10 @@ class AdminRole(BilingualNameMixin, BaseModel):
 
 class AdminRoleAssignment(BaseModel):
     """
-    إسناد دور لمدير — بسجل زمني.
+    Assigning a role to an administrator — with a time record.
 
-    الإسناد المنتهي يبقى محفوظًا: التدقيق يحتاج معرفة مَن كان
-    يملك أي صلاحية وقت وقوع حدث ما.
+    An expired assignment is retained: auditing needs to know who held which
+    permission at the moment an event occurred.
     """
 
     admin = models.ForeignKey(
@@ -140,7 +140,7 @@ class AdminRoleAssignment(BaseModel):
     def is_current(self) -> bool:
         from django.utils import timezone
 
-        # ⚠️  `localdate()` لا `now().date()`: الثانية تاريخ UTC،
-        #     فتنتهي صلاحية التكليف قبل موعدها بيوم في ساعات
-        #     الليل الأولى بتوقيت القاهرة.
+        # ⚠️  `localdate()`, not `now().date()`: the latter is a UTC date, so the
+        #     assignment expires a day early during the first hours of the night in
+        #     Cairo time.
         return self.to_date is None or self.to_date >= timezone.localdate()

@@ -1,16 +1,18 @@
 """
-مستمعو B2B.
+B2B listeners.
 
-⚠️  **`orders` لا يعرف بوجود الآجل.**
+⚠️  **`orders` does not know credit terms exist.**
 
-    الطلب يُبعث حالته، وهذا الملف يترجمها إلى حركة على حساب
-    العميل. الاستيراد نازل: `b2b` يعرف الطلبات ولا العكس.
+    The order emits its state, and this file translates it into a movement on
+    the customer's account. The import is downward: `b2b` knows orders, never
+    the reverse.
 
-⚠️  وفشل التقييد **لا يُفشل الطلب** — لكنه يُسجَّل بمستوى خطأ.
+⚠️  And a failed posting **does not fail the order** — but it is logged at error level.
 
-    قيد مديونية لم يُكتب يعني بضاعة خرجت بلا أثر على الحساب،
-    وهو أخطر من بريد لم يُرسَل: يُكتشف بفارق في كشف الحساب بعد
-    شهر. الابتلاع هنا لمنع تراجع الطلب فقط، والسجل هو ما يُراجَع.
+    A debt entry that was never written means goods left with no effect on the
+    account, which is more dangerous than an email that was never sent: it is
+    discovered as a discrepancy in the statement a month later. The swallow here
+    exists only to prevent rolling the order back, and the log is what gets reviewed.
 """
 
 from __future__ import annotations
@@ -31,10 +33,10 @@ def _register():
     @receiver(post_save, sender=Order, weak=False)
     def on_order_refunded(sender, instance, created, **kwargs):
         """
-        ⚠️  المرتجع على طلب آجل **يُقيَّد إشعارًا دائنًا**.
+        ⚠️  A return on a credit order is **posted as a credit note**.
 
-            بدونه يبقى العميل مدينًا ببضاعة أعادها — فيُمنَع من
-            الشراء بحدٍّ استهلكه طلب أُلغي.
+            Without it the customer stays in debt for goods they returned — so
+            they are blocked from buying against a limit consumed by a cancelled order.
         """
         if instance.status != OrderStatus.REFUNDED or instance.customer_id is None:
             return

@@ -3,13 +3,13 @@ import { QueryClient } from '@tanstack/react-query';
 import { isApiError } from '@/shared/http';
 
 /**
- * إعدادات طبقة جلب البيانات.
+ * Data-fetching layer configuration.
  *
- * ⚠️  لا تُعاد المحاولة على أخطاء العميل.
+ * ⚠️  Client errors are never retried.
  *
- *     إعادة نداء يعيد ٤٠٤ أو ٤٠٣ ثلاث مرات تؤخّر ظهور رسالة الخطأ
- *     ثلاثة أضعاف بلا أي احتمال نجاح. الخادم المتعطّل أو الشبكة
- *     المنقطعة وحدهما يستحقّان المحاولة.
+ *     Repeating a call that returns 404 or 403 three times triples the delay
+ *     before the error message appears, with no chance of success. Only a
+ *     failing server or a dropped network is worth a retry.
  */
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,8 +19,8 @@ export const queryClient = new QueryClient({
         return failureCount < 2;
       },
       staleTime: 60 * 1000,
-      // ⚠️  لا إعادة جلب عند كل عودة للتبويب: على اتصال محمول تعني
-      //     استهلاك بيانات المستخدم في تحديث لم يطلبه.
+      // ⚠️  No refetch on every tab focus: on a mobile connection that means
+      //     spending the user's data on a refresh they never asked for.
       refetchOnWindowFocus: false,
     },
     mutations: {

@@ -5,8 +5,61 @@ from rest_framework import serializers
 from employees.models import CustomerAssignment, EmployeeProfile, EmployeeRole
 
 
+class PermissionCodesField(serializers.Field):
+    """
+    صلاحيات الدور بصيغة `app_label.codename`.
+
+    ⚠️  **بالرمز لا بالمعرّف الرقمي.**
+
+        معرّفات `auth.Permission` تُولَّد بترتيب الهجرات وتختلف بين
+        التطوير والإنتاج؛ واجهة تحفظ الرقم تمنح في الإنتاج صلاحية
+        غير التي اختارها الأدمن على شاشته. والرمز ثابت أبدًا.
+
+    ⚠️  و**لا يُقبل إلا ما في الدليل**.
+
+        الجدول يحمل مئتي صلاحية آلية بينها `delete_user`؛ قبول أي
+        رمز يعني أن نداءً مصنوعًا يمنح ما لا تعرضه الشاشة أصلًا.
+    """
+
+    def to_representation(self, value):
+        return sorted(
+            f"{p.content_type.app_label}.{p.codename}"
+            for p in value.select_related("content_type")
+        )
+
+    def to_internal_value(self, data):
+        from django.contrib.auth.models import Permission
+
+        from core.permissions import CATALOGUE_CODES
+
+        if not isinstance(data, list):
+            raise serializers.ValidationError("القيمة يجب أن تكون قائمة")
+
+        unknown = [code for code in data if code not in CATALOGUE_CODES]
+        if unknown:
+            raise serializers.ValidationError(
+                f"صلاحيات خارج الدليل: {'، '.join(map(str, unknown))}"
+            )
+
+        found = []
+        for code in dict.fromkeys(data):
+            app_label, codename = code.split(".")
+            permission = Permission.objects.filter(
+                content_type__app_label=app_label, codename=codename
+            ).first()
+            if permission is None:
+                raise serializers.ValidationError(f"صلاحية غير موجودة: {code}")
+            found.append(permission)
+
+        return found
+
+
 class EmployeeRoleSerializer(serializers.ModelSerializer):
     permission_count = serializers.IntegerField(read_only=True, default=0)
+
+    # ⚠️  `required=False` — إنشاء دور بلا صلاحيات حالة صالحة:
+    #     يُنشأ فارغًا ثم تُمنح صلاحياته على مهل.
+    permissions = PermissionCodesField(required=False)
 
     class Meta:
         model = EmployeeRole
@@ -18,6 +71,7 @@ class EmployeeRoleSerializer(serializers.ModelSerializer):
             "name_en",
             "is_active",
             "permission_count",
+            "permissions",
         ]
         read_only_fields = ["id", "permission_count"]
 

@@ -1,4 +1,4 @@
-"""مسارات حركة الاستخدام — /api/v1/analytics/"""
+"""Usage traffic routes — /api/v1/analytics/"""
 
 from django.urls import path
 

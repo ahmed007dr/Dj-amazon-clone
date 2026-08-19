@@ -1,10 +1,10 @@
 """
-واجهات الهوية البصرية.
+Visual identity endpoints.
 
-⚠️  نقطة واحدة عامة (`GET /api/v1/branding/theme/`) والباقي للأدمن.
+⚠️  One public endpoint (`GET /api/v1/branding/theme/`) and the rest are admin.
 
-    الحمولة العامة لا تحمل أي حقل إداري — لا مسوّدات ولا ملفات غير
-    مفعّلة ولا معرّفات. ما يخرج للجمهور هو ما يُرسم فقط.
+    The public payload carries no administrative field — no drafts, no
+    unactivated profiles, no ids. What goes out to the public is only what gets painted.
 """
 
 from django.utils.translation import gettext as _
@@ -19,15 +19,16 @@ from branding.contrast import audit_palette
 from branding.models import BrandProfile, ThemeMode, ThemePalette
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
-from core.permissions import IsAdminAccount
+from core.permissions import CanManageBranding
 
 
 class PublicThemeAPI(APIView):
     """
-    الهوية المفعّلة — عامة ومُخزَّنة بقوة.
+    The active identity — public and aggressively cached.
 
-    ⚠️  تُقرأ في كل تحميل صفحة. الكاش هنا ليس تحسينًا اختياريًا:
-        بدونه كل زائر يكلّف استعلامين على جدول لا يتغيّر شهريًا.
+    ⚠️  It is read on every page load. The cache here is not an optional
+        optimisation: without it every visitor costs two queries on a table that
+        changes monthly.
     """
 
     permission_classes = [AllowAny]
@@ -38,17 +39,18 @@ class PublicThemeAPI(APIView):
 
 
 class ProfileListCreateAPI(generics.ListCreateAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageBranding]
     serializer_class = s.BrandProfileSerializer
     pagination_class = None
     queryset = BrandProfile.objects.prefetch_related("palettes")
 
     def perform_create(self, serializer):
         """
-        ⚠️  الملف الجديد يُولَد بلوحتيه.
+        ⚠️  A new profile is born with both of its palettes.
 
-            ملف بلا لوحات يعني هوية بلا ألوان — وتفعيله يطفئ الموقع
-            بصريًا. إنشاؤهما هنا يجعل الحالة غير الصالحة غير ممكنة.
+            A profile with no palettes means an identity with no colours — and
+            activating it blanks the site visually. Creating them here makes the
+            invalid state impossible.
         """
         profile = serializer.save(is_active=False)
 
@@ -64,7 +66,7 @@ class ProfileListCreateAPI(generics.ListCreateAPIView):
 
 
 class ProfileDetailAPI(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageBranding]
     serializer_class = s.BrandProfileSerializer
     queryset = BrandProfile.objects.prefetch_related("palettes")
 
@@ -81,7 +83,7 @@ class ProfileDetailAPI(generics.RetrieveUpdateDestroyAPIView):
         )
 
     def perform_destroy(self, instance):
-        """⚠️  حذف الملف المفعّل يترك النظام بلا هوية."""
+        """⚠️  Deleting the active profile leaves the system with no identity."""
         if instance.is_active:
             raise BusinessError(
                 ErrorCode.CONFLICT,
@@ -94,12 +96,12 @@ class ProfileDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
 class ActivateProfileAPI(APIView):
     """
-    تفعيل ملف هوية.
+    Activate an identity profile.
 
-    ⚠️  الأثر فوري على **كل** المستخدمين — ولذلك الفحص قبله لا بعده.
+    ⚠️  The effect is immediate for **every** user — hence the check before it, not after.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageBranding]
 
     def post(self, request, pk):
         profile = BrandProfile.objects.filter(pk=pk).prefetch_related("palettes").first()
@@ -144,7 +146,7 @@ class ActivateProfileAPI(APIView):
 
 
 class PaletteDetailAPI(generics.RetrieveUpdateAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageBranding]
     serializer_class = s.ThemePaletteSerializer
     lookup_url_kwarg = "palette_pk"
 
@@ -165,24 +167,24 @@ class PaletteDetailAPI(generics.RetrieveUpdateAPIView):
 
 class PreviewThemeAPI(APIView):
     """
-    معاينة لوحة قبل حفظها.
+    Preview a palette before saving it.
 
-    ⚠️  **لا تكتب شيئًا.**
+    ⚠️  **It writes nothing.**
 
-        «جرّب ثم تراجع» على الهوية يعني أن كل زائر خلال المحاولة
-        رأى ألوانًا مكسورة. المعاينة تحسب الرموز والتباين وتعيدهما
-        بلا مساس بالمفعّل.
+        "Try it and undo" on the identity means every visitor during the attempt
+        saw broken colours. The preview computes the tokens and the contrast and
+        returns them without touching what is active.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageBranding]
     serializer_class = s.ThemePaletteSerializer
 
     def post(self, request):
-        # ⚠️  الحقول المعروفة فقط.
+        # ⚠️  Known fields only.
         #
-        #     تمرير `request.data` كما هو إلى الموديل يجعل مفتاحًا
-        #     مجهولًا واحدًا يرفع `TypeError` — أي خطأ ٥٠٠ على
-        #     إدخال مستخدم.
+        #     Passing `request.data` straight to the model makes one
+        #     unknown key raise `TypeError` — that is, a 500 on
+        #     user input.
         colors = {
             field: request.data[field] for field in services.COLOR_TOKENS if field in request.data
         }

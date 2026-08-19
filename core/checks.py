@@ -1,22 +1,23 @@
 """
-فحوص إعداد الدومين — وقت الإقلاع لا بعد النشر.
+Domain configuration checks — at startup, not after deployment.
 
-⚠️  **المشكلة التي تحلّها**: أخطاء الدومين كلها صامتة عند الخادم.
+⚠️  **The problem this solves**: every domain misconfiguration is silent at the server.
 
-    أصل غير مدرَج في CORS يجعل المتصفح يحجب الاستجابة بعد أن يعيد
-    الخادم ٢٠٠ سليمة؛ ومضيف ناقص في `ALLOWED_HOSTS` يعطي 400 لطلبات
-    المزحف وحدها؛ ودومين `localhost` في الإنتاج يجعل روابط تفعيل
-    البريد تشير إلى جهاز المستلم نفسه. لا واحدة منها تكتب سطرًا في
-    سجل Django، وكلها تُكتشف بعد النشر — أو بعد أن تختفي الصفحات من
-    نتائج البحث.
+    An origin missing from CORS makes the browser block the response after the
+    server has returned a perfectly good 200; a host missing from
+    `ALLOWED_HOSTS` returns 400 for the crawler's requests alone; and a
+    `localhost` domain in production makes email activation links point at the
+    recipient's own machine. Not one of them writes a line to the Django log,
+    and all of them are discovered after deployment — or after the pages vanish
+    from search results.
 
-    الفحص ينقلها إلى ما قبل النشر: `manage.py check` يفشل، فلا
-    يقلع الخادم أصلًا.
+    The check moves them to before deployment: `manage.py check` fails, so the
+    server never boots at all.
 
-⚠️  والفحوص الصارمة مربوطة بـ `IS_PRODUCTION` لا بـ `DEBUG`.
+⚠️  And the strict checks are tied to `IS_PRODUCTION`, not to `DEBUG`.
 
-    `DEBUG=False` حالة مشروعة في الاختبارات والتطوير، وربطها بها كان
-    يُفشل بيئة صحيحة تمامًا في مكانها.
+    `DEBUG=False` is a legitimate state in tests and development, and tying them
+    to it was failing an environment that was entirely correct in place.
 """
 
 from __future__ import annotations
@@ -25,10 +26,10 @@ from django.conf import settings
 from django.core.checks import Error, register
 from django.http.request import validate_host
 
-#: وسم يسمح بتشغيلها وحدها: `manage.py check --tag domain`
+#: A tag allowing them to be run alone: `manage.py check --tag domain`
 DOMAIN = "domain"
 
-#: أسماء لا تصلح دومينًا لخادم يخدم العالم
+#: Names unfit to be the domain of a server facing the world
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"}  # noqa: S104
 
 
@@ -39,11 +40,11 @@ def _hostname(domain: str) -> str:
 @register(DOMAIN)
 def check_frontend_origin_allowed(app_configs, **kwargs):
     """
-    أصل الفرونت إند مدرَج في CORS.
+    The frontend origin is listed in CORS.
 
-    ⚠️  هذا أكثر أخطاء الإعداد كلفةً في الوقت: الواجهة تُظهر شاشة
-        فارغة، والخادم يقول إنه ردّ ٢٠٠ على كل نداء. فيُبحث عن العطل
-        في الخادم بينما هو في المتصفح.
+    ⚠️  This is the most time-expensive misconfiguration of them all: the
+        frontend shows a blank screen while the server reports it answered 200
+        to every call. So the fault is hunted in the server while it is in the browser.
     """
     if getattr(settings, "CORS_ALLOW_ALL_ORIGINS", False):
         return []
@@ -70,13 +71,13 @@ def check_frontend_origin_allowed(app_configs, **kwargs):
 @register(DOMAIN)
 def check_domains_in_allowed_hosts(app_configs, **kwargs):
     """
-    دومينا الموقع والخادم مقبولان في `ALLOWED_HOSTS`.
+    The site and server domains are both accepted in `ALLOWED_HOSTS`.
 
-    ⚠️  المقارنة بـ `validate_host` — مطابِق Django نفسه.
+    ⚠️  Compared with `validate_host` — Django's own matcher.
 
-        الفحص بـ `in` كان سيرفض `.example.com` (البادئة النقطية
-        تعني «كل النطاقات الفرعية») ويُنتج خطأً كاذبًا يدفع المشغّل
-        إلى «إصلاح» إعداد سليم.
+        Checking with `in` would have rejected `.example.com` (the leading dot
+        means "all subdomains") and produced a false error pushing the operator
+        to "fix" a perfectly sound configuration.
     """
     errors = []
 
@@ -115,11 +116,11 @@ def check_api_prefix(app_configs, **kwargs):
 @register(DOMAIN)
 def check_production_domains(app_configs, **kwargs):
     """
-    ⚠️  الإنتاج لا يقلع بإعداد تطوير.
+    ⚠️  Production does not boot with a development configuration.
 
-        خادم حقيقي بدومين `localhost` يعيد 400 لكل زائر، ويولّد
-        روابط تفعيل بريد تشير إلى جهاز المستلم نفسه. وبمخطَّط `http`
-        يسافر توكن الدخول نصًّا صريحًا على الشبكة.
+        A real server on a `localhost` domain returns 400 to every visitor and
+        generates email activation links pointing at the recipient's own
+        machine. And on an `http` scheme the access token travels the network in plaintext.
     """
     if not getattr(settings, "IS_PRODUCTION", False):
         return []

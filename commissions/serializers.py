@@ -1,4 +1,4 @@
-"""عقود العمولات."""
+"""Commission contracts."""
 
 from rest_framework import serializers
 
@@ -34,10 +34,10 @@ class CommissionSchemeSerializer(serializers.ModelSerializer):
 
 class CommissionRecordSerializer(serializers.ModelSerializer):
     """
-    ⚠️  **كل الحقول للقراءة.**
+    ⚠️  **Every field is read-only.**
 
-        السجل لقطة تُبنى عليها عملية صرف؛ وقبول تعديل أي رقم فيه
-        يعني عمولة تُغيَّر بعد اعتمادها.
+        The record is a snapshot a payment is built on; accepting an edit to any
+        number in it means a commission changed after it was approved.
     """
 
     employee_number = serializers.CharField(source="employee.employee_number", read_only=True)

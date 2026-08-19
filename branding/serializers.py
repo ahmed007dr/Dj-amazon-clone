@@ -1,4 +1,4 @@
-"""عقود الهوية البصرية."""
+"""Visual identity contracts."""
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
@@ -10,9 +10,9 @@ from core.files import ALLOWED_IMAGE_TYPES, validate_upload
 
 class ThemePaletteSerializer(serializers.ModelSerializer):
     """
-    ⚠️  `contrast` للقراءة فقط ويُحسب عند كل عرض.
+    ⚠️  `contrast` is read-only and recomputed on every display.
 
-        تخزينه يعني رقمًا يتقادم بصمت عند أول تعديل لون.
+        Storing it means a number going silently stale at the first colour edit.
     """
 
     contrast = serializers.SerializerMethodField()
@@ -44,10 +44,10 @@ class ThemePaletteSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        ⚠️  `clean()` في الموديل لا يعمل تلقائيًا عبر DRF.
+        ⚠️  The model's `clean()` does not run automatically through DRF.
 
-            استدعاؤه صراحةً هنا هو ما يجعل فحص التباين حارسًا فعليًا
-            بدل أن يكون كودًا لا يمرّ به شيء.
+            Calling it explicitly here is what makes the contrast check a real
+            guard rather than code nothing ever reaches.
         """
         instance = self.instance
         candidate = ThemePalette(
@@ -67,24 +67,24 @@ class ThemePaletteSerializer(serializers.ModelSerializer):
         return attrs
 
 
-#: أصول الهوية الخمسة — كلها صور تُرفَع من اللوحة
+#: The five identity assets — all images uploaded from the panel
 ASSET_FIELDS = ("logo_light", "logo_dark", "icon", "favicon", "og_image")
 
-#: ⚠️  أصغر من حد صور المنتجات: اللوجو يُحمَّل في **كل** صفحة لكل
-#:     زائر. ملف بحجمين ميجابايت يبطئ الموقع كله لا صفحة منتج.
+#: ⚠️  Smaller than the product image limit: the logo is downloaded on **every**
+#:     page by every visitor. A two-megabyte file slows the whole site, not one product page.
 MAX_ASSET_SIZE = 2 * 1024 * 1024
 
 
 class BrandProfileSerializer(serializers.ModelSerializer):
     palettes = ThemePaletteSerializer(many=True, read_only=True)
 
-    # ⚠️  `allow_null` هو ما يجعل **المسح** ممكنًا.
+    # ⚠️  `allow_null` is what makes **clearing** possible.
     #
-    #     الحقل الافتراضي يتجاهل القيمة الفارغة القادمة من نموذج
-    #     متعدد الأجزاء بصمت — يعيد ٢٠٠ ويُبقي الصورة مكانها. فيضغط
-    #     الأدمن «حذف» ويرى نجاحًا واللوجو لم يتغيّر.
+    #     The default field silently ignores an empty value coming from a
+    #     multipart form — it returns 200 and leaves the image in place. So the
+    #     admin presses "delete", sees success, and the logo has not changed.
     #
-    #     والرفع يبقى `multipart`؛ أما المسح فـ JSON بقيمة `null`.
+    #     Uploading stays `multipart`; clearing is JSON with a `null` value.
     logo_light = serializers.ImageField(required=False, allow_null=True)
     logo_dark = serializers.ImageField(required=False, allow_null=True)
     icon = serializers.ImageField(required=False, allow_null=True)
@@ -93,11 +93,11 @@ class BrandProfileSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         """
-        ⚠️  `None` ← سلسلة فارغة.
+        ⚠️  `None` ← the empty string.
 
-            عمود `ImageField` غير قابل لـ `NULL` (`blank` لا `null`)،
-            فتمرير `None` كما هو يرفع خطأ قاعدة بيانات عند الحفظ.
-            والسلسلة الفارغة هي تمثيل «لا صورة» في Django.
+            The `ImageField` column is not nullable (`blank`, not `null`), so
+            passing `None` through raises a database error on save. And the
+            empty string is Django's representation of "no image".
         """
         for field in ASSET_FIELDS:
             if field in validated_data and validated_data[field] is None:
@@ -107,17 +107,18 @@ class BrandProfileSerializer(serializers.ModelSerializer):
 
     def _validate_asset(self, value):
         """
-        ⚠️  **الفحص على توقيع الملف لا على ترويسته.**
+        ⚠️  **The check is on the file signature, not on its header.**
 
-            `content_type` يأتي من العميل ويُزوَّر بسطر واحد. وأصول
-            الهوية تُقدَّم من أصل الموقع نفسه، فملف SVG يحمل نصًا
-            برمجيًا يصير ثغرة على كل زائر — وهي أخطر من نظيرتها في
-            صور المنتجات لأن اللوجو يظهر في كل صفحة.
+            `content_type` comes from the client and is forged in one line. And
+            identity assets are served from the site's own origin, so an SVG
+            file carrying a script becomes a hole for every visitor — more
+            dangerous than its counterpart in product images, because the logo
+            appears on every page.
 
-        ⚠️  وكانت هذه الحقول **بلا أي فحص** بينما صور المنتجات
-            مفحوصة — تفاوت لا يبرّره شيء.
+        ⚠️  And these fields used to have **no check at all** while product
+            images were checked — a disparity nothing justified.
         """
-        # الحقل المتروك كما هو يصل نصًّا لا ملفًا — لا شيء يُفحص
+        # A field left untouched arrives as text, not a file — there is nothing to check
         if not hasattr(value, "size"):
             return value
 
@@ -177,11 +178,11 @@ class BrandProfileSerializer(serializers.ModelSerializer):
 
 class PublicThemeSerializer(serializers.Serializer):
     """
-    ⚠️  الحمولة العامة **لا تشبه الموديل**.
+    ⚠️  The public payload **does not resemble the model**.
 
-        الفرونت يحتاج خريطة رموز جاهزة (`--color-primary: #...`)
-        لا أسماء حقول. بناؤها في الواجهة يكرّر أسماء الرموز في
-        مكانين، فتصير إضافة لون تعديلين في مستودعين.
+        The frontend needs a ready-made token map (`--color-primary: #...`),
+        not field names. Building it in the frontend duplicates the token names
+        in two places, so adding a colour becomes two edits in two repositories.
     """
 
     code = serializers.CharField(read_only=True)

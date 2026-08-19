@@ -1,14 +1,14 @@
 """
-اختبارات قياس الحركة.
+Traffic measurement tests.
 
-⚠️  الخاصية المحروسة الأولى: **القياس لا يُسقط طلبًا أبدًا**.
+⚠️  The first property guarded: **measurement never drops a request**.
 
-    وسيطٌ يرفع استثناءً على مسار صفحة منتج يحوّل عطلًا في الإحصاء
-    إلى عطل في المتجر — وهو ثمن لا يستحقه أي رقم.
+    Middleware that raises on a product page path turns a fault in the
+    statistics into a fault in the store — a price no number is worth.
 
-⚠️  والثانية: لا هوية شخصية تصل قاعدة البيانات.
+⚠️  And the second: no personal identity reaches the database.
 
-    الجدول أعداد فقط، والبصمة تعيش في الكاش وتزول.
+    The table holds counts only, and the fingerprint lives in the cache and expires.
 """
 
 from datetime import timedelta
@@ -30,12 +30,12 @@ PASSWORD = "Str0ng-Test-Pass!23"
 
 def _admin_profile():
     """
-    ⚠️  `apps.get_model` لا `import` — **مقصود**.
+    ⚠️  `apps.get_model`, not `import` — **deliberate**.
 
-        `analytics` تحت `administration` في مخطط الطبقات، ويفرضه
-        `import-linter` في الـ CI. واختبارٌ يستورد لأعلى يكسر العقد
-        الذي يحرسه كل الكود الآخر — و«لأنه اختبار فقط» هو أول ثقب
-        في أي عقد معماري.
+        `analytics` sits below `administration` in the layer diagram, enforced
+        by `import-linter` in CI. A test that imports upward breaks the contract
+        every other piece of code observes — and "but it is only a test" is the
+        first hole in any architectural contract.
     """
     from django.apps import apps
 
@@ -63,14 +63,14 @@ def _counter(kind: str, device: str) -> int:
 
 
 # ═══════════════════════════════════════════════════════════
-#  العدّ
+#  Counting
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 class TestCounting:
     def test_a_visitor_is_unique_within_the_hour(self, visit):
-        """⚠️  «زائر فريد» لا «طلب» — الخلط يضخّم الرقم عشرة أضعاف."""
+        """⚠️  A "unique visitor", not "a request" — conflating them inflates the number tenfold."""
         for _ in range(5):
             visit()
 
@@ -91,7 +91,7 @@ class TestCounting:
         assert _counter("guest", DeviceType.MOBILE) == 1
 
     def test_a_signed_in_visitor_is_not_a_guest(self, visit):
-        """⚠️  عدّه مرتين يجعل «المتصلون الآن» رقمًا مضخّمًا."""
+        """⚠️  Counting them twice makes "online now" an inflated number."""
         visit(authenticated=True)
 
         assert _counter("known", DeviceType.DESKTOP) == 1
@@ -99,7 +99,7 @@ class TestCounting:
         assert services.guests_online() == 0
 
     def test_a_crawler_is_not_pressure(self, visit):
-        """⚠️  ذروة زحف محرك بحث ليست ساعة يوجد فيها إنسان."""
+        """⚠️  A search engine crawl peak is not an hour with a human in it."""
         visit(user_agent=GOOGLEBOT)
 
         assert _counter("req", DeviceType.DESKTOP) == 0
@@ -114,7 +114,7 @@ class TestCounting:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحضور الآن
+#  Presence right now
 # ═══════════════════════════════════════════════════════════
 
 
@@ -136,7 +136,7 @@ class TestGuestPresence:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الوسيط
+#  The middleware
 # ═══════════════════════════════════════════════════════════
 
 
@@ -147,7 +147,7 @@ class TestMiddleware:
         assert _counter("req", DeviceType.DESKTOP) == 1
 
     def test_the_admin_panel_is_not_store_pressure(self, db):
-        """⚠️  لوحة تُحدِّث نفسها كل ٣٠ ثانية تصنع ذروة وهمية."""
+        """⚠️  A panel refreshing itself every 30 seconds manufactures a phantom peak."""
         admin = User.objects.create_user(
             email="traffic-admin@test.local", password=PASSWORD, account_type=AccountType.ADMIN
         )
@@ -162,7 +162,7 @@ class TestMiddleware:
         assert _counter("req", DeviceType.DESKTOP) == 0
 
     def test_a_refused_request_is_not_usage(self, client):
-        """⚠️  محاولة اقتحام لا يجوز أن تبدو ذروة تصفّح."""
+        """⚠️  A break-in attempt must not look like a browsing peak."""
         client.get("/api/v1/catalog/products/no-such-product/", HTTP_USER_AGENT=CHROME)
         assert _counter("req", DeviceType.DESKTOP) == 0
 
@@ -177,10 +177,10 @@ class TestMiddleware:
 
     def test_the_proxy_header_wins_over_the_socket(self):
         """
-        ⚠️  خلف Nginx يكون `REMOTE_ADDR` هو الوكيل نفسه.
+        ⚠️  Behind Nginx, `REMOTE_ADDR` is the proxy itself.
 
-            بدون قراءة الترويسة يصير كل الزوار بصمةً واحدة و«الزوار
-            الفريدون» رقمًا ثابتًا عند ١ إلى الأبد.
+            Without reading the header every visitor becomes a single
+            fingerprint and "unique visitors" is stuck at 1 forever.
         """
         request = RequestFactory().get(
             "/api/v1/catalog/products/",
@@ -206,7 +206,7 @@ def _ok_response():
 
 
 # ═══════════════════════════════════════════════════════════
-#  التفريغ
+#  Flushing
 # ═══════════════════════════════════════════════════════════
 
 
@@ -232,7 +232,7 @@ class TestFlush:
         assert TrafficBucket.objects.get().requests == 1
 
     def test_a_reset_cache_does_not_erase_a_recorded_hour(self, visit):
-        """⚠️  الكتابة بالأكبر لا بالإحلال — وإلا محا الصفرُ ساعةً."""
+        """⚠️  Write by maximum, not by replacement — otherwise a zero erases an hour."""
         visit()
         visit(ip="10.0.0.2")
         services.flush_traffic()
@@ -259,7 +259,7 @@ class TestFlush:
 
 
 # ═══════════════════════════════════════════════════════════
-#  القراءة والصلاحيات
+#  Reading and permissions
 # ═══════════════════════════════════════════════════════════
 
 
@@ -277,11 +277,11 @@ def admin_user(db):
 @pytest.fixture
 def reports_user(db):
     """
-    ⚠️  **مستخدم آخر** لا نفس الأدمن بصلاحية مضافة.
+    ⚠️  **A different user**, not the same admin with a permission added.
 
-        منح الصلاحية لكائن الاختبار نفسه كان يجعل «أدمن بلا صلاحية»
-        و«أدمن بصلاحية» شخصًا واحدًا — فيمرّ اختبار الحجب دائمًا
-        بلا أن يفحص شيئًا.
+        Granting the permission to the test subject itself made "an admin
+        without the permission" and "an admin with it" the same person — so the
+        denial test passed unconditionally without checking anything.
     """
     from django.contrib.auth.models import Permission
 
@@ -320,7 +320,7 @@ class TestReadEndpoints:
         assert api.get(reverse("v1:analytics:live")).status_code == 403
 
     def test_traffic_needs_more_than_panel_access(self, admin_user, reports_user):
-        """⚠️  منحنى الحركة يكشف حجم النشاط — صلاحية التقارير لا اللوحة."""
+        """⚠️  The traffic curve reveals the size of the business — the reporting permission, not panel access."""
         panel_only = APIClient()
         panel_only.force_authenticate(user=admin_user)
         assert panel_only.get(reverse("v1:analytics:traffic")).status_code == 403

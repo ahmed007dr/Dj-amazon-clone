@@ -1,8 +1,8 @@
 """
-اختبارات السلة.
+Cart tests.
 
-⚠️  المجموعة الحرجة هي **إعادة التحقق**: السلة تعيش أيامًا، وكل
-    ما بُني عليه قرار الإضافة قد يتغيّر قبل إتمام الشراء.
+⚠️  The critical group is **re-validation**: a cart lives for days, and
+    everything the add decision was based on may change before checkout.
 """
 
 from decimal import Decimal
@@ -74,7 +74,7 @@ def cart(user):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأساس
+#  Fundamentals
 # ═══════════════════════════════════════════════════════════
 
 
@@ -100,10 +100,10 @@ class TestCartBasics:
 
     def test_cart_stores_no_prices(self):
         """
-        ⚠️  السعر يُحسب عند كل عرض.
+        ⚠️  The price is computed on every display.
 
-        تخزينه يعني سلة تعرض سعر الأمس بعد تغيير اليوم — والعميل
-        يرى رقمًا ويُحاسَب بآخر.
+        Storing it means a cart showing yesterday's price after today's change —
+        and the customer sees one number and is charged another.
         """
         names = {f.name for f in CartLine._meta.get_fields()}
 
@@ -114,7 +114,7 @@ class TestCartBasics:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الملكية
+#  Ownership
 # ═══════════════════════════════════════════════════════════
 
 
@@ -141,7 +141,7 @@ class TestOwnership:
 
 
 # ═══════════════════════════════════════════════════════════
-#  المخزون
+#  Stock
 # ═══════════════════════════════════════════════════════════
 
 
@@ -154,9 +154,9 @@ class TestStockChecks:
 
     def test_accumulation_is_checked_against_the_total(self, cart, product, user):
         """
-        ⚠️  الفحص للكمية الإجمالية بعد الإضافة لا للمضافة وحدها.
+        ⚠️  The check is on the total quantity after the addition, not on the added amount alone.
 
-        بدونه يمكن تجاوز المخزون بإضافات متتالية صغيرة.
+        Without it, stock can be exceeded through a series of small additions.
         """
         services.add_line(cart, product, 15, user=user)
 
@@ -165,7 +165,7 @@ class TestStockChecks:
 
 
 # ═══════════════════════════════════════════════════════════
-#  إعادة التحقق — قلب هذا النطاق
+#  Re-validation — the heart of this domain
 # ═══════════════════════════════════════════════════════════
 
 
@@ -191,7 +191,7 @@ class TestRevalidation:
 
     def test_lost_access_raises_an_issue(self, cart, product, user, policies):
         """
-        ⚠️  العميل قد يفقد أهليته بعد الإضافة — انتهاء رخصة مثلًا.
+        ⚠️  A customer may lose eligibility after adding — an expired licence, say.
         """
         services.add_line(cart, product, 1, user=user)
 
@@ -224,7 +224,7 @@ class TestRevalidation:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الكوبونات
+#  Coupons
 # ═══════════════════════════════════════════════════════════
 
 
@@ -252,7 +252,7 @@ class TestCoupons:
 
     def test_cart_stores_the_code_not_the_amount(self, cart, product, user, coupon):
         """
-        ⚠️  تخزين القيمة يعني خصمًا محسوبًا على سلة تغيّرت بعده.
+        ⚠️  Storing the value means a discount computed against a cart that changed afterwards.
         """
         names = {f.name for f in Cart._meta.get_fields()}
 
@@ -292,13 +292,13 @@ class TestCoupons:
             value=Decimal("50.00"),
             max_discount_amount=Decimal("30.00"),
         )
-        services.add_line(cart, product, 5, user=user)  # ٥٠٠
+        services.add_line(cart, product, 5, user=user)  # 500
 
         snapshot = services.apply_coupon(cart, "CAP")
-        assert snapshot.coupon_result.discount_amount == Decimal("30.00")  # لا ٢٥٠
+        assert snapshot.coupon_result.discount_amount == Decimal("30.00")  # not 250
 
     def test_unknown_code_is_rejected_without_raising(self, cart, product, user):
-        """العميل يجرّب أكوادًا — الرفض حالة متوقعة لا خطأ."""
+        """The customer is trying codes — rejection is an expected state, not an error."""
         services.add_line(cart, product, 1, user=user)
         snapshot = services.apply_coupon(cart, "NOPE")
 
@@ -307,7 +307,7 @@ class TestCoupons:
 
 
 # ═══════════════════════════════════════════════════════════
-#  دمج سلة الزائر
+#  Merging the guest cart
 # ═══════════════════════════════════════════════════════════
 
 
@@ -320,10 +320,10 @@ class TestGuestMerge:
 
     def test_merge_sums_quantities(self, user, product):
         """
-        ⚠️  الكميات تُجمَع لا تُستبدَل.
+        ⚠️  Quantities are added, not replaced.
 
-        من أضاف صنفين كزائر ثم دخل ووجد واحدًا في سلته المحفوظة
-        يتوقع ثلاثة. الاستبدال يفقده ما اختاره للتو.
+        Someone who added two items as a guest and then logged in to find one in
+        their saved cart expects three. Replacing loses what they just chose.
         """
         guest_cart = services.get_active_cart(session_key="guest-1")
         services.add_line(guest_cart, product, 2)

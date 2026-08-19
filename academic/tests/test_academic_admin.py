@@ -1,16 +1,18 @@
 """
-الشجرة الأكاديمية والحزم من اللوحة.
+The academic tree and bundles from the admin panel.
 
-⚠️  **الشجرة شرط لتسجيل أي طالب**: يختار جامعته وكليته قبل إنشاء
-    الحساب. ومتجر بلا شاشة جامعات لا يستقبل طالبًا واحدًا من لوحته.
+⚠️  **The tree is a precondition for registering any student**: they pick their
+    university and faculty before creating an account. A store with no
+    universities screen accepts not a single student from its panel.
 
-⚠️  والمحروس: سنة الحزمة داخل سنوات كليتها · الكلية ذات الطلاب
-    لا تُحذف · بنود الحزمة مُصفّاة بحزمتها.
+⚠️  What is guarded: a bundle's year falls within its faculty's years · a
+    faculty with students is not deleted · bundle items are filtered by their bundle.
 
-⚠️  و`catalog` يُوصَل إليه بـ `apps.get_model` لا بالاستيراد.
+⚠️  And `catalog` is reached through `apps.get_model`, not by import.
 
-    هو و`academic` صنوان في نفس الطبقة، ولا يستورد أحدهما الآخر —
-    يفرضه import-linter، والاختبار جزء من الحزمة لا استثناء منها.
+    It and `academic` are siblings on the same layer, and neither imports the
+    other — enforced by import-linter, and the test is part of the package, not
+    an exception to it.
 """
 
 import pytest
@@ -53,7 +55,7 @@ def faculty(university):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الشجرة
+#  The tree
 # ═══════════════════════════════════════════════════════════
 
 
@@ -86,8 +88,8 @@ class TestTree:
 
     def test_zero_years_is_refused(self, admin_client, university):
         """
-        ⚠️  عدد السنوات يحكم قوائم الحزم — والصفر يجعل كل حزمة غير
-            قابلة للإسناد.
+        ⚠️  The year count governs the bundle lists — and zero makes every
+            bundle impossible to assign.
         """
         response = admin_client.post(
             reverse("v1:academic:admin-faculties"),
@@ -133,7 +135,7 @@ class TestTree:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحزم
+#  Bundles
 # ═══════════════════════════════════════════════════════════
 
 
@@ -156,10 +158,11 @@ class TestBundles:
 
     def test_a_year_beyond_the_faculty_length_is_refused(self, admin_client, faculty):
         """
-        ⚠️  **حزمة لا يراها أحد.**
+        ⚠️  **A bundle nobody sees.**
 
-            السنة السادسة في كلية بخمس سنوات لا يصلها طالب أبدًا،
-            وتُنشأ صامتة ثم يُسأل «لماذا لا يراها أحد؟» بعد أسابيع.
+            A sixth year in a five-year faculty never reaches a student; it is
+            created silently and then, weeks later, someone asks "why does
+            nobody see it?".
         """
         response = admin_client.post(
             reverse("v1:academic:admin-bundles"),
@@ -175,11 +178,11 @@ class TestBundles:
 
         assert response.status_code == 400
         assert "academic_year" in response.data["fields"]
-        # الرسالة تذكر مدة الكلية — الأدمن يصحّح بلا بحث
+        # The message names the faculty's duration — the admin corrects it without going to look
         assert "5" in str(response.data["fields"]["academic_year"])
 
     def test_bundle_items_are_scoped_to_their_bundle(self, admin_client, faculty):
-        """قائمة كل البنود بلا سياق بلا معنى — والتصفية إلزامية."""
+        """A list of all items with no context is meaningless — filtering is mandatory."""
         category = apps.get_model("catalog", "Category").objects.create(
             name_ar="فئة", name_en="Cat"
         )
@@ -207,7 +210,7 @@ class TestBundles:
         assert len(in_second.data) == 0
 
     def test_item_count_is_exposed(self, admin_client, faculty):
-        """حزمة بلا بنود تظهر للطالب فارغة — والعدد يكشفها قبل ذلك."""
+        """A bundle with no items shows up empty to the student — the count reveals it sooner."""
         StudyBundle.objects.create(
             faculty=faculty, academic_year=1, name_ar="فارغة", name_en="Empty"
         )
@@ -217,7 +220,7 @@ class TestBundles:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الصلاحية
+#  Permissions
 # ═══════════════════════════════════════════════════════════
 
 
@@ -231,7 +234,7 @@ class TestBundles:
 )
 def test_customers_cannot_edit_the_academic_tree(route):
     """
-    ⚠️  من يضيف جامعة يضيف بابًا لتسجيل الطلاب — بنية لا بيانات.
+    ⚠️  Whoever adds a university adds a door for student registration — structure, not data.
     """
     customer = User.objects.create_user(email="c@test.local", password=PASSWORD)
     customer.is_active = True

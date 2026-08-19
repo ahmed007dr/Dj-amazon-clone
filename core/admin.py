@@ -1,21 +1,21 @@
 """
-لوحة Django — نافذة تشغيلية داخلية، لا واجهة المنتج.
+The Django admin — an internal operational window, not the product interface.
 
-⚠️  واجهة الإدارة الحقيقية هي الـ SPA فوق `/api/v1/administration/` (ADR-03).
-    هذه اللوحة أداة للفريق الداخلي: تشخيص · تدقيق · إصلاح يدوي نادر.
-    لذلك ثلاث قواعد تسري على كل ملف `admin.py` في المشروع:
+⚠️  The real admin interface is the SPA on top of `/api/v1/administration/` (ADR-03).
+    This panel is a tool for the internal team: diagnosis · auditing · rare manual repair.
+    Three rules therefore apply to every `admin.py` file in the project:
 
-      ١. **السجلات للقراءة فقط.** سجل التدقيق وحركة المخزون وأحداث
-         الويب‌هوك تُكتب بالخدمات لا باليد؛ السماح بتعديلها من اللوحة
-         يجعل السجل نفسه غير جدير بالثقة.
+      1. **Logs are read-only.** The audit log, stock movements and webhook
+         events are written by services, never by hand; allowing them to be
+         edited from the panel makes the log itself untrustworthy.
 
-      ٢. **الحذف الناعم يُعرض لا يُخفى.** المدير الافتراضي يستبعد
-         `deleted_at` — فلو استعملته اللوحة لاختفى الصف من الشاشة
-         وبقي في قاعدة البيانات، وهي أسوأ حالة تشخيصية ممكنة.
-         لذلك نقرأ من `all_objects` ونضيف عمود «محذوف» ومرشّحًا.
+      2. **Soft deletes are shown, not hidden.** The default manager excludes
+         `deleted_at` — so if the panel used it, the row would vanish from the
+         screen while remaining in the database, the worst possible diagnostic
+         state. We therefore read from `all_objects` and add a "Deleted" column and filter.
 
-      ٣. **الأسرار لا تُعرض.** بيانات اعتماد البوابات وبصمات التوكن
-         للكتابة فقط — انظر `payments/admin.py`.
+      3. **Secrets are never displayed.** Gateway credentials and token
+         fingerprints are write-only — see `payments/admin.py`.
 """
 
 from django.contrib import admin
@@ -24,7 +24,7 @@ from django.utils.translation import gettext_lazy as _
 from core.models import AuditLog, SystemSetting, TaxClass
 
 # ═══════════════════════════════════════════════════════════
-#  هوية اللوحة
+#  Panel identity
 # ═══════════════════════════════════════════════════════════
 
 admin.site.site_header = _("منصة التجارة الطبية")
@@ -33,12 +33,12 @@ admin.site.index_title = _("النطاقات")
 
 
 # ═══════════════════════════════════════════════════════════
-#  أساسات مشتركة
+#  Shared foundations
 # ═══════════════════════════════════════════════════════════
 
 
 class DeletedListFilter(admin.SimpleListFilter):
-    """مرشّح الحذف الناعم — الافتراضي يعرض الكل."""
+    """Soft-delete filter — the default shows everything."""
 
     title = _("الحذف الناعم")
     parameter_name = "deleted"
@@ -56,10 +56,10 @@ class DeletedListFilter(admin.SimpleListFilter):
 
 class SoftDeleteAdminMixin:
     """
-    يقرأ من `all_objects` بدل المدير الافتراضي.
+    Reads from `all_objects` instead of the default manager.
 
-    ⚠️  الصنف الذي يضيف إجراءات خاصة به يجب أن يعيد ذكر
-        `restore_selected` في `actions` — القائمة تُستبدل لا تُدمج.
+    ⚠️  A class that adds its own actions must repeat `restore_selected` in
+        `actions` — the list is replaced, not merged.
     """
 
     actions = ["restore_selected"]
@@ -83,10 +83,11 @@ class SoftDeleteAdminMixin:
 
 class SlugAdminMixin:
     """
-    الـ slug يُولَّد عند الإنشاء ثم يُقفل.
+    The slug is generated on creation and then locked.
 
-    تركه قابلًا للتعديل في اللوحة يناقض `SlugMixin` نفسه: تغييره يكسر
-    كل رابط خارجي يشير إلى الكيان، وهو بالضبط ما بُني المزيج لمنعه.
+    Leaving it editable in the panel contradicts `SlugMixin` itself: changing it
+    breaks every external link pointing at the entity, which is exactly what the
+    mixin was built to prevent.
     """
 
     def get_readonly_fields(self, request, obj=None):
@@ -95,7 +96,7 @@ class SlugAdminMixin:
 
 
 class ReadOnlyAdminMixin:
-    """عرض وبحث فقط — لا إضافة ولا تعديل ولا حذف."""
+    """View and search only — no add, no change, no delete."""
 
     def has_add_permission(self, request):
         return False
@@ -111,32 +112,32 @@ class ReadOnlyAdminMixin:
 
 
 class TimeStampedAdmin(admin.ModelAdmin):
-    """لنماذج `TimeStampedModel` — بلا حذف ناعم."""
+    """For `TimeStampedModel` models — no soft delete."""
 
     readonly_fields = ("created_at", "updated_at")
 
 
 class DomainModelAdmin(SoftDeleteAdminMixin, admin.ModelAdmin):
-    """الأساس المعتاد لكيان `BaseModel`."""
+    """The usual base for a `BaseModel` entity."""
 
     readonly_fields = ("id", "created_at", "updated_at", "deleted_at")
 
 
 class LogAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
-    """سجل يُكتب بالخدمات ويُقرأ هنا."""
+    """A log written by services and read here."""
 
     show_full_result_count = False
 
 
 class ReadOnlyDomainAdmin(SoftDeleteAdminMixin, ReadOnlyAdminMixin, admin.ModelAdmin):
-    """كيان `BaseModel` تكتبه خدمته وحدها — يُعرض كاملًا ولا يُعدَّل."""
+    """A `BaseModel` entity written by its service alone — shown in full, never edited."""
 
     actions = []
     show_full_result_count = False
 
 
 # ═══════════════════════════════════════════════════════════
-#  البنية التحتية
+#  Infrastructure
 # ═══════════════════════════════════════════════════════════
 
 
@@ -158,7 +159,7 @@ class SystemSettingAdmin(TimeStampedAdmin):
     ordering = ("group", "key")
 
     def has_delete_permission(self, request, obj=None):
-        """المفاتيح يقرأها الكود بالاسم — حذف مفتاح يكسر مستهلكه."""
+        """The keys are read by name from code — deleting one breaks its consumer."""
         return False
 
 

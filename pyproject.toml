@@ -4,7 +4,7 @@ version = "0.5.0"
 requires-python = ">=3.11"
 
 # ═══════════════════════════════════════════════════════════
-#  Ruff — lint + تنسيق
+#  Ruff — lint + formatting
 # ═══════════════════════════════════════════════════════════
 
 [tool.ruff]
@@ -15,26 +15,26 @@ exclude = [".venv", "*/migrations/*", "full-temp", "static", "media"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "C4", "DJ", "S", "RUF"]
 ignore = [
-    "S101",    # assert مسموح
-    "RUF001",  # محارف عربية تشبه لاتينية — مقصودة
+    "S101",    # assert is allowed
+    "RUF001",  # Arabic characters that resemble Latin ones — intentional
     "RUF002",
     "RUF003",
-    "RUF012",  # ClassVar على سمات Django
+    "RUF012",  # ClassVar on Django attributes
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "*/tests/*" = ["S105", "S106", "S311"]
-# ⚠️  عشوائية البذرة **شكل عرض لا سرّ**: تُشكّل منحنى الزوار كي
-#     تُرى الذروة على الشاشة، وببذرة ثابتة تُنتج نفس النتيجة كل مرة.
-#     ومولّد التشفير هنا أبطأ ولا يضيف شيئًا.
+# ⚠️  Seed randomness is a **presentation detail, not a secret**: it shapes the
+#     visitor curve so the peak is visible on screen, and with a fixed seed it
+#     produces the same result every time. A cryptographic generator here is slower and adds nothing.
 "devtools/seeds/*" = ["S311"]
 "config/settings/*" = ["F403", "F405", "E402"]
 "core/models/__init__.py" = ["F401"]
 "core/api/__init__.py" = ["F401"]
-# أسماء أكواد أخطاء لا أسرار — TOKEN_EXPIRED/TOKEN_INVALID
+# Error code names, not secrets — TOKEN_EXPIRED/TOKEN_INVALID
 "core/errors.py" = ["S105"]
-# object_id نصي ليستوعب UUID وBigInt معًا في مرجع عام؛
-# null=True مقصود لأن القيد قد لا يرتبط بكائن
+# object_id is text so it can hold both a UUID and a BigInt in a generic reference;
+# null=True is deliberate because the entry may not be tied to an object
 "core/models/audit.py" = ["DJ001"]
 
 [tool.ruff.lint.isort]
@@ -69,10 +69,10 @@ source = ["."]
 omit = ["*/migrations/*", "*/tests/*", ".venv/*", "config/*", "manage.py"]
 
 # ═══════════════════════════════════════════════════════════
-#  import-linter — فرض حدود النطاقات
+#  import-linter — enforcing domain boundaries
 # ═══════════════════════════════════════════════════════════
-#  التوثيق لا يفرض معمارية. فشل البناء يفرضها. (ADR-08)
-#  انظر docs/backend/02-DEPENDENCIES.md
+#  Documentation does not enforce architecture. A failing build does. (ADR-08)
+#  See docs/backend/02-DEPENDENCIES.md
 # ═══════════════════════════════════════════════════════════
 
 [tool.importlinter]
@@ -88,119 +88,119 @@ root_packages = [
 [[tool.importlinter.contracts]]
 name = "Domain layering - dependencies flow downward only"
 type = "layers"
-# ⚠️  `access` تحت `catalog` لا فوقه.
+# ⚠️  `access` sits below `catalog`, not above it.
 #
-#     يعتمد على accounts + core فقط، **ويستهلكه الجميع**:
-#     catalog · cart · orders · البحث. وضعه فوق catalog كان خطأً
-#     في العقد خالف ما توثّقه docs/backend/02-DEPENDENCIES.md،
-#     وأمسكه import-linter عند أول استيراد فعلي.
+#     It depends on accounts + core only, **and everyone consumes it**:
+#     catalog · cart · orders · search. Placing it above catalog was a mistake
+#     in the contract that contradicted docs/backend/02-DEPENDENCIES.md,
+#     and import-linter caught it on the first real import.
 layers = [
-    # ⚠️  `devtools` فوق الجميع — يستورد كل شيء ولا يستورده أحد.
+    # ⚠️  `devtools` above everything — it imports everything and nobody imports it.
     #
-    #     بذرة البيانات تلمس كل نطاق؛ وضعها داخل أحدها يجعله يعتمد
-    #     على نطاقات لا علاقة له بها فيكذب المخطط. وهي غير مثبّتة
-    #     خارج بيئة التطوير أصلًا (config/settings/dev.py).
+    #     The data seed touches every domain; putting it inside one of them would
+    #     make that domain depend on domains it has nothing to do with, and the
+    #     diagram would lie. It is not installed outside development anyway (config/settings/dev.py).
     "devtools",
-    # ⚠️  `reporting` تحت `devtools` وفوق الجميع.
+    # ⚠️  `reporting` below `devtools` and above everything else.
     #
-    #     يقرأ كل نطاق ولا يكتب في أيٍّ منها، ولا نطاق يستورده.
-    #     وضعه أدنى كان يمنعه من قراءة ما فوقه — وهو تقرير يجب أن
-    #     يرى كل شيء بحكم تعريفه.
+    #     It reads every domain, writes to none of them, and no domain imports it.
+    #     Placing it lower would have stopped it reading what sits above — and a
+    #     report must see everything by definition.
     "reporting",
-    # ⚠️  `ops` فوق نطاقات العمل وتحت `devtools`.
+    # ⚠️  `ops` above the business domains and below `devtools`.
     #
-    #     أوامر التشغيل تمسّ `inventory` و`cart` معًا؛ وضعها في
-    #     أحدهما يجعله يستورد الآخر، وفي `core` يجعل البنية التحتية
-    #     تعرف نطاقات العمل. ولا تصلح `devtools` لأنه غير مثبّت في
-    #     الإنتاج — والمهام الدورية تعمل هناك قبل أي مكان آخر.
+    #     Operational commands touch `inventory` and `cart` alike; putting them in
+    #     either would make it import the other, and putting them in `core` would
+    #     make the infrastructure know about business domains. `devtools` will not
+    #     do because it is not installed in production — and periodic tasks run there before anywhere else.
     #
-    # ⚠️  و`seo` بجواره لا داخل `catalog`.
+    # ⚠️  And `seo` sits beside it, not inside `catalog`.
     #
-    #     خريطة الموقع تجمع منتجات `catalog` وحزم `academic`
-    #     وترشّحهما بـ `access` — وهما شقيقان في الطبقة نفسها لا
-    #     يستورد أحدهما الآخر.
+    #     The sitemap combines `catalog` products with `academic` bundles and
+    #     filters both through `access` — siblings on the same layer, neither
+    #     importing the other.
     "ops | seo",
-    # ⚠️  `commissions` **فوق `targets` و`finance` معًا**.
+    # ⚠️  `commissions` sits **above both `targets` and `finance`**.
     #
-    #     العمولة على الربح تحتاج `finance.COGSEntry` — وهي التكلفة
-    #     المحسوبة من الدفعة التي خرجت فعلًا. حسابها هنا من جديد
-    #     يُنتج رقم ربح يخالف قائمة الأرباح، ولا أحد يعرف أيّهما
-    #     يُصدَّق حين تُصرَف عمولة على أحدهما.
+    #     Commission on profit needs `finance.COGSEntry` — the cost computed from
+    #     the batch that actually shipped. Recomputing it here would produce a
+    #     profit figure that disagrees with the P&L statement, and nobody would
+    #     know which to believe once a commission is paid against one of them.
     "commissions",
     "targets",
-    # ⚠️  `b2b` و`finance` شقيقان فوق `pos` و`orders`.
+    # ⚠️  `b2b` and `finance` are siblings above `pos` and `orders`.
     #
-    #     كلاهما يستهلك الطلبات ولا يستورد الآخر: المالية تسأل «كم
-    #     ربحنا؟» وB2B يسأل «كم على هذا العميل؟». خلطهما كان يجعل
-    #     كشف حساب صيدلية يعتمد على قيود الأرباح — وهما دفتران
-    #     مختلفان لجمهورين مختلفين.
-    # ⚠️  `loyalty` فوق `b2b | finance` وتحت `employees`.
+    #     Both consume orders and neither imports the other: finance asks "how much
+    #     did we earn?" and B2B asks "how much does this customer owe?". Mixing them
+    #     made a pharmacy's account statement depend on profit entries — two
+    #     different ledgers for two different audiences.
+    # ⚠️  `loyalty` above `b2b | finance` and below `employees`.
     #
-    #     يستمع لاكتمال الطلب ويقرأ `customers`؛ والاستبدال يُنتج
-    #     `promotions.Coupon` بدل أن يلمس السلة أو الطلب — فالسلة
-    #     والطلب **تحته**، ومسّهما كان يقلب الاتجاه.
+    #     It listens for order completion and reads `customers`; redemption produces
+    #     a `promotions.Coupon` instead of touching the cart or the order — the cart
+    #     and the order are **below it**, and touching them would invert the direction.
     "loyalty",
     "b2b | finance",
-    # ⚠️  `employees` فوق `orders` وتحت `b2b | finance`.
+    # ⚠️  `employees` above `orders` and below `b2b | finance`.
     #
-    #     يقرأ الطلبات لحساب الأداء وينشئها نيابةً عن العميل،
-    #     ويستورد `customers` للإسناد — اتجاه نازل مسموح (ADR-12).
-    #     و`customers` لا يستورده أبدًا: الحقل المعاكس كان ينشئ
-    #     دائرة `customers ↔ employees`.
+    #     It reads orders to compute performance and creates them on the customer's
+    #     behalf, and imports `customers` for assignment — a permitted downward direction (ADR-12).
+    #     `customers` never imports it: the reverse field used to create a
+    #     `customers ↔ employees` cycle.
     "employees",
-    # ⚠️  `suppliers` فوق `inventory` و`catalog` وتحت `employees`.
+    # ⚠️  `suppliers` above `inventory` and `catalog`, below `employees`.
     #
-    #     يستلم البضاعة عبر `inventory.services.receive`، ولا يعرف
-    #     بوجود الطلبات ولا الموظفين إطلاقًا: الشراء واردٌ لا صادر.
+    #     It receives goods through `inventory.services.receive`, and knows nothing
+    #     at all about orders or employees: purchasing is inbound, not outbound.
     "suppliers",
-    # ⚠️  `pos` **فوق** `orders` لا بديلًا عنه.
+    # ⚠️  `pos` sits **above** `orders`, not as an alternative to it.
     #
-    #     كل بيعة تُنتج `Order` بـ `channel=POS` عبر
-    #     `orders.services.create_pos_order`. و`orders` لا يعرف
-    #     بوجود نقطة البيع إطلاقًا: مدخلاته أصناف وأرقام.
+    #     Every sale produces an `Order` with `channel=POS` through
+    #     `orders.services.create_pos_order`. And `orders` knows nothing at all
+    #     about point of sale: its inputs are items and numbers.
     #
-    #     النموذج الموازي (`POSOrder`) كان سينتج تقريرَي مبيعات
-    #     ومخزونين ومصدرَي حقيقة — وأول سؤال محاسبي يكشف الفجوة
-    #     بينهما بلا طريقة لحسمها.
+    #     A parallel model (`POSOrder`) would have produced two sales reports, two
+    #     stock figures and two sources of truth — and the first accounting question
+    #     would expose the gap between them with no way to settle it.
     "pos",
     "orders",
     "cart",
-    # ⚠️  `payments` **تحت** `orders` لا فوقه.
+    # ⚠️  `payments` sits **below** `orders`, not above it.
     #
-    #     التبعية `orders → payments.services.charge()` — والطلب
-    #     يعرف الواجهة المجرّدة لا أي بوابة بعينها. أما `payments`
-    #     فلا يعرف بوجود الطلبات إطلاقًا: مرجعه نصي.
+    #     The dependency is `orders → payments.services.charge()` — and the order
+    #     knows the abstract interface, never a specific gateway. `payments` in turn
+    #     knows nothing at all about orders: its reference is a string.
     #
-    #     وضعه فوق `orders` كان خطأً في العقد خالف ما توثّقه
-    #     docs/backend/02-DEPENDENCIES.md — وهو ثاني تناقض من نوعه
-    #     بعد `access`.
+    #     Placing it above `orders` was a mistake in the contract that contradicted
+    #     docs/backend/02-DEPENDENCIES.md — the second contradiction of its kind
+    #     after `access`.
     "payments",
     "promotions",
     "pricing | inventory | reviews",
     "customers | administration | academic | catalog | shipping",
-    # ⚠️  `analytics` شقيق `access` فوق `accounts` وتحت `administration`.
+    # ⚠️  `analytics` is a sibling of `access`, above `accounts` and below `administration`.
     #
-    #     يستورد `accounts` لتصنيف الأجهزة ولا يعرف أي نطاق عمل،
-    #     و`administration` يقرأ منه عدد الزوار — فلو وُضع أعلى
-    #     لانقلب الاتجاه. ولا يستورد `reporting` أبدًا: خريطتا
-    #     الذروة متوازيتان لا متداخلتان، والصلاحية المشتركة بينهما
-    #     في `core.permissions` لهذا السبب بالذات.
+    #     It imports `accounts` to classify devices and knows no business domain,
+    #     and `administration` reads the visitor count from it — so placing it
+    #     higher would invert the direction. It never imports `reporting`: the two
+    #     peak charts are parallel, not overlapping, and the permission they share
+    #     lives in `core.permissions` for exactly that reason.
     "access | analytics",
     "accounts",
-    # ⚠️  `branding` **فوق** `core` لا شقيقًا له.
+    # ⚠️  `branding` sits **above** `core`, not as a sibling of it.
     #
-    #     كان في نفس الطبقة حين كان تطبيقًا فارغًا، فلم يستورد شيئًا
-    #     ولم ينكشف الخطأ. أول موديل حقيقي جعله يستورد `BaseModel`
-    #     و`random_filename` — والشقيقان لا يستوردان بعضهما.
+    #     It was on the same layer while it was an empty app, so it imported nothing
+    #     and the mistake stayed hidden. The first real model made it import
+    #     `BaseModel` and `random_filename` — and siblings do not import each other.
     #
-    #     الترتيب الصحيح يعبّر عن الحقيقة: الهوية البصرية تستهلك
-    #     البنية التحتية، ولا نطاق عمل يستهلكها.
-    # ⚠️  `mailing` شقيق `branding` فوق `core`.
+    #     The correct order states the truth: visual identity consumes the
+    #     infrastructure, and no business domain consumes it.
+    # ⚠️  `mailing` is a sibling of `branding`, above `core`.
     #
-    #     كلاهما يستهلك البنية التحتية ولا يعرف نطاق عمل، ولا يستورد
-    #     أحدهما الآخر. و`accounts` فوقهما لأنه يرسل بريد التفعيل —
-    #     الاتجاه نازل: الهوية تستدعي البريد، والبريد لا يعرف من
-    #     يستدعيه.
+    #     Both consume the infrastructure and know no business domain, and neither
+    #     imports the other. `accounts` sits above them because it sends activation
+    #     email — a downward direction: identity calls email, and email does not
+    #     know who calls it.
     "branding | mailing",
     "core",
 ]
@@ -221,15 +221,15 @@ type = "independence"
 modules = ["customers", "administration"]
 
 [[tool.importlinter.contracts]]
-# ⚠️  الدائرة التي وُجد ADR-12 ليمنعها — **مفروضة الآن لا موثَّقة فقط**.
+# ⚠️  The cycle ADR-12 exists to prevent — **now enforced, not merely documented**.
 #
-#     حقل `assigned_employee` على `CustomerProfile` يبدو أبسط طريق
-#     لسؤال «من المسؤول عن هذا العميل؟»، وهو بالضبط ما ينشئ
-#     `customers ↔ employees`. الإسناد يملكه الطرف الأعلى
-#     (`employees.CustomerAssignment`) فيبقى الاتجاه نازلًا.
+#     An `assigned_employee` field on `CustomerProfile` looks like the simplest
+#     way to answer "who owns this customer?", and it is exactly what creates
+#     `customers ↔ employees`. Assignment is owned by the upper side
+#     (`employees.CustomerAssignment`) so the direction stays downward.
 #
-#     العقد أعلاه لا يغطيها: `employees` لم يكن موجودًا حين كُتب،
-#     وإضافته إلى `independence` كانت ستمنع الاتجاه المسموح أيضًا.
+#     The contract above does not cover it: `employees` did not exist when it
+#     was written, and adding it to `independence` would have blocked the permitted direction too.
 name = "Customers must never know about employees (ADR-12)"
 type = "forbidden"
 source_modules = ["customers"]
@@ -240,15 +240,15 @@ name = "Domains never import each other models directly"
 type = "forbidden"
 source_modules = ["orders", "cart", "promotions"]
 forbidden_modules = ["inventory.models", "pricing.models"]
-# ⚠️  `allow_indirect_imports` ضروري لا تساهل.
+# ⚠️  `allow_indirect_imports` is a necessity, not a concession.
 #
-#     بدونه يُرفض المسار **الصحيح** أيضًا:
+#     Without it the **correct** path is rejected as well:
 #
 #         orders.services → inventory.services → inventory.models
 #
-#     وهو بالضبط ما نريده — استدعاء الخدمة، والخدمة تعرف موديلاتها.
-#     العقد يمنع الاستيراد **المباشر** لموديلات نطاق آخر، لا مرور
-#     الاستدعاء عبر طبقة خدماته.
+#     which is exactly what we want — call the service, and let the service know its own models.
+#     The contract forbids the **direct** import of another domain's models, not
+#     a call passing through that domain's service layer.
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
@@ -261,11 +261,11 @@ forbidden_modules = [
 
 [[tool.importlinter.contracts]]
 name = "Mailing is independent of business domains"
-# ⚠️  `send_to_user(user)` يقبل الكائن ولا يستورد نوعه.
+# ⚠️  `send_to_user(user)` accepts the object without importing its type.
 #
-#     أول استيراد لـ`accounts.User` هنا يقلب الاتجاه: البريد يصير
-#     فوق الهوية بينما الهوية تستدعيه — وهي دائرة لا يكسرها إلا
-#     استيراد داخل دالة، أي إخفاء الدائرة لا حلّها.
+#     The first import of `accounts.User` here inverts the direction: email ends
+#     up above identity while identity calls it — a cycle breakable only by an
+#     import inside a function, which hides the cycle rather than resolving it.
 type = "forbidden"
 source_modules = ["mailing"]
 forbidden_modules = [
@@ -276,11 +276,11 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "Nothing may import notifications"
 type = "forbidden"
-# ⚠️  النطاقات تبعث إشارات؛ `notifications` يستمع.
+# ⚠️  Domains emit signals; `notifications` listens.
 #
-#     الاستيراد المباشر يعني أن `inventory` يعرف بوجود البريد،
-#     و`orders` يعرف قوالب الرسائل — وكل تغيير في الإشعارات يمس
-#     نطاقات لا علاقة لها به.
+#     A direct import would mean `inventory` knows email exists and `orders`
+#     knows the message templates — and every change to notifications would
+#     touch domains that have nothing to do with it.
 source_modules = [
     "core", "accounts", "customers", "administration", "academic",
     "catalog", "shipping", "access", "pricing", "inventory",

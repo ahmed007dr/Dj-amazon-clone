@@ -1,11 +1,12 @@
 """
-قوائم الأسعار وقواعدها والخصومات والكوبونات.
+Price lists, their rules, discounts and coupons.
 
-⚠️  **قائمة منفصلة للطلاب لا نسبة خصم** — قاعدة العمل ٩.
+⚠️  **A separate list for students, not a discount percentage** — business rule 9.
 
-    الفارق ليس شكليًا: النسبة تجعل سعر الطالب مشتقًا من سعر
-    التجزئة، فيستحيل تسعير صنف للطلاب بأقل من التكلفة ترويجيًا،
-    ويستحيل تدقيق ما دفعه الطالب فعلًا بعد تغيّر السعر الأصلي.
+    The difference is not cosmetic: a percentage makes the student price derived
+    from the retail price, so it becomes impossible to price an item below cost
+    for students as a promotion, and impossible to audit what a student actually
+    paid after the original price changes.
 """
 
 from datetime import timedelta
@@ -61,10 +62,10 @@ PRICE_LISTS = [
     },
 ]
 
-#: (رمز القائمة، SKU، الكمية الدنيا، سعر الوحدة)
-#: ⚠️  شرائح الكمية **صفوف** لا حقول — أي عدد شرائح بلا هجرة
+#: (list code, SKU, minimum quantity, unit price)
+#: ⚠️  Quantity tiers are **rows**, not fields — any number of tiers with no migration
 PRICE_RULES = [
-    # ── التجزئة: السعر المرجعي هو الأساس، والاستثناءات هنا ──
+    # ── Retail: the reference price is the base, and the exceptions are here ──
     ("retail", "GLV-NIT", 1, "185.00"),
     ("retail", "GLV-NIT", 6, "172.00"),
     ("retail", "GLV-NIT", 12, "160.00"),
@@ -72,26 +73,26 @@ PRICE_RULES = [
     ("retail", "MSK-SRG", 10, "40.00"),
     ("retail", "SYR-3ML", 1, "1.75"),
     ("retail", "SYR-3ML", 100, "1.40"),
-    # ── الطلاب: أسعار مستقلة لا مشتقّة ─────────────────────
+    # ── Students: independent prices, not derived ──────────
     ("student", "STE-CLS", 1, "690.00"),
     ("student", "LAB-COAT", 1, "245.00"),
     ("student", "SCR-SET", 1, "365.00"),
     ("student", "DIS-KIT", 1, "195.00"),
     ("student", "BOK-ANA", 1, "410.00"),
     ("student", "GLV-NIT", 1, "165.00"),
-    # ── الجملة ─────────────────────────────────────────────
+    # ── Wholesale ──────────────────────────────────────────
     ("wholesale", "GZE-BULK", 1, "980.00"),
     ("wholesale", "GZE-BULK", 5, "910.00"),
     ("wholesale", "GLV-NIT", 12, "142.00"),
     ("wholesale", "GLV-NIT", 50, "128.00"),
     ("wholesale", "MSK-SRG", 20, "34.00"),
     ("wholesale", "SYR-3ML", 500, "1.10"),
-    # ── المهنيون ───────────────────────────────────────────
+    # ── Professionals ──────────────────────────────────────
     ("professional", "INS-PEN", 1, "148.00"),
     ("professional", "BPM-DIG", 1, "1320.00"),
 ]
 
-#: (SKU، نوع الخصم، القيمة، عدد أيام السريان)
+#: (SKU, discount type, value, days it stays valid)
 PRICE_OVERRIDES = [
     ("VTC-1000", DiscountKind.PERCENTAGE, "15.00", 21),
     ("THR-IRD", DiscountKind.FIXED, "60.00", 14),
@@ -105,10 +106,10 @@ COUPONS = [
         "name_en": "First order discount",
         "kind": "PERCENTAGE",
         "value": Decimal("10.00"),
-        # ⚠️  سقف إلزامي على الخصم النسبي.
+        # ⚠️  A mandatory cap on percentage discounts.
         #
-        #     «١٠٪ بلا سقف» على طلب جملة بعشرات الآلاف خسارةٌ لم
-        #     يقصدها أحد — ويُكتشف بعد الشحن.
+        #     "10% with no cap" on a wholesale order of tens of thousands is a loss
+        #     nobody intended — and it is discovered after shipping.
         "max_discount_amount": Decimal("50.00"),
         "min_order_amount": Decimal("200.00"),
         "first_order_only": True,
@@ -141,10 +142,10 @@ COUPONS = [
         "kind": "PERCENTAGE",
         "value": Decimal("25.00"),
         "min_order_amount": Decimal("0.00"),
-        # ⚠️  كوبون منتهٍ **مقصود**.
+        # ⚠️  An expired coupon is **deliberate**.
         #
-        #     رسالة الرفض مسار لا يمرّ به أحد إلا حين يشتكي عميل.
-        #     وجوده في البذرة يجعله قابلًا للتجربة في أول دقيقة.
+        #     The rejection message is a path nobody walks until a customer complains.
+        #     Having it in the seed makes it testable in the first minute.
         "_expired": True,
     },
 ]

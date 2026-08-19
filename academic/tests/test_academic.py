@@ -1,5 +1,5 @@
 """
-اختبارات النطاق الأكاديمي.
+Academic domain tests.
 """
 
 from decimal import Decimal
@@ -23,11 +23,11 @@ from core.errors import BusinessError
 PASSWORD = "Str0ng-Test-Pass!23"
 
 
-# ⚠️  مراجع نصية كسولة.
+# ⚠️  Lazy string references.
 #
-#     `academic` و`catalog` صنوان **مستقلان** في نفس الطبقة —
-#     لا يستورد أحدهما الآخر بأي اتجاه. و`apps.get_model` بحث في
-#     السجل فلا ينشئ تبعية يرصدها import-linter.
+#     `academic` and `catalog` are **independent** siblings on the same layer —
+#     neither imports the other in any direction. And `apps.get_model` is a
+#     registry lookup, so it creates no dependency for import-linter to catch.
 
 
 def product_model():
@@ -98,7 +98,7 @@ def products(db):
 
 
 # ═══════════════════════════════════════════════════════════
-#  اتساق التسلسل الأكاديمي
+#  Academic hierarchy consistency
 # ═══════════════════════════════════════════════════════════
 
 
@@ -106,7 +106,7 @@ def products(db):
 class TestHierarchyConsistency:
     def test_faculty_must_belong_to_the_chosen_university(self, student_user, university, db):
         """
-        ⚠️  كلية لا تتبع الجامعة المختارة تعطي طالبًا بحزم لا تخصّه.
+        ⚠️  A faculty not belonging to the chosen university gives a student bundles that are not theirs.
         """
         other = University.objects.create(code="asu", name_ar="عين شمس", name_en="ASU")
         foreign = Faculty.objects.create(
@@ -137,7 +137,7 @@ class TestHierarchyConsistency:
         assert "department" in exc.value.message_dict
 
     def test_year_cannot_exceed_faculty_duration(self, student_user, university, pharmacy):
-        """كلية من خمس سنوات لا تقبل طالبًا في السابعة."""
+        """A five-year faculty does not accept a seventh-year student."""
         with pytest.raises(ValidationError) as exc:
             services.create_student_profile(
                 student_user, university=university, faculty=pharmacy, academic_year=7
@@ -145,7 +145,7 @@ class TestHierarchyConsistency:
         assert "academic_year" in exc.value.message_dict
 
     def test_department_is_optional(self, student_user, university, pharmacy):
-        """كليات كثيرة بلا أقسام في سنواتها الأولى."""
+        """Many faculties have no departments in their early years."""
         profile = services.create_student_profile(
             student_user, university=university, faculty=pharmacy, academic_year=1
         )
@@ -160,7 +160,7 @@ class TestHierarchyConsistency:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحزم
+#  Bundles
 # ═══════════════════════════════════════════════════════════
 
 
@@ -183,10 +183,10 @@ class TestBundles:
         self, student_user, university, pharmacy
     ):
         """
-        ⚠️  الحزمة بلا قسم تخص كل أقسام الكلية.
+        ⚠️  A bundle with no department belongs to every department in the faculty.
 
-        استبعادها يعني طالبًا في قسم متخصص لا يرى المستلزمات
-        المشتركة.
+        Excluding it means a student in a specialised department never sees the
+        shared essentials.
         """
         department = Department.objects.create(
             faculty=pharmacy, code="clinical", name_ar="إكلينيكي", name_en="Clinical"
@@ -249,7 +249,7 @@ class TestBundles:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الترقية
+#  Promotion
 # ═══════════════════════════════════════════════════════════
 
 
@@ -263,8 +263,8 @@ class TestPromotion:
 
     def test_final_year_students_are_not_promoted(self, student_user, university, pharmacy):
         """
-        ⚠️  الترقية بلا حد تعطي طلابًا في السنة السابعة بكلية من
-            خمس — فتختفي حزمهم تمامًا.
+        ⚠️  Unbounded promotion gives seventh-year students in a five-year
+            faculty — and their bundles disappear entirely.
         """
         profile = services.create_student_profile(
             student_user, university=university, faculty=pharmacy, academic_year=5
@@ -277,7 +277,7 @@ class TestPromotion:
 
 
 # ═══════════════════════════════════════════════════════════
-#  حدود النطاق
+#  Domain boundaries
 # ═══════════════════════════════════════════════════════════
 
 
@@ -285,10 +285,10 @@ class TestPromotion:
 class TestDomainBoundaries:
     def test_academic_does_not_import_cart(self):
         """
-        ⚠️  `academic` في L2 و`cart` في L5.
+        ⚠️  `academic` is in L2 and `cart` is in L5.
 
-        تنسيق «إضافة حزمة للسلة» يسكن في `cart` — أمسك
-        `import-linter` وضعه هنا فور كتابته.
+        The "add a bundle to the cart" orchestration lives in `cart` —
+        `import-linter` caught it being placed here the moment it was written.
         """
         import inspect
 
@@ -299,7 +299,7 @@ class TestDomainBoundaries:
         assert "import cart" not in source
 
     def test_bundle_item_stores_no_price(self):
-        """السعر يحسبه `pricing` لكل عميل — تخزينه يتقادم بصمت."""
+        """`pricing` computes the price per customer — storing it goes silently stale."""
         names = {f.name for f in BundleItem._meta.get_fields()}
 
         assert "price" not in names

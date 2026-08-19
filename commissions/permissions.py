@@ -1,11 +1,11 @@
 """
-صلاحيات العمولات.
+Commission permissions.
 
-⚠️  **رؤية عمولات الفريق ليست صلاحية أدمن تلقائية.**
+⚠️  **Seeing the team's commissions is not an automatic admin permission.**
 
-    مبلغ عمولة كل مندوب معلومة حسّاسة بين الزملاء أنفسهم: من يراها
-    يعرف ترتيب أداء الفريق ورواتبه الفعلية. والاعتماد قرار مالي
-    بحجم صرف نقدي.
+    Each rep's commission amount is sensitive information among colleagues
+    themselves: whoever sees it knows the team's performance ranking and their
+    actual pay. And approval is a financial decision the size of a cash disbursement.
 """
 
 from rest_framework.permissions import BasePermission

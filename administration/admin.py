@@ -1,4 +1,4 @@
-"""لوحة مديري النظام وأدوارهم."""
+"""System administrators and their roles admin panel."""
 
 from django.contrib import admin
 
@@ -11,7 +11,7 @@ class AdminRoleAssignmentInline(admin.TabularInline):
     fk_name = "admin"
     extra = 0
     fields = ("role", "from_date", "to_date", "assigned_by")
-    readonly_fields = ("from_date",)  # يُثبَّت وقت الإسناد
+    readonly_fields = ("from_date",)  # Fixed at assignment time
     autocomplete_fields = ("role", "assigned_by")
     show_change_link = True
 
@@ -35,7 +35,7 @@ class AdminRoleAdmin(DomainModelAdmin):
     ordering = ("code",)
 
     def has_delete_permission(self, request, obj=None):
-        """الأدوار النظامية يشير إليها الكود بالرمز — احذف الدور فيفشل مستهلكه."""
+        """System roles are referenced by code — delete a role and its consumer breaks."""
         if obj is not None and obj.is_system:
             return False
         return super().has_delete_permission(request, obj)

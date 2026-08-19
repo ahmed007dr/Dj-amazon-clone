@@ -30,15 +30,15 @@ jobs:
           pip install -r requirements.txt
           pip install ruff pytest pytest-django factory-boy import-linter uuid-utils
 
-      # ═══ جودة الكود ═══
+      # ═══ Code quality ═══
       - name: Ruff — lint
         run: ruff check .
 
       - name: Ruff — تنسيق
         run: ruff format --check .
 
-      # ═══ الحدود المعمارية ═══
-      # صفر استيراد صاعد · صفر تبعية دائرية
+      # ═══ Architectural boundaries ═══
+      # zero upward imports · zero circular dependencies
       - name: فرض حدود النطاقات
         run: lint-imports
 
@@ -56,11 +56,11 @@ jobs:
       - name: لا migrations منسية
         run: python manage.py makemigrations --check --dry-run
 
-      # ═══ الاختبارات ═══
+      # ═══ Tests ═══
       - name: pytest
         run: pytest -q
 
-      # ═══ الأسرار ═══
+      # ═══ Secrets ═══
       - name: فحص الأسرار المثبّتة
         run: |
           if git ls-files -z | xargs -0 grep -lE "SECRET_KEY *= *['\"][^'\"]|PASSWORD *= *['\"][^'\"]" 2>/dev/null; then

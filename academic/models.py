@@ -1,16 +1,16 @@
 """
-النطاق الأكاديمي — الجامعات والكليات والحزم الدراسية.
+The academic domain — universities, faculties and study bundles.
 
-⚠️  نطاق مستقل لم يرد في المتطلبات الأصلية. (ADR-05)
+⚠️  An independent domain that did not appear in the original requirements. (ADR-05)
 
-    السوق الأولي هو الطلاب، والجامعة/الكلية/القسم/السنة لها دورة
-    حياة وملكية بيانات خاصة. دفنها في `catalog` أو `customers`
-    يجعلها المصدر الأول للتشابك لاحقًا.
+    The initial market is students, and university/faculty/department/year have
+    their own lifecycle and data ownership. Burying them in `catalog` or
+    `customers` would make them the primary source of entanglement later.
 
-⚠️  والطالب **نوع حساب لا بوابة سادسة**. (ADR-18)
+⚠️  And a student is **an account type, not a sixth portal**. (ADR-18)
 
-    ما يبنيه هذا النطاق يظهر كأقسام إضافية داخل بوابة العميل —
-    لا واجهة موازية تُصان مرتين.
+    What this domain builds appears as extra sections inside the customer
+    portal — not a parallel interface maintained twice.
 """
 
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -46,7 +46,7 @@ class University(BilingualNameMixin, SlugMixin, BaseModel):
 
 
 class Faculty(BilingualNameMixin, SlugMixin, BaseModel):
-    """كلية — طب · صيدلة · أسنان · علوم."""
+    """A faculty — Medicine · Pharmacy · Dentistry · Science."""
 
     university = models.ForeignKey(
         University,
@@ -56,7 +56,7 @@ class Faculty(BilingualNameMixin, SlugMixin, BaseModel):
     )
     code = models.SlugField(_("الرمز"), max_length=50)
 
-    #: عدد سنوات الدراسة — يحدد السنوات الصالحة للطالب
+    #: Number of study years — determines which years are valid for a student
     years_count = models.PositiveSmallIntegerField(
         _("عدد سنوات الدراسة"),
         default=5,
@@ -84,10 +84,10 @@ class Faculty(BilingualNameMixin, SlugMixin, BaseModel):
 
 class Department(BilingualNameMixin, SlugMixin, BaseModel):
     """
-    قسم داخل كلية.
+    A department within a faculty.
 
-    ⚠️  اختياري في مسار الطالب: كليات كثيرة بلا أقسام في سنواتها
-        الأولى. إجباره يمنع الطالب من إكمال ملفه.
+    ⚠️  Optional on the student's path: many faculties have no departments in
+        their early years. Making it mandatory stops the student completing their profile.
     """
 
     faculty = models.ForeignKey(
@@ -117,13 +117,14 @@ class Department(BilingualNameMixin, SlugMixin, BaseModel):
 
 class StudentProfile(BaseModel):
     """
-    الملف الأكاديمي للطالب.
+    A student's academic profile.
 
-    ⚠️  منفصل عن `CustomerProfile` عمدًا.
+    ⚠️  Deliberately separate from `CustomerProfile`.
 
-        الطالب عميل أولًا — له عناوين وطلبات وتقييمات. وكونه طالبًا
-        سياق **إضافي** ينتهي بتخرّجه، بينما ملفه كعميل يبقى.
-        دمجهما يعني حقولًا أكاديمية ميتة في ملف كل عميل غير طالب.
+        A student is a customer first — with addresses, orders and reviews.
+        Being a student is **additional** context that ends at graduation, while
+        their customer profile remains. Merging them means dead academic fields
+        on every non-student customer's profile.
     """
 
     user = models.OneToOneField(
@@ -159,7 +160,7 @@ class StudentProfile(BaseModel):
     )
     student_number = models.CharField(_("الرقم الجامعي"), max_length=50, blank=True)
 
-    #: يُضبط من `customers` بعد اعتماد الكارنيه
+    #: Set from `customers` once the student ID card is approved
     is_verified = models.BooleanField(
         _("موثّق"),
         default=False,
@@ -184,10 +185,11 @@ class StudentProfile(BaseModel):
 
     def clean(self):
         """
-        ⚠️  اتساق التسلسل الأكاديمي.
+        ⚠️  Academic hierarchy consistency.
 
-            كلية لا تتبع الجامعة المختارة، أو سنة تتجاوز سنوات
-            الكلية — كلاهما يعطي طالبًا بحزم دراسية لا تخصّه.
+            A faculty that does not belong to the chosen university, or a year
+            beyond the faculty's year count — either one gives a student study
+            bundles that are not theirs.
         """
         from django.core.exceptions import ValidationError
 
@@ -217,13 +219,13 @@ class BundleKind(models.TextChoices):
 
 class StudyBundle(BilingualNameMixin, SlugMixin, BaseModel):
     """
-    حزمة دراسية — مجموعة منتجات لسنة وكلية بعينها.
+    A study bundle — a set of products for one specific year and faculty.
 
-    ⚠️  الحزمة **ليست منتجًا**.
+    ⚠️  A bundle **is not a product**.
 
-        شراؤها يضيف أصنافها للسلة كأسطر مستقلة، فيبقى المخزون
-        والتسعير والوصول محسوبًا لكل صنف على حدة. جعلها منتجًا
-        يعني مخزونًا وهميًا لا يعكس توفر مكوّناتها.
+        Buying it adds its items to the cart as independent lines, so stock,
+        pricing and access stay computed per item. Making it a product would
+        mean phantom stock that does not reflect its components' availability.
     """
 
     faculty = models.ForeignKey(
@@ -273,10 +275,10 @@ class StudyBundle(BilingualNameMixin, SlugMixin, BaseModel):
 
 class BundleItem(BaseModel):
     """
-    صنف في حزمة.
+    An item within a bundle.
 
-    ⚠️  لا سعر هنا — يحسبه `pricing` لكل عميل على حدة.
-        تخزينه يعني سعرًا يتقادم بصمت داخل الحزمة.
+    ⚠️  No price here — `pricing` computes it per customer.
+        Storing it means a price going silently stale inside the bundle.
     """
 
     bundle = models.ForeignKey(StudyBundle, on_delete=models.CASCADE, related_name="items")

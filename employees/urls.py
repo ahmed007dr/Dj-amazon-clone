@@ -19,6 +19,17 @@ urlpatterns = [
     path("orders/", api.CreateOrderForCustomerAPI.as_view(), name="create-order"),
     # ── الأدمن ─────────────────────────────────────────────
     path("admin/roles/", api.AdminRoleListCreateAPI.as_view(), name="admin-roles"),
+    # ⚠️  قبل `<uuid:pk>` عمدًا: الثابت يسبق المتغيّر.
+    path(
+        "admin/permissions/",
+        api.AdminPermissionCatalogueAPI.as_view(),
+        name="admin-permissions",
+    ),
+    path(
+        "admin/roles/<uuid:pk>/",
+        api.AdminRoleDetailAPI.as_view(),
+        name="admin-role-detail",
+    ),
     path("admin/staff/", api.AdminEmployeeListAPI.as_view(), name="admin-staff"),
     path("admin/staff/<uuid:pk>/", api.AdminEmployeeDetailAPI.as_view(), name="admin-staff-detail"),
     path(

@@ -1,8 +1,8 @@
 """
-واجهات سياسات الوصول.
+Access policy endpoints.
 
-الإدارة للأدمن حصرًا — سياسة الوصول أداة أمنية، وتعديلها يفتح
-أو يغلق كتالوجات كاملة.
+Management is admin-only — an access policy is a security tool, and editing it
+opens or closes entire catalogues.
 """
 
 from rest_framework import generics
@@ -15,23 +15,23 @@ from access.preview import build_preview_user, resolve_preview
 from access.services import evaluate
 from accounts.models import AccountType
 from core.errors import BusinessError, ErrorCode
-from core.permissions import IsAdminAccount
+from core.permissions import CanManageAccess
 
 
 class AccessPolicyListCreateAPI(generics.ListCreateAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAccess]
     serializer_class = s.AccessPolicySerializer
     queryset = AccessPolicy.objects.all()
     pagination_class = None
 
 
 class AccessPolicyDetailAPI(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAccess]
     serializer_class = s.AccessPolicySerializer
     queryset = AccessPolicy.objects.all()
 
     def perform_destroy(self, instance):
-        # حذف السياسة الافتراضية يترك كل مورد بلا مرجع
+        # Deleting the default policy leaves every resource without a reference
         if instance.is_default:
             raise BusinessError(
                 ErrorCode.CONFLICT,
@@ -43,15 +43,16 @@ class AccessPolicyDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
 class PolicyMatrixAPI(APIView):
     """
-    مصفوفة السياسات × أنواع الحسابات.
+    The policies × account types matrix.
 
-    ⚠️  أداة تشخيص أساسية: تُظهر للأدمن **من يرى ماذا** في جدول
-        واحد، بدل تجربة كل تركيبة يدويًا.
+    ⚠️  A core diagnostic tool: it shows the admin **who sees what** in a single
+        table, instead of trying every combination by hand.
 
-        تُحسب من نفس محرك التقييم — فلا تتباعد عن السلوك الفعلي.
+        It is computed from the same evaluation engine — so it cannot drift
+        from actual behaviour.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAccess]
 
     def get(self, request):
         account_types = [t for t in AccountType.values if t != AccountType.ADMIN]
@@ -86,9 +87,9 @@ class PolicyMatrixAPI(APIView):
 
 
 class PreviewStatusAPI(APIView):
-    """هل وضع المعاينة نشط في هذا الطلب؟ — لعرض شريط تنبيه في الواجهة."""
+    """Is preview mode active on this request? — for showing a warning bar in the frontend."""
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAccess]
 
     def get(self, request):
         preview = resolve_preview(request)

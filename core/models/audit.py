@@ -1,9 +1,9 @@
 """
-سجل التدقيق.
+The audit log.
 
-يجيب على سؤال الأدمن: **«ما آخر عملية قام بها هذا المستخدم؟»**
+It answers the admin's question: **"what was this user's last action?"**
 
-مفتاح BigInt لا UUID — جدول داخلي ضخم لا يظهر في أي رابط. (ADR-28)
+A BigInt key rather than a UUID — a large internal table that appears in no URL. (ADR-28)
 """
 
 from django.conf import settings
@@ -35,7 +35,7 @@ class AuditAction(models.TextChoices):
 
 class AuditLog(models.Model):
     """
-    قيد تدقيق واحد. **إضافة فقط** — لا تعديل ولا حذف.
+    A single audit entry. **Append-only** — no editing and no deleting.
     """
 
     actor = models.ForeignKey(
@@ -49,11 +49,11 @@ class AuditLog(models.Model):
     action = models.CharField(_("الإجراء"), max_length=32, choices=AuditAction.choices)
 
     content_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True, blank=True)
-    # نصي ليستوعب UUID وBigInt معًا
+    # Text, so it can hold both a UUID and a BigInt
     object_id = models.CharField(_("معرّف الكائن"), max_length=64, null=True, blank=True)
     content_object = GenericForeignKey("content_type", "object_id")
 
-    # لقطة نصية — تبقى مقروءة بعد حذف الكائن
+    # A textual snapshot — it stays readable after the object is deleted
     object_repr = models.CharField(_("وصف الكائن"), max_length=200, blank=True)
 
     changes = models.JSONField(

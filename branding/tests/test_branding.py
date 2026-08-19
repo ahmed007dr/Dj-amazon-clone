@@ -1,11 +1,11 @@
 """
-اختبارات الهوية البصرية.
+Visual identity tests.
 
-⚠️  المتطلب: **التحكم في الألوان واللوجو والشعارات من لوحة الأدمن
-    للفرونت إند** — بلا إعادة نشر.
+⚠️  The requirement: **control of colours, logo and slogans from the admin panel
+    for the frontend** — with no redeployment.
 
-    الاختبارات هنا تحرس الخصائص التي تجعل ذلك حقيقيًا: الأثر فوري ·
-    التباين مفروض · الهوية تعمل قبل ضبطها.
+    The tests here guard the properties that make that real: the effect is
+    immediate · contrast is enforced · the identity works before it is configured.
 """
 
 import pytest
@@ -23,15 +23,15 @@ PASSWORD = "Str0ng-Test-Pass!23"
 
 def _model(label: str, name: str):
     """
-    ⚠️  `apps.get_model` لا `import`.
+    ⚠️  `apps.get_model`, not `import`.
 
-        `branding` ممنوع من استيراد أي نطاق عمل — يفرضه
-        `import-linter`، والاختبار جزء من الحزمة لا استثناء منها.
-        وهذا صحيح: لو استورد `branding` النموذج `User` لصار حذف
-        نطاق الحسابات كاسرًا للهوية البصرية بلا سبب.
+        `branding` is forbidden from importing any business domain — enforced by
+        `import-linter`, and the test is part of the package, not an exception
+        to it. And that is right: were `branding` to import the `User` model,
+        deleting the accounts domain would break the visual identity for no reason.
 
-        البحث بالنص يبقي الاعتماد على **وقت التشغيل** فقط، ويجب أن
-        يقع داخل دالة لا في مستوى الوحدة (`AppRegistryNotReady`).
+        A string lookup keeps the dependency at **runtime** only, and it must sit
+        inside a function rather than at module level (`AppRegistryNotReady`).
     """
     return apps.get_model(label, name)
 
@@ -64,13 +64,13 @@ def admin_client(db):
 
 
 # ═══════════════════════════════════════════════════════════
-#  حساب التباين
+#  Contrast calculation
 # ═══════════════════════════════════════════════════════════
 
 
 class TestContrast:
     def test_known_ratios(self):
-        """القيم المرجعية من مواصفة WCAG."""
+        """Reference values from the WCAG specification."""
         assert round(contrast_ratio("#000000", "#ffffff"), 1) == 21.0
         assert round(contrast_ratio("#ffffff", "#ffffff"), 1) == 1.0
 
@@ -82,23 +82,23 @@ class TestContrast:
 
     def test_green_channel_dominates(self):
         """
-        ⚠️  ليس متوسط القنوات — العين أشدّ حساسية للأخضر بكثير.
+        ⚠️  Not the average of the channels — the eye is far more sensitive to green.
 
-            متوسط بسيط يجعل الأزرق النقي والأخضر النقي متساويين،
-            وهما في الواقع على طرفَي نقيض في القراءة.
+            A simple average makes pure blue and pure green equal, when in
+            reality they sit at opposite ends of readability.
         """
         green = contrast_ratio("#00ff00", "#000000")
         blue = contrast_ratio("#0000ff", "#000000")
         assert green > blue * 3
 
     def test_light_grey_on_white_fails_aa(self):
-        """الرمادي الفاتح «الأنيق» — يسقط تحت الشمس ولعين ضعيفة."""
+        """The "elegant" light grey — it collapses in sunlight and for a weak eye."""
         assert not passes_aa("#aaaaaa", "#ffffff")
         assert passes_aa("#595959", "#ffffff")
 
 
 # ═══════════════════════════════════════════════════════════
-#  حارس التباين
+#  The contrast guard
 # ═══════════════════════════════════════════════════════════
 
 
@@ -106,8 +106,9 @@ class TestContrast:
 class TestContrastGuard:
     def test_unreadable_palette_is_rejected(self, profile):
         """
-        ⚠️  لوحة غير مقروءة تُكتشف عادةً بشكوى مستخدم لا يعرف كيف
-            يصفها. الفحص هنا يجعلها خطأً في شاشة الأدمن.
+        ⚠️  An unreadable palette is normally discovered through a complaint
+            from a user who cannot describe it. Checking here turns it into an
+            error on the admin screen.
         """
         palette = profile.palettes.get(mode=ThemeMode.LIGHT)
         palette.text = "#dddddd"
@@ -118,8 +119,8 @@ class TestContrastGuard:
 
     def test_white_on_light_green_is_rejected(self):
         """
-        ⚠️  الفخّ الشائع: أبيض فوق أخضر فاتح — يبدو سليمًا ويعطي
-            2.1:1، أي أقل من نصف الحد المقبول.
+        ⚠️  The common trap: white on light green — it looks fine and yields
+            2.1:1, less than half the acceptable threshold.
         """
         palette = ThemePalette(mode=ThemeMode.DARK, on_primary="#ffffff", primary="#66bb6a")
 
@@ -142,7 +143,7 @@ class TestContrastGuard:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحمولة العامة
+#  The public payload
 # ═══════════════════════════════════════════════════════════
 
 
@@ -154,10 +155,10 @@ class TestPublicTheme:
 
     def test_returns_ready_css_tokens(self, profile):
         """
-        ⚠️  رموز جاهزة لا حقول خام.
+        ⚠️  Ready-made tokens, not raw fields.
 
-            ترك الفرونت يبني أسماء المتغيرات يكرّرها في مستودعين،
-            فتصير إضافة لون واحد تعديلين.
+            Leaving the frontend to build the variable names duplicates them
+            across two repositories, so adding one colour becomes two edits.
         """
         payload = APIClient().get(reverse("v1:branding:theme")).data
 
@@ -170,8 +171,8 @@ class TestPublicTheme:
 
     def test_works_before_any_profile_is_configured(self, db):
         """
-        ⚠️  واجهة بلا ألوان ترسم صفحة بيضاء بنص أسود — تبدو عطلًا
-            لا «لم تُضبط الهوية بعد».
+        ⚠️  A frontend with no colours paints a white page with black text — it
+            looks like a fault rather than "the identity is not configured yet".
         """
         assert not BrandProfile.objects.exists()
 
@@ -188,7 +189,7 @@ class TestPublicTheme:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأثر الفوري — جوهر المتطلب
+#  Immediate effect — the heart of the requirement
 # ═══════════════════════════════════════════════════════════
 
 
@@ -196,10 +197,10 @@ class TestPublicTheme:
 class TestLiveControl:
     def test_color_change_reaches_the_frontend_immediately(self, admin_client, profile):
         """
-        ⚠️  **جوهر المتطلب.**
+        ⚠️  **The heart of the requirement.**
 
-            الأدمن يغيّر اللون الأساسي فينعكس على الحمولة العامة في
-            الطلب التالي — بلا إعادة نشر ولا إعادة بناء.
+            The admin changes the primary colour and it shows in the public
+            payload on the next request — with no redeployment and no rebuild.
         """
         client = APIClient()
         palette = profile.palettes.get(mode=ThemeMode.LIGHT)
@@ -219,12 +220,12 @@ class TestLiveControl:
 
     def test_cache_is_invalidated_outside_the_api_too(self, profile):
         """
-        ⚠️  الهوية تُعدَّل من أربعة مسارات (API · لوحة Django ·
-            البذرة · الـ shell). الإبطال بإشارة لا باستدعاء يدوي —
-            وإلا ترك أي مسار منسيّ ألوانًا قديمة نصف يوم.
+        ⚠️  The identity is edited from four paths (API · the Django panel ·
+            the seed · the shell). Invalidation is by signal, not by a manual
+            call — otherwise any forgotten path leaves stale colours for half a day.
         """
         client = APIClient()
-        client.get(reverse("v1:branding:theme"))  # يملأ الكاش
+        client.get(reverse("v1:branding:theme"))  # fills the cache
 
         palette = profile.palettes.get(mode=ThemeMode.LIGHT)
         palette.primary = "#7b1fa2"
@@ -251,7 +252,7 @@ class TestLiveControl:
         assert response.status_code == 409
 
     def test_new_profile_is_born_with_both_palettes(self, admin_client):
-        """ملف بلا لوحات يعني هوية بلا ألوان — وتفعيله يطفئ الموقع."""
+        """A profile with no palettes means an identity with no colours — activating it blanks the site."""
         response = admin_client.post(
             reverse("v1:branding:profiles"),
             {"code": "winter", "name_ar": "شتاء", "name_en": "Winter"},
@@ -265,8 +266,8 @@ class TestLiveControl:
 
     def test_preview_does_not_touch_the_live_theme(self, admin_client, profile):
         """
-        ⚠️  «جرّب ثم تراجع» على الهوية يعني أن كل زائر خلال المحاولة
-            رأى ألوانًا مكسورة.
+        ⚠️  "Try it and undo" on the identity means every visitor during the
+            attempt saw broken colours.
         """
         client = APIClient()
         before = client.get(reverse("v1:branding:theme")).data
@@ -284,7 +285,7 @@ class TestLiveControl:
         assert after == before
 
     def test_preview_ignores_unknown_fields(self, admin_client):
-        """حقل مجهول واحد لا يجوز أن يصير خطأ ٥٠٠."""
+        """One unknown field must not become a 500."""
         response = admin_client.post(
             reverse("v1:branding:preview"),
             {"primary": "#2e7d32", "nonsense": "x"},
@@ -308,7 +309,7 @@ class TestLiveControl:
 
 @pytest.mark.django_db
 def test_only_one_profile_can_be_active(profile):
-    """«ما ألوان النظام؟» يجب ألا تعتمد على ترتيب الاستعلام."""
+    """"What are the system's colours?" must not depend on query ordering."""
     from django.db.utils import IntegrityError
 
     with pytest.raises(IntegrityError):

@@ -29,6 +29,19 @@ export interface User {
   preferred_language: 'ar' | 'en';
   is_email_verified: boolean;
   date_joined: string;
+
+  /**
+   * ⚠️  **ما يملكه المستخدم — بصيغة `app_label.codename`.**
+   *
+   *     فارغة للمالك: صلاحياته «كل شيء» و`is_owner` تكفي، وإرسال
+   *     آلاف السلاسل في كل إقلاع بلا فائدة.
+   */
+  permissions: string[];
+
+  /** المالك — يمرّ من كل بوابة، وهو سبيل التراجع الوحيد. */
+  is_owner: boolean;
+  has_admin_profile: boolean;
+  has_employee_profile: boolean;
 }
 
 export interface LoginPayload {

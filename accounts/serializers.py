@@ -1,8 +1,8 @@
 """
-عقود الـ API لنطاق الهوية.
+API contracts for the identity domain.
 
-⚠️  تحقق المدخلات وتمثيل المخرجات فقط.
-    منطق العمل في `services.py`. (docs/backend/01-ARCHITECTURE.md)
+⚠️  Input validation and output representation only.
+    Business logic lives in `services.py`. (docs/backend/01-ARCHITECTURE.md)
 """
 
 from django.contrib.auth import authenticate
@@ -14,10 +14,26 @@ from accounts.models import AccountType, Language, User, UserSession
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """تمثيل المستخدم — بلا أي حقل داخلي أو حساس."""
+    """User representation — without any internal or sensitive field."""
 
     full_name = serializers.CharField(read_only=True)
     is_email_verified = serializers.BooleanField(read_only=True)
+
+    # ── What the user owns ─────────────────────────────────
+    #
+    # ⚠️  **Without these fields the frontend cannot hide anything.**
+    #
+    #     It used to know the account type alone, so everyone who entered the panel
+    #     saw every link in it — including what they do not own.
+    #     Hiding without knowing is impossible.
+    #
+    # ⚠️  And they are **for display, not for guarding**: the server refuses
+    #     regardless of what the screen shows. Hiding a button is not security, and
+    #     showing a button that fails when pressed is a bad experience — both are needed together.
+    permissions = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
+    has_admin_profile = serializers.SerializerMethodField()
+    has_employee_profile = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -34,6 +50,10 @@ class UserSerializer(serializers.ModelSerializer):
             "preferred_language",
             "is_email_verified",
             "date_joined",
+            "permissions",
+            "is_owner",
+            "has_admin_profile",
+            "has_employee_profile",
         ]
         read_only_fields = [
             "id",
@@ -42,7 +62,42 @@ class UserSerializer(serializers.ModelSerializer):
             "status",
             "verification_status",
             "date_joined",
+            "permissions",
+            "is_owner",
+            "has_admin_profile",
+            "has_employee_profile",
         ]
+
+    def get_permissions(self, obj) -> list[str]:
+        """
+        ⚠️  `get_all_permissions`, not a read of the role table.
+
+            A role stores its permissions in its own table **and its group**
+            together (ADR-53), and `has_perm` reads the group alone. Reading
+            from the table would have shown the frontend things the server
+            refuses — which is worse than hiding: a button that appears and
+            then fails.
+
+        ⚠️  And the owner is returned with no list: their permissions are
+            "everything", and sending thousands of strings on every startup
+            serves no purpose — `is_owner` is enough.
+        """
+        if not obj.is_authenticated or obj.is_superuser:
+            return []
+        return sorted(obj.get_all_permissions())
+
+    def get_is_owner(self, obj) -> bool:
+        if obj.is_superuser:
+            return True
+        profile = getattr(obj, "admin_profile", None)
+        return bool(profile and profile.is_owner)
+
+    def get_has_admin_profile(self, obj) -> bool:
+        return hasattr(obj, "admin_profile")
+
+    def get_has_employee_profile(self, obj) -> bool:
+        profile = getattr(obj, "employee_profile", None)
+        return bool(profile and profile.is_active)
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -83,10 +138,10 @@ class RegisterSerializer(serializers.Serializer):
 
 class LoginSerializer(serializers.Serializer):
     """
-    ⚠️  رسالة فشل واحدة لكل الحالات.
+    ⚠️  One failure message for every case.
 
-    التمييز بين «بريد غير مسجل» و«كلمة مرور خاطئة» يحوّل شاشة
-    الدخول إلى أداة لكشف الحسابات المسجلة.
+    Distinguishing "email not registered" from "wrong password" turns the login
+    screen into a tool for discovering registered accounts.
     """
 
     identifier = serializers.CharField(help_text="البريد الإلكتروني أو رقم الهاتف")
@@ -144,10 +199,10 @@ class VerifyEmailSerializer(serializers.Serializer):
 
 class EmailChangeRequestSerializer(serializers.Serializer):
     """
-    ⚠️  كلمة المرور مطلوبة.
+    ⚠️  The password is required.
 
-    جهاز مفتوح بلا صاحبه يكفي لتغيير البريد ثم الاستيلاء على
-    الحساب عبر «نسيت كلمة المرور». طلبها يقطع هذا الطريق.
+    An unattended unlocked device is enough to change the email and then take
+    over the account through "forgot password". Requiring it closes that route.
     """
 
     new_email = serializers.EmailField()
@@ -175,9 +230,9 @@ class EmailChangeConfirmSerializer(serializers.Serializer):
 
 class UserSessionSerializer(serializers.ModelSerializer):
     """
-    جلسات المستخدم — يراها هو ليُنهي ما لا يعرفه.
+    The user's sessions — shown to them so they can end any they do not recognise.
 
-    `session_key` **لا يُكشف** — من يعرفه يستطيع انتحال الجلسة.
+    `session_key` is **never exposed** — anyone who knows it can hijack the session.
     """
 
     is_current = serializers.SerializerMethodField()

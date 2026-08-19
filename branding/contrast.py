@@ -1,24 +1,24 @@
 """
-حساب نسبة التباين — WCAG 2.1.
+Contrast ratio calculation — WCAG 2.1.
 
-⚠️  التباين ليس رأيًا جماليًا.
+⚠️  Contrast is not an aesthetic opinion.
 
-    نص رماديّ فاتح على أبيض يبدو «أنيقًا» على شاشة المصمّم، ويصير
-    غير مقروء على هاتف تحت الشمس أو لعين ضعيفة. الصيغة هنا هي
-    نفسها التي تستخدمها أدوات التدقيق، فما يمرّ هنا يمرّ عندها.
+    Light grey text on white looks "elegant" on a designer's monitor and becomes
+    unreadable on a phone in sunlight or to a weak eye. The formula here is the
+    same one auditing tools use, so what passes here passes there.
 
-المرجع: https://www.w3.org/TR/WCAG21/#contrast-minimum
+Reference: https://www.w3.org/TR/WCAG21/#contrast-minimum
 """
 
-#: الحد الأدنى للنص العادي
+#: The minimum for normal text
 AA_NORMAL_TEXT = 4.5
 
-#: الحد الأدنى للنص الكبير (≥ 18.66px عريض أو ≥ 24px)
+#: The minimum for large text (≥ 18.66px bold or ≥ 24px)
 AA_LARGE_TEXT = 3.0
 
 
 def parse_hex(value: str) -> tuple[int, int, int]:
-    """`#rgb` أو `#rrggbb` → (r, g, b)."""
+    """`#rgb` or `#rrggbb` → (r, g, b)."""
     digits = value.lstrip("#")
 
     if len(digits) == 3:
@@ -32,10 +32,10 @@ def parse_hex(value: str) -> tuple[int, int, int]:
 
 def relative_luminance(color: str) -> float:
     """
-    السطوع النسبي.
+    Relative luminance.
 
-    ⚠️  ليس متوسط القنوات: العين أشدّ حساسية للأخضر بكثير، ولذلك
-        المعاملات (0.2126 · 0.7152 · 0.0722) غير متساوية.
+    ⚠️  Not the average of the channels: the eye is far more sensitive to green,
+        which is why the coefficients (0.2126 · 0.7152 · 0.0722) are unequal.
     """
     channels = []
     for raw in parse_hex(color):
@@ -47,7 +47,7 @@ def relative_luminance(color: str) -> float:
 
 
 def contrast_ratio(foreground: str, background: str) -> float:
-    """نسبة التباين بين لونين — من 1:1 (متطابقان) إلى 21:1 (أبيض/أسود)."""
+    """The contrast ratio between two colours — from 1:1 (identical) to 21:1 (white/black)."""
     first = relative_luminance(foreground)
     second = relative_luminance(background)
 
@@ -62,10 +62,10 @@ def passes_aa(foreground: str, background: str, *, large_text: bool = False) -> 
 
 def audit_palette(palette) -> list[dict]:
     """
-    تقرير تباين كامل للوحة — للعرض في شاشة الأدمن.
+    A full contrast report for a palette — for display on the admin screen.
 
-    يعيد **كل** الأزواج لا الفاشلة وحدها: إظهار الناجح يجعل الأدمن
-    يرى أثر تعديله لحظةً بلحظة بدل أن يخمّن.
+    It returns **every** pair, not the failing ones alone: showing what passes
+    lets the admin see the effect of their edit moment by moment instead of guessing.
     """
     pairs = [
         ("text_on_bg", "النص على الخلفية", palette.text, palette.bg),

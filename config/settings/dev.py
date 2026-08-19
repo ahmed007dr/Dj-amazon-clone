@@ -1,5 +1,5 @@
 """
-إعدادات التطوير المحلي.
+Local development settings.
 
     DJANGO_SETTINGS_MODULE=config.settings.dev
 """
@@ -9,42 +9,43 @@ from .base import ALLOWED_HOSTS, CORS_ALLOWED_ORIGINS, INSTALLED_APPS, MIDDLEWAR
 
 DEBUG = env.bool("DJANGO_DEBUG", default=True)
 
-# ⚠️  الأسماء الثلاثة تُضاف إلى المشتقّ من `PUBLIC_API_DOMAIN` لا تحلّ محلّه.
+# ⚠️  These three names are added to the host derived from
+#     `PUBLIC_API_DOMAIN`; they do not replace it.
 #
-#     المطوّر يفتح `localhost` تارة و`127.0.0.1` تارة — وهما مضيفان
-#     مختلفان عند المتصفح وإن كانا نفس الجهاز.
+#     A developer opens `localhost` one moment and `127.0.0.1` the next — two
+#     distinct hosts to the browser, even though it is the same machine.
 ALLOWED_HOSTS = list(dict.fromkeys([*ALLOWED_HOSTS, "localhost", "127.0.0.1", "[::1]"]))
 
 
-# ── شريط التصحيح — بيئة التطوير فقط ────────────────────────
-# وجوده في الإنتاج تسريب معلومات
+# ── Debug toolbar — development environment only ───────────
+# Shipping it in production leaks internal information
 
 INSTALLED_APPS += ["debug_toolbar"]
 MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
 
 
-# ── أدوات التطوير — بيئة التطوير وحدها ─────────────────────
-# ⚠️  `seed_dev` تُنشئ حسابات بكلمة مرور معروفة ومنشورة.
+# ── Developer tooling — development environment only ───────
+# ⚠️  `seed_dev` creates accounts with a well-known, published password.
 #
-#     عدم تثبيت التطبيق في الإنتاج يجعل الأمر **غير موجود** هناك —
-#     وهذا أقوى من فحص `if DEBUG` داخله، لأن متغيّر بيئة خاطئًا
-#     واحدًا يقلب الفحص بينما لا يخلق أمرًا من العدم.
+#     Leaving the app uninstalled in production makes the command **not exist**
+#     there — stronger than an `if DEBUG` check inside it, because a single
+#     wrong environment variable flips a check but cannot conjure a command.
 
 INSTALLED_APPS += ["devtools"]
 
 
-# ── CORS — خادم Vite ───────────────────────────────────────
-# ⚠️  الفرونت إند على منفذ آخر، فكل نداء منه طلب عابر للأصل.
+# ── CORS — Vite dev server ─────────────────────────────────
+# ⚠️  The frontend runs on another port, so every call from it is cross-origin.
 #
-#     بلا هذا يحجب المتصفح **كل** استجابة بصمت — تصل ٢٠٠ من
-#     الخادم ويرفض المتصفح تسليمها للكود. والخطأ يظهر في وحدة
-#     تحكّم المتصفح لا في سجل Django، فيُبحث عنه في المكان الخطأ.
+#     Without this the browser silently blocks **every** response — a 200 arrives
+#     from the server and the browser refuses to hand it to the code. The error
+#     shows in the browser console, not the Django log, so it is hunted for in the wrong place.
 #
-#     التطوير وحده. الإنتاج يبقى على الأصل المشتقّ من دومين الموقع.
+#     Development only. Production stays on the origin derived from the site domain.
 #
-# ⚠️  والتوأم مضاف هنا: `localhost` و`127.0.0.1` نفس الجهاز وأصلان
-#     مختلفان عند المتصفح. المطوّر الذي يفتح أحدهما بينما الإعداد
-#     يذكر الآخر يرى كل نداء محجوبًا بلا سطر واحد في سجل Django.
+# ⚠️  The twin is added here too: `localhost` and `127.0.0.1` are the same machine
+#     but two different origins to the browser. A developer who opens one while
+#     the setting names the other sees every call blocked, with not one line in the Django log.
 
 _CORS_TWINS = {"localhost": "127.0.0.1", "127.0.0.1": "localhost"}
 
@@ -65,8 +66,8 @@ CORS_ALLOWED_ORIGINS = list(
 INTERNAL_IPS = ["127.0.0.1"]
 
 
-# ── البريد ─────────────────────────────────────────────────
-# الافتراضي: الطباعة في الطرفية بدل الإرسال الفعلي
+# ── Email ──────────────────────────────────────────────────
+# Default: print to the terminal instead of sending for real
 
 EMAIL_BACKEND = env(
     "EMAIL_BACKEND",
@@ -74,5 +75,5 @@ EMAIL_BACKEND = env(
 )
 
 
-# ⚠️  مدققات كلمة المرور تبقى كاملة كما في الإنتاج.
-#     تخفيفها هنا يخلق فجوة بين البيئتين تُخفي أخطاء حتى النشر.
+# ⚠️  Password validators stay complete, exactly as in production.
+#     Relaxing them here opens a gap between environments that hides bugs until deployment.

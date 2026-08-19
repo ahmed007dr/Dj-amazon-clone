@@ -1,8 +1,8 @@
 """
-الإعدادات المشتركة بين كل البيئات.
+Settings shared across every environment.
 
-⚠️  ممنوع وضع أي سر في هذا الملف. كل قيمة حساسة تُقرأ من متغيرات البيئة.
-    انظر .env.example
+⚠️  Never put a secret in this file. Every sensitive value is read from environment variables.
+    See .env.example
 """
 
 from pathlib import Path
@@ -14,36 +14,36 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 env = environ.Env()
 
-# ⚠️  **الملف الأول يفوز.**
+# ⚠️  **The first file wins.**
 #
-#     `read_env` لا يستبدل قيمة موجودة سلفًا في البيئة — ولا قيمةً
-#     قرأها ملف سابق. فالترتيب أدناه هو سلّم الأسبقية بعينه:
+#     `read_env` never replaces a value already present in the environment — nor
+#     one read by an earlier file. The order below is exactly the precedence ladder:
 #
-#         بيئة التشغيل الحقيقية  >  .env (خاص)  >  .env.public (مشترك)
+#         the real process environment  >  .env (private)  >  .env.public (shared)
 #
-#     وهو معكوس ما يتوقّعه القارئ عادةً (أن يطغى الأخير)، ولذلك
-#     يُذكر صراحةً: الحاوية تتجاوز الملفين، والملف الخاص يتجاوز
-#     المشترك بلا أن يعدّله.
+#     This is the reverse of what a reader usually expects (that the last one
+#     wins), so it is stated explicitly: the container overrides both files, and
+#     the private file overrides the shared one without modifying it.
 environ.Env.read_env(BASE_DIR / ".env")
 environ.Env.read_env(BASE_DIR / ".env.public")
 
 
 # ═══════════════════════════════════════════════════════════
-#  الدومين — مصدر واحد يشتق منه الطرفان (ADR-73 · ADR-74)
+#  Domain — one source both sides derive from (ADR-73 · ADR-74)
 # ═══════════════════════════════════════════════════════════
-# ⚠️  الدومين يُكتب مرة واحدة في `.env.public`، ويقرأ الفرونت إند
-#     **نفس الملف** (`web/vite.config.ts`).
+# ⚠️  The domain is written once in `.env.public`, and the frontend reads
+#     **the same file** (`web/vite.config.ts`).
 #
-#     قبل هذا كان الدومين موزّعًا على خمس قيم في ملفين:
-#     `DJANGO_ALLOWED_HOSTS` (مضيف بلا مخطَّط) و`CORS_ALLOWED_ORIGINS`
-#     (أصل كامل) و`FRONTEND_BASE_URL` (الفرونت) و`CSRF_TRUSTED_ORIGINS`
-#     و`VITE_API_BASE_URL` (الخادم). أربعة أشكال لشيء واحد تعني أن
-#     نسيان واحد ينتج فشلًا **صامتًا** — والاشتقاق يجعل النسيان
-#     مستحيلًا لا نادرًا.
+#     Before this the domain was spread over five values across two files:
+#     `DJANGO_ALLOWED_HOSTS` (host without scheme), `CORS_ALLOWED_ORIGINS`
+#     (full origin), `FRONTEND_BASE_URL` (the frontend), `CSRF_TRUSTED_ORIGINS`
+#     and `VITE_API_BASE_URL` (the server). Four shapes for one thing means
+#     forgetting one produces a **silent** failure — deriving them makes
+#     forgetting impossible rather than merely rare.
 #
-# ⚠️  والتجاوز الصريح يبقى ممكنًا: كل قيمة مشتقّة أدناه تقبل متغيّر
-#     بيئة يعلوها، للحالات التي تخرج عن النمط (دومين ثانٍ · CDN ·
-#     موازن حِمل يمرّر مضيفًا داخليًا).
+# ⚠️  Explicit overrides stay possible: every derived value below accepts an
+#     environment variable that outranks it, for the cases that fall outside the
+#     pattern (a second domain · a CDN · a load balancer forwarding an internal host).
 
 PUBLIC_SCHEME = env("PUBLIC_SCHEME", default="http")
 PUBLIC_SITE_DOMAIN = env("PUBLIC_SITE_DOMAIN", default="localhost:5173")
@@ -59,46 +59,46 @@ def _origin(domain: str) -> str:
 
 
 def _hostname(domain: str) -> str:
-    """⚠️  `ALLOWED_HOSTS` يقارن بالمضيف وحده — والمنفذ فيه يُفشل المطابقة."""
+    """⚠️  `ALLOWED_HOSTS` matches on the host alone — a port in it breaks the match."""
     return domain.rsplit(":", 1)[0] if ":" in domain else domain
 
 
-#: الموقع الذي يزوره الإنسان — تُبنى منه روابط البريد وخريطة الموقع
+#: The site a human visits — email links and the sitemap are built from it
 SITE_ORIGIN = _origin(PUBLIC_SITE_DOMAIN)
 
-#: خادم الـ API
+#: The API server
 API_ORIGIN = _origin(PUBLIC_API_DOMAIN)
 
-#: أصل الوسائط — يتبع الخادم ما لم يُضبط CDN صراحةً
+#: Media origin — follows the server unless a CDN is set explicitly
 MEDIA_ORIGIN = PUBLIC_MEDIA_ORIGIN or API_ORIGIN
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأمان
+#  Security
 # ═══════════════════════════════════════════════════════════
 
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 
-# الافتراضي آمن — البيئات التي تحتاج التصحيح تفعّله صراحةً
+# The default is safe — environments that need debugging enable it explicitly
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
-#: علامة الإنتاج — تقرأها فحوص الإقلاع في `core/checks.py`.
+#: Production marker — read by the startup checks in `core/checks.py`.
 #:
-#: ⚠️  **لا تُشتقّ من `DEBUG`.**
+#: ⚠️  **Not derived from `DEBUG`.**
 #:
-#:     `DEBUG=False` حالة مشروعة خارج الإنتاج: مشغّل الاختبارات
-#:     يفرضها، والمطوّر يشغّلها ليختبر سلوكًا إنتاجيًا محليًا. وربط
-#:     فحوص «الدومين ليس localhost» و«المخطَّط https» بها كان يُفشل
-#:     الاختبارات على إعداد صحيح تمامًا في مكانه.
+#:     `DEBUG=False` is a legitimate state outside production: the test runner
+#:     forces it, and developers enable it to exercise production behaviour
+#:     locally. Tying the "domain is not localhost" and "scheme is https" checks
+#:     to it was failing the tests on a configuration that was perfectly correct.
 IS_PRODUCTION = False
 
-# ⚠️  دومين الموقع مُدرَج مع دومين الخادم.
+# ⚠️  The site domain is listed alongside the server domain.
 #
-#     `seo/` يخدم `robots.txt` و`sitemap.xml` على **الجذر** لأن
-#     المزحف يطلبهما حرفيًا من الدومين الذي يزوره الإنسان. وأي وكيل
-#     يمرّرهما إلى Django يصل بترويسة `Host` تحمل دومين الموقع —
-#     فغيابه هنا يعطي 400 لطلبَي المزحف وحدهما، وهو عطل لا يلاحظه
-#     أحد إلا حين تختفي الصفحات من نتائج البحث.
+#     `seo/` serves `robots.txt` and `sitemap.xml` at the **root**, because a
+#     crawler requests them literally from the domain a human visits. Any proxy
+#     forwarding them to Django arrives with a `Host` header carrying the site
+#     domain — so its absence here returns 400 for the crawler's two requests
+#     alone, a fault nobody notices until the pages vanish from search results.
 ALLOWED_HOSTS = env.list(
     "DJANGO_ALLOWED_HOSTS",
     default=list(dict.fromkeys([_hostname(PUBLIC_API_DOMAIN), _hostname(PUBLIC_SITE_DOMAIN)])),
@@ -106,7 +106,7 @@ ALLOWED_HOSTS = env.list(
 
 
 # ═══════════════════════════════════════════════════════════
-#  التطبيقات
+#  Applications
 # ═══════════════════════════════════════════════════════════
 
 DJANGO_APPS = [
@@ -127,26 +127,26 @@ THIRD_PARTY_APPS = [
     "corsheaders",
 ]
 
-# ⚠️  الترتيب يعكس مخطط الطبقات في docs/backend/02-DEPENDENCIES.md
-#     التبعية تسير للأسفل فقط — يفرضه import-linter في الـ CI
+# ⚠️  The order mirrors the layer diagram in docs/backend/02-DEPENDENCIES.md
+#     Dependencies only point downwards — enforced by import-linter in CI
 LOCAL_APPS = [
-    # L0 — البنية التحتية
+    # L0 — Infrastructure
     "core",
     "branding",
-    # ⚠️  `mailing` بجوار `branding`: يعتمد على `core` وحده ولا يعرف
-    #     أي نطاق عمل. و`accounts` فوقه لأنه يرسل بريد التفعيل.
+    # ⚠️  `mailing` sits beside `branding`: it depends on `core` alone and knows no
+    #     business domain. `accounts` is above it because it sends activation email.
     "mailing",
-    # L1 — الهوية
+    # L1 — Identity
     "accounts",
-    # L1.5 — سياسات الوصول: تعتمد على accounts فقط ويستهلكها الجميع
+    # L1.5 — Access policies: depend on accounts only, consumed by everyone
     "access",
-    # ⚠️  `analytics` شقيق `access` فوق `accounts`.
+    # ⚠️  `analytics` is a sibling of `access`, above `accounts`.
     #
-    #     يقيس الحركة ويصنّف الأجهزة بـ`accounts.services`، ولا يعرف
-    #     أي نطاق عمل: المتجر والسلة والطلب كلها «طلب HTTP» عنده.
-    #     ووضعه أعلى كان سيمنع `administration` من قراءة رقم الزوار.
+    #     It measures traffic and classifies devices via `accounts.services`, and
+    #     knows no business domain: store, cart and order are all "an HTTP request".
+    #     Placing it higher would have stopped `administration` reading the visitor count.
     "analytics",
-    # L2 — الشخصيات ونطاقات الأساس
+    # L2 — Personas and base domains
     "customers",
     "administration",
     "academic",
@@ -158,44 +158,44 @@ LOCAL_APPS = [
     "reviews",
     # L4 → L6
     "promotions",
-    # payments تحت orders — الطلب يستدعي الدفع لا العكس
+    # payments below orders — the order calls payment, not the reverse
     "payments",
     "cart",
     "orders",
-    # مستهلك فقط — لا نطاق يستورده
+    # consumer only — no domain imports it
     "notifications",
-    # ⚠️  أوامر التشغيل عابرة النطاقات — **مثبّت في الإنتاج**.
-    #     بخلاف `devtools` الذي يبقى في بيئة التطوير وحدها.
+    # ⚠️  Cross-domain operational commands — **installed in production**.
+    #     Unlike `devtools`, which stays in the development environment alone.
     "ops",
-    # ⚠️  الأرشفة تجمع `catalog` و`academic` وترشّحهما بـ `access` —
-    #     ولا نطاق منها يجوز أن يستورد الآخر.
+    # ⚠️  Sitemaps combine `catalog` and `academic` and filter them through `access` —
+    #     and neither of those domains may import the other.
     "seo",
-    # ⚠️  نقطة البيع **قناة** لا نظام موازٍ: كل بيعة تُنتج `Order`
-    #     بـ `channel=POS`. فوق `orders` لأنها تستدعيه.
+    # ⚠️  Point of sale is a **channel**, not a parallel system: every sale produces
+    #     an `Order` with `channel=POS`. Above `orders` because it calls it.
     "pos",
-    # ⚠️  المالية **تستمع ولا تُستدعى**: تلتقط الإيراد من أحداث
-    #     `orders` وحالاته، وتحسب التكلفة من حركات `inventory`.
-    #     ولا نطاق عمل يستوردها.
+    # ⚠️  Finance **listens and is never called**: it picks up revenue from `orders`
+    #     events and states, and computes cost from `inventory` movements.
+    #     No business domain imports it.
     "finance",
-    # ⚠️  B2B فوق `orders`: الآجل يقيّد الطلب على حساب العميل
-    #     ويُصدر فاتورته. و`orders` لا يعرف بوجوده.
+    # ⚠️  B2B above `orders`: credit terms charge the order to the customer account
+    #     and issue its invoice. `orders` does not know it exists.
     "b2b",
-    # ⚠️  `employees` فوق `customers`: الإسناد يملكه الطرف الأعلى
-    #     (ADR-12)، و`customers` لا يعرف بوجود الموظفين إطلاقًا.
+    # ⚠️  `employees` above `customers`: assignment is owned by the upper side
+    #     (ADR-12), and `customers` knows nothing at all about employees.
     "employees",
-    # ⚠️  الأهداف فوق `employees`، والعمولات فوق الأهداف و`finance`
-    #     معًا: العمولة على الربح تحتاج تكلفة البضاعة المباعة.
+    # ⚠️  Targets above `employees`, and commissions above both targets and `finance`:
+    #     commission on profit needs the cost of goods sold.
     "targets",
     "commissions",
-    # ⚠️  الولاء فوق `orders` و`promotions` معًا: يستمع لاكتمال
-    #     الطلب ليمنح النقاط، ويُنتج **كوبونًا** عند الاستبدال بدل
-    #     أن يلمس السلة أو الطلب — وكلاهما تحته.
+    # ⚠️  Loyalty above both `orders` and `promotions`: it listens for order
+    #     completion to award points, and issues a **coupon** on redemption instead
+    #     of touching the cart or the order — both of which sit below it.
     "loyalty",
-    # ⚠️  `suppliers` فوق `inventory` و`catalog`: الاستلام يُنشئ
-    #     دفعة عبر `inventory.services.receive` لا بكتابة مباشرة.
+    # ⚠️  `suppliers` above `inventory` and `catalog`: receiving creates a batch
+    #     through `inventory.services.receive`, never by writing directly.
     "suppliers",
-    # ⚠️  `reporting` **يقرأ ولا يكتب** — بلا موديل ولا migrations.
-    #     الطبقة العليا: يعرف الجميع ولا يعرفه أحد.
+    # ⚠️  `reporting` **reads and never writes** — no models, no migrations.
+    #     The top layer: it knows everyone and nobody knows it.
     "reporting",
 ]
 
@@ -205,11 +205,11 @@ AUTH_USER_MODEL = "accounts.User"
 
 
 # ═══════════════════════════════════════════════════════════
-#  الوسائط (Middleware)
+#  Middleware
 # ═══════════════════════════════════════════════════════════
-# ⚠️  الترتيب مقصود:
-#     CorsMiddleware قبل CommonMiddleware (متطلب الحزمة)
-#     LanguageMiddleware بعد المصادقة — يحتاج request.user لقراءة تفضيله
+# ⚠️  The order is deliberate:
+#     CorsMiddleware before CommonMiddleware (required by the package)
+#     LanguageMiddleware after authentication — it needs request.user to read the preference
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -221,41 +221,41 @@ MIDDLEWARE = [
     "core.middleware.LanguageMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    # ⚠️  **الأخير عمدًا** — القياس على الاستجابة الجاهزة.
+    # ⚠️  **Last on purpose** — measurement runs on the finished response.
     #
-    #     وسائط الاستجابة تعمل بالترتيب المعكوس، فموضعه هنا يعني أنه
-    #     أول من يرى الاستجابة النهائية برمزها الصحيح. وضعه في الأعلى
-    #     كان سيعدّ طلبات ردّها CORS أو CSRF بالرفض استخدامًا حقيقيًا.
+    #     Response middleware runs in reverse order, so this position makes it the
+    #     first to see the final response with its correct status code. Putting it at
+    #     the top would have counted requests rejected by CORS or CSRF as real usage.
     "analytics.middleware.TrafficMiddleware",
 ]
 
 
 # ═══════════════════════════════════════════════════════════
-#  CORS — الفرونت إند منفصل (ADR-03)
+#  CORS — the frontend is a separate app (ADR-03)
 # ═══════════════════════════════════════════════════════════
 
-#: الأصل الوحيد المسموح — مشتقّ من دومين الموقع لا مكتوبًا بجانبه
+#: The only allowed origin — derived from the site domain, not written beside it
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[SITE_ORIGIN])
 
-# ⚠️  الموقع **والخادم** معًا في الأصول الموثوقة لـ CSRF.
+# ⚠️  Both the site **and the server** belong in the CSRF trusted origins.
 #
-#     لوحة إدارة Django تُقدَّم من دومين الخادم وتعتمد على الجلسة
-#     والتوكن معًا؛ وحذفه منها يجعل كل حفظ في `/admin/` يفشل بـ 403
-#     خلف وكيل HTTPS.
+#     The Django admin is served from the server domain and relies on the session
+#     and the token together; dropping it makes every save under `/admin/` fail
+#     with 403 behind an HTTPS proxy.
 CSRF_TRUSTED_ORIGINS = env.list(
     "CSRF_TRUSTED_ORIGINS",
     default=list(dict.fromkeys([SITE_ORIGIN, API_ORIGIN])),
 )
 
 CORS_ALLOW_CREDENTIALS = True
-# ⚠️  كل ترويسة مخصّصة يقرأها الخادم **يجب** أن تُدرَج هنا.
+# ⚠️  Every custom header the server reads **must** be listed here.
 #
-#     الترويسة غير المدرَجة تجعل المتصفح يرفض الطلب في مرحلة
-#     الفحص المبدئي (preflight) — فلا يصل النداء إلى Django أصلًا،
-#     ولا يظهر شيء في سجلّه. المطوّر يبحث عن الخطأ في الخادم بينما
-#     هو في المتصفح.
+#     An unlisted header makes the browser reject the request at the preflight
+#     stage — the call never reaches Django at all, and nothing shows up in its
+#     log. The developer hunts for the fault in the server while it is in the
+#     browser.
 #
-#     المدرَجة أدناه يقرؤها: cart/api.py · access/preview.py
+#     The ones listed below are read by: cart/api.py · access/preview.py
 CORS_ALLOW_HEADERS = [
     "accept",
     "accept-language",
@@ -263,9 +263,9 @@ CORS_ALLOW_HEADERS = [
     "content-type",
     "idempotency-key",
     "x-requested-with",
-    # سلة الزائر — قبل التسجيل
+    # Guest cart — before registration
     "x-cart-session",
-    # وضع معاينة الأدمن (قراءة فقط · مُدقَّق)
+    # Admin preview mode (read-only · audited)
     "x-preview-as",
     "x-preview-verified",
 ]
@@ -275,11 +275,11 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 
 # ═══════════════════════════════════════════════════════════
-#  القوالب
+#  Templates
 # ═══════════════════════════════════════════════════════════
-# تُحذف بالكامل في المرحلة 0.5 (قرار SPA)
+# Removed entirely in phase 0.5 (SPA decision)
 
-# القوالب للوحة Django فقط — طبقة العرض حُذفت (قرار SPA · ADR-03)
+# Templates serve the Django admin only — the presentation layer was removed (SPA decision · ADR-03)
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -298,9 +298,9 @@ TEMPLATES = [
 
 
 # ═══════════════════════════════════════════════════════════
-#  قاعدة البيانات
+#  Database
 # ═══════════════════════════════════════════════════════════
-# تنتقل إلى PostgreSQL في المرحلة 0.5
+# Moves to PostgreSQL in phase 0.5
 
 DATABASES = {
     "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
@@ -308,7 +308,7 @@ DATABASES = {
 
 
 # ═══════════════════════════════════════════════════════════
-#  المصادقة
+#  Authentication
 # ═══════════════════════════════════════════════════════════
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -332,7 +332,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "core.api.pagination.DefaultCursorPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        # يفحص الإيقاف على كل طلب — الطبقة ٣ من ADR-16
+        # Checks suspension on every request — layer 3 of ADR-16
         "accounts.authentication.StatefulJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
@@ -340,7 +340,7 @@ REST_FRAMEWORK = {
     ],
     "EXCEPTION_HANDLER": "core.api.exception_handler.custom_exception_handler",
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
-    "COERCE_DECIMAL_TO_STRING": True,  # المال نصًا لا رقمًا (ADR-31)
+    "COERCE_DECIMAL_TO_STRING": True,  # Money as a string, not a number (ADR-31)
     "DATETIME_FORMAT": "%Y-%m-%dT%H:%M:%SZ",
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
@@ -349,16 +349,16 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/minute",
         "user": "300/minute",
-        # نقاط المصادقة — حدود مشدّدة تمنع التخمين
+        # Authentication endpoints — tight limits that block guessing
         "login": "5/minute",
         "register": "3/hour",
         "password_reset": "3/hour",
-        # ⚠️  أحداث البوابات — نطاق منفصل ومرتفع.
+        # ⚠️  Gateway events — a separate and higher scope.
         #
-        #     الحارس هنا التوقيع لا العدّاد. والحدّ المنخفض يُسقط
-        #     ذروة حقيقية، وكل حدث مفقود طلب مدفوع لا يعرف أحد
-        #     أنه دُفع. وفصله عن `anon` يمنع بوابةً نشطة من
-        #     استهلاك حصة الزوّار وإسقاط تصفّح المتجر.
+        #     The guard here is the signature, not the counter. A low limit drops a
+        #     genuine spike, and every lost event is a paid order nobody knows was
+        #     paid. Keeping it apart from `anon` also stops a busy gateway from
+        #     consuming the visitor quota and taking store browsing down with it.
         "webhook": "600/minute",
     },
 }
@@ -367,8 +367,8 @@ REST_FRAMEWORK = {
 # ═══════════════════════════════════════════════════════════
 #  JWT
 # ═══════════════════════════════════════════════════════════
-# عمر قصير للـ Access + تدوير + قائمة سوداء — الطبقات ١ و٢ من
-# آلية إبطال الجلسة عند الإيقاف. الطبقة ٣ (مجموعة Redis) في المرحلة ٢.
+# Short-lived access token + rotation + blacklist — layers 1 and 2 of the
+# session-revocation mechanism on suspension. Layer 3 (Redis set) in phase 2.
 
 from datetime import timedelta
 
@@ -386,9 +386,9 @@ SIMPLE_JWT = {
 
 
 # ═══════════════════════════════════════════════════════════
-#  الكاش
+#  Cache
 # ═══════════════════════════════════════════════════════════
-# بلا REDIS_URL يستخدم ذاكرة محلية — لا يفشل التطوير عند غياب Redis
+# Without REDIS_URL it falls back to local memory — development does not break when Redis is absent
 
 _redis_url = env("REDIS_URL", default="")
 
@@ -409,13 +409,13 @@ else:
 
 
 # ═══════════════════════════════════════════════════════════
-#  اللغة والتوقيت
+#  Language and time
 # ═══════════════════════════════════════════════════════════
 
-# ⚠️  اللغة الافتراضية تُكتب مرة واحدة في `.env.public` ويقرأها
-#     الطرفان: الخادم هنا، والواجهة عبر `VITE_DEFAULT_LOCALE`.
-#     قيمتان منفصلتان كانتا تعنيان خادمًا يردّ بالعربية وواجهةً
-#     تبدأ بالإنجليزية — تناقضٌ يظهر في أول تحميل صفحة.
+# ⚠️  The default language is written once in `.env.public` and read by both
+#     sides: the server here, and the frontend through `VITE_DEFAULT_LOCALE`.
+#     Two separate values meant a server answering in Arabic and a frontend
+#     starting in English — a contradiction visible on the very first page load.
 LANGUAGE_CODE = env("LANGUAGE_CODE", default=PUBLIC_DEFAULT_LOCALE)
 TIME_ZONE = env("TIME_ZONE", default="Africa/Cairo")
 
@@ -431,7 +431,7 @@ LOCALE_PATHS = [BASE_DIR / "locale"]
 
 
 # ═══════════════════════════════════════════════════════════
-#  الملفات الثابتة والوسائط
+#  Static files and media
 # ═══════════════════════════════════════════════════════════
 
 STATIC_URL = "static/"
@@ -443,9 +443,9 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 
 # ═══════════════════════════════════════════════════════════
-#  البريد الإلكتروني
+#  Email
 # ═══════════════════════════════════════════════════════════
-# ⚠️  بيانات الاعتماد من البيئة حصرًا. لا كلمة مرور في الكود.
+# ⚠️  Credentials come from the environment exclusively. No password in the code.
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 EMAIL_HOST = env("EMAIL_HOST", default="")
@@ -458,54 +458,55 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@example.com")
 
 
 # ═══════════════════════════════════════════════════════════
-#  قواعد العمل القابلة للضبط
+#  Configurable business rules
 # ═══════════════════════════════════════════════════════════
-# تنتقل إلى core/settings كإعدادات في قاعدة البيانات (المرحلة ١)
+# Moves to core/settings as database-backed settings (phase 1)
 
-# العملة
+# Currency
 DEFAULT_CURRENCY = env("DEFAULT_CURRENCY", default="EGP")
 CURRENCY_DECIMAL_PLACES = env.int("CURRENCY_DECIMAL_PLACES", default=2)
 
-# الضريبة — قابلة للضبط، غير مثبتة في الكود
+# Tax — configurable, never hard-coded
 TAX_ENABLED = env.bool("TAX_ENABLED", default=True)
 TAX_DEFAULT_RATE = env("TAX_DEFAULT_RATE", default="14.00")
 TAX_PRICES_INCLUDE_TAX = env.bool("TAX_PRICES_INCLUDE_TAX", default=False)
 
 
 # ═══════════════════════════════════════════════════════════
-#  الفرونت إند
+#  Frontend
 # ═══════════════════════════════════════════════════════════
-# ⚠️  مشتقّ من `PUBLIC_SITE_DOMAIN` — لا قيمة مكتوبة.
+# ⚠️  Derived from `PUBLIC_SITE_DOMAIN` — no literal value.
 #
-#     كان افتراضيه `localhost:3000` وهو بقيّة من زمن Next.js بينما
-#     خادم Vite على ٥١٧٣. ولأنه مصدر روابط البريد وخريطة الموقع
-#     (`seo/sitemaps.py`)، كان الافتراضي الخاطئ ينتج روابط تفعيل
-#     ميتة وخريطة موقع تشير إلى منفذ لا أحد عليه — بلا خطأ واحد
-#     في أي سجل.
+#     Its default used to be `localhost:3000`, a leftover from the Next.js era,
+#     while the Vite server listens on 5173. And because it is the source of
+#     email links and the sitemap (`seo/sitemaps.py`), the wrong default produced
+#     dead activation links and a sitemap pointing at a port nobody was on —
+#     without a single error in any log.
 FRONTEND_BASE_URL = env("FRONTEND_BASE_URL", default=SITE_ORIGIN)
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأرشفة
+#  Sitemaps
 # ═══════════════════════════════════════════════════════════
-# ⚠️  الافتراضي **مغلق**.
+# ⚠️  The default is **off**.
 #
-#     بيئة تجريبية مفهرسة تنافس الموقع الحقيقي على نفس الكلمات
-#     وتعرض بيانات اختبار كأنها منتجات. والافتراضي المغلق يجعل
-#     نسيان الضبط خطأً آمنًا؛ العكس يجعله كارثة تسويقية صامتة.
+#     An indexed staging environment competes with the real site for the same
+#     keywords and exposes test data as though it were products. Off-by-default
+#     makes forgetting to configure it a safe mistake; the reverse makes
+#     it a silent marketing disaster.
 
 SEO_INDEXING_ENABLED = env.bool("SEO_INDEXING_ENABLED", default=False)
 
 
 # ═══════════════════════════════════════════════════════════
-#  التشفير
+#  Encryption
 # ═══════════════════════════════════════════════════════════
-# لبيانات اعتماد بوابات الدفع المخزّنة في قاعدة البيانات (المرحلة ٥)
+# For payment gateway credentials stored in the database (phase 5)
 
 FIELD_ENCRYPTION_KEY = env("FIELD_ENCRYPTION_KEY", default="")
 
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# drf-yasg — تعطيل العارضات المتوافقة القديمة
+# drf-yasg — disable the legacy compatibility renderers
 SWAGGER_USE_COMPAT_RENDERERS = False

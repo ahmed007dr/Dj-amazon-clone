@@ -1,4 +1,4 @@
-"""مسارات سياسات الوصول — /api/v1/access/"""
+"""Access policy routes — /api/v1/access/"""
 
 from django.urls import path
 

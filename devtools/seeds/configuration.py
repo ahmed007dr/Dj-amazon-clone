@@ -1,14 +1,15 @@
 """
-الإعدادات التشغيلية والفئات الضريبية.
+Operational settings and tax classes.
 
-⚠️  **هذه قيم موصى بها لقاعدة عمل لم تُحسم بعد** (البند ١ب).
+⚠️  **These are recommended values for a business rule that is not yet settled** (item 1b).
 
-    نسبة الضريبة وشمول الأسعار لها قرارٌ محاسبي لا تقني. البذرة
-    تضع التوصية المكتوبة في `docs/shared/04-DECISIONS.md` وتطبعها
-    صراحةً عند التشغيل — لأن رقمًا ضريبيًا يُبتلع بصمت في بيانات
-    تجريبية يصير بعد شهور «ما كان دائمًا هكذا».
+    The tax rate and whether prices include tax are an accounting decision, not
+    a technical one. The seed applies the recommendation written in
+    `docs/shared/04-DECISIONS.md` and prints it explicitly on each run — because
+    a tax figure swallowed silently in sample data becomes, months later, "it
+    was always like that".
 
-    كلها قابلة للتعديل من لوحة الأدمن بلا نشر.
+    All of them are editable from the admin panel with no deployment.
 """
 
 from decimal import Decimal
@@ -16,7 +17,7 @@ from decimal import Decimal
 from core.models.settings import SettingGroup, SettingValueType, SystemSetting
 from core.models.tax import TaxClass
 
-#: (المفتاح، القيمة، النوع، المجموعة، عربي، إنجليزي، شرح عربي)
+#: (key, value, type, group, Arabic, English, Arabic description)
 SETTINGS = [
     (
         "tax.enabled",
@@ -92,7 +93,7 @@ SETTINGS = [
     ),
 ]
 
-#: (الرمز، عربي، إنجليزي، النسبة، افتراضية؟)
+#: (code, Arabic, English, rate, default?)
 TAX_CLASSES = [
     ("standard", "الضريبة القياسية", "Standard rate", Decimal("14.00"), True),
     ("zero", "نسبة صفرية", "Zero rated", Decimal("0.00"), False),

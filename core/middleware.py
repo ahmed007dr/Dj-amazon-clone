@@ -1,5 +1,5 @@
 """
-وسائط البنية التحتية المشتركة.
+Shared infrastructure middleware.
 """
 
 from django.conf import settings
@@ -8,8 +8,8 @@ from django.utils.deprecation import MiddlewareMixin
 
 FALLBACK_LANGUAGE = "ar"
 
-#: تُوضع على الطلب حين تحدَّد اللغة من ترويسة صريحة —
-#: عندها لا يجوز لتفضيل المستخدم أن يدهسها.
+#: Set on the request when the language is determined by an explicit header —
+#: at which point the user's preference must not override it.
 EXPLICIT_FLAG = "_language_from_header"
 
 
@@ -37,23 +37,24 @@ def default_language() -> str:
 
 class LanguageMiddleware(MiddlewareMixin):
     """
-    المرحلة الأولى من تفاوض اللغة — **الترويسة فقط**.
+    The first stage of language negotiation — **the header only**.
 
-    ⚠️  لماذا مرحلتان؟
+    ⚠️  Why two stages?
 
-        مع JWT تحدث المصادقة في طبقة DRF، أي **بعد** كل الوسائط.
-        فـ `request.user` هنا مجهول دائمًا ولا يمكن قراءة تفضيله.
+        With JWT, authentication happens in the DRF layer, that is **after** all
+        middleware. So `request.user` here is always anonymous and its
+        preference cannot be read.
 
-        لذا:
-          • هنا      → الترويسة الصريحة (بلا استعلام قاعدة بيانات)
-          • في طبقة  → تفضيل المستخدم، حين لا توجد ترويسة صريحة
-            المصادقة   (`accounts.authentication.apply_user_language`)
+        Hence:
+          • here        → the explicit header (with no database query)
+          • in the      → the user's preference, when there is no explicit header
+            auth layer    (`accounts.authentication.apply_user_language`)
 
-        الترتيب النهائي:
-            ترويسة صريحة  ←  تفضيل المستخدم  ←  الافتراضي  ←  العربية
+        The final order:
+            explicit header  ←  user preference  ←  the default  ←  Arabic
 
-    الترويسة تسبق التفضيل عمدًا: من يفتح اللوحة بالإنجليزية لجلسة
-    واحدة، طلبه الصريح يُحترم.
+    The header outranks the preference deliberately: someone opening the panel
+    in English for a single session has their explicit request honoured.
     """
 
     def process_request(self, request):

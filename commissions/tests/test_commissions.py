@@ -1,14 +1,15 @@
 """
-اختبارات الأهداف والعمولات.
+Targets and commissions tests.
 
-⚠️  بوابة الخروج للمرحلة ١١:
+⚠️  The exit gate for phase 11:
 
-        الحساب **حتمي وقابل للتفسير** · المرتجعات تُخصم من
-        الاثنين · الشهر المقفل لا يتغيّر بأثر رجعي.
+        the calculation is **deterministic and explainable** · returns are
+        deducted from both · a closed month does not change retroactively.
 
-    وأخطر ما تحرسه: أن تُصرَف عمولة مرتين عن شهر · أن يتغيّر مبلغ
-    صُرف حين يُفتح من جديد · أن يخرج من حقّق ٥٠٠٪ بعمولة صفر لأن
-    الشريحة العليا لها سقف · أن تُحسب عمولة سالبة تُخصم من راتب.
+    And the greatest dangers it guards: a commission paid twice for one month ·
+    a paid amount changing when the record is reopened · someone who achieved
+    500% coming out with zero commission because the top tier had a ceiling · a
+    negative commission being calculated and deducted from a salary.
 """
 
 from decimal import Decimal
@@ -38,7 +39,7 @@ PASSWORD = "Str0ng-Test-Pass!23"
 
 
 # ═══════════════════════════════════════════════════════════
-#  التجهيز
+#  Setup
 # ═══════════════════════════════════════════════════════════
 
 
@@ -70,7 +71,7 @@ def customer(db):
 
 @pytest.fixture
 def scheme(role):
-    """شرائح: <٥٠٪ صفر · ٥٠–٨٠ ١٪ · ٨٠–١٠٠ ٢٪ · ١٠٠+ ٣٪ بلا سقف."""
+    """Tiers: <50% zero · 50–80 1% · 80–100 2% · 100+ 3% with no ceiling."""
     plan = CommissionScheme.objects.create(
         code="std",
         name_ar="قياسية",
@@ -126,7 +127,7 @@ def client_for(user):
 
 
 # ═══════════════════════════════════════════════════════════
-#  قياس التحقيق
+#  Measuring achievement
 # ═══════════════════════════════════════════════════════════
 
 
@@ -143,10 +144,10 @@ class TestAchievement:
 
     def test_returns_reduce_achievement(self, rep, customer):
         """
-        ⚠️  **قاعدة العمل ١٦ — توصية مطبَّقة.**
+        ⚠️  **Business rule 16 — the recommendation as implemented.**
 
-            عدم خصمها يجعل مندوبًا يبيع ويُرجِع ويبيع ثانيةً يحقّق
-            هدفه مرتين على نفس البضاعة.
+            Not deducting them lets a rep who sells, takes a return, and sells
+            again hit their target twice on the same goods.
         """
         target = make_target(rep, "10000.00")
         make_order(customer, rep, "5000.00")
@@ -169,7 +170,7 @@ class TestAchievement:
         assert result.net_sales == Decimal("1000.00")
 
     def test_a_zero_target_does_not_divide_by_zero(self, rep, customer):
-        """شهر تدريب بهدف صفر حالة قائمة لا خطأ."""
+        """A training month with a zero target is a real case, not an error."""
         target = make_target(rep, "0.00")
         make_order(customer, rep, "500.00")
 
@@ -179,8 +180,8 @@ class TestAchievement:
 
     def test_month_bounds_handle_february(self):
         """
-        ⚠️  «٣٠» تكسر يناير و«٣١» تكسر فبراير — والطلب يسقط من
-            قياس شهره أو يُحتسب مرتين.
+        ⚠️  "30" breaks January and "31" breaks February — and the order either
+            drops out of its month's measurement or is counted twice.
         """
         start, end = target_services.month_bounds(2027, 2)
 
@@ -206,7 +207,7 @@ class TestAchievement:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الشرائح
+#  Tiers
 # ═══════════════════════════════════════════════════════════
 
 
@@ -214,8 +215,9 @@ class TestAchievement:
 class TestTiers:
     def test_boundaries_are_inclusive_below_exclusive_above(self, scheme):
         """
-        ⚠️  `[from, to)` — والاصطلاح مكتوب لأن نصفه في الرأس
-            ونصفه في الكود هو ما يُنتج فجوة عند ٨٠ بالضبط.
+        ⚠️  `[from, to)` — and the convention is written down because keeping
+            half of it in someone's head and half in the code is what produces
+            a gap at precisely 80.
         """
         assert services.resolve_tier(scheme, Decimal("79.99")).rate == Decimal("1.00")
         assert services.resolve_tier(scheme, Decimal("80.00")).rate == Decimal("2.00")
@@ -224,13 +226,14 @@ class TestTiers:
 
     def test_the_top_tier_has_no_ceiling(self, scheme):
         """
-        ⚠️  سقف مكتوب يجعل من حقّق ٥٠٠٪ لا يطابق شيئًا — فيخرج
-            بعمولة صفر مكافأةً على أفضل شهر في حياته.
+        ⚠️  A written ceiling makes someone who achieved 500% match nothing —
+            so they come out with zero commission as a reward for the best
+            month of their life.
         """
         assert services.resolve_tier(scheme, Decimal("500.00")).rate == Decimal("3.00")
 
     def test_no_matching_tier_yields_zero_not_an_error(self, role):
-        """خطة ناقصة يجب ألا تُفشل حساب الفريق كله."""
+        """An incomplete scheme must not fail the whole team's calculation."""
         empty = CommissionScheme.objects.create(
             code="empty", name_ar="فارغة", name_en="Empty", role=role
         )
@@ -242,7 +245,7 @@ class TestTiers:
 
 
 # ═══════════════════════════════════════════════════════════
-#  حساب العمولة — بوابة الخروج
+#  Commission calculation — the exit gate
 # ═══════════════════════════════════════════════════════════
 
 
@@ -250,10 +253,10 @@ class TestTiers:
 class TestCalculation:
     def test_the_full_chain_is_auditable(self, rep, customer, scheme):
         """
-        ⚠️  **بوابة الخروج:** كل نتيجة قابلة للتفسير.
+        ⚠️  **The exit gate:** every result is explainable.
 
-            هدف ١٠٠٠٠ · مبيعات ٩٠٠٠ ⟵ تحقيق ٩٠٪ ⟵ شريحة ٨٠–١٠٠
-            ⟵ ٢٪ من ٩٠٠٠ = ١٨٠.
+            Target 10000 · sales 9000 ⟵ 90% achievement ⟵ tier 80–100
+            ⟵ 2% of 9000 = 180.
         """
         target = make_target(rep, "10000.00")
         make_order(customer, rep, "9000.00")
@@ -272,11 +275,11 @@ class TestCalculation:
 
     def test_below_the_minimum_pays_nothing(self, rep, customer, scheme):
         """
-        ⚠️  بلا حدّ أدنى يستحق من باع ٥٪ من هدفه عمولةً — وهي
-            مكافأة على الإخفاق.
+        ⚠️  Without a minimum, someone who sold 5% of their target earns a
+            commission — a reward for failure.
         """
         target = make_target(rep, "10000.00", minimum="60")
-        make_order(customer, rep, "5500.00")  # ٥٥٪ — شريحة ١٪ لكنه دون الحد
+        make_order(customer, rep, "5500.00")  # 55% — the 1% tier, but below the minimum
 
         record = services.calculate(target)
 
@@ -287,9 +290,10 @@ class TestCalculation:
 
     def test_a_negative_base_is_clamped_to_zero(self, rep, customer, scheme):
         """
-        ⚠️  شهر مرتجعاته أكبر من مبيعاته يعطي صافيًا سالبًا؛ وضربه
-            في نسبة يُنتج **عمولة سالبة تُخصم من راتب**. الخصم من
-            الراتب قرار إداري لا نتيجة حسابية.
+        ⚠️  A month whose returns exceed its sales gives a negative net; and
+            multiplying it by a rate produces **a negative commission deducted
+            from a salary**. Deducting from salary is a management decision, not
+            an arithmetic result.
         """
         target = make_target(rep, "10000.00")
         make_order(customer, rep, "1000.00")
@@ -303,7 +307,7 @@ class TestCalculation:
 
     def test_recalculating_updates_and_never_duplicates(self, rep, customer, scheme):
         """
-        ⚠️  سجلّان لشهر واحد يعنيان عمولتين تُصرفان عن نفس الفترة.
+        ⚠️  Two records for one month mean two commissions paid for the same period.
         """
         target = make_target(rep, "10000.00")
         make_order(customer, rep, "9000.00")
@@ -318,10 +322,10 @@ class TestCalculation:
 
     def test_an_approved_record_is_never_recalculated(self, rep, customer, scheme):
         """
-        ⚠️  **المبلغ خرج من الخزينة.**
+        ⚠️  **The money has left the treasury.**
 
-            إعادة حسابه تجعل السجل يخالف القيد المحاسبي، ولا أحد
-            يعرف أيّ رقم صُرف فعلًا.
+            Recomputing it makes the record disagree with the accounting entry,
+            and nobody knows which figure was actually paid.
         """
         target = make_target(rep, "10000.00")
         make_order(customer, rep, "9000.00")
@@ -333,8 +337,8 @@ class TestCalculation:
 
     def test_profit_based_scheme_uses_profit_not_sales(self, rep, customer, role):
         """
-        ⚠️  الفارق جوهري: ٣٪ من المبيعات قد تفوق ١٠٪ من الربح أو
-            تقلّ عنها بأضعاف — حسب هامش الصنف المباع.
+        ⚠️  The difference is substantive: 3% of sales may exceed 10% of profit
+            or fall many times below it — depending on the margin of the item sold.
         """
         plan = CommissionScheme.objects.create(
             code="profit",
@@ -353,18 +357,18 @@ class TestCalculation:
         record = services.calculate(target, scheme=plan)
 
         assert record.base == CommissionBase.GROSS_PROFIT
-        # ⚠️  بلا قيد تكلفة يبقى الربح صفرًا لا مساويًا للمبيعات:
-        #     العمولة على ربح لم يتحقّق أسوأ من صفر.
+        # ⚠️  Without a cost entry the profit stays zero rather than equal to sales:
+        #     A commission on profit that never materialised is worse than zero.
         assert record.base_amount == Decimal("0.00")
         assert record.amount == Decimal("0.00")
 
     def test_profit_commission_works_with_real_cost(self, rep, customer, role):
         """
-        ⚠️  **الوجه الآخر للاختبار السابق.**
+        ⚠️  **The other side of the previous test.**
 
-            الاستبعاد المحافظ لا يصحّ أن يعني «الربح صفر دائمًا».
-            هنا تكلفة مُثبَتة من دفعة حقيقية: بيع ١٠ × ١٠٠ بتكلفة
-            ٦٠ ⟵ ربح ٤٠٠ ⟵ ١٠٪ = ٤٠.
+            Conservative exclusion must not come to mean "profit is always
+            zero". Here the cost is established from a real batch: selling
+            10 × 100 at a cost of 60 ⟵ profit 400 ⟵ 10% = 40.
         """
         from catalog.models import Category, Product
         from finance import services as finance_services
@@ -408,8 +412,8 @@ class TestCalculation:
             reference_type="order",
             reference_id=str(order.pk),
         )
-        # ⚠️  إعادة الالتقاط بعد وجود الحركات: قيد التكلفة يُنشأ
-        #     عند حفظ الطلب، وحركات المخزون تلته هنا.
+        # ⚠️  Re-captured after the movements exist: the cost entry is created
+        #     when the order is saved, and the stock movements followed it here.
         entry = finance_services.RevenueEntry.objects.get(order=order)
         finance_services.record_cogs(entry)
 
@@ -427,7 +431,7 @@ class TestCalculation:
             services.calculate(target)
 
     def test_month_run_skips_failures_without_stopping(self, rep, customer, scheme, role):
-        """⚠️  موظف بلا خطة كان سيُفشل حساب الفريق كله."""
+        """⚠️  An employee with no scheme would have failed the whole team's calculation."""
         other_user = User.objects.create_user(
             email="norole@test.local", password=PASSWORD, account_type=AccountType.EMPLOYEE
         )
@@ -453,7 +457,7 @@ class TestCalculation:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الإقفال والاعتماد
+#  Closing and approval
 # ═══════════════════════════════════════════════════════════
 
 
@@ -461,7 +465,7 @@ class TestCalculation:
 class TestLifecycle:
     def test_closing_freezes_the_snapshot(self, rep, customer, scheme):
         """
-        ⚠️  مرتجع يقع بعد الإقفال يجب ألا يغيّر لقطة شهر أُغلق.
+        ⚠️  A return landing after closing must not change a closed month's snapshot.
         """
         target = make_target(rep, "10000.00")
         order = make_order(customer, rep, "9000.00")
@@ -491,8 +495,8 @@ class TestLifecycle:
 
     def test_paying_requires_approval_first(self, rep, customer, scheme):
         """
-        ⚠️  القفز من «محسوبة» إلى «مصروفة» يتجاوز المراجعة — وهي
-            الخطوة الوحيدة التي تمسك خطأ الحساب قبل خروج المال.
+        ⚠️  Jumping from "calculated" to "paid" bypasses the review — the one
+            step that catches a calculation error before the money leaves.
         """
         target = make_target(rep, "10000.00")
         make_order(customer, rep, "9000.00")
@@ -524,7 +528,7 @@ class TestLifecycle:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الواجهات والعزل
+#  Endpoints and isolation
 # ═══════════════════════════════════════════════════════════
 
 
@@ -541,14 +545,14 @@ class TestAPI:
         assert response.data["net_sales"] == "6000.00"
 
     def test_no_target_returns_null_not_404(self, rep):
-        """⚠️  غياب الهدف حالة عادية أول الشهر لا شاشة عطل."""
+        """⚠️  A missing target is normal at the start of the month, not a fault screen."""
         response = client_for(rep.user).get(reverse("v1:targets:me"))
 
         assert response.status_code == 200
         assert response.data is None
 
     def test_a_draft_target_is_hidden_from_the_rep(self, rep):
-        """رقم لم يُعتمَد بعد يبني عليه المندوب توقّعًا ثم يتغيّر."""
+        """A number not yet approved is one the rep builds an expectation on, and it then changes."""
         make_target(rep, "10000.00", status=TargetStatus.DRAFT)
 
         response = client_for(rep.user).get(reverse("v1:targets:me"))
@@ -586,7 +590,7 @@ class TestAPI:
         assert response.status_code == 404
 
     def test_a_rep_cannot_set_their_own_target(self, rep):
-        """⚠️  هدف يحدّده صاحبه ليس هدفًا."""
+        """⚠️  A target set by the person it applies to is not a target."""
         today = timezone.localdate()
 
         response = client_for(rep.user).post(
@@ -618,9 +622,9 @@ class TestAPI:
 @pytest.mark.django_db
 def test_the_seeded_scheme_covers_every_achievement(db):
     """
-    ⚠️  فجوة في الشرائح تعني مندوبًا لا يطابق شيئًا بلا سبب مفهوم.
+    ⚠️  A gap in the tiers means a rep matching nothing for no comprehensible reason.
 
-        الفحص يمرّ على كل نسبة من ٠ إلى ٣٠٠ ويتأكد أن لكلٍّ شريحة.
+        The check walks every percentage from 0 to 300 and confirms each has a tier.
     """
     from django.core.management import call_command
 

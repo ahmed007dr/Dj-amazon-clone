@@ -1,16 +1,16 @@
 """
-الهوية البصرية — كل ما يراه العميل، قابلًا للضبط من لوحة الأدمن.
+Visual identity — everything the customer sees, configurable from the admin panel.
 
-⚠️  الحدود مع `core.SystemSetting`:
+⚠️  The boundary with `core.SystemSetting`:
 
-        core/settings  →  إعدادات تشغيلية (حدود · قواعد عمل · أعلام)
-        branding/      →  ما يُرى (ألوان · لوجو · خطوط · شعارات)
+        core/settings  →  operational settings (limits · business rules · flags)
+        branding/      →  what is seen (colours · logo · fonts · slogans)
 
-    الخلط يجعل «نسبة الضريبة» و«اللون الأساسي» في نفس الشاشة —
-    وهما قراران لا يتخذهما الشخص نفسه ولا بنفس الحذر.
+    Mixing them puts "the tax rate" and "the primary colour" on the same screen —
+    two decisions not taken by the same person, nor with the same care.
 
-⚠️  هذا النطاق **لا يعرف بوجود أي نطاق عمل**. لا مستخدمين ولا
-    منتجات ولا طلبات — يفرضه `import-linter`.
+⚠️  This domain **knows of no business domain**. No users, no products, no
+    orders — enforced by `import-linter`.
 """
 
 from decimal import Decimal
@@ -23,7 +23,7 @@ from django.utils.translation import gettext_lazy as _
 from core.identifiers import random_filename
 from core.models.base import BaseModel, TimeStampedModel, UUIDPrimaryKeyModel
 
-#: لون HEX — `#rgb` أو `#rrggbb`
+#: A HEX colour — `#rgb` or `#rrggbb`
 HEX_COLOR = RegexValidator(
     regex=r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
     message=_("لون غير صالح — استخدم صيغة #rrggbb"),
@@ -41,11 +41,11 @@ class ThemeMode(models.TextChoices):
 
 class DefaultMode(models.TextChoices):
     """
-    ⚠️  `SYSTEM` ليس وضعًا ثالثًا — إنه **تفويض** لتفضيل الجهاز.
+    ⚠️  `SYSTEM` is not a third mode — it is a **delegation** to the device preference.
 
-        دمجه مع الفاتح والداكن في حقل واحد يجعل «ما الوضع الحالي؟»
-        سؤالًا بلا إجابة واحدة؛ فصله يبقي اللوحتين اثنتين ويجعل
-        الاختيار بينهما هو المتغيّر.
+        Merging it with light and dark in one field makes "what is the current
+        mode?" a question with no single answer; separating it keeps the two
+        palettes as two, and makes the choice between them the variable.
     """
 
     LIGHT = "LIGHT", _("فاتح دائمًا")
@@ -55,25 +55,26 @@ class DefaultMode(models.TextChoices):
 
 class BrandProfile(BaseModel):
     """
-    ملف الهوية.
+    An identity profile.
 
-    ⚠️  **واحد مفعّل فقط** — والبقية مسوّدات.
+    ⚠️  **Exactly one active** — the rest are drafts.
 
-        السماح بأكثر من ملف مفعّل يعني أن «ما ألوان النظام؟» تعتمد
-        على ترتيب الاستعلام. والملفات غير المفعّلة ليست ترفًا: هي
-        ما يسمح بتجهيز هوية موسمية كاملة ثم تفعيلها بضغطة.
+        Allowing more than one active profile makes "what are the system's
+        colours?" depend on query ordering. And the inactive profiles are not a
+        luxury: they are what allows a complete seasonal identity to be prepared
+        and then activated with one click.
     """
 
-    # ── الاسم والهوية ──────────────────────────────────────
+    # ── Name and identity ──────────────────────────────────
     code = models.SlugField(_("الرمز"), max_length=50, unique=True)
     name_ar = models.CharField(_("اسم الموقع بالعربية"), max_length=120)
     name_en = models.CharField(_("اسم الموقع بالإنجليزية"), max_length=120)
     tagline_ar = models.CharField(_("الشعار النصي عربي"), max_length=200, blank=True)
     tagline_en = models.CharField(_("الشعار النصي إنجليزي"), max_length=200, blank=True)
 
-    # ── الأصول ─────────────────────────────────────────────
-    # ⚠️  لوجو للفاتح وآخر للداكن — لوجو واحد بخلفية شفافة ونص
-    #     داكن يختفي تمامًا على الوضع الداكن.
+    # ── Assets ─────────────────────────────────────────────
+    # ⚠️  One logo for light and another for dark — a single logo with a
+    #     transparent background and dark text disappears entirely in dark mode.
     logo_light = models.ImageField(
         _("اللوجو — الوضع الفاتح"), upload_to=branding_asset_path, blank=True
     )
@@ -94,9 +95,9 @@ class BrandProfile(BaseModel):
         help_text=_("تظهر عند مشاركة رابط الموقع — 1200×630"),
     )
 
-    # ── الخطوط ─────────────────────────────────────────────
-    # ⚠️  خط عربي وخط إنجليزي منفصلان: خط لاتيني جيد قد لا يحمل
-    #     محارف عربية أصلًا، فيسقط النص إلى خط النظام بلا تحذير.
+    # ── Fonts ──────────────────────────────────────────────
+    # ⚠️  Separate Arabic and Latin fonts: a good Latin font may carry no Arabic
+    #     glyphs at all, so the text falls back to the system font with no warning.
     font_ar = models.CharField(_("الخط العربي"), max_length=120, default="Cairo")
     font_en = models.CharField(_("الخط الإنجليزي"), max_length=120, default="Inter")
     font_size_base = models.DecimalField(
@@ -104,12 +105,12 @@ class BrandProfile(BaseModel):
         max_digits=4,
         decimal_places=3,
         default=Decimal("1.000"),
-        # ⚠️  `Decimal` لا `float` — المدقّق العشري يقارن بنوعه،
-        #     وتمرير عائم يجعل DRF يحذّر ويسقط الحد من المخطط.
+        # ⚠️  `Decimal`, not `float` — the decimal validator compares against its
+        #     own type, and passing a float makes DRF warn and drops the limit from the schema.
         validators=[MinValueValidator(Decimal("0.75")), MaxValueValidator(Decimal("1.5"))],
     )
 
-    # ── الشكل ──────────────────────────────────────────────
+    # ── Shape ──────────────────────────────────────────────
     radius = models.DecimalField(
         _("استدارة الحواف (rem)"),
         max_digits=4,
@@ -131,14 +132,14 @@ class BrandProfile(BaseModel):
         default=DefaultMode.SYSTEM,
     )
 
-    # ── التواصل ────────────────────────────────────────────
+    # ── Contact ────────────────────────────────────────────
     contact_email = models.EmailField(_("بريد التواصل"), blank=True)
     contact_phone = models.CharField(_("هاتف التواصل"), max_length=30, blank=True)
     whatsapp = models.CharField(_("واتساب"), max_length=30, blank=True)
     address_ar = models.CharField(_("العنوان بالعربية"), max_length=300, blank=True)
     address_en = models.CharField(_("العنوان بالإنجليزية"), max_length=300, blank=True)
 
-    # ── السوشيال ───────────────────────────────────────────
+    # ── Social ─────────────────────────────────────────────
     facebook = models.URLField(_("فيسبوك"), blank=True)
     instagram = models.URLField(_("إنستجرام"), blank=True)
     x_twitter = models.URLField(_("إكس"), blank=True)
@@ -170,18 +171,20 @@ class BrandProfile(BaseModel):
 
 class ThemePalette(UUIDPrimaryKeyModel, TimeStampedModel):
     """
-    لوحة ألوان لوضع واحد.
+    A colour palette for one mode.
 
-    ⚠️  **لوحتان لا واحدة.** اشتقاق الداكن آليًا بعكس الإضاءة ينتج
-        ألوانًا موحلة وتباينًا يسقط تحت الحد المقروء — والأدمن لا
-        يملك تصحيحه لأنه ليس حقلًا.
+    ⚠️  **Two palettes, not one.** Deriving the dark one automatically by
+        inverting lightness produces muddy colours and contrast that falls below
+        the readable threshold — and the admin cannot correct it because it is
+        not a field.
 
-    ⚠️  مفتاح UUIDv7 لا BigInt.
+    ⚠️  A UUIDv7 key, not BigInt.
 
-        بدا «جدولًا تابعًا لا يظهر في رابط»، ثم ظهر فعلًا في
-        `/branding/admin/profiles/{id}/palettes/{id}/`. ومعرّف تسلسلي
-        في رابط ممنوع بلا استثناء — أمسكه
-        `test_exposed_models_use_uuid_pk`، وهو بالضبط سبب وجوده.
+        It looked like "a child table that never appears in a URL", and then it
+        did appear, at
+        `/branding/admin/profiles/{id}/palettes/{id}/`. A sequential id in a URL
+        is forbidden without exception — `test_exposed_models_use_uuid_pk`
+        caught it, which is exactly why that test exists.
     """
 
     profile = models.ForeignKey(
@@ -192,7 +195,7 @@ class ThemePalette(UUIDPrimaryKeyModel, TimeStampedModel):
     )
     mode = models.CharField(_("الوضع"), max_length=8, choices=ThemeMode.choices)
 
-    # ── ألوان العلامة ──────────────────────────────────────
+    # ── Brand colours ──────────────────────────────────────
     primary = models.CharField(
         _("الأساسي"), max_length=7, default="#2e7d32", validators=[HEX_COLOR]
     )
@@ -204,13 +207,13 @@ class ThemePalette(UUIDPrimaryKeyModel, TimeStampedModel):
     )
     accent = models.CharField(_("المميّز"), max_length=7, default="#f9a825", validators=[HEX_COLOR])
 
-    # ── ألوان الحالة ───────────────────────────────────────
+    # ── Status colours ─────────────────────────────────────
     success = models.CharField(_("نجاح"), max_length=7, default="#2e7d32", validators=[HEX_COLOR])
     warning = models.CharField(_("تحذير"), max_length=7, default="#ef6c00", validators=[HEX_COLOR])
     danger = models.CharField(_("خطر"), max_length=7, default="#c62828", validators=[HEX_COLOR])
     info = models.CharField(_("معلومة"), max_length=7, default="#0277bd", validators=[HEX_COLOR])
 
-    # ── الأسطح والنص ───────────────────────────────────────
+    # ── Surfaces and text ──────────────────────────────────
     bg = models.CharField(_("الخلفية"), max_length=7, default="#f7f8fa", validators=[HEX_COLOR])
     surface = models.CharField(_("السطح"), max_length=7, default="#ffffff", validators=[HEX_COLOR])
     border = models.CharField(_("الحدود"), max_length=7, default="#e3e6ea", validators=[HEX_COLOR])
@@ -232,10 +235,11 @@ class ThemePalette(UUIDPrimaryKeyModel, TimeStampedModel):
 
     def clean(self):
         """
-        ⚠️  التباين يُفحص عند الحفظ لا عند العرض.
+        ⚠️  Contrast is checked on save, not on display.
 
-            لوحة غير مقروءة تُكتشف عادةً بشكوى مستخدم لا يعرف كيف
-            يصف المشكلة. الفحص هنا يجعلها خطأً في شاشة الأدمن.
+            An unreadable palette is normally discovered through a complaint
+            from a user who cannot describe the problem. Checking here turns it
+            into an error on the admin screen.
         """
         from branding.contrast import AA_NORMAL_TEXT, contrast_ratio
 

@@ -1,16 +1,16 @@
 """
-الكتالوج — «ما هذا المنتج؟»
+The catalogue — "what is this product?"
 
-⚠️  حدود صارمة مع النطاقات المجاورة:
+⚠️  Strict boundaries with the neighbouring domains:
 
-        الكتالوج    →  ما هذا المنتج؟
-        inventory   →  كم المتاح منه؟        ← **لا حقل كمية هنا**
-        pricing     →  كم يدفع هذا العميل؟   ← **لا حقل سعر نهائي هنا**
-        access      →  من يراه ويشتريه؟      ← مرجع للسياسة لا منطقها
-        reviews     →  ما تقييمه؟            ← لا تجميع محسوب هنا
+        catalog     →  what is this product?
+        inventory   →  how much of it is available?  ← **no quantity field here**
+        pricing     →  what does this customer pay?  ← **no final price field here**
+        access      →  who sees and buys it?         ← a reference to the policy, not its logic
+        reviews     →  what is it rated?             ← no computed aggregate here
 
-    النموذج القديم خالف ثلاثًا من هذه: `Product.quantity` و
-    `avg_rate` و `reviews_count` كـ properties (N+1 في كل قائمة).
+    The legacy model violated three of these: `Product.quantity`,
+    `avg_rate` and `reviews_count` as properties (N+1 on every list).
 """
 
 from django.core.validators import MinValueValidator
@@ -26,26 +26,25 @@ from core.money import MoneyField
 
 def catalog_image_path(instance, filename: str) -> str:
     """
-    ⚠️  اسم عشوائي بمسار مجزّأ.
+    ⚠️  A random name on a sharded path.
 
-    المسارات التسلسلية القديمة (`media/brand/01.jpg`) كانت قابلة
-    للتعداد بالكامل.
+    The old sequential paths (`media/brand/01.jpg`) were fully enumerable.
     """
     return f"catalog/{random_filename(filename)}"
 
 
 # ═══════════════════════════════════════════════════════════
-#  التصنيف
+#  Classification
 # ═══════════════════════════════════════════════════════════
 
 
 class Category(BilingualNameMixin, SlugMixin, BaseModel):
     """
-    فئة شجرية.
+    A tree category.
 
-    التنفيذ بـ adjacency list + مسار مادي (`path`) — يجمع بساطة
-    الأولى وسرعة الاستعلام عن كل الأحفاد دفعة واحدة، بلا مكتبة
-    شجرية إضافية.
+    Implemented as an adjacency list + a materialised path (`path`) — combining
+    the simplicity of the first with fast "all descendants at once" queries, and
+    no extra tree library.
     """
 
     parent = models.ForeignKey(
@@ -62,7 +61,7 @@ class Category(BilingualNameMixin, SlugMixin, BaseModel):
     image = models.ImageField(_("الصورة"), upload_to=catalog_image_path, blank=True)
     icon = models.CharField(_("الأيقونة"), max_length=50, blank=True)
 
-    #: مسار مادي: 'sup/med/dis'  ⟵ استعلام الأحفاد بـ startswith
+    #: Materialised path: 'sup/med/dis'  ⟵ descendants queried with startswith
     path = models.CharField(_("المسار"), max_length=500, blank=True, db_index=True)
     depth = models.PositiveSmallIntegerField(_("العمق"), default=0)
 
@@ -94,10 +93,11 @@ class Category(BilingualNameMixin, SlugMixin, BaseModel):
 
     def _rebuild_path(self):
         """
-        يعيد بناء المسار والعمق — للفئة ولكل أحفادها.
+        Rebuilds the path and depth — for the category and all its descendants.
 
-        ⚠️  نقل فئة يغيّر مسار كل ما تحتها. تجاهل ذلك يترك أحفادًا
-            بمسارات ميتة فتختفي من كل استعلام شجري.
+        ⚠️  Moving a category changes the path of everything beneath it.
+            Ignoring that leaves descendants on dead paths, so they disappear
+            from every tree query.
         """
         prefix = f"{self.parent.path}/" if self.parent else ""
         new_path = f"{prefix}{self.slug}"
@@ -111,7 +111,7 @@ class Category(BilingualNameMixin, SlugMixin, BaseModel):
                 child._rebuild_path()
 
     def descendants(self):
-        """كل الأحفاد باستعلام واحد."""
+        """All descendants in a single query."""
         return type(self).objects.filter(path__startswith=f"{self.path}/")
 
     def self_and_descendants(self):
@@ -125,16 +125,16 @@ class Category(BilingualNameMixin, SlugMixin, BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
-#  المصنّع والبراند
+#  Manufacturer and brand
 # ═══════════════════════════════════════════════════════════
 
 
 class Manufacturer(BilingualNameMixin, SlugMixin, BaseModel):
     """
-    الشركة المصنّعة.
+    The manufacturing company.
 
-    ⚠️  منفصل عن البراند عمدًا — شركة واحدة تملك عدة براندات،
-        والمتطلبات التنظيمية تسأل عن **المصنّع** لا عن البراند.
+    ⚠️  Deliberately separate from the brand — one company owns several brands,
+        and regulatory requirements ask about the **manufacturer**, not the brand.
     """
 
     country = models.CharField(_("بلد المنشأ"), max_length=100, blank=True)
@@ -180,15 +180,15 @@ class Brand(BilingualNameMixin, SlugMixin, BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
-#  المنتج
+#  The product
 # ═══════════════════════════════════════════════════════════
 
 
 class ProductKind(models.TextChoices):
     """
-    نوع المنتج — يحدد الحقول ذات المعنى.
+    Product type — it determines which fields are meaningful.
 
-    مستلزم طبي لا يحمل مادة فعّالة، والدواء يحملها إلزامًا.
+    A medical supply carries no active ingredient; a medicine must carry one.
     """
 
     SUPPLY = "SUPPLY", _("مستلزم طبي")
@@ -203,14 +203,14 @@ class ProductKind(models.TextChoices):
 
 class RegulatoryClass(models.TextChoices):
     """
-    التصنيف التنظيمي.
+    Regulatory classification.
 
-    ⚠️  `PRESCRIPTION` و`CONTROLLED` موجودان **رغم أن نطاق العمل
-        الحالي OTC فقط**. (ADR-06)
+    ⚠️  `PRESCRIPTION` and `CONTROLLED` exist **even though the current business
+        scope is OTC only**. (ADR-06)
 
-        تكلفتهما اليوم سطران؛ إضافتهما بعد سنة من البيانات هجرة
-        مؤلمة على أكبر جدول. وجودهما لا يُفعّل أي سلوك — يمنع
-        الألم لاحقًا فقط.
+        They cost two lines today; adding them after a year of data is a painful
+        migration on the largest table. Their presence enables no behaviour — it
+        only prevents the pain later.
     """
 
     NOT_APPLICABLE = "NOT_APPLICABLE", _("لا ينطبق")
@@ -243,14 +243,15 @@ class StorageCondition(models.TextChoices):
 
 class Product(BilingualNameMixin, SlugMixin, BaseModel):
     """
-    المنتج.
+    The product.
 
-    ⚠️  **لا حقل كمية ولا سعر نهائي هنا.** الأول يملكه `inventory`
-        والثاني يملكه `pricing`. `base_price` أدناه سعر مرجعي
-        يستهلكه محرك التسعير، لا السعر الذي يدفعه العميل.
+    ⚠️  **No quantity field and no final price field here.** The first is owned
+        by `inventory` and the second by `pricing`. `base_price` below is a
+        reference price consumed by the pricing engine, not the price the
+        customer pays.
     """
 
-    # ── التعريف ────────────────────────────────────────────
+    # ── Identification ─────────────────────────────────────
     sku = models.CharField(_("رمز المنتج"), max_length=64, unique=True, db_index=True)
     barcode = models.CharField(
         _("الباركود"),
@@ -273,7 +274,7 @@ class Product(BilingualNameMixin, SlugMixin, BaseModel):
     description_ar = models.TextField(_("الوصف بالعربية"), blank=True)
     description_en = models.TextField(_("الوصف بالإنجليزية"), blank=True)
 
-    # ── التصنيف ────────────────────────────────────────────
+    # ── Classification ─────────────────────────────────────
     category = models.ForeignKey(
         Category,
         on_delete=models.PROTECT,
@@ -297,7 +298,7 @@ class Product(BilingualNameMixin, SlugMixin, BaseModel):
         verbose_name=_("الشركة المصنّعة"),
     )
 
-    # ── الوصول والضريبة — مراجع لا منطق ────────────────────
+    # ── Access and tax — references, not logic ─────────────
     access_policy = models.ForeignKey(
         "access.AccessPolicy",
         on_delete=models.PROTECT,
@@ -316,7 +317,7 @@ class Product(BilingualNameMixin, SlugMixin, BaseModel):
         verbose_name=_("الفئة الضريبية"),
     )
 
-    # ── السعر المرجعي ──────────────────────────────────────
+    # ── Reference price ────────────────────────────────────
     base_price = MoneyField(
         _("السعر المرجعي"),
         default=0,
@@ -324,7 +325,7 @@ class Product(BilingualNameMixin, SlugMixin, BaseModel):
         help_text=_("مرجع لمحرك التسعير — ليس السعر النهائي للعميل"),
     )
 
-    # ── حقول تنظيمية ودوائية ───────────────────────────────
+    # ── Regulatory and pharmaceutical fields ───────────────
     regulatory_class = models.CharField(
         _("التصنيف التنظيمي"),
         max_length=20,
@@ -358,10 +359,10 @@ class Product(BilingualNameMixin, SlugMixin, BaseModel):
         default=StorageCondition.ROOM,
     )
 
-    # ── فيزيائي — للشحن ────────────────────────────────────
+    # ── Physical — for shipping ────────────────────────────
     weight_grams = models.PositiveIntegerField(_("الوزن بالجرام"), null=True, blank=True)
 
-    # ── الحالة ─────────────────────────────────────────────
+    # ── Status ─────────────────────────────────────────────
     is_active = models.BooleanField(_("مفعّل"), default=True, db_index=True)
     is_featured = models.BooleanField(_("مميّز"), default=False, db_index=True)
     published_at = models.DateTimeField(_("تاريخ النشر"), null=True, blank=True)
@@ -424,10 +425,10 @@ class ProductImage(BaseModel):
 
 class ProductVariant(BaseModel):
     """
-    نسخة من المنتج تختلف في خاصية واحدة (مقاس · لون · تركيز).
+    A copy of the product differing in one attribute (size · colour · strength).
 
-    ⚠️  المخزون يُتتبَّع على **الـ variant** لا على المنتج —
-        قفاز مقاس M ينفد بينما L متوفر.
+    ⚠️  Stock is tracked on the **variant**, not on the product — a size M glove
+        runs out while L is in stock.
     """
 
     product = models.ForeignKey(
@@ -439,7 +440,7 @@ class ProductVariant(BaseModel):
     name_ar = models.CharField(_("الاسم بالعربية"), max_length=200)
     name_en = models.CharField(_("الاسم بالإنجليزية"), max_length=200)
 
-    #: فروق النسخة: {"size": "M", "color": "أزرق"}
+    #: The variant's differences: {"size": "M", "color": "blue"}
     attributes = models.JSONField(_("الخصائص"), default=dict, blank=True)
 
     price_adjustment = MoneyField(

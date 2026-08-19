@@ -1,4 +1,4 @@
-"""مسارات الهوية البصرية — /api/v1/branding/"""
+"""Visual identity routes — /api/v1/branding/"""
 
 from django.urls import path
 
@@ -7,9 +7,9 @@ from branding import api
 app_name = "branding"
 
 urlpatterns = [
-    # ── عام ────────────────────────────────────────────────
+    # ── Public ─────────────────────────────────────────────
     path("theme/", api.PublicThemeAPI.as_view(), name="theme"),
-    # ── الأدمن ─────────────────────────────────────────────
+    # ── Admin ──────────────────────────────────────────────
     path("admin/profiles/", api.ProfileListCreateAPI.as_view(), name="profiles"),
     path("admin/profiles/<uuid:pk>/", api.ProfileDetailAPI.as_view(), name="profile-detail"),
     path(
@@ -18,7 +18,7 @@ urlpatterns = [
         name="profile-activate",
     ),
     path(
-        # ⚠️  `uuid` لا `int` — لا معرّف تسلسلي في أي رابط
+        # ⚠️  `uuid`, not `int` — no sequential id in any URL
         "admin/profiles/<uuid:pk>/palettes/<uuid:palette_pk>/",
         api.PaletteDetailAPI.as_view(),
         name="palette-detail",

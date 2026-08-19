@@ -1,16 +1,16 @@
 """
-محرك تقييم سياسات الوصول.
+Access policy evaluation engine.
 
-⚠️  المبدأ الحاكم: **إخفاء الواجهة ليس أمنًا.**
+⚠️  The governing principle: **hiding the interface is not security.**
 
-    الفلترة تحدث في الـ **queryset** لا في الـ serializer ولا في
-    المكوّن. المستخدم غير المصرّح له لا يستطيع:
+    Filtering happens in the **queryset**, not in the serializer and not in the
+    component. An unauthorised user cannot:
 
-        عرض · بحث · فلترة · إضافة لقائمة الرغبات · إضافة للسلة ·
-        إتمام شراء · وصولًا بالرابط المباشر · تلاعبًا بالـ API
+        view · search · filter · add to a wishlist · add to the cart ·
+        check out · reach it by direct link · manipulate it through the API
 
-    نقطة واحدة تُقرِّر، والجميع يستهلك قرارها. تكرار المنطق في
-    عدة أماكن يعني ثغرة عند أول تعديل يُنسى في أحدها.
+    One point decides, and everyone consumes its decision. Duplicating the logic
+    in several places means a hole at the first edit forgotten in one of them.
 """
 
 from __future__ import annotations
@@ -31,10 +31,11 @@ class Decision(str, Enum):
 
 class DenialReason(str, Enum):
     """
-    سبب المنع — للتشخيص ولاختيار الرسالة المعروضة.
+    The denial reason — for diagnosis and for choosing the displayed message.
 
-    ⚠️  لا يُكشف للمستخدم إلا حين يكون كشف وجود المورد مقبولًا.
-        للموارد التي يجب إخفاء وجودها أصلًا، الرد `404` موحّد.
+    ⚠️  Never revealed to the user except where disclosing the resource's
+        existence is acceptable. For resources whose existence must be hidden,
+        the response is a uniform `404`.
     """
 
     NONE = "NONE"
@@ -71,15 +72,15 @@ def _deny(reason: DenialReason, policy: AccessPolicy | None = None) -> AccessRes
 
 
 # ═══════════════════════════════════════════════════════════
-#  التقييم
+#  Evaluation
 # ═══════════════════════════════════════════════════════════
 
 
 def evaluate(user, policy: AccessPolicy | None) -> AccessResult:
     """
-    القرار المركزي. **كل** فحص وصول يمر من هنا.
+    The central decision. **Every** access check passes through here.
 
-    `policy=None` ⟵ السياسة الافتراضية، وإن غابت فالمورد عام.
+    `policy=None` ⟵ the default policy, and if that is absent the resource is public.
     """
     if policy is None:
         policy = AccessPolicy.get_default()
@@ -87,8 +88,8 @@ def evaluate(user, policy: AccessPolicy | None) -> AccessResult:
             return ALLOWED
 
     if not policy.is_active:
-        # سياسة معطّلة ⟵ منع لا سماح.
-        # الافتراض الآمن: تعطيل سياسة بالخطأ يجب ألا يكشف موارد.
+        # A disabled policy ⟵ deny, not allow.
+        # The safe assumption: disabling a policy by mistake must not expose resources.
         return _deny(DenialReason.POLICY_INACTIVE, policy)
 
     if policy.level == AccessLevel.PUBLIC:
@@ -114,12 +115,13 @@ def evaluate(user, policy: AccessPolicy | None) -> AccessResult:
 
 def accessible_policy_ids(user) -> list:
     """
-    معرّفات السياسات المسموحة لهذا المستخدم.
+    The policy ids permitted for this user.
 
-    ⚠️  تُحسب **مرة واحدة** ثم تُستخدم في `filter(policy_id__in=...)`.
+    ⚠️  Computed **once** and then used in `filter(policy_id__in=...)`.
 
-        البديل — تقييم كل صف على حدة — يعني تقييمًا لكل منتج في كل
-        صفحة. عدد السياسات عشرات، وعدد المنتجات عشرات الآلاف.
+        The alternative — evaluating each row separately — means one evaluation
+        per product per page. Policies number in the tens; products in the tens
+        of thousands.
     """
     return [
         policy.pk
@@ -130,16 +132,17 @@ def accessible_policy_ids(user) -> list:
 
 def selectable_policies() -> list[AccessPolicy]:
     """
-    السياسات التي يجوز إسنادها إلى مورد — لشاشات الأدمن.
+    The policies assignable to a resource — for admin screens.
 
-    ⚠️  الواجهة العامة لهذا النطاق هي `services` وحدها؛ والنطاقات
-        الأخرى تستدعيها ولا تلمس `models`.
+    ⚠️  This domain's public interface is `services` alone; other domains
+        call it and never touch `models`.
 
-    ⚠️  والافتراضية **أولًا** لا مرتّبة أبجديًا.
+    ⚠️  And the default comes **first**, not in alphabetical order.
 
-        هي جواب «للجميع» وهو الاختيار الصحيح لمعظم المنتجات. دفنها
-        وسط القائمة يجعل الأدمن يختار من أعلى الظاهر — فيقيّد منتجًا
-        عامًا بلا قصد، ولا يكتشف ذلك إلا بشكوى عميل لا يرى الصنف.
+        It is the "for everyone" answer, and the right choice for most products.
+        Burying it mid-list makes the admin pick from the top of what is visible
+        — restricting a public product unintentionally, and discovering it only
+        when a customer complains they cannot see the item.
     """
     return list(
         AccessPolicy.objects.filter(is_active=True).order_by("-is_default", "level", "code")
@@ -148,12 +151,12 @@ def selectable_policies() -> list[AccessPolicy]:
 
 def accessible_filter(user, field: str = "access_policy") -> Q:
     """
-    مرشِّح جاهز للدمج في أي queryset.
+    A ready-made filter to merge into any queryset.
 
         Product.objects.filter(access.accessible_filter(user))
 
-    يشمل الموارد بلا سياسة صريحة إن كانت الافتراضية مسموحة —
-    وإلا استُبعدت.
+    It includes resources with no explicit policy if the default one is
+    permitted — otherwise they are excluded.
     """
     condition = Q(**{f"{field}_id__in": accessible_policy_ids(user)})
 
@@ -167,7 +170,7 @@ def accessible_filter(user, field: str = "access_policy") -> Q:
 
 class PolicyAwareQuerySetMixin:
     """
-    يُدمج في أي view يقدّم موارد محكومة بسياسة.
+    Mixed into any view that serves policy-governed resources.
 
         class ProductListAPI(PolicyAwareQuerySetMixin, ListAPIView):
             policy_field = "access_policy"
@@ -175,38 +178,38 @@ class PolicyAwareQuerySetMixin:
             def get_base_queryset(self):
                 return Product.objects.filter(is_active=True)
 
-    ⚠️  الفلترة في الـ queryset — لا في الـ serializer.
+    ⚠️  Filtering happens in the queryset — not in the serializer.
 
-        الفلترة في الـ serializer تعني أن الصف يُقرأ من قاعدة
-        البيانات ثم يُخفى: العدّ يبقى خاطئًا، والترقيم يعطي صفحات
-        ناقصة، ووجود المورد يتسرّب من فارق الأعداد.
+        Filtering in the serializer means the row is read from the database and
+        then hidden: the count stays wrong, pagination yields short pages, and
+        the resource's existence leaks through the difference in counts.
 
-    ⚠️  **الفلاتر المخصصة تُكتب في `get_base_queryset` لا `get_queryset`.**
+    ⚠️  **Custom filters go in `get_base_queryset`, never in `get_queryset`.**
 
-        تجاوز `get_queryset` في صنف فرعي **يُعطّل فلترة السياسات
-        بصمت** — لا خطأ، ولا تحذير، فقط منتجات مقيّدة تظهر للجميع.
-        وهو خطأ وقعنا فيه فعلًا وأمسكته الاختبارات.
+        Overriding `get_queryset` in a subclass **silently disables policy
+        filtering** — no error, no warning, just restricted products visible to
+        everyone. It is a mistake we actually made, and the tests caught it.
 
-        لذا `get_queryset` هنا `final` عمليًا: يستدعي
-        `get_base_queryset` ثم يطبّق الفلتر دائمًا.
+        So `get_queryset` here is effectively `final`: it calls
+        `get_base_queryset` and then always applies the filter.
     """
 
     policy_field = "access_policy"
 
     def get_access_user(self):
         """
-        نقطة الامتداد الوحيدة لتحديد «مَن يقيَّم».
+        The single extension point for deciding "who is being evaluated".
 
-        `access.preview.PreviewAwareMixin` يتجاوزها ليعيد مستخدمًا
-        وهميًا — فلا يحتاج تجاوز `get_queryset` ولا يفلتر مرتين.
+        `access.preview.PreviewAwareMixin` overrides it to return a dummy user —
+        so it needs no `get_queryset` override and never filters twice.
         """
         return getattr(self.request, "user", None)
 
     def get_base_queryset(self):
         """
-        الـ queryset قبل فلترة السياسات.
+        The queryset before policy filtering.
 
-        **هنا** تُكتب الفلاتر والترتيب والبحث — لا في `get_queryset`.
+        Filters, ordering and search are written **here** — not in `get_queryset`.
         """
         return super().get_queryset()
 
@@ -218,16 +221,17 @@ class PolicyAwareQuerySetMixin:
 
 def require_access(user, policy: AccessPolicy | None, *, reveal_existence: bool = False):
     """
-    يرفع استثناءً عند المنع.
+    Raises on denial.
 
-    `reveal_existence=False` (الافتراضي) ⟵ **`404`**.
+    `reveal_existence=False` (the default) ⟵ **`404`**.
 
-        الرد `403` يؤكد وجود المورد. على كتالوج مقيّد، الفارق بين
-        `403` و`404` يكشف قائمة المنتجات المقيّدة بالكامل.
+        A `403` confirms the resource exists. On a restricted catalogue, the
+        difference between `403` and `404` exposes the entire list of restricted
+        products.
 
-    `reveal_existence=True` ⟵ `403` برسالة السياسة، للحالات التي
-    يكون فيها وجود المورد معلومًا أصلًا (منتج ظهر في نتيجة عامة
-    ثم قُيّد الشراء عليه).
+    `reveal_existence=True` ⟵ `403` with the policy's message, for cases where
+    the resource's existence is already known (a product that appeared in public
+    results and then had purchasing restricted).
     """
     from core.errors import BusinessError, ErrorCode
 

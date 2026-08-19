@@ -1,11 +1,11 @@
 """
-استعلامات الكتالوج.
+Catalogue queries.
 
-⚠️  كل دالة هنا مسؤولة عن **ألا تُنتج N+1**.
+⚠️  Every function here is responsible for **not producing N+1**.
 
-    قائمة منتجات تعرض: الاسم · الفئة · البراند · الصورة · التقييم ·
-    السعر · التوفر. بلا `select_related`/`prefetch_related` تصير
-    كل صفحة عشرات الاستعلامات.
+    A product list displays: name · category · brand · image · rating · price ·
+    availability. Without `select_related`/`prefetch_related` every page becomes
+    dozens of queries.
 """
 
 from __future__ import annotations
@@ -18,10 +18,10 @@ from catalog.models import Category, Product, ProductImage, ProductVariant
 
 def product_base_queryset():
     """
-    الأساس المشترك — يُحمّل كل ما تعرضه بطاقة المنتج دفعة واحدة.
+    The shared base — it loads everything the product card displays in one go.
 
-    `rating` من `reviews.ProductRating` عبر `select_related` —
-    وهو ما يستبدل الـ properties القديمة التي كانت تستعلم لكل صف.
+    `rating` comes from `reviews.ProductRating` through `select_related` — which
+    is what replaced the legacy properties that queried per row.
     """
     primary_images = ProductImage.objects.filter(is_primary=True)
 
@@ -38,7 +38,7 @@ def product_base_queryset():
 
 
 def published_products(user=None):
-    """المنتجات المنشورة المتاحة لهذا المستخدم."""
+    """The published products available to this user."""
     queryset = product_base_queryset().filter(is_active=True)
 
     if user is not None:
@@ -48,7 +48,7 @@ def published_products(user=None):
 
 
 def product_detail_queryset(user=None):
-    """صفحة المنتج — تُحمّل الصور والنسخ كاملة."""
+    """The product page — it loads the images and variants in full."""
     active_variants = ProductVariant.objects.filter(is_active=True)
 
     queryset = (
@@ -68,14 +68,15 @@ def product_detail_queryset(user=None):
 
 def products_in_category(category: Category, user=None, *, include_descendants=True):
     """
-    منتجات فئة.
+    A category's products.
 
-    ⚠️  `include_descendants` افتراضيًا `True`.
+    ⚠️  `include_descendants` defaults to `True`.
 
-        فتح «مستلزمات طبية» يجب أن يُظهر ما تحتها كله — عرض ما
-        أُسند للفئة الأب مباشرةً فقط يعطي صفحة شبه فارغة.
+        Opening "Medical supplies" must show everything beneath it — displaying
+        only what was assigned directly to the parent category gives a nearly
+        empty page.
 
-        المسار المادي يجعلها استعلامًا واحدًا بـ `startswith`.
+        The materialised path makes this a single `startswith` query.
     """
     queryset = published_products(user)
 
@@ -89,14 +90,14 @@ def products_in_category(category: Category, user=None, *, include_descendants=T
 
 def search_products(term: str, user=None):
     """
-    بحث نصي.
+    Text search.
 
-    ⚠️  يبحث في اللغتين والمادة الفعّالة و SKU والباركود معًا.
+    ⚠️  It searches both languages, the active ingredient, the SKU and the barcode together.
 
-        الصيدلي يبحث بالمادة الفعّالة لا بالاسم التجاري، والكاشير
-        يبحث بالباركود. بحث في الاسم وحده يفشل عندهما.
+        A pharmacist searches by active ingredient rather than trade name, and a
+        cashier searches by barcode. Searching the name alone fails both.
 
-        FTS الحقيقي يأتي مع PostgreSQL — هذا كافٍ للتطوير على SQLite.
+        Real FTS arrives with PostgreSQL — this is sufficient for development on SQLite.
     """
     term = (term or "").strip()
     if not term:
@@ -115,7 +116,7 @@ def search_products(term: str, user=None):
 
 
 def menu_categories():
-    """شجرة القائمة — استعلام واحد ثم بناء الشجرة في الذاكرة."""
+    """The menu tree — one query, then the tree is built in memory."""
     return Category.objects.filter(is_active=True, show_in_menu=True).order_by(
         "path", "display_order"
     )
@@ -123,10 +124,9 @@ def menu_categories():
 
 def build_category_tree(categories) -> list[dict]:
     """
-    يحوّل قائمة مسطّحة إلى شجرة متداخلة.
+    Converts a flat list into a nested tree.
 
-    ⚠️  في الذاكرة لا بقاعدة البيانات — استعلام واحد بدل استعلام
-        لكل مستوى.
+    ⚠️  In memory, not in the database — one query instead of one query per level.
     """
     nodes: dict = {}
     roots: list = []

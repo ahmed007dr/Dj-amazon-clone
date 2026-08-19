@@ -1,8 +1,8 @@
 """
-اختبارات بوابة الأدمن.
+Admin portal tests.
 
-تغطي ما طُلب صراحةً: إيقاف/تفعيل أي حساب · من متصل الآن ·
-آخر استخدام · آخر عملية · مدة الاستخدام.
+They cover what was explicitly requested: suspend/reactivate any account ·
+who is online now · last seen · last action · total time used.
 """
 
 import pytest
@@ -43,14 +43,14 @@ def admin_client(admin):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الصلاحيات
+#  Permissions
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 class TestAdminAccessControl:
     def test_customer_cannot_reach_admin_endpoints(self, customer):
-        """أخطر اختبار في هذا الملف — تصعيد الصلاحيات."""
+        """The most critical test in this file — privilege escalation."""
         client = APIClient()
         client.force_authenticate(user=customer)
 
@@ -78,8 +78,8 @@ class TestAdminAccessControl:
 
     def test_is_staff_alone_grants_nothing(self, customer):
         """
-        ⚠️  `is_staff` وصول لوحة Django — **ليست نموذج الصلاحيات**.
-            الاعتماد عليها يمنح كل شيء ضمنيًا.
+        ⚠️  `is_staff` is Django admin access — **it is not the permission model**.
+            Relying on it grants everything implicitly.
         """
         customer.is_staff = True
         customer.save()
@@ -93,7 +93,7 @@ class TestAdminAccessControl:
 
 
 # ═══════════════════════════════════════════════════════════
-#  إدارة الحسابات
+#  Account management
 # ═══════════════════════════════════════════════════════════
 
 
@@ -103,7 +103,7 @@ class TestAccountManagement:
         response = admin_client.get(reverse("v1:administration:accounts"))
 
         assert response.status_code == 200
-        # ترقيم بالإزاحة للأدمن — مصرَّح له برؤية العدد الكلي
+        # Offset pagination for the admin — they are authorised to see the total
         assert response.data["count"] >= 2
 
     def test_search_and_filter(self, admin_client, customer):
@@ -113,7 +113,7 @@ class TestAccountManagement:
         assert admin_client.get(url, {"status": "SUSPENDED"}).data["count"] == 0
 
     def test_suspend_requires_reason(self, admin_client, customer):
-        """إيقاف بلا سبب موثّق لا يُدافَع عنه لاحقًا."""
+        """A suspension with no documented reason cannot be defended later."""
         response = admin_client.post(
             reverse("v1:administration:account-suspend", args=[customer.pk]),
             {},
@@ -157,7 +157,7 @@ class TestAccountManagement:
         assert "مخالفة" in django_mail.outbox[0].body
 
     def test_admin_cannot_suspend_self(self, admin_client, admin):
-        """قفل الذات خطأ لا رجعة فيه بلا تدخل قاعدة البيانات."""
+        """Locking yourself out is an irreversible mistake short of database surgery."""
         response = admin_client.post(
             reverse("v1:administration:account-suspend", args=[admin.pk]),
             {"reason": "خطأ"},
@@ -210,7 +210,7 @@ class TestAccountManagement:
 
 
 # ═══════════════════════════════════════════════════════════
-#  المراقبة
+#  Monitoring
 # ═══════════════════════════════════════════════════════════
 
 
@@ -224,10 +224,10 @@ class TestMonitoring:
         session = services.open_session(customer, session_key="live")
 
         response = admin_client.get(reverse("v1:administration:online-now"))
-        # المعرّف يُسلسَل نصًا في الاستجابة
+        # The id is serialised as a string in the response
         assert str(customer.pk) in {str(u["id"]) for u in response.data["users"]}
 
-        # خارج النافذة ⟵ لم يعد متصلًا
+        # Outside the window ⟵ no longer online
         session.last_activity = timezone.now() - timedelta(minutes=30)
         session.save()
 
@@ -257,9 +257,9 @@ class TestMonitoring:
 
     def test_last_action_comes_from_audit_log(self, admin_client, customer):
         """
-        ⚠️  «آخر ظهور» و«آخر عملية» سؤالان مختلفان.
+        ⚠️  "Last seen" and "last action" are two different questions.
 
-        من يفتح التطبيق ولا يفعل شيئًا له ظهور بلا عملية.
+        Someone who opens the app and does nothing has a sighting but no action.
         """
         from core.models.audit import AuditAction, AuditLog
 
@@ -277,7 +277,7 @@ class TestMonitoring:
         assert response.data["last_action"] is None
 
     def test_session_list_hides_session_key(self, admin_client, customer):
-        """من يعرف مفتاح الجلسة ينتحلها."""
+        """Anyone who knows the session key can hijack it."""
         from accounts import services
 
         services.open_session(customer, session_key="secret-key-value")
@@ -310,10 +310,10 @@ class TestQueryEfficiency:
         self, admin_client, django_assert_max_num_queries
     ):
         """
-        ⚠️  الحارس ضد N+1.
+        ⚠️  The guard against N+1.
 
-        جدول الأدمن يُثري كل صف بأربعة حقول محسوبة. بلا تجميع،
-        مئة مستخدم = أربعمئة استعلام.
+        The admin table enriches every row with four computed fields. Without
+        aggregation, a hundred users = four hundred queries.
         """
         for i in range(25):
             user = make_user(f"bulk{i}@test.local")

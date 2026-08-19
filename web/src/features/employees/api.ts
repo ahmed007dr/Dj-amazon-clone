@@ -210,6 +210,56 @@ export interface EmployeeRole {
   name_en: string;
   is_active: boolean;
   permission_count: number;
+  /** ⚠️  بصيغة `app_label.codename` لا معرّفات رقمية: الأرقام
+   *     تختلف بين التطوير والإنتاج فتمنح غير ما اختاره الأدمن. */
+  permissions: string[];
+}
+
+export interface PermissionOption {
+  code: string;
+  label_ar: string;
+  label_en: string;
+}
+
+export interface PermissionGroup {
+  key: string;
+  label_ar: string;
+  label_en: string;
+  permissions: PermissionOption[];
+}
+
+/**
+ * دليل الصلاحيات — **مُنتقى لا خام**.
+ *
+ * ⚠️  جدول Django يحمل مئتي صلاحية آلية بأسماء تقنية بينها
+ *     `delete_user`. عرضه كما هو يجعل الشاشة غير قابلة للاستعمال
+ *     ويجعل منح الخطير سهوًا بضغطة.
+ */
+export function usePermissionCatalogue(enabled = true) {
+  return useQuery({
+    queryKey: ['admin', 'permission-catalogue'],
+    queryFn: () => http.get<PermissionGroup[]>('/employees/admin/permissions/'),
+    enabled,
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+export function useUpdateRole() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, ...body }: Partial<EmployeeRole> & { id: string }) =>
+      http.patch<EmployeeRole>(`/employees/admin/roles/${id}/`, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'employee-roles'] });
+      // ⚠️  **وصلاحيات المستخدم الحالي معها.**
+      //
+      //     من يعدّل دوره هو يجب أن ترتّب شاشته فورًا؛ وبقاء
+      //     الكاش يجعله يرى روابط سحبها عن نفسه للتوّ ثم تُرفض
+      //     عند الضغط — وهي أسوأ حالة: يظنّ العطل في النظام.
+      void queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+    },
+  });
 }
 
 export function useEmployeeRoles(enabled = true) {

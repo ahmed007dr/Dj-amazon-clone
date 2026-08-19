@@ -1,11 +1,12 @@
 """
-واجهة `branding` العامة.
+The public interface of `branding`.
 
-⚠️  النطاقات الأخرى تستدعي هذه الدوال ولا تلمس `models.py`.
+⚠️  Other domains call these functions and never touch `models.py`.
 
-⚠️  الهوية تُقرأ في **كل** طلب صفحة تقريبًا — فهي مُخزَّنة بقوة،
-    والكاش يُبطَل عند أي تعديل. بلا ذلك يصير كل عرض صفحة استعلامين
-    إضافيين على جدول لا يتغيّر مرة في الشهر.
+⚠️  The identity is read on **almost every** page request — so it is
+    aggressively cached, and the cache is invalidated on any edit. Without that,
+    every page view costs two extra queries on a table that does not change once
+    a month.
 """
 
 from django.core.cache import cache
@@ -26,13 +27,13 @@ def get_active_profile() -> BrandProfile | None:
 
 def theme_payload() -> dict:
     """
-    الحمولة العامة التي يستهلكها الفرونت إند.
+    The public payload the frontend consumes.
 
-    ⚠️  **رموز جاهزة لا حقول خام.**
+    ⚠️  **Ready-made tokens, not raw fields.**
 
-        إرسال الحقول كما هي يترك الفرونت يبني أسماء المتغيرات
-        بنفسه — فيصير اسم الرمز متكرّرًا في مكانين، وأي إضافة لون
-        تحتاج تعديلين. الباك إند يرسل الخريطة النهائية.
+        Sending the fields as they are leaves the frontend to build the variable
+        names itself — so a token name ends up duplicated in two places, and
+        adding a colour needs two edits. The backend sends the finished map.
     """
     cached = cache.get(CACHE_KEY)
     if cached is not None:
@@ -65,8 +66,8 @@ def _serialize(profile: BrandProfile) -> dict:
         },
         "default_mode": profile.default_mode,
         "tokens": {
-            # ⚠️  ثابتة عبر الوضعين — المسافات ونقاط الكسر ليست
-            #     قابلة للتحكم أصلًا لأن تغييرها يكسر التخطيط
+            # ⚠️  Constant across both modes — spacing and breakpoints are not
+            #     configurable at all, because changing them breaks the layout
             "--font-ar": profile.font_ar,
             "--font-en": profile.font_en,
             "--font-size-base": f"{profile.font_size_base}rem",
@@ -91,7 +92,7 @@ def _serialize(profile: BrandProfile) -> dict:
     }
 
 
-#: الحقل في الموديل  →  اسم رمز CSS
+#: The model field  →  the CSS token name
 COLOR_TOKENS = {
     "primary": "--color-primary",
     "on_primary": "--color-on-primary",
@@ -117,11 +118,11 @@ def _palette_tokens(palette) -> dict:
 
 def _fallback() -> dict:
     """
-    ⚠️  هوية افتراضية حين لا يوجد ملف مفعّل.
+    ⚠️  A default identity for when no profile is active.
 
-        الفرونت إند بلا ألوان يرسم صفحة بيضاء بنص أسود — يبدو
-        عطلًا لا «لم تُضبط الهوية بعد». الافتراضي يجعل النظام
-        صالحًا للاستخدام من أول دقيقة.
+        A frontend with no colours paints a white page with black text — which
+        looks like a fault rather than "the identity has not been configured
+        yet". The default makes the system usable from the first minute.
     """
     from branding.models import ThemePalette
 

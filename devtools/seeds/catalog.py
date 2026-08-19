@@ -1,12 +1,14 @@
 """
-الكتالوج: مصنّعون · براندات · شجرة فئات · منتجات ونسخها.
+The catalogue: manufacturers · brands · category tree · products and their variants.
 
-⚠️  **لا كمية ولا سعر نهائي هنا** — يبذرهما `stock` و`pricing`.
-    خلطها في هذا الملف يعيد بالضبط الخلط الذي فُصِّل النطاق لمنعه.
+⚠️  **No quantity and no final price here** — `stock` and `pricing` seed those.
+    Mixing them into this file recreates exactly the conflation the domain split
+    was made to prevent.
 
-⚠️  المنتجات مختارة لتغطية **الحالات الصعبة** لا لملء الشاشة:
-    منتج بنسخ · دواء بصلاحية · صنف جملة فقط · صنف يتطلب حسابًا
-    مهنيًا موثّقًا · صنف بارد يحتاج تخزين مبرّد.
+⚠️  The products are chosen to cover **the hard cases**, not to fill the screen:
+    a product with variants · a medicine with an expiry · a wholesale-only item ·
+    an item requiring a verified professional account · a cold item needing
+    refrigerated storage.
 """
 
 from decimal import Decimal
@@ -33,7 +35,7 @@ MANUFACTURERS = [
     ("ansell", "أنسيل", "Ansell", "أستراليا"),
 ]
 
-#: (slug, عربي, إنجليزي, slug المصنّع, مميّز؟)
+#: (slug, Arabic, English, manufacturer slug, featured?)
 BRANDS = [
     ("medix", "ميديكس", "Medix", "nile-medical", True),
     ("safeguard", "سيف جارد", "Safeguard", "ansell", True),
@@ -43,7 +45,7 @@ BRANDS = [
     ("campus", "كامبس", "Campus", None, False),
 ]
 
-#: (slug, عربي, إنجليزي, slug الأب, أيقونة, ترتيب)
+#: (slug, Arabic, English, parent slug, icon, ordering)
 CATEGORIES = [
     ("supplies", "مستلزمات طبية", "Medical supplies", None, "syringe", 10),
     ("disposables", "مستهلكات", "Disposables", "supplies", "gloves", 10),
@@ -58,7 +60,7 @@ CATEGORIES = [
     ("students", "مستلزمات الطلاب", "Student supplies", None, "book", 60),
 ]
 
-#: قوالب المنتجات — الحقول المشتركة تُملأ لاحقًا
+#: Product templates — the shared fields are filled in later
 PRODUCTS = [
     {
         "sku": "GLV-NIT",
@@ -74,7 +76,7 @@ PRODUCTS = [
         "is_featured": True,
         "short_description_ar": "علبة ١٠٠ قفاز نيتريل — خالٍ من اللاتكس ومناسب لحساسية الجلد.",
         "short_description_en": "Box of 100 latex-free nitrile gloves.",
-        # ⚠️  المخزون يُتتبَّع على النسخة — مقاس M ينفد وL متوفر
+        # ⚠️  Stock is tracked on the variant — size M runs out while L is in stock
         "variants": [
             ("GLV-NIT-S", "مقاس S", "Size S", {"size": "S"}, "0.00"),
             ("GLV-NIT-M", "مقاس M", "Size M", {"size": "M"}, "0.00"),
@@ -177,7 +179,7 @@ PRODUCTS = [
         "base_price": "28.00",
         "pack_size": "زجاجة 500 مل",
         "weight_grams": 550,
-        # ⚠️  مادة قابلة للاشتعال — لا تُشحن سريعًا جوًّا
+        # ⚠️  A flammable substance — not shipped by air express
         "storage_condition": StorageCondition.COOL,
     },
     {
@@ -275,8 +277,8 @@ PRODUCTS = [
         "base_price": "165.00",
         "pack_size": "100 إبرة",
         "weight_grams": 90,
-        # ⚠️  يتطلب حسابًا مهنيًا موثّقًا — يجعل سياسة الوصول قابلة
-        #     للتجربة فعليًا بدل أن تكون سطرًا في جدول
+        # ⚠️  Requires a verified professional account — it makes the access policy
+        #     genuinely testable rather than a line in a table
         "access_policy": "professionals",
     },
     {
@@ -290,7 +292,7 @@ PRODUCTS = [
         "base_price": "420.00",
         "pack_size": "50 شريحة",
         "weight_grams": 70,
-        # ⚠️  سلسلة تبريد — يكشف أن الشحن ليس نوعًا واحدًا
+        # ⚠️  A cold chain item — it reveals that shipping is not one single kind
         "storage_condition": StorageCondition.REFRIGERATED,
         "access_policy": "pharmacy_only",
     },
@@ -382,7 +384,7 @@ PRODUCTS = [
 
 def _seed_categories():
     categories = {}
-    # المسار يُبنى من الأب — والترتيب هنا يضمن وجوده قبل ابنه
+    # The path is built from the parent — and the ordering here guarantees it exists before its child
     for slug, name_ar, name_en, parent_slug, icon, order in CATEGORIES:
         category, _created = Category.objects.update_or_create(
             slug=slug,
@@ -439,8 +441,8 @@ def seed():
         sku = payload.pop("sku")
         variant_specs = payload.pop("variants", [])
 
-        # المراجع تُحلّ أولًا — الخلط بين نصٍّ وكائن في نفس القاموس
-        # يعتمد على ترتيب تقييم يصعب تتبّعه عند القراءة
+        # References are resolved first — mixing a string and an object in the same dict
+        # depends on an evaluation order that is hard to follow when reading
         payload["category"] = categories[payload["category"]]
         payload["brand"] = brands.get(payload.get("brand"))
         payload["manufacturer"] = manufacturers.get(payload.get("manufacturer"))

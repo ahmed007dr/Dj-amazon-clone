@@ -1,18 +1,19 @@
 """
-السلة — «ما ينوي العميل شراءه».
+The cart — "what the customer intends to buy".
 
-⚠️  السلة **ليست طلبًا**.
+⚠️  A cart **is not an order**.
 
-        السلة  →  نية قابلة للتغيير · أسعارها لحظية · قد تُهجر
-        الطلب  →  معاملة مؤكدة · أسعارها لقطة · لا تتغير
+        cart   →  a changeable intention · live prices · may be abandoned
+        order  →  a confirmed transaction · snapshot prices · never changes
 
-    النموذج القديم خلطهما في تطبيق واحد (الانتهاك H2). الفصل هنا
-    ليس تنظيميًا: دورتا الحياة مختلفتان تمامًا.
+    The legacy model conflated them in one app (violation H2). Separating them
+    here is not organisational: their two lifecycles are entirely different.
 
-⚠️  **السلة لا تخزّن أسعارًا نهائية.**
+⚠️  **The cart stores no final prices.**
 
-    السعر يُحسب من `pricing` عند كل عرض. تخزينه يعني سلة تعرض سعر
-    الأمس بعد تغيير اليوم — والعميل يرى رقمًا ويُحاسَب بآخر.
+    The price is computed from `pricing` on every display. Storing it means a
+    cart showing yesterday's price after today's change — and the customer sees
+    one number and is charged another.
 """
 
 from django.core.validators import MinValueValidator
@@ -32,12 +33,12 @@ class CartStatus(models.TextChoices):
 
 class Cart(BaseModel):
     """
-    سلة.
+    A cart.
 
-    ⚠️  `user` قد يكون فارغًا — سلة الزائر.
+    ⚠️  `user` may be empty — a guest cart.
 
-        الزائر يضيف إلى السلة قبل التسجيل، وعند الدخول تُدمج سلته
-        مع سلته المحفوظة. إجباره على التسجيل أولًا يفقد المبيعة.
+        A visitor adds to the cart before registering, and on login their cart
+        is merged with their saved one. Forcing them to register first loses the sale.
     """
 
     user = models.ForeignKey(
@@ -64,11 +65,11 @@ class Cart(BaseModel):
         db_index=True,
     )
 
-    #: يُطبَّق عند العرض ويُعاد التحقق منه عند إتمام الشراء
+    #: Applied at display time and re-validated at checkout
     coupon_code = models.CharField(_("كود الكوبون"), max_length=32, blank=True)
 
-    #: مرجع نصي — `cart` في L5 و`shipping` في L2، لكن الطريقة
-    #: تُختار وقت إتمام الشراء لا وقت الإضافة
+    #: A string reference — `cart` is in L5 and `shipping` in L2, but the
+    #: method is chosen at checkout time, not at add time
     shipping_method_code = models.CharField(_("طريقة الشحن"), max_length=50, blank=True)
 
     last_activity_at = models.DateTimeField(_("آخر نشاط"), default=timezone.now)
@@ -79,7 +80,7 @@ class Cart(BaseModel):
         verbose_name_plural = _("السلال")
         ordering = ["-last_activity_at"]
         constraints = [
-            # سلة نشطة واحدة لكل مستخدم
+            # One active cart per user
             models.UniqueConstraint(
                 fields=["user"],
                 condition=models.Q(status="ACTIVE", deleted_at__isnull=True),
@@ -110,12 +111,12 @@ class Cart(BaseModel):
 
 class CartLine(BaseModel):
     """
-    سطر سلة.
+    A cart line.
 
-    ⚠️  يخزّن **المنتج والكمية فقط**.
+    ⚠️  It stores **the product and the quantity only**.
 
-        لا سعر ولا ضريبة ولا إجمالي — كلها تُحسب من `pricing` عند
-        كل عرض. تخزينها يعني قيمًا تتقادم بصمت.
+        No price, no tax, no total — all computed from `pricing` on every
+        display. Storing them means values going silently stale.
     """
 
     cart = models.ForeignKey(

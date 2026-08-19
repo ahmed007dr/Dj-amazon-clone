@@ -1,17 +1,17 @@
 """
-دفعات المخزون وحدود التنبيه.
+Stock batches and alert thresholds.
 
-⚠️  البذرة تمرّ عبر `inventory.services.receive` لا عبر
+⚠️  The seed goes through `inventory.services.receive` rather than
     `Batch.objects.create`.
 
-    الإنشاء المباشر يكتب دفعة بلا حركة مخزون وبلا تحديث للرصيد —
-    فيبدو المخزون سليمًا بينما سجلّه فارغ، وأول جرد يكشف فرقًا لا
-    يفسّره أحد. المرور بالخدمة يجعل بيانات التطوير **بنفس شكل**
-    بيانات الإنتاج.
+    Direct creation writes a batch with no stock movement and no balance update
+    — so the stock looks sound while its ledger is empty, and the first stock
+    count reveals a discrepancy nobody can explain. Going through the service
+    makes development data **the same shape as** production data.
 
-⚠️  الحالات الحدّية مبذورة عمدًا: دفعة منتهية · دفعة توشك ·
-    منتج نافد · منتج تحت حد إعادة الطلب. هذه هي المسارات التي لا
-    يراها أحد حتى يشتكي عميل.
+⚠️  The edge cases are seeded deliberately: an expired batch · one about to
+    expire · an out-of-stock product · a product below its reorder point. These
+    are the paths nobody sees until a customer complains.
 """
 
 from datetime import timedelta
@@ -22,7 +22,7 @@ from django.utils import timezone
 from inventory.models import Batch, Stock
 from inventory.services import get_or_create_stock, receive
 
-#: (SKU، كمية، تكلفة الوحدة، أيام حتى الصلاحية أو None، رمز الموقع)
+#: (SKU, quantity, unit cost, days until expiry or None, location code)
 BATCHES = [
     ("GLV-LTX", 400, "96.00", 540, "main"),
     ("MSK-N95", 1200, "14.00", 720, "main"),
@@ -42,13 +42,13 @@ BATCHES = [
     ("VTC-1000", 220, "62.00", 300, "main"),
     ("DIS-KIT", 120, "175.00", None, "main"),
     ("BOK-ANA", 70, "360.00", None, "main"),
-    # ── الفرع: مخزون أصغر ومستقل ───────────────────────────
+    # ── The branch: smaller, independent stock ─────────────
     ("MSK-SRG", 80, "31.00", 480, "br-nasr"),
     ("SYR-3ML", 500, "1.10", 900, "br-nasr"),
     ("ALC-70", 40, "18.00", 365, "br-nasr"),
     ("BPM-DIG", 5, "1050.00", None, "br-nasr"),
-    # ── الحالات الحدّية ────────────────────────────────────
-    # دفعتان لنفس الصنف: القريبة انتهاءً تُستهلك أولًا (FEFO)
+    # ── Edge cases ─────────────────────────────────────────
+    # Two batches of the same item: the one expiring sooner is consumed first (FEFO)
     ("PAR-500", 150, "12.50", 25, "main"),
     ("PAR-500", 600, "12.00", 500, "main"),
     # توشك على الانتهاء — داخل نافذة التنبيه (٩٠ يومًا)

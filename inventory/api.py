@@ -16,7 +16,7 @@ from catalog.models import Product, ProductVariant
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
-from core.permissions import IsAdminAccount
+from core.permissions import CanManageInventory
 from inventory import serializers as s
 from inventory import services
 from inventory.models import (
@@ -74,20 +74,20 @@ class AvailabilityAPI(APIView):
 
 
 class StockLocationListCreateAPI(generics.ListCreateAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.StockLocationSerializer
     queryset = StockLocation.objects.all()
     pagination_class = None
 
 
 class StockLocationDetailAPI(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.StockLocationSerializer
     queryset = StockLocation.objects.all()
 
 
 class StockListAPI(generics.ListAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.StockSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -120,13 +120,13 @@ class StockListAPI(generics.ListAPIView):
 class StockDetailAPI(generics.RetrieveUpdateAPIView):
     """تعديل حدود التنبيه فقط — الكميات لا تُعدَّل يدويًا."""
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.StockSerializer
     queryset = Stock.objects.select_related("product", "location")
 
 
 class BatchListAPI(generics.ListAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.BatchSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -166,7 +166,7 @@ class StockMovementListAPI(generics.ListAPIView):
     ⚠️  للقراءة فقط — السجل إضافة فقط، والتصحيح بحركة معاكسة.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.StockMovementSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -189,7 +189,7 @@ class StockMovementListAPI(generics.ListAPIView):
 
 
 class StockAlertListAPI(generics.ListAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.StockAlertSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -205,7 +205,7 @@ class StockAlertListAPI(generics.ListAPIView):
 
 
 class ReservationListAPI(generics.ListAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.StockReservationSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -222,7 +222,7 @@ class ReservationListAPI(generics.ListAPIView):
 
 
 class ReceiveStockAPI(APIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.ReceiveStockSerializer
 
     def post(self, request):
@@ -244,7 +244,7 @@ class ReceiveStockAPI(APIView):
 
 
 class AdjustStockAPI(APIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.AdjustStockSerializer
 
     def post(self, request):
@@ -264,7 +264,7 @@ class AdjustStockAPI(APIView):
 
 
 class TransferStockAPI(APIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.TransferStockSerializer
 
     def post(self, request):
@@ -290,7 +290,7 @@ class TransferStockAPI(APIView):
 
 
 class MarkDamagedAPI(APIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.MarkDamagedSerializer
 
     def post(self, request):
@@ -316,7 +316,7 @@ class RunMaintenanceAPI(APIView):
     تعمل تلقائيًا بجدولة، وهذه النقطة للتشغيل عند الحاجة.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
 
     def post(self, request):
         return Response(
@@ -334,7 +334,7 @@ class RunMaintenanceAPI(APIView):
 
 
 class StockCountListAPI(generics.ListAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.StockCountSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -364,7 +364,7 @@ class StockCountListAPI(generics.ListAPIView):
 
 
 class StockCountDetailAPI(generics.RetrieveAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.StockCountDetailSerializer
     queryset = StockCount.objects.select_related("location").prefetch_related(
         "lines__product", "lines__variant"
@@ -381,7 +381,7 @@ class OpenStockCountAPI(APIView):
         فيبدأ العدّ على ورق — واللقطة تُؤخذ لاحقًا برصيد تغيّر.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.OpenCountSerializer
 
     def post(self, request):
@@ -406,7 +406,7 @@ class OpenStockCountAPI(APIView):
 
 
 class RecordCountedAPI(APIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.RecordCountedSerializer
 
     def post(self, request, pk):
@@ -431,7 +431,7 @@ class ApplyStockCountAPI(APIView):
     ⚠️  لا رجعة فيه: الفروق تصير حركات، والتصحيح بجرد جديد.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
 
     def post(self, request, pk):
         count = get_object_or_404(StockCount, pk=pk)
@@ -450,7 +450,7 @@ class ApplyStockCountAPI(APIView):
 
 
 class CancelStockCountAPI(APIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageInventory]
     serializer_class = s.CancelCountSerializer
 
     def post(self, request, pk):

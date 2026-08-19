@@ -1,10 +1,10 @@
 """
-واجهات العمولات.
+Commission endpoints.
 
-⚠️  **المندوب يرى عمولته هو — من السجل لا بإعادة حساب.**
+⚠️  **A rep sees their own commission — from the record, not by recomputation.**
 
-    الرقم الذي يقرأه هو الذي سيُصرَف. إعادة حسابه عند كل فتح يجعله
-    يتغيّر بين يوم وآخر بلا سبب ظاهر للمندوب.
+    The number they read is the number that will be paid. Recomputing it on
+    every open makes it change from one day to the next for no reason the rep can see.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from employees.permissions import HasEmployeeProfile
 
 
 class MyCommissionsAPI(generics.ListAPIView):
-    """عمولاتي — سجلّاتي وحدها."""
+    """My commissions — my records alone."""
 
     permission_classes = [HasEmployeeProfile]
     serializer_class = s.CommissionRecordSerializer
@@ -38,10 +38,10 @@ class MyCommissionsAPI(generics.ListAPIView):
 
 class MyCommissionExplainAPI(APIView):
     """
-    تفسير عمولة — **كل مدخلاتها**.
+    Explain a commission — **all of its inputs**.
 
-    ⚠️  هذا ما يجعل «كيف حُسبت؟» سؤالًا له جواب واحد ثابت لا
-        يتغيّر بتغيّر البيانات بعد الحساب.
+    ⚠️  This is what makes "how was it calculated?" a question with one fixed
+        answer that does not shift as the data changes after the calculation.
     """
 
     permission_classes = [HasEmployeeProfile]
@@ -81,10 +81,10 @@ class AdminCommissionListAPI(generics.ListAPIView):
 
 class AdminCalculateMonthAPI(APIView):
     """
-    حساب عمولات شهر.
+    Calculate a month's commissions.
 
-    ⚠️  فشل موظف لا يوقف البقية — والنتيجة تُبلّغ النجاح والتخطّي
-        معًا لا رقمًا واحدًا يُقرأ نجاحًا كاملًا.
+    ⚠️  One employee failing does not stop the rest — and the result reports
+        successes and skips together, rather than a single number that reads as complete success.
     """
 
     permission_classes = [CanManageCommissions]

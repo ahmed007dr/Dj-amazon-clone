@@ -1,9 +1,10 @@
 """
-حركة الاستخدام — **مجمّعة بالساعة لا مسجَّلة بالطلب**.
+Usage traffic — **aggregated by hour, not recorded per request**.
 
-⚠️  صفٌّ لكل طلب كان يعني ملايين الصفوف شهريًا لسؤال إجابته رقم
-    واحد. والتجميع في مكانه: «كم زائرًا في السابعة مساءً؟» لا
-    يحتاج معرفة أي طلب بعينه، ولا يجوز أن يُتاح استرجاعه.
+⚠️  A row per request would have meant millions of rows a month for a question
+    whose answer is a single number. And aggregation is the right place:
+    "how many visitors at 7pm?" does not need to know any individual request,
+    and retrieving one must not be possible.
 """
 
 from django.db import models
@@ -14,17 +15,17 @@ from accounts.models import DeviceType
 
 class TrafficBucket(models.Model):
     """
-    ساعة واحدة من حركة نوع جهاز واحد.
+    One hour of traffic for one device type.
 
-    ⚠️  مفتاح `BigInt` — جدول داخلي عالي الحجم لا يظهر في أي رابط
-        ولا استجابة، فـUUID عليه تكلفة بلا مقابل (ADR-28).
+    ⚠️  A `BigInt` key — a high-volume internal table that appears in no URL and
+        no response, so a UUID on it is cost with no return (ADR-28).
 
-    ⚠️  و«الزائر الفريد» **تقدير لا إحصاء**.
+    ⚠️  And a "unique visitor" is **an estimate, not a count**.
 
-        الهوية بصمة مُجزّأة من عنوان الشبكة والمتصفح: من يبدّل
-        الشبكة يُعَدّ مرتين، ومن يشارك شبكة مكتب يُعَدّ مرة. وهذا
-        مقبول لقياس الضغط — ولا يصلح لعدّ العملاء، ولا يُقدَّم
-        على أنه كذلك.
+        Identity is a hash of the network address and the browser: someone who
+        switches network is counted twice, and everyone sharing an office
+        network is counted once. That is acceptable for measuring load — it is
+        unfit for counting customers, and is not presented as such.
     """
 
     bucket_start = models.DateTimeField(_("بداية الساعة"), db_index=True)

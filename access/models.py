@@ -1,15 +1,16 @@
 """
-سياسات الوصول للمنتجات.
+Product access policies.
 
-⚠️  هذا النطاق يجيب على سؤال واحد:
+⚠️  This domain answers a single question:
 
-        «هل يستطيع هذا المستخدم رؤية/شراء هذا الشيء؟»
+        "Can this user view/buy this thing?"
 
-    وضعه في `catalog` كان سيجبر `cart` و`orders` والبحث على
-    الاعتماد على الكتالوج، وينفخ الكتالوج بمنطق أمني ليس ملكه. (ADR-04)
+    Putting it in `catalog` would have forced `cart`, `orders` and search to
+    depend on the catalogue, and inflated the catalogue with security logic that
+    is not its own. (ADR-04)
 
-    السياسة **كيان مستقل** لا حقل على المنتج: المنتجات تتشارك
-    السياسات، وتعديل سياسة واحدة يسري على آلاف المنتجات فورًا.
+    A policy is **an independent entity**, not a field on the product: products
+    share policies, and editing one policy applies to thousands of products at once.
 """
 
 from django.db import models
@@ -21,10 +22,10 @@ from core.models.translatable import BilingualNameMixin
 
 class AccessLevel(models.TextChoices):
     """
-    مستوى الوصول — التصنيف الخشن.
+    Access level — the coarse classification.
 
-    الشروط الدقيقة (التوثيق · الصلاحيات · أنواع الحسابات) في
-    حقول `AccessPolicy` المنفصلة.
+    The precise conditions (verification · permissions · account types) live in
+    separate `AccessPolicy` fields.
     """
 
     PUBLIC = "PUBLIC", _("عام")
@@ -35,10 +36,10 @@ class AccessLevel(models.TextChoices):
 
 class AccessPolicy(BilingualNameMixin, BaseModel):
     """
-    سياسة وصول قابلة لإعادة الاستخدام.
+    A reusable access policy.
 
-    مثال: «أدوية للصيادلة» تُطبَّق على كل الأدوية المقيّدة —
-    تغيير شرط واحد فيها يسري عليها كلها.
+    Example: "medicines for pharmacists" applied to every restricted medicine —
+    changing one condition in it applies to all of them.
     """
 
     code = models.SlugField(_("الرمز"), max_length=50, unique=True)
@@ -53,7 +54,7 @@ class AccessPolicy(BilingualNameMixin, BaseModel):
         db_index=True,
     )
 
-    # ── الشروط ─────────────────────────────────────────────
+    # ── Conditions ─────────────────────────────────────────
     allowed_account_types = models.JSONField(
         _("أنواع الحسابات المسموحة"),
         default=list,
@@ -72,8 +73,8 @@ class AccessPolicy(BilingualNameMixin, BaseModel):
         help_text=_("بصيغة app_label.codename"),
     )
 
-    # ── الرسالة المعروضة عند المنع ─────────────────────────
-    # تُعرض للمستخدم بدل «غير موجود» حين يكون كشف الوجود مقبولًا
+    # ── Message shown on denial ────────────────────────────
+    # Shown to the user instead of "not found" when revealing existence is acceptable
     denial_message_ar = models.CharField(_("رسالة المنع بالعربية"), max_length=300, blank=True)
     denial_message_en = models.CharField(_("رسالة المنع بالإنجليزية"), max_length=300, blank=True)
 

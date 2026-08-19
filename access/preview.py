@@ -1,16 +1,16 @@
 """
-وضع معاينة الأدمن.
+Admin preview mode.
 
-يجيب على: **«ماذا يرى الطالب؟ وماذا ترى الصيدلية؟»**
+Answers: **"What does a student see? And what does a pharmacy see?"**
 
-⚠️  هذه أداة اختبار للسياسات، وهي **خطرة بطبيعتها**:
+⚠️  This is a policy testing tool, and it is **dangerous by nature**:
 
-    - لا تمنح صلاحيات — تُضيّق فقط
-    - لا تعمل إلا لمن يملك ملف أدمن
-    - لا تُستخدم في أي عملية كتابة
-    - كل استخدام يُسجَّل في سجل التدقيق
+    - it grants no permissions — it only narrows
+    - it works only for someone holding an admin profile
+    - it is never used in any write operation
+    - every use is recorded in the audit log
 
-    بلا هذه القيود تصير جسرًا لانتحال الهوية.
+    Without these constraints it becomes a bridge to impersonation.
 """
 
 from __future__ import annotations
@@ -26,24 +26,24 @@ PREVIEW_VERIFIED_HEADER = "HTTP_X_PREVIEW_VERIFIED"
 @dataclass
 class PreviewUser:
     """
-    مستخدم وهمي للتقييم فقط.
+    A dummy user for evaluation only.
 
-    ⚠️  لا يُحفظ ولا يُصادَق ولا يُستخدم إلا في `access.evaluate`.
-        يحمل الحد الأدنى من السطح الذي يقرأه المحرك.
+    ⚠️  Never saved, never authenticated, and used only in `access.evaluate`.
+        It carries the minimum surface the engine reads.
     """
 
     account_type: str
     is_verified: bool = False
     is_authenticated: bool = True
 
-    #: صلاحيات المعاينة فارغة دائمًا — الأدمن لا «يستعير» صلاحياته
-    #: للنوع الذي يعاينه، وإلا رأى ما لا يراه ذلك النوع فعلًا.
+    #: Preview permissions are always empty — the admin does not "lend" their own
+    #: permissions to the type being previewed, or they would see what that type genuinely cannot.
     def has_perm(self, _permission: str) -> bool:
         return False
 
 
 class AnonymousPreview:
-    """معاينة الزائر."""
+    """Preview as a guest."""
 
     account_type = AccountType.GUEST
     is_verified = False
@@ -61,13 +61,13 @@ def build_preview_user(account_type: str, *, verified: bool = False):
 
 def resolve_preview(request):
     """
-    يستخرج مستخدم المعاينة من ترويسات الطلب، أو `None`.
+    Extracts the preview user from the request headers, or `None`.
 
-    الشروط مجتمعة:
-      • الطالب مصادَق
-      • يملك ملف أدمن
-      • النوع المطلوب صالح
-      • الطلب للقراءة فقط
+    All conditions together:
+      • the caller is authenticated
+      • they hold an admin profile
+      • the requested type is valid
+      • the request is read-only
     """
     requested = request.META.get(PREVIEW_HEADER)
     if not requested:
@@ -110,17 +110,17 @@ def log_preview(request, preview_user) -> None:
 
 class PreviewAwareMixin:
     """
-    يجعل الـ view يحترم وضع المعاينة.
+    Makes the view respect preview mode.
 
         class ProductListAPI(PreviewAwareMixin, PolicyAwareQuerySetMixin, ListAPIView):
             ...
 
-    ⚠️  لا يتجاوز `get_queryset` إطلاقًا.
+    ⚠️  It never overrides `get_queryset`.
 
-        يكتفي بتجاوز `get_access_user` — نقطة الامتداد الوحيدة في
-        `PolicyAwareQuerySetMixin`. لو تجاوز `get_queryset` أيضًا
-        لفلتر الـ queryset مرتين: مرة بالمعاينة ومرة بالمستخدم
-        الحقيقي، فتظهر نتائج الأدمن الكاملة مقاطَعةً بالمعاينة.
+        It overrides `get_access_user` alone — the single extension point in
+        `PolicyAwareQuerySetMixin`. Were it to override `get_queryset` too, the
+        queryset would be filtered twice: once by the preview and once by the
+        real user, showing the admin's full results interleaved with the preview.
     """
 
     def get_access_user(self):

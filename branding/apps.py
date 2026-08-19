@@ -7,10 +7,10 @@ class BrandingConfig(AppConfig):
     verbose_name = "الهوية البصرية"
 
     def ready(self):
-        # ⚠️  إبطال الكاش بإشارة لا باستدعاء يدوي.
+        # ⚠️  Cache invalidation by signal, not by a manual call.
         #
-        #     الهوية تُعدَّل من أربعة مسارات: واجهة الأدمن · لوحة
-        #     Django · البذرة · الـ shell. الاستدعاء اليدوي يعني أن
-        #     أي مسار يُنسى يترك الموقع بألوان قديمة إلى نصف يوم،
-        #     بلا خطأ ولا أثر — والإشارة تغطيها كلها بلا صيانة.
+        #     The identity is edited from four paths: the admin API · the Django
+        #     panel · the seed · the shell. A manual call means any forgotten path
+        #     leaves the site on stale colours for up to half a day, with no error
+        #     and no trace — and the signal covers all of them with no upkeep.
         from branding import signals  # noqa: F401

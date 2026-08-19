@@ -1,11 +1,11 @@
 """
-عقود السلة.
+Cart contracts.
 
-⚠️  الأسعار **مخرجات محسوبة لا مدخلات**.
+⚠️  Prices are **computed outputs, not inputs**.
 
-    ما يرسله العميل من أسعار وإجماليات يُتجاهَل تمامًا — كلها
-    `read_only`. قبولها يعني سلة يحدد العميل سعرها بتعديل حقل في
-    المتصفح.
+    Any prices or totals the client sends are ignored entirely — all of them are
+    `read_only`. Accepting them means a cart whose price the customer sets by
+    editing a field in the browser.
 """
 
 from rest_framework import serializers
@@ -13,10 +13,10 @@ from rest_framework import serializers
 
 class MoneyField(serializers.DecimalField):
     """
-    مبلغ يُسلسَل **نصًا**. (ADR-31)
+    An amount serialised **as a string**. (ADR-31)
 
-    `JSON.parse` يحوّل الأرقام إلى `double` فتُفقد الدقة:
-    `450.00` تصير `450`.
+    `JSON.parse` converts numbers to `double`, so precision is lost:
+    `450.00` becomes `450`.
     """
 
     def __init__(self, **kwargs):
@@ -28,7 +28,7 @@ class MoneyField(serializers.DecimalField):
 
 
 class PricedLineSerializer(serializers.Serializer):
-    """سطر مُسعَّر — كله مخرجات."""
+    """A priced line — output throughout."""
 
     quantity = serializers.IntegerField(read_only=True)
     unit_price = MoneyField()
@@ -44,10 +44,10 @@ class PricedLineSerializer(serializers.Serializer):
 
 class CartLineSerializer(serializers.Serializer):
     """
-    سطر السلة مع تسعيره اللحظي.
+    A cart line with its live pricing.
 
-    يجمع بيانات السطر المخزَّنة (المنتج والكمية) مع السعر المحسوب
-    من `pricing` — والسعر لا يُخزَّن.
+    It combines the stored line data (product and quantity) with the price
+    computed from `pricing` — and the price is never stored.
     """
 
     id = serializers.UUIDField(read_only=True)
@@ -63,12 +63,12 @@ class CartLineSerializer(serializers.Serializer):
 
 class LineIssueSerializer(serializers.Serializer):
     """
-    مشكلة في سطر.
+    A problem on a line.
 
-    ⚠️  تُعرض للعميل ليصحّحها — لا تُخفى.
+    ⚠️  Shown to the customer to correct — never hidden.
 
-        سلة تمنع إتمام الشراء بلا تفسير تُفقد المبيعة؛ وسطر يُحذف
-        بصمت يُفقد الثقة.
+        A cart that blocks checkout with no explanation loses the sale; a line
+        silently removed loses trust.
     """
 
     line_id = serializers.CharField(read_only=True)
@@ -109,10 +109,10 @@ class CouponResultSerializer(serializers.Serializer):
 
 class CartSnapshotSerializer(serializers.Serializer):
     """
-    السلة كاملة بعد إعادة التحقق.
+    The complete cart after re-validation.
 
-    ⚠️  `is_checkoutable` هي البوابة الوحيدة إلى إتمام الشراء —
-        والواجهة تعرضها ولا تقرّرها.
+    ⚠️  `is_checkoutable` is the only gate to checkout — the frontend displays
+        it and never decides it.
     """
 
     id = serializers.UUIDField(source="cart.id", read_only=True)
@@ -177,7 +177,7 @@ class CartSnapshotSerializer(serializers.Serializer):
 
 
 # ═══════════════════════════════════════════════════════════
-#  المدخلات
+#  Inputs
 # ═══════════════════════════════════════════════════════════
 
 

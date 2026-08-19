@@ -1,11 +1,11 @@
 """
-إعدادات النظام التشغيلية القابلة للضبط من الأدمن.
+Operational system settings, configurable by the admin.
 
-تحل محل الثوابت المثبّتة في الكود.
+They replace constants fixed in code.
 
-الحدود:
-  core/settings  → إعدادات تشغيلية (حدود · أعلام ميزات · قواعد عمل)
-  branding/      → كل ما يراه العميل (ألوان · لوجو · خطوط)
+The boundaries:
+  core/settings  → operational settings (limits · feature flags · business rules)
+  branding/      → everything the customer sees (colours · logo · fonts)
 """
 
 from decimal import Decimal
@@ -74,11 +74,11 @@ class SystemSetting(TimeStampedModel):
             return Decimal(str(self.value))
         return self.value
 
-    # ── الواجهة العامة ─────────────────────────────────────
+    # ── The public interface ───────────────────────────────
 
     @classmethod
     def get(cls, key: str, default=None):
-        """قراءة إعداد بكاش."""
+        """Read a setting, with caching."""
         cache_key = f"{CACHE_KEY_PREFIX}{key}"
         cached = cache.get(cache_key)
         if cached is not None:

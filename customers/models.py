@@ -1,12 +1,12 @@
 """
-ملف العميل الخارجي.
+The external customer's profile.
 
-⚠️  هذا النطاق **لا يعرف بوجود `employees` إطلاقًا**.
-    `CustomerAssignment` يسكن في `employees/` — لو وُضع حقل
-    `assigned_employee` هنا لنشأت دائرة `customers ↔ employees`. (ADR-12)
+⚠️  This domain **knows nothing at all about `employees`**.
+    `CustomerAssignment` lives in `employees/` — had an `assigned_employee`
+    field been placed here, a `customers ↔ employees` cycle would have formed. (ADR-12)
 
-يتوسّع لاحقًا إلى: صيدلية · مخزن · تاجر · مورّد — كل واحد بملف
-إضافي يشير إلى `CustomerProfile`، بلا مساس بهذا الجدول.
+It later expands into: pharmacy · warehouse · trader · supplier — each with an
+additional profile pointing at `CustomerProfile`, without touching this table.
 """
 
 from django.db import models
@@ -23,16 +23,17 @@ def customer_number() -> str:
 
 def document_upload_to(instance, filename: str) -> str:
     """
-    ⚠️  وثائق التحقق **غير عامة**.
+    ⚠️  Verification documents are **not public**.
 
-    اسم عشوائي بمسار مجزّأ — المسارات التسلسلية تُخمَّن بلا أي صلاحية.
-    التقديم عبر رابط موقّع بصلاحية زمنية لا مسار مباشر.
+    A random name on a sharded path — sequential paths are guessed with no
+    permission at all. Serving happens through a time-limited signed URL, never
+    a direct path.
     """
     return f"private/customer-documents/{random_filename(filename)}"
 
 
 class CustomerSegment(models.TextChoices):
-    """تصنيف تجاري — منفصل عن `AccountType` الذي يحدد التجربة."""
+    """A commercial segment — separate from `AccountType`, which determines the experience."""
 
     NEW = "NEW", _("جديد")
     REGULAR = "REGULAR", _("منتظم")
@@ -68,7 +69,7 @@ class CustomerProfile(BaseModel):
         db_index=True,
     )
 
-    # ── بيانات ضريبية — للعملاء التجاريين (ADR-30) ─────────
+    # ── Tax data — for business customers (ADR-30) ─────────
     tax_number = models.CharField(_("الرقم الضريبي"), max_length=50, blank=True)
     tax_exempt = models.BooleanField(_("معفى من الضريبة"), default=False)
     commercial_register = models.CharField(_("السجل التجاري"), max_length=50, blank=True)
@@ -76,9 +77,9 @@ class CustomerProfile(BaseModel):
     accepts_marketing = models.BooleanField(_("يقبل الرسائل التسويقية"), default=False)
     notes = models.TextField(_("ملاحظات داخلية"), blank=True, help_text=_("لا يراها العميل"))
 
-    # ── إحصاءات مُخزَّنة مسبقًا ─────────────────────────────
-    # تُحدَّث بحدث `order_completed` لا بحساب لحظي —
-    # COUNT/SUM على كل عرض للملف الشخصي لا يتوسّع.
+    # ── Pre-stored statistics ──────────────────────────────
+    # Updated by the `order_completed` event rather than computed on the fly —
+    # COUNT/SUM on every profile view does not scale.
     total_orders = models.PositiveIntegerField(_("عدد الطلبات"), default=0)
     total_spent = MoneyField(_("إجمالي المشتريات"), default=0)
     first_order_at = models.DateTimeField(_("أول طلب"), null=True, blank=True)
@@ -117,7 +118,7 @@ class DocumentStatus(models.TextChoices):
 
 
 class CustomerDocument(BaseModel):
-    """وثيقة تحقق — ملف حساس غير عام."""
+    """A verification document — a sensitive, non-public file."""
 
     customer = models.ForeignKey(
         CustomerProfile,
@@ -146,7 +147,7 @@ class CustomerDocument(BaseModel):
     reviewed_at = models.DateTimeField(_("تاريخ المراجعة"), null=True, blank=True)
     rejection_reason = models.TextField(_("سبب الرفض"), blank=True)
 
-    # الرخص تنتهي — والمنتج المقيّد لا يُصرف برخصة منتهية
+    # Licences expire — and a restricted product is not dispensed on an expired licence
     expires_at = models.DateField(_("تنتهي في"), null=True, blank=True)
 
     class Meta:
@@ -161,12 +162,12 @@ class CustomerDocument(BaseModel):
 
 class CustomerAddress(BaseModel):
     """
-    عنوان محفوظ للعميل.
+    A saved address for the customer.
 
-    مورد مكشوف في `/api/v1/customers/addresses/{uuid}/` ⟵ UUIDv7 إلزامي.
+    An exposed resource at `/api/v1/customers/addresses/{uuid}/` ⟵ UUIDv7 is mandatory.
 
-    مؤقت هنا حتى المرحلة ٥ حيث ينتقل إلى `shipping/` مع المناطق
-    والرسوم والشحنات. `customers` سيشير إليه ولا يملكه.
+    Temporary here until phase 5, where it moves to `shipping/` along with zones,
+    fees and shipments. `customers` will then reference it rather than own it.
     """
 
     customer = models.ForeignKey(
@@ -192,8 +193,8 @@ class CustomerAddress(BaseModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["customer"],
-                # يستبعد المحذوف ناعمًا — وإلا منع عنوان محذوف
-                # تعيين عنوان افتراضي جديد
+                # Excludes the soft-deleted — otherwise a deleted address would block
+                # setting a new default address
                 condition=models.Q(is_default=True, deleted_at__isnull=True),
                 name="unique_default_address_per_customer",
             ),

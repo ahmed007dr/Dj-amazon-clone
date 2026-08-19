@@ -1,10 +1,11 @@
 """
-خدمات B2B.
+B2B services.
 
-⚠️  **فحص الائتمان هو الوظيفة الحرجة في هذا الملف.**
+⚠️  **The credit check is the critical function in this file.**
 
-    كل ما عداه عرض وتقرير. أما هذا الفحص فيقرّر خروج بضاعة مقابل
-    وعد بالدفع — وخطؤه في اتجاه واحد يعني خسارة نقدية مباشرة.
+    Everything else is display and reporting. This check decides whether goods
+    leave against a promise to pay — and being wrong in one direction means a
+    direct cash loss.
 """
 
 from __future__ import annotations
@@ -34,18 +35,18 @@ from core.money import ZERO, quantize
 
 logger = logging.getLogger(__name__)
 
-#: حدود التقادم بالأيام — تطابق ما يقرأه المحاسب في أي كشف
+#: Ageing buckets in days — matching what an accountant reads on any statement
 AGING_BUCKETS = [(0, 30), (31, 60), (61, 90)]
 
 
 def _signed_sum(queryset) -> Decimal:
     """
-    مجموع الحركات بإشاراتها.
+    The sum of the movements with their signs.
 
-    ⚠️  الإشارة تُحسَب في قاعدة البيانات لا في بايثون.
+    ⚠️  The sign is computed in the database, not in Python.
 
-        جرّ كل حركات عميل له ألف طلب إلى الذاكرة لجمعها يجعل فتح
-        كشف الحساب أبطأ كلما زاد ولاؤه.
+        Dragging every movement of a customer with a thousand orders into memory
+        to add them up makes opening the statement slower the more loyal they become.
     """
     total = queryset.aggregate(
         total=Coalesce(
@@ -65,61 +66,61 @@ def _signed_sum(queryset) -> Decimal:
 
 def outstanding_balance(business: BusinessProfile) -> Decimal:
     """
-    ما على العميل الآن — **مشتق من الدفتر**.
+    What the customer owes right now — **derived from the ledger**.
 
-    ⚠️  لا حقل `balance` مخزَّن.
+    ⚠️  There is no stored `balance` field.
 
-        الحقل المُحدَّث بالجمع والطرح ينحرف عند أول استثناء في
-        منتصف معاملة أو أول تصحيح يدوي. وانحراف الرصيد الائتماني
-        يعني منع عميل ملتزم أو تمديد ائتمان لمتعثّر — بلا أن
-        يعرف أحد أيّهما وقع.
+        A field updated by addition and subtraction drifts at the first
+        exception mid-transaction or the first manual correction. And drift in
+        the credit balance means blocking a customer in good standing or
+        extending credit to a defaulter — with nobody knowing which happened.
     """
     return _signed_sum(LedgerEntry.objects.filter(business=business))
 
 
 def available_credit(business: BusinessProfile) -> Decimal:
     """
-    ⚠️  لا يقلّ عن صفر.
+    ⚠️  Never less than zero.
 
-        عميل سدّد أكثر مما عليه يصير رصيده سالبًا، فيبدو حده
-        الائتماني أكبر مما مُنح له. الرصيد الدائن ميزة للعميل لا
-        توسيع لسقفه.
+        A customer who paid more than they owe would have a negative balance,
+        making their credit limit look larger than what was granted. A credit
+        balance is a benefit to the customer, not an extension of their ceiling.
     """
     remaining = business.credit_limit - outstanding_balance(business)
 
-    # ⚠️  محصور بين الصفر والحد الممنوح — **من الطرفين**.
+    # ⚠️  Clamped between zero and the granted limit — **at both ends**.
     #
-    #     الأرضية تمنع رقمًا سالبًا يُقرأ كأنه متاح. والسقف يمنع ما
-    #     هو أخطر: عميل سدّد أكثر مما عليه يصير رصيده سالبًا،
-    #     فيرفع الطرح متاحه فوق ما مُنح له — فيشتري بحدٍّ لم يوافق
-    #     عليه أحد. الرصيد الدائن ميزة له لا توسيع لسقفه.
+    #     The floor prevents a negative number being read as available credit. The
+    #     ceiling prevents something more dangerous: a customer who paid more than
+    #     they owe has a negative balance, so the subtraction lifts their available
+    #     credit above what was granted — and they buy against a limit nobody approved.
     return min(max(remaining, ZERO), business.credit_limit)
 
 
 def overdue_invoices(business: BusinessProfile):
-    """الفواتير التي تجاوزت استحقاقها ولم تُسدَّد."""
+    """Invoices past their due date and unpaid."""
     return Invoice.objects.filter(
         business=business,
-        # ⚠️  `OPEN_...` لا `ISSUED`: الفاتورة المعلَّمة «متأخرة»
-        #     ما زالت مستحقة، واستبعادها كان يجعل تعليمها يخفيها
-        #     من بوابة الائتمان — فتسقط أقدم الديون من الحساب.
+        # ⚠️  `OPEN_...`, not `ISSUED`: an invoice marked "overdue" is still
+        #     due, and excluding it made marking it hide it from the credit
+        #     gate — so the oldest debts dropped out of the account.
         status__in=OPEN_INVOICE_STATUSES,
         due_on__lt=timezone.localdate(),
     )
 
 
 # ═══════════════════════════════════════════════════════════
-#  البوابة الائتمانية
+#  The credit gate
 # ═══════════════════════════════════════════════════════════
 
 
 @dataclass(frozen=True)
 class CreditDecision:
     """
-    ⚠️  القرار يحمل **سببه** لا نعم/لا فقط.
+    ⚠️  The decision carries **its reason**, not just yes/no.
 
-        «مرفوض» بلا سبب يجعل مندوب المبيعات يتصل بالإدارة في كل
-        طلب. والسبب يُعرَض للعميل ليتصرّف: يسدّد أو يجدّد ترخيصه.
+        A bare "refused" makes the sales rep call head office on every order.
+        The reason is shown to the customer so they can act: pay, or renew their licence.
     """
 
     allowed: bool
@@ -129,12 +130,12 @@ class CreditDecision:
 
 def evaluate_credit(business: BusinessProfile, amount: Decimal) -> CreditDecision:
     """
-    هل يُسمح بطلب آجل بهذا المبلغ؟
+    Is a credit order for this amount allowed?
 
-    ⚠️  الترتيب مقصود: **الأسباب البنيوية قبل الحسابية.**
+    ⚠️  The order is deliberate: **structural reasons before arithmetic ones.**
 
-        عميل موقوف ترخيصه يجب أن يقرأ «ترخيصك منتهٍ» لا «تجاوزت
-        حدك» — فالثاني يدفعه إلى السداد بلا فائدة.
+        A customer whose licence has lapsed must read "your licence has expired",
+        not "you have exceeded your limit" — the latter pushes them to pay for nothing.
     """
     if business.credit_status == CreditStatus.SUSPENDED:
         return CreditDecision(False, "الحساب الائتماني موقوف — راجع خدمة العملاء")
@@ -142,11 +143,11 @@ def evaluate_credit(business: BusinessProfile, amount: Decimal) -> CreditDecisio
     if not business.allows_credit:
         return CreditDecision(False, "لا ائتمان على هذا الحساب — الدفع مقدَّم")
 
-    # ⚠️  الترخيص المنتهي يمنع الآجل لا البيع.
+    # ⚠️  An expired licence blocks credit, not the sale.
     #
-    #     الصيدلية بترخيص منتهٍ ما زالت قائمة وقد تسدّد؛ لكن
-    #     منحها بضاعة على وعد بينما وضعها القانوني معلّق مخاطرة
-    #     لا تُقاس بالمال وحده.
+    #     A pharmacy with an expired licence is still trading and may well pay;
+    #     but handing it goods on a promise while its legal standing is in
+    #     suspense is a risk not measured in money alone.
     if not business.license_is_valid:
         return CreditDecision(
             False, f"الترخيص منتهٍ منذ {business.license_expires_on} — جدّده أو ادفع مقدَّمًا"
@@ -174,16 +175,16 @@ def evaluate_credit(business: BusinessProfile, amount: Decimal) -> CreditDecisio
 @transaction.atomic
 def charge_on_credit(business: BusinessProfile, order, *, actor=None) -> LedgerEntry:
     """
-    يقيّد طلبًا على الحساب ويُصدر فاتورته.
+    Charges an order to the account and issues its invoice.
 
-    ⚠️  **`select_for_update` على الملف التجاري — وليس تجميلًا.**
+    ⚠️  **`select_for_update` on the business profile — and it is not decoration.**
 
-        طلبان متزامنان يقرأ كلٌّ منهما رصيدًا قبل أن يكتب الآخر،
-        فيمرّان معًا ويتجاوز المجموع الحد. القفل يجعل الثاني
-        ينتظر ويقرأ أثر الأول.
+        Two concurrent orders each read a balance before the other writes, so
+        both pass and their total exceeds the limit. The lock makes the second
+        wait and read the first one's effect.
 
-        وهذا السيناريو **ليس نادرًا** في B2B: نقرة مزدوجة على زر
-        الإتمام تكفي.
+        And this scenario is **not rare** in B2B: a double-click on the checkout
+        button is enough.
     """
     locked = BusinessProfile.objects.select_for_update().get(pk=business.pk)
 
@@ -226,13 +227,13 @@ def record_payment(
     actor=None,
 ) -> LedgerEntry:
     """
-    سداد من العميل — ويُسوّي أقدم الفواتير أولًا.
+    A payment from the customer — settling the oldest invoices first.
 
-    ⚠️  **الأقدم أولًا (FIFO) لا الأحدث.**
+    ⚠️  **Oldest first (FIFO), not newest.**
 
-        تسوية الأحدث تُبقي الفاتورة القديمة مفتوحة إلى الأبد،
-        فيظهر العميل متأخرًا وهو يسدّد بانتظام — ويُمنَع من الشراء
-        بسبب دين سدّده فعلًا.
+        Settling the newest leaves the old invoice open forever, so the customer
+        shows as overdue while paying regularly — and is blocked from buying
+        because of a debt they have actually paid.
     """
     if amount <= ZERO:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="مبلغ السداد يجب أن يكون موجبًا")
@@ -252,10 +253,11 @@ def record_payment(
 
 def _settle_oldest_first(business: BusinessProfile, amount: Decimal) -> None:
     """
-    ⚠️  السداد الجزئي **لا يغلق فاتورة**.
+    ⚠️  A partial payment **does not close an invoice**.
 
-        إغلاقها بمبلغ أقل يخفي الباقي من كشف الحساب، فيختفي دين
-        قائم من كل تقرير — والعميل نفسه لا يعرف أنه مدين به.
+        Closing it for a smaller amount hides the remainder from the statement,
+        so an outstanding debt disappears from every report — and the customer
+        themselves does not know they owe it.
     """
     remaining = amount
 
@@ -274,10 +276,11 @@ def _settle_oldest_first(business: BusinessProfile, amount: Decimal) -> None:
 @transaction.atomic
 def record_credit_note(business: BusinessProfile, order, *, note: str = "", actor=None):
     """
-    إشعار دائن — مرتجع على طلب آجل.
+    A credit note — a return against a credit order.
 
-    ⚠️  لا يُحذف قيد المديونية الأصلي: الفاتورة صدرت وسُلّمت،
-        وإلغاؤها بأثر رجعي يترك محاسب العميل بمستند بلا نظير.
+    ⚠️  The original debt entry is not deleted: the invoice was issued and
+        delivered, and cancelling it retroactively leaves the customer's
+        accountant holding a document with no counterpart.
     """
     charge = LedgerEntry.objects.filter(
         business=business, order=order, kind=LedgerKind.CHARGE
@@ -307,7 +310,7 @@ def record_credit_note(business: BusinessProfile, order, *, note: str = "", acto
 
 
 # ═══════════════════════════════════════════════════════════
-#  كشف الحساب والتقادم
+#  Statement and ageing
 # ═══════════════════════════════════════════════════════════
 
 
@@ -320,13 +323,13 @@ class AgingBucket:
 @dataclass(frozen=True)
 class Statement:
     """
-    كشف حساب — **مستند يُرسَل للعميل**.
+    An account statement — **a document sent to the customer**.
 
-    ⚠️  الرصيد الافتتاحي والحركات والختامي معًا.
+    ⚠️  Opening balance, movements and closing balance together.
 
-        كشف بالحركات وحدها يجبر العميل على جمعها ليعرف موقفه،
-        وكشف بالرصيد وحده لا يُراجَع. الثلاثة معًا هي ما يجعل
-        النزاع قابلًا للحسم.
+        A statement of movements alone forces the customer to add them up to
+        learn where they stand, and a statement of the balance alone cannot be
+        reviewed. All three together are what makes a dispute settleable.
     """
 
     business: BusinessProfile
@@ -367,12 +370,13 @@ def statement(business: BusinessProfile, start: date, end: date) -> Statement:
 
 def aging(business: BusinessProfile) -> list[AgingBucket]:
     """
-    تقادم المديونية — **من الفواتير المفتوحة**.
+    Debt ageing — **from the open invoices**.
 
-    ⚠️  يُحسب من الفواتير لا من الدفتر.
+    ⚠️  Computed from the invoices, not from the ledger.
 
-        الدفتر يحمل السداد بلا ربط بفاتورة بعينها، فحساب التقادم
-        منه يحتاج تخصيصًا يعيد اختراع ما تفعله الفواتير أصلًا.
+        The ledger carries payments with no link to a specific invoice, so
+        computing ageing from it needs an allocation that reinvents what the
+        invoices already do.
     """
     today = timezone.localdate()
     open_invoices = Invoice.objects.filter(business=business, status__in=OPEN_INVOICE_STATUSES)
@@ -391,8 +395,8 @@ def aging(business: BusinessProfile) -> list[AgingBucket]:
         )["total"]
         buckets.append(AgingBucket(label=f"{low}-{high}", amount=quantize(total)))
 
-    # ⚠️  السلة الأخيرة مفتوحة من الأعلى: دين عمره سنة يجب أن
-    #     يظهر لا أن يسقط من الكشف لأنه تجاوز آخر حد مكتوب.
+    # ⚠️  The last bucket is open-ended at the top: a debt a year old must
+    #     show up, not drop off the statement for passing the last written boundary.
     oldest_edge = AGING_BUCKETS[-1][1]
     beyond = open_invoices.filter(due_on__lt=today - timedelta(days=oldest_edge)).aggregate(
         total=Coalesce(
@@ -403,8 +407,8 @@ def aging(business: BusinessProfile) -> list[AgingBucket]:
     )["total"]
     buckets.append(AgingBucket(label=f"{oldest_edge}+", amount=quantize(beyond)))
 
-    # ⚠️  غير المستحق بعد يُعرَض منفصلًا: خلطه بالمتأخر يجعل عميلًا
-    #     ملتزمًا يبدو متعثّرًا بمبلغ لم يحن موعده.
+    # ⚠️  Not-yet-due amounts are shown separately: mixing them with overdue ones
+    #     makes a customer in good standing look like a defaulter over a sum that is not due yet.
     not_due = open_invoices.filter(due_on__gt=today).aggregate(
         total=Coalesce(
             Sum("total"),
@@ -418,19 +422,19 @@ def aging(business: BusinessProfile) -> list[AgingBucket]:
 
 
 # ═══════════════════════════════════════════════════════════
-#  إعادة الطلب السريع
+#  Quick reordering
 # ═══════════════════════════════════════════════════════════
 
 
 def frequently_ordered(customer, limit: int = 20) -> list[dict]:
     """
-    أكثر ما يطلبه هذا العميل.
+    What this customer orders most.
 
-    ⚠️  **الأكثر تكرارًا لا الأحدث.**
+    ⚠️  **Most frequent, not most recent.**
 
-        الصيدلية تعيد طلب نفس العشرين صنفًا كل أسبوعين. «آخر طلب»
-        يعطي طلبًا واحدًا قد يكون استثنائيًا؛ والتكرار يعطي سلّتها
-        المعتادة فعلًا.
+        A pharmacy reorders the same twenty items every fortnight. "Last order"
+        gives a single order that may have been exceptional; frequency gives
+        their genuinely habitual basket.
     """
     from orders.models import OrderLine, OrderStatus
 
@@ -467,10 +471,10 @@ def grant_credit(
     note: str = "",
 ) -> BusinessProfile:
     """
-    ⚠️  المنح **فعل موثَّق** لا تعديل حقل.
+    ⚠️  Granting is **a documented act**, not a field edit.
 
-        «من رفع حد هذا العميل إلى مئة ألف ومتى؟» سؤال يُطرَح بعد
-        أول تعثّر — ولا بد أن يُجاب من الصف نفسه.
+        "Who raised this customer's limit to a hundred thousand, and when?" is
+        asked after the first default — and it has to be answerable from the row itself.
     """
     if limit < ZERO:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="الحد الائتماني لا يكون سالبًا")
@@ -497,10 +501,10 @@ def grant_credit(
 
 def suspend_credit(business: BusinessProfile, *, actor, reason: str) -> BusinessProfile:
     """
-    ⚠️  الإيقاف **لا يمسّ الحد** — يعطّله فقط.
+    ⚠️  Suspension **does not touch the limit** — it only disables it.
 
-        تصفير الحد يفقد ما كان ممنوحًا، فتحتاج إعادة التفعيل قرارًا
-        جديدًا من الصفر بدل رفع الإيقاف.
+        Zeroing the limit loses what was granted, so reactivation needs a fresh
+        decision from scratch instead of simply lifting the suspension.
     """
     if not reason.strip():
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="سبب الإيقاف إلزامي")
@@ -523,13 +527,13 @@ def suspend_credit(business: BusinessProfile, *, actor, reason: str) -> Business
 
 def refresh_overdue_flags() -> int:
     """
-    يعلّم الفواتير المتأخرة — **للعرض والتقارير فقط**.
+    Marks invoices overdue — **for display and reporting only**.
 
-    ⚠️  قرارات المنع **لا تعتمد على هذا الحقل**.
+    ⚠️  Blocking decisions **do not depend on this field**.
 
-        `evaluate_credit` تستعلم عن `due_on` مباشرةً. لو اعتمدت
-        على الحالة المخزَّنة لصار تعطّل المهمة الدورية ثغرة صامتة:
-        فواتير متأخرة تبدو سليمة فيستمر الائتمان.
+        `evaluate_credit` queries `due_on` directly. Were it to rely on the
+        stored state, a failure of the periodic task would become a silent hole:
+        overdue invoices looking healthy, so credit keeps flowing.
     """
     updated = Invoice.objects.filter(
         status=InvoiceStatus.ISSUED, due_on__lt=timezone.localdate()

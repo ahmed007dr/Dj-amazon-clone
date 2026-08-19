@@ -1,10 +1,10 @@
 """
-اختبارات الكتالوج.
+Catalogue tests.
 
-⚠️  ثلاث مجموعات حرجة:
-      ١. الفلترة بالسياسات — المقيّد لا يظهر ولا يُفتح بالرابط
-      ٢. غياب N+1 — الخطأ الذي أنتجه النموذج القديم
-      ٣. ثبات الـ slug — تغييره يكسر الروابط و SEO
+⚠️  Three critical groups:
+      1. policy filtering — the restricted does not appear and does not open by URL
+      2. absence of N+1 — the defect the legacy model produced
+      3. slug stability — changing it breaks links and SEO
 """
 
 from decimal import Decimal
@@ -49,7 +49,7 @@ def category(db):
 
 @pytest.fixture
 def catalog(policies, category):
-    """منتجان: عام ومقيّد بالصيدليات."""
+    """Two products: one public and one restricted to pharmacies."""
     public = Product.objects.create(
         sku="PUB-001",
         name_ar="قفازات",
@@ -72,7 +72,7 @@ def catalog(policies, category):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الفلترة بالسياسات
+#  Policy filtering
 # ═══════════════════════════════════════════════════════════
 
 
@@ -112,7 +112,7 @@ class TestPolicyFiltering:
 
     def test_direct_url_returns_404_not_403(self, catalog):
         """
-        ⚠️  الفارق بين `403` و`404` يكشف قائمة المقيّد بمسح الروابط.
+        ⚠️  The difference between `403` and `404` exposes the restricted list by scanning URLs.
         """
         client = APIClient()
         client.force_authenticate(user=make_user("direct@test.local"))
@@ -123,7 +123,7 @@ class TestPolicyFiltering:
         assert response.status_code == 404
 
     def test_search_does_not_leak_restricted(self, catalog):
-        """البحث بالاسم الصريح لا يكشف المقيّد."""
+        """Searching by the exact name does not reveal the restricted one."""
         client = APIClient()
         client.force_authenticate(user=make_user("search@test.local"))
 
@@ -142,7 +142,7 @@ class TestPolicyFiltering:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأداء — الخطأ الذي أنتجه النموذج القديم
+#  Performance — the defect the legacy model produced
 # ═══════════════════════════════════════════════════════════
 
 
@@ -152,11 +152,10 @@ class TestNoNPlusOne:
         self, policies, category, django_assert_max_num_queries
     ):
         """
-        ⚠️  النموذج القديم وضع `avg_rate` و`reviews_count` كـ
-            properties على `Product` — استعلامان لكل صف.
-            عشرون منتجًا = ٤١ استعلامًا.
+        ⚠️  The legacy model put `avg_rate` and `reviews_count` on `Product` as
+            properties — two queries per row. Twenty products = 41 queries.
 
-        هنا العدد ثابت مهما كبر عدد المنتجات.
+        Here the count is constant however many products there are.
         """
         brand = Brand.objects.create(name_ar="براند", name_en="Brand")
         for i in range(30):
@@ -191,7 +190,7 @@ class TestNoNPlusOne:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الشجرة
+#  The tree
 # ═══════════════════════════════════════════════════════════
 
 
@@ -213,10 +212,11 @@ class TestCategoryTree:
 
     def test_moving_a_category_rebuilds_descendant_paths(self, db):
         """
-        ⚠️  نقل فئة يغيّر مسار كل ما تحتها.
+        ⚠️  Moving a category changes the path of everything beneath it.
 
-        تجاهل ذلك يترك أحفادًا بمسارات ميتة فيختفون من كل استعلام
-        شجري — ومنتجاتهم تختفي من صفحة الفئة الأب.
+        Ignoring that leaves descendants on dead paths, so they disappear from
+        every tree query — and their products disappear from the parent
+        category's page.
         """
         first = Category.objects.create(name_ar="أول", name_en="First")
         second = Category.objects.create(name_ar="ثانٍ", name_en="Second")
@@ -231,7 +231,7 @@ class TestCategoryTree:
         assert leaf.depth == 2
 
     def test_products_include_descendant_categories(self, policies):
-        """فتح فئة أب يُظهر منتجات ما تحتها."""
+        """Opening a parent category shows the products beneath it."""
         root = Category.objects.create(name_ar="مستلزمات", name_en="Supplies")
         child = Category.objects.create(name_ar="قفازات", name_en="Gloves", parent=root)
 
@@ -248,7 +248,7 @@ class TestCategoryTree:
         assert len(response.data["results"]) == 1
 
     def test_category_with_products_cannot_be_deleted(self, catalog, category):
-        """PROTECT — حذف فئة تحمل منتجات يترك منتجات بلا تصنيف."""
+        """PROTECT — deleting a category holding products leaves products unclassified."""
         from django.db.models import ProtectedError
 
         with pytest.raises(ProtectedError):
@@ -256,7 +256,7 @@ class TestCategoryTree:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الـ slug
+#  The slug
 # ═══════════════════════════════════════════════════════════
 
 
@@ -264,8 +264,8 @@ class TestCategoryTree:
 class TestSlugStability:
     def test_slug_is_generated_once_and_never_changes(self, catalog):
         """
-        ⚠️  الكود القديم أعاد توليد الـ slug في **كل حفظ** — أي أن
-            تعديل اسم منتج يكسر رابطه وكل فهرسة أشارت إليه.
+        ⚠️  The legacy code regenerated the slug on **every save** — meaning
+            editing a product's name broke its URL and every index pointing at it.
         """
         product = catalog["public"]
         original = product.slug
@@ -297,7 +297,7 @@ class TestSlugStability:
 
 
 # ═══════════════════════════════════════════════════════════
-#  حدود النطاق
+#  Domain boundaries
 # ═══════════════════════════════════════════════════════════
 
 
@@ -305,8 +305,8 @@ class TestSlugStability:
 class TestDomainBoundaries:
     def test_product_has_no_stock_field(self):
         """
-        ⚠️  `Product.quantity` كان الانتهاك رقم H4 في التدقيق —
-            الكتالوج يجيب عن سؤال المخزون.
+        ⚠️  `Product.quantity` was violation H4 in the audit — the catalogue
+            answering the inventory question.
         """
         forbidden = {"quantity", "stock", "available", "in_stock", "stock_quantity"}
         actual = {f.name for f in Product._meta.get_fields()}
@@ -314,17 +314,17 @@ class TestDomainBoundaries:
 
     def test_product_has_no_computed_rating_property(self):
         """
-        ⚠️  `avg_rate` و`reviews_count` كانتا properties تستعلمان
-            لكل صف — الانتهاك H8.
+        ⚠️  `avg_rate` and `reviews_count` were properties querying per row —
+            violation H8.
 
-        البديل: `reviews.ProductRating` عبر `select_related`.
+        The replacement: `reviews.ProductRating` through `select_related`.
         """
         assert not hasattr(Product, "avg_rate")
         assert not hasattr(Product, "reviews_count")
 
     def test_product_has_no_final_price_field(self):
-        """السعر النهائي يحسبه `pricing` حسب العميل."""
+        """The final price is computed by `pricing` per customer."""
         actual = {f.name for f in Product._meta.get_fields()}
         assert "price" not in actual
         assert "final_price" not in actual
-        assert "base_price" in actual  # مرجع للمحرك لا سعر نهائي
+        assert "base_price" in actual  # a reference for the engine, not a final price

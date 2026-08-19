@@ -1,11 +1,11 @@
 """
-حساب العمولات.
+Commission calculation.
 
-⚠️  **حتمي وقابل للتفسير.**
+⚠️  **Deterministic and explainable.**
 
-    نفس المدخلات تعطي نفس المخرجات دائمًا، وكل مخرج يحمل مدخلاته
-    معه. هذا ليس ترفًا: المبلغ يُصرَف، والخلاف عليه يُحسم بالسجل
-    لا بإعادة تشغيل الحساب.
+    The same inputs always give the same outputs, and every output carries its
+    inputs with it. This is not a luxury: the amount is paid out, and a dispute
+    over it is settled from the record, not by re-running the calculation.
 """
 
 from __future__ import annotations
@@ -40,14 +40,14 @@ class TierMatch:
 
 def resolve_tier(scheme: CommissionScheme, achievement: Decimal) -> TierMatch:
     """
-    يختار الشريحة المطابقة لنسبة التحقيق.
+    Selects the tier matching the achievement percentage.
 
-    ⚠️  **لا شريحة مطابقة ⟵ عمولة صفر لا استثناء.**
+    ⚠️  **No matching tier ⟵ zero commission, not an exception.**
 
-        خطة بلا شريحة تغطي ٠–٥٠٪ تعني أن المندوب المتعثّر لا
-        يطابق شيئًا. رفع استثناء هنا كان يُفشل حساب الفريق كله
-        بسبب موظف واحد؛ والصفر هو الجواب الصحيح تجاريًا ويُسجَّل
-        بوصف مقروء.
+        A scheme with no tier covering 0–50% means a struggling rep matches
+        nothing. Raising an exception here failed the whole team's calculation
+        because of one employee; zero is the commercially correct answer, and it
+        is recorded with a readable description.
     """
     for tier in scheme.tiers.order_by("from_percent"):
         if tier.matches(achievement):
@@ -58,9 +58,9 @@ def resolve_tier(scheme: CommissionScheme, achievement: Decimal) -> TierMatch:
 
 def scheme_for(employee) -> CommissionScheme | None:
     """
-    خطة الموظف: خطة دوره، وإلا الخطة العامة المفعّلة.
+    The employee's scheme: their role's, otherwise the active general scheme.
 
-    ⚠️  الغياب **ليس خطأً** — موظف مخزن بلا عمولة حالة طبيعية.
+    ⚠️  Absence is **not an error** — a warehouse employee with no commission is normal.
     """
     by_role = CommissionScheme.objects.filter(role=employee.role, is_active=True).first()
     if by_role is not None:
@@ -72,24 +72,25 @@ def scheme_for(employee) -> CommissionScheme | None:
 @transaction.atomic
 def calculate(target: MonthlyTarget, *, scheme: CommissionScheme | None = None):
     """
-    يحسب عمولة شهر ويحفظ **كل مدخلاته**.
+    Calculates a month's commission and stores **all of its inputs**.
 
-    ⚠️  الترتيب مقصود:
+    ⚠️  The order is deliberate:
 
-          ١. الحد الأدنى للتحقيق  ← دونه لا عمولة مهما بيع
-          ٢. الشريحة حسب التحقيق
-          ٣. الأساس (صافي مبيعات أو ربح)
-          ٤. المبلغ = الأساس × النسبة
+          1. the minimum achievement  ← below it there is no commission however much was sold
+          2. the tier by achievement
+          3. the base (net sales or profit)
+          4. the amount = base × rate
 
-        فحص الحد الأدنى **قبل** الشريحة: خطة قد تمنح ١٪ لشريحة
-        ٠–٥٠٪ بينما الحد الأدنى ٦٠٪ — والحد الأدنى هو الأشدّ
-        فيسبق.
+        The minimum is checked **before** the tier: a scheme may grant 1% for
+        the 0–50% tier while the minimum is 60% — and the minimum is the
+        stricter, so it comes first.
 
-    ⚠️  والأساس السالب **يُقصَّ إلى صفر**.
+    ⚠️  And a negative base is **clamped to zero**.
 
-        شهر مرتجعاته أكبر من مبيعاته يعطي صافيًا سالبًا؛ وضرب
-        السالب في نسبة يُنتج عمولة سالبة تُخصم من راتب. الخصم من
-        الراتب قرار إداري لا نتيجة حسابية.
+        A month whose returns exceed its sales gives a negative net; and
+        multiplying a negative by a rate produces a negative commission deducted
+        from a salary. Deducting from salary is a management decision, not an
+        arithmetic result.
     """
     from targets import services as target_services
 
@@ -115,20 +116,20 @@ def calculate(target: MonthlyTarget, *, scheme: CommissionScheme | None = None):
 
     result = target_services.measure(target)
 
-    # ── ١. الحد الأدنى ─────────────────────────────────────
+    # ── 1. The minimum ─────────────────────────────────────
     below_minimum = not result.meets_minimum
 
-    # ── ٢. الشريحة ─────────────────────────────────────────
+    # ── 2. The tier ────────────────────────────────────────
     match = resolve_tier(scheme, result.achievement_percent)
 
-    # ── ٣. الأساس ──────────────────────────────────────────
+    # ── 3. The base ────────────────────────────────────────
     base_amount = (
         result.gross_profit if scheme.base == CommissionBase.GROSS_PROFIT else result.net_sales
     )
-    # الأساس السالب يُقصّ — لا عمولة سالبة
+    # A negative base is clamped — no negative commission
     base_amount = max(base_amount, ZERO)
 
-    # ── ٤. المبلغ ──────────────────────────────────────────
+    # ── 4. The amount ──────────────────────────────────────
     rate = ZERO if below_minimum else match.rate
     amount = quantize(base_amount * rate / Decimal("100"))
 
@@ -169,12 +170,13 @@ def calculate(target: MonthlyTarget, *, scheme: CommissionScheme | None = None):
 @transaction.atomic
 def calculate_month(year: int, month: int) -> dict:
     """
-    حساب عمولات شهر لكل من له هدف نشط أو مقفل.
+    Calculate a month's commissions for everyone with an active or closed target.
 
-    ⚠️  فشل موظف **لا يوقف البقية**.
+    ⚠️  One employee failing **does not stop the rest**.
 
-        موظف بلا خطة عمولة كان سيُفشل حساب الفريق كله؛ والنتيجة
-        تُبلَّغ بعدد النجاح والتخطّي معًا لا برقم واحد يُقرأ نجاحًا.
+        An employee with no commission scheme used to fail the whole team's
+        calculation; the result reports the success and skip counts together
+        rather than a single number that reads as success.
     """
     targets = MonthlyTarget.objects.filter(
         year=year, month=month, status__in=[TargetStatus.ACTIVE, TargetStatus.CLOSED]
@@ -203,10 +205,10 @@ def calculate_month(year: int, month: int) -> dict:
 @transaction.atomic
 def approve(record: CommissionRecord, *, by) -> CommissionRecord:
     """
-    ⚠️  الاعتماد **فعل منفصل** — ولا يُعاد.
+    ⚠️  Approval is **a separate act** — and it is not repeated.
 
-        العمولة تبدأ محسوبة؛ والاعتماد التلقائي يجعل خطأ هدف أو
-        مرتجعًا متأخرًا يتحوّل إلى مبلغ مصروف قبل مراجعة.
+        A commission starts calculated; automatic approval turns a target error
+        or a late return into money paid out before review.
     """
     if record.is_locked:
         raise BusinessError(ErrorCode.CONFLICT, detail="العمولة معتمدة سلفًا", status_code=409)
@@ -221,10 +223,10 @@ def approve(record: CommissionRecord, *, by) -> CommissionRecord:
 @transaction.atomic
 def mark_paid(record: CommissionRecord, *, by) -> CommissionRecord:
     """
-    ⚠️  الصرف لا يقع إلا على **معتمدة**.
+    ⚠️  Payment happens only on an **approved** record.
 
-        القفز من «محسوبة» إلى «مصروفة» يتجاوز المراجعة كلها —
-        وهي الخطوة الوحيدة التي تمسك خطأ الحساب قبل خروج المال.
+        Jumping from "calculated" to "paid" bypasses the review entirely — the
+        one step that catches a calculation error before the money leaves.
     """
     if record.status != CommissionStatus.APPROVED:
         raise BusinessError(
@@ -258,9 +260,9 @@ def reject(record: CommissionRecord, *, by, reason: str) -> CommissionRecord:
 
 def explain(record: CommissionRecord) -> dict:
     """
-    تفسير كامل لنتيجة عمولة — **من السجل لا بإعادة حساب**.
+    A full explanation of a commission result — **from the record, not by recomputation**.
 
-    ⚠️  هذا هو ما يجعل «كيف حُسبت؟» سؤالًا له جواب واحد ثابت.
+    ⚠️  This is what makes "how was it calculated?" a question with one fixed answer.
     """
     return {
         "employee": record.employee.employee_number,

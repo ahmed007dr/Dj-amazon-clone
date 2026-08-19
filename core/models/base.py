@@ -1,8 +1,8 @@
 """
-النماذج الأساسية المشتركة.
+The shared base models.
 
-⚠️  بنية تحتية فقط — ممنوع أي قاعدة عمل هنا.
-    اختبار الانتماء: احذف نطاقًا واحدًا؛ إن بقي الكود مطلوبًا فهو core.
+⚠️  Infrastructure only — no business rule is permitted here.
+    The membership test: delete one domain; if the code is still needed, it belongs to core.
 """
 
 import uuid
@@ -16,21 +16,21 @@ from django.utils.translation import gettext_lazy as _
 
 def uuid7() -> uuid.UUID:
     """
-    معرّف UUIDv7 — بادئة زمنية + عشوائي.
+    A UUIDv7 identifier — a time prefix plus randomness.
 
-    اخترناه على v4 لأن v4 عشوائي بالكامل فيسبّب انقسام صفحات B-tree
-    وتدهور الإدراج عند الملايين. أما v7 فمرتّب زمنيًا فيحافظ على
-    موضعية الفهرس. (ADR-26)
+    Chosen over v4 because v4 is entirely random, which causes B-tree page
+    splits and degrades inserts at the scale of millions. v7 is time-ordered and
+    so preserves index locality. (ADR-26)
     """
     return uuid.UUID(bytes=uuid_utils.uuid7().bytes)
 
 
 class UUIDPrimaryKeyModel(models.Model):
     """
-    مفتاح أساسي UUIDv7.
+    A UUIDv7 primary key.
 
-    يرثه **كل نموذج يظهر في رابط أو استجابة API**.
-    الجداول الداخلية عالية الحجم تبقى BigInt. (ADR-25, ADR-28)
+    Inherited by **every model that appears in a URL or an API response**.
+    High-volume internal tables stay on BigInt. (ADR-25, ADR-28)
     """
 
     id = models.UUIDField(
@@ -60,7 +60,7 @@ class SoftDeleteQuerySet(models.QuerySet):
         return self.filter(deleted_at__isnull=False)
 
     def delete(self):
-        """حذف ناعم جماعي."""
+        """A bulk soft delete."""
         return self.update(deleted_at=timezone.now())
 
     def hard_delete(self):
@@ -68,14 +68,14 @@ class SoftDeleteQuerySet(models.QuerySet):
 
 
 class SoftDeleteManager(models.Manager):
-    """المدير الافتراضي — يستبعد المحذوف ناعمًا."""
+    """The default manager — it excludes soft-deleted rows."""
 
     def get_queryset(self):
         return SoftDeleteQuerySet(self.model, using=self._db).filter(deleted_at__isnull=True)
 
 
 class AllObjectsManager(models.Manager):
-    """يشمل المحذوف — للأدمن والتدقيق."""
+    """Includes the deleted — for the admin and for auditing."""
 
     def get_queryset(self):
         return SoftDeleteQuerySet(self.model, using=self._db)
@@ -83,9 +83,10 @@ class AllObjectsManager(models.Manager):
 
 class SoftDeleteModel(models.Model):
     """
-    حذف ناعم للكيانات التجارية.
+    A soft delete for business entities.
 
-    لا يُحذف منتج بِيع فعلًا — الطلبات التاريخية تشير إليه.
+    A product that has actually been sold is never deleted — historical orders
+    point at it.
     """
 
     deleted_at = models.DateTimeField(_("تاريخ الحذف"), null=True, blank=True, db_index=True)
@@ -113,7 +114,7 @@ class SoftDeleteModel(models.Model):
 
 
 class AuditedModel(models.Model):
-    """مَن أنشأ ومَن عدّل. السجل التفصيلي في core.audit.AuditLog."""
+    """Who created it and who last changed it. The detailed record lives in core.audit.AuditLog."""
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -137,7 +138,7 @@ class AuditedModel(models.Model):
 
 
 class BaseModel(UUIDPrimaryKeyModel, TimeStampedModel, SoftDeleteModel):
-    """الأساس المعتاد لكيان تجاري مكشوف."""
+    """The usual base for an exposed business entity."""
 
     class Meta:
         abstract = True

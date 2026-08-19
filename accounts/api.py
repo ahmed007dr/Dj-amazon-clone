@@ -1,8 +1,8 @@
 """
-واجهات نطاق الهوية.
+Identity domain endpoints.
 
-⚠️  رقيقة عمدًا: تحقق ← استدعاء خدمة ← استجابة.
-    أي منطق عمل هنا انتهاك لتدفق الطلب الإلزامي.
+⚠️  Deliberately thin: validate ← call a service ← respond.
+    Any business logic here violates the mandatory request flow.
 """
 
 from django.contrib.auth import get_user_model
@@ -26,7 +26,7 @@ User = get_user_model()
 
 
 # ═══════════════════════════════════════════════════════════
-#  تحديد المعدل
+#  Rate limiting
 # ═══════════════════════════════════════════════════════════
 
 
@@ -43,7 +43,7 @@ class PasswordResetThrottle(AnonRateThrottle):
 
 
 # ═══════════════════════════════════════════════════════════
-#  التسجيل والتفعيل
+#  Registration and activation
 # ═══════════════════════════════════════════════════════════
 
 
@@ -67,9 +67,9 @@ class RegisterAPI(APIView):
             account_type=data["account_type"],
             preferred_language=data["preferred_language"],
         )
-        # ⚠️  غير مفعّل حتى تأكيد البريد.
-        #     الكود القديم كان يحفظ مستخدمًا نشطًا فورًا ويتجاهل
-        #     is_active=False — فكان نظام التفعيل زخرفيًا بالكامل.
+        # ⚠️  Inactive until the email is confirmed.
+        #     The legacy code saved an active user immediately and ignored
+        #     is_active=False — making the activation system entirely decorative.
 
         _, raw_token = services.issue_token(user, TokenPurpose.EMAIL_VERIFICATION, request=request)
         mail_services.send_to_user(
@@ -125,12 +125,12 @@ class ResendVerificationAPI(APIView):
                 {"link": services.frontend_url(f"/auth/verify-email?token={raw_token}")},
             )
 
-        # ⚠️  رد موحّد — لا يكشف أي بريد مسجل وأيه لا
+        # ⚠️  A uniform response — it never reveals which email is registered and which is not
         return Response({"message": "إن كان البريد مسجلًا وغير مفعّل فستصلك رسالة."})
 
 
 # ═══════════════════════════════════════════════════════════
-#  الدخول والخروج
+#  Login and logout
 # ═══════════════════════════════════════════════════════════
 
 
@@ -184,15 +184,15 @@ class LogoutAPI(APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  كلمة المرور
+#  Password
 # ═══════════════════════════════════════════════════════════
 
 
 class PasswordResetRequestAPI(APIView):
     """
-    ⚠️  يعيد `200` دائمًا — سواء كان البريد مسجلًا أو لا.
+    ⚠️  Always returns `200` — whether the email is registered or not.
 
-    رد مختلف لكل حالة يحوّل هذه النقطة إلى أداة لكشف الحسابات.
+    A different response per case turns this endpoint into an account discovery tool.
     """
 
     permission_classes = [AllowAny]
@@ -246,7 +246,7 @@ class PasswordChangeAPI(APIView):
         user.set_password(serializer.validated_data["new_password"])
         user.save(update_fields=["password"])
 
-        # كل الجلسات تُنهى — من عرف القديمة يفقد وصوله
+        # Every session is ended — anyone who knew the old password loses access
         services.revoke_all_tokens(user)
         services.close_all_sessions(user, revoked=True)
         mail_services.send_to_user(mail_templates.PASSWORD_CHANGED.key, user, {})
@@ -255,21 +255,22 @@ class PasswordChangeAPI(APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  تغيير البريد — تأكيد من العنوانين
+#  Email change — confirmation from both addresses
 # ═══════════════════════════════════════════════════════════
 
 
 class EmailChangeRequestAPI(APIView):
     """
-    طلب تغيير البريد.
+    Request an email change.
 
-    ⚠️  رسالتان لا واحدة:
+    ⚠️  Two messages, not one:
 
-        القديم  →  تحذير: «طُلب تغيير بريدك». من اختُرق حسابه يعلم.
-        الجديد  →  رمز تأكيد. يثبت أن الطالب يملك العنوان.
+        the old one  →  a warning: "a change to your email was requested". A
+                        compromised account's owner finds out.
+        the new one  →  a confirmation code. It proves the requester owns the address.
 
-        الاكتفاء بالجديد يعني أن مهاجمًا يغيّر البريد بصمت ثم
-        يستولي على الحساب عبر «نسيت كلمة المرور».
+        Sending to the new address alone means an attacker changes the email
+        silently and then takes over the account through "forgot password".
     """
 
     permission_classes = [IsAuthenticated]
@@ -287,12 +288,12 @@ class EmailChangeRequestAPI(APIView):
             new_email=new_email,
         )
 
-        # ١ — تحذير للعنوان القديم
+        # 1 — warning to the old address
         mail_services.send_to_user(
             mail_templates.EMAIL_CHANGE_ALERT.key, request.user, {"new_email": new_email}
         )
 
-        # ٢ — تأكيد للعنوان الجديد
+        # 2 — confirmation to the new address
         mail_services.send_mail(
             mail_templates.EMAIL_CHANGE_CONFIRM.key,
             to=new_email,
@@ -316,12 +317,12 @@ class EmailChangeConfirmAPI(APIView):
 
         services.confirm_email_change(serializer.validated_data["token"])
 
-        # البريد هو المعرّف — تغييره يبطل كل الجلسات
+        # Email is the identifier — changing it invalidates every session
         return Response({"message": "تم تغيير البريد. سجّل الدخول من جديد."})
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحساب الحالي
+#  The current account
 # ═══════════════════════════════════════════════════════════
 
 
@@ -340,7 +341,7 @@ class MeAPI(APIView):
 
 
 class SessionListAPI(APIView):
-    """جلسات المستخدم — ليرى أجهزته ويُنهي ما لا يعرفه."""
+    """The user's sessions — so they can see their devices and end any they do not recognise."""
 
     permission_classes = [IsAuthenticated]
     serializer_class = s.UserSessionSerializer
@@ -360,13 +361,13 @@ class SessionRevokeAPI(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
-        # ⚠️  الفلترة بالمستخدم إلزامية — بدونها IDOR
+        # ⚠️  Filtering by user is mandatory — without it this is an IDOR
         session = UserSession.objects.filter(
             pk=session_id, user=request.user, logout_at__isnull=True
         ).first()
 
         if session is None:
-            # ⚠️  404 لغير الموجود وغير المملوك معًا — الفرق أداة تعداد
+            # ⚠️  404 for both nonexistent and not-owned — the difference is an enumeration tool
             raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
 
         services.close_session(session, revoked=True)

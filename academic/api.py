@@ -1,7 +1,7 @@
 """
-واجهات النطاق الأكاديمي.
+Academic domain endpoints.
 
-⚠️  تظهر كأقسام داخل بوابة العميل لا كبوابة سادسة. (ADR-18)
+⚠️  These appear as sections inside the customer portal, not as a sixth portal. (ADR-18)
 """
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -23,14 +23,14 @@ from academic.models import (
 )
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
-from core.permissions import IsAdminAccount
+from core.permissions import CanManageAcademic
 
 
 class UniversityTreeAPI(generics.ListAPIView):
     """
-    شجرة الجامعات — لنموذج التسجيل.
+    The university tree — for the registration form.
 
-    ⚠️  عامة: الطالب يختار جامعته **قبل** إنشاء الحساب.
+    ⚠️  Public: a student picks their university **before** creating an account.
     """
 
     permission_classes = [AllowAny]
@@ -42,7 +42,7 @@ class UniversityTreeAPI(generics.ListAPIView):
 
 
 class MyStudentProfileAPI(APIView):
-    """الملف الأكاديمي للمستخدم الحالي."""
+    """The current user's academic profile."""
 
     permission_classes = [IsAuthenticated]
     serializer_class = s.StudentProfileSerializer
@@ -50,7 +50,7 @@ class MyStudentProfileAPI(APIView):
     def get(self, request):
         profile = getattr(request.user, "student_profile", None)
         if profile is None:
-            # ⚠️  `null` لا `404` — غياب الملف حالة عادية لغير الطلاب
+            # ⚠️  `null`, not `404` — a missing profile is normal for non-students
             return Response(None)
         return Response(s.StudentProfileSerializer(profile).data)
 
@@ -73,7 +73,7 @@ class MyStudentProfileAPI(APIView):
                 student_number=data.get("student_number", ""),
             )
         except DjangoValidationError as exc:
-            # ⚠️  أخطاء اتساق التسلسل تُترجم إلى أخطاء حقول
+            # ⚠️  Academic-hierarchy consistency errors are translated into field errors
             raise serializers.ValidationError(exc.message_dict) from exc
 
         return Response(s.StudentProfileSerializer(profile).data, status=201)
@@ -97,10 +97,11 @@ class MyStudentProfileAPI(APIView):
 
 class MyBundlesAPI(generics.ListAPIView):
     """
-    حزم الطالب لسنته.
+    A student's bundles for their year.
 
-    ⚠️  حزم قسمه **وحزم كليته العامة** معًا — استبعاد الثانية يعني
-        طالبًا في قسم متخصص لا يرى المستلزمات المشتركة.
+    ⚠️  Their department's bundles **and their faculty's general bundles**
+        together — excluding the latter means a student in a specialised
+        department never sees the shared essentials.
     """
 
     permission_classes = [IsAuthenticated]
@@ -131,13 +132,14 @@ class BundleDetailAPI(generics.RetrieveAPIView):
 
 class AdminPromoteStudentsAPI(APIView):
     """
-    ترقية طلاب كلية سنةً دراسية.
+    Promote a faculty's students by one academic year.
 
-    ⚠️  يدوي لا تلقائي — تاريخ بدء العام يختلف بين الجامعات،
-        والترقية التلقائية بتاريخ ثابت ترقّي طلابًا لم يبدأوا عامهم.
+    ⚠️  Manual, not automatic — the start date of the year differs between
+        universities, and automatic promotion on a fixed date promotes students
+        who have not started their year.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAcademic]
 
     def post(self, request, pk):
         faculty = get_object_or_404(Faculty, pk=pk)
@@ -153,7 +155,7 @@ class AdminPromoteStudentsAPI(APIView):
 
 
 class AdminStudentListAPI(generics.ListAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAcademic]
     serializer_class = s.StudentProfileSerializer
 
     def get_queryset(self):
@@ -175,16 +177,16 @@ class AdminStudentListAPI(generics.ListAPIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن — الشجرة الأكاديمية والحزم
+#  Admin — the academic tree and bundles
 # ═══════════════════════════════════════════════════════════
 #
-#  ⚠️  **الشجرة شرط لتسجيل أي طالب**: يختار جامعته وكليته قبل
-#      إنشاء الحساب. ومتجر بلا شاشة جامعات لا يستقبل طالبًا واحدًا
-#      من لوحته.
+#  ⚠️  **The tree is a precondition for registering any student**: they pick
+#      their university and faculty before creating an account. A store with no
+#      universities screen accepts not a single student from its panel.
 
 
 class _AcademicAdmin:
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageAcademic]
     pagination_class = None
     label = ""
 
@@ -252,8 +254,8 @@ class AdminFacultyDetailAPI(_AcademicAdmin, generics.RetrieveUpdateDestroyAPIVie
 
     def perform_destroy(self, instance):
         """
-        ⚠️  الكلية ذات الطلاب لا تُحذف — ملفاتهم تشير إليها، وحذفها
-            يترك كل طالب بلا انتماء فتختفي حزمه.
+        ⚠️  A faculty with students is not deleted — their profiles point at it,
+            and deleting it leaves every student unaffiliated, so their bundles vanish.
         """
         students = instance.students.count()
         departments = instance.departments.count()
@@ -331,9 +333,9 @@ class AdminBundleDetailAPI(_AcademicAdmin, generics.RetrieveUpdateDestroyAPIView
 
 class AdminBundleItemListCreateAPI(_AcademicAdmin, generics.ListCreateAPIView):
     """
-    بنود حزمة.
+    Bundle items.
 
-    ⚠️  مُصفّاة بالحزمة إلزامًا — قائمة كل البنود بلا سياق بلا معنى.
+    ⚠️  Filtering by bundle is mandatory — a list of all items with no context is meaningless.
     """
 
     serializer_class = s.AdminBundleItemSerializer
@@ -357,5 +359,5 @@ class AdminBundleItemDetailAPI(_AcademicAdmin, generics.RetrieveUpdateDestroyAPI
     lookup_url_kwarg = "item_pk"
 
     def get_queryset(self):
-        # ⚠️  مُصفّى بالحزمة — لا يُحذف بند حزمة أخرى بتخمين معرّفه
+        # ⚠️  Filtered by bundle — no deleting another bundle's item by guessing its id
         return BundleItem.objects.filter(bundle_id=self.kwargs["pk"])

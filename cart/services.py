@@ -1,13 +1,14 @@
 """
-خدمات السلة.
+Cart services.
 
-⚠️  **إعادة تحقق كاملة عند كل عملية.**
+⚠️  **A full re-validation on every operation.**
 
-    السلة تعيش أيامًا: المنتج قد يُوقَف، والسعر يتغيّر، والمخزون
-    ينفد، وسياسة الوصول تُشدَّد، والكوبون ينتهي.
+    A cart lives for days: the product may be discontinued, the price may
+    change, the stock may run out, the access policy may tighten, the coupon may
+    expire.
 
-    الاكتفاء بالتحقق وقت الإضافة يعني طلبًا يُنشأ بمنتج ممنوع
-    بسعر قديم من مخزون غير موجود.
+    Validating at add time alone means an order created with a forbidden product
+    at an old price from stock that does not exist.
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ from shipping import services as shipping_services
 
 @dataclass(frozen=True)
 class LineIssue:
-    """مشكلة في سطر — تُعرض للعميل ليصحّحها."""
+    """A problem on a line — shown to the customer to correct."""
 
     line_id: str
     product_sku: str
@@ -42,10 +43,10 @@ class LineIssue:
 @dataclass(frozen=True)
 class CartSnapshot:
     """
-    لقطة السلة بعد إعادة التحقق الكاملة.
+    A snapshot of the cart after full re-validation.
 
-    ⚠️  `is_checkoutable` هي البوابة الوحيدة إلى إنشاء الطلب.
-        أي مشكلة في أي سطر تغلقها.
+    ⚠️  `is_checkoutable` is the only gate to creating an order.
+        Any problem on any line closes it.
     """
 
     cart: Cart
@@ -65,12 +66,12 @@ class CartSnapshot:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحصول على السلة
+#  Getting the cart
 # ═══════════════════════════════════════════════════════════
 
 
 def get_active_cart(user=None, session_key: str = "") -> Cart:
-    """السلة النشطة للمستخدم أو الجلسة، تُنشأ عند الغياب."""
+    """The active cart for the user or the session, created if absent."""
     if user is not None and getattr(user, "is_authenticated", False):
         cart = Cart.objects.filter(user=user, status=CartStatus.ACTIVE).first()
         if cart is None:
@@ -91,12 +92,12 @@ def get_active_cart(user=None, session_key: str = "") -> Cart:
 @transaction.atomic
 def merge_guest_cart(user, session_key: str) -> Cart:
     """
-    دمج سلة الزائر مع سلة المستخدم عند الدخول.
+    Merge the guest cart with the user's cart on login.
 
-    ⚠️  الكميات تُجمَع لا تُستبدَل.
+    ⚠️  Quantities are added, not replaced.
 
-        من أضاف صنفين كزائر ثم دخل ووجد واحدًا في سلته المحفوظة
-        يتوقع ثلاثة. الاستبدال يفقده ما اختاره للتو.
+        Someone who added two items as a guest and then logged in to find one in
+        their saved cart expects three. Replacing loses what they just chose.
     """
     guest_cart = Cart.objects.filter(
         session_key=session_key, status=CartStatus.ACTIVE, user__isnull=True
@@ -131,15 +132,16 @@ def merge_guest_cart(user, session_key: str) -> Cart:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التعديل
+#  Editing
 # ═══════════════════════════════════════════════════════════
 
 
 def _assert_purchasable(product, user) -> None:
     """
-    فحص الوصول والحالة قبل الإضافة.
+    Check access and status before adding.
 
-    ⚠️  `404` لا `403` — الفارق بينهما يكشف قائمة المنتجات المقيّدة.
+    ⚠️  `404`, not `403` — the difference between them exposes the list of
+        restricted products.
     """
     if not product.is_active:
         raise BusinessError(ErrorCode.PRODUCT_UNAVAILABLE)
@@ -151,10 +153,11 @@ def _assert_purchasable(product, user) -> None:
 @transaction.atomic
 def add_line(cart: Cart, product, quantity: int = 1, *, variant=None, user=None) -> CartLine:
     """
-    إضافة أو زيادة سطر.
+    Add a line or increase it.
 
-    ⚠️  التوفر يُفحص للكمية **الإجمالية** بعد الإضافة لا للمضافة
-        وحدها — وإلا أمكن تجاوز المخزون بإضافات متتالية صغيرة.
+    ⚠️  Availability is checked against the **total** quantity after the
+        addition, not against the added amount alone — otherwise stock could be
+        exceeded through a series of small additions.
     """
     if quantity < 1:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="الكمية يجب أن تكون موجبة")
@@ -185,7 +188,7 @@ def add_line(cart: Cart, product, quantity: int = 1, *, variant=None, user=None)
 
 @transaction.atomic
 def set_quantity(cart: Cart, line: CartLine, quantity: int) -> CartLine | None:
-    """تعديل كمية سطر. الصفر يحذفه."""
+    """Change a line's quantity. Zero removes it."""
     if line.cart_id != cart.pk:
         raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
 
@@ -225,18 +228,19 @@ def clear(cart: Cart) -> None:
 
 def apply_coupon(cart: Cart, code: str) -> CartSnapshot:
     """
-    تطبيق كوبون على السلة. يعيد **اللقطة كاملة**.
+    Apply a coupon to the cart. Returns **the complete snapshot**.
 
-    ⚠️  يُخزَّن **الكود** لا قيمة الخصم.
+    ⚠️  **The code** is stored, not the discount value.
 
-        تخزين القيمة يعني خصمًا محسوبًا على سلة تغيّرت بعده. الكود
-        يُعاد التحقق منه عند كل عرض وعند إتمام الشراء.
+        Storing the value means a discount computed against a cart that changed
+        afterwards. The code is re-validated on every display and at checkout.
 
-    ⚠️  ويُعاد اللقطة لا نتيجة الكوبون وحدها.
+    ⚠️  And the snapshot is returned, not the coupon result alone.
 
-        الكود المرفوض لا يُحفظ — فإعادة التحقق في الواجهة بعدها
-        تفقد سببَ الرفض تمامًا، ويرى العميل «حدث خطأ» بدل
-        «انتهت صلاحية الكوبون». وتوفّر تحققًا كاملًا مكررًا.
+        A rejected code is not saved — so re-validating in the frontend
+        afterwards loses the rejection reason entirely, and the customer sees
+        "an error occurred" instead of "the coupon has expired". It also saves a
+        duplicated full re-validation.
     """
     snapshot = revalidate(cart, coupon_code=code)
 
@@ -253,7 +257,7 @@ def remove_coupon(cart: Cart) -> None:
 
 
 # ═══════════════════════════════════════════════════════════
-#  إعادة التحقق — قلب هذا النطاق
+#  Re-validation — the heart of this domain
 # ═══════════════════════════════════════════════════════════
 
 
@@ -266,17 +270,17 @@ def revalidate(
     shipping_method_code: str = "",
 ) -> CartSnapshot:
     """
-    إعادة تحقق كاملة + تسعير.
+    Full re-validation + pricing.
 
-    ⚠️  **تُستدعى عند كل عرض وكل عملية وقبل إنشاء الطلب.**
+    ⚠️  **Called on every display, every operation, and before creating the order.**
 
-        الفحوص الخمسة، وكل واحد منها منع طلبًا فاسدًا:
+        The five checks, each of which has prevented a corrupt order:
 
-          ١. المنتج ما زال مفعّلًا      ⟵ لا بيع منتج موقوف
-          ٢. الوصول ما زال مسموحًا     ⟵ لا بيع لمن فقد أهليته
-          ٣. المخزون كافٍ               ⟵ لا بيع زائد
-          ٤. السعر محسوب الآن           ⟵ لا سعر متقادم
-          ٥. الكوبون ما زال صالحًا      ⟵ لا خصم منتهٍ
+          1. the product is still active   ⟵ no selling a discontinued product
+          2. access is still permitted     ⟵ no selling to someone who lost eligibility
+          3. stock is sufficient           ⟵ no overselling
+          4. the price is computed now     ⟵ no stale price
+          5. the coupon is still valid     ⟵ no expired discount
     """
     user = user or cart.user
     lines = list(
@@ -295,7 +299,7 @@ def revalidate(
     for line in lines:
         product = line.product
 
-        # ١ — المنتج مفعّل
+        # 1 — the product is active
         if not product.is_active:
             issues.append(
                 LineIssue(
@@ -308,7 +312,7 @@ def revalidate(
             )
             continue
 
-        # ٢ — الوصول ما زال مسموحًا
+        # 2 — access is still permitted
         if not evaluate(user, product.access_policy).allowed:
             issues.append(
                 LineIssue(
@@ -321,7 +325,7 @@ def revalidate(
             )
             continue
 
-        # ٣ — المخزون كافٍ
+        # 3 — stock is sufficient
         available = inventory_services.available_quantity(product, variant=line.variant)
         if available < line.quantity:
             issues.append(
@@ -338,10 +342,10 @@ def revalidate(
 
         valid_items.append((product, line.quantity, line.variant))
 
-    # ٤ — التسعير من المصدر
+    # 4 — pricing from the source
     priced_lines = pricing_services.price_many(valid_items, user=user)
 
-    # ٥ — الكوبون
+    # 5 — the coupon
     code = coupon_code if coupon_code is not None else cart.coupon_code
     coupon_result = None
     coupon_discount = ZERO
@@ -355,7 +359,7 @@ def revalidate(
         if coupon_result.is_valid:
             coupon_discount = coupon_result.discount_amount
 
-    # الشحن
+    # Shipping
     shipping_amount = ZERO
     quote = None
     method_code = shipping_method_code or cart.shipping_method_code
@@ -383,7 +387,7 @@ def revalidate(
 
 
 def abandon_stale_carts(days: int = 30) -> int:
-    """تعليم السلال الراكدة مهجورة — للتحليلات وحملات الاسترجاع."""
+    """Mark stale carts as abandoned — for analytics and recovery campaigns."""
     from datetime import timedelta
 
     cutoff = timezone.now() - timedelta(days=days)
@@ -393,30 +397,30 @@ def abandon_stale_carts(days: int = 30) -> int:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحزم الدراسية
+#  Study bundles
 # ═══════════════════════════════════════════════════════════
 
 
 @transaction.atomic
 def add_bundle(cart: Cart, bundle, *, user=None, essentials_only: bool = False) -> dict:
     """
-    إضافة حزمة دراسية إلى السلة.
+    Add a study bundle to the cart.
 
-    ⚠️  **يسكن هنا لا في `academic`.**
+    ⚠️  **This lives here, not in `academic`.**
 
-        `academic` في L2 و`cart` في L5 — استدعاء السلة من هناك
-        استيراد صاعد أمسكه `import-linter`. الاتجاه الصحيح:
-        السلة تعرف الحزم، والحزم لا تعرف السلة.
+        `academic` is in L2 and `cart` in L5 — calling the cart from there is an
+        upward import, and `import-linter` caught it. The correct direction: the
+        cart knows about bundles, and bundles know nothing of the cart.
 
-    ⚠️  والحزمة تُفكَّك إلى **أسطر مستقلة**.
+    ⚠️  And the bundle is broken out into **independent lines**.
 
-        إضافتها كصنف واحد يعني مخزونًا وهميًا لا يعكس توفر
-        مكوّناتها، وتسعيرًا لا يحترم قائمة أسعار العميل.
+        Adding it as a single item means phantom stock that does not reflect its
+        components' availability, and pricing that ignores the customer's price list.
 
-    ⚠️  والفشل الجزئي **مقبول ومُبلَّغ عنه**.
+    ⚠️  And partial failure is **accepted and reported**.
 
-        صنف نافد من عشرة يجب ألا يمنع التسعة الباقية. رفض الحزمة
-        كاملة لأجل صنف واحد يفقد المبيعة كلها.
+        One item out of ten being out of stock must not block the other nine.
+        Rejecting the whole bundle over one item loses the entire sale.
     """
     items = bundle.items.select_related("product", "variant").all()
     if essentials_only:

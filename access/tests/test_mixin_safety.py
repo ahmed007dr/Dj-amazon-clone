@@ -1,18 +1,19 @@
 """
-حارس بنيوي على `PolicyAwareQuerySetMixin`.
+Structural guard on `PolicyAwareQuerySetMixin`.
 
-⚠️  خلفية هذا الملف — عيب حقيقي وقع أثناء بناء الكتالوج:
+⚠️  The background to this file — a real defect that occurred while building the catalogue:
 
         class ProductListAPI(PublicCatalogMixin, ListAPIView):
-            def get_queryset(self):          # ← تجاوز صامت
+            def get_queryset(self):          # ← a silent override
                 return Product.objects.all()
 
-    الـ view يعمل، والاختبارات الوظيفية تمر، والصفحة تُعرض —
-    **وفلترة السياسات معطّلة تمامًا**. المنتجات المقيّدة تظهر
-    للجميع بلا خطأ ولا تحذير.
+    The view works, the functional tests pass, the page renders —
+    **and policy filtering is entirely disabled**. Restricted products show up
+    for everyone with no error and no warning.
 
-    الحل بنيوي: `get_queryset` في الـ mixin نهائي عمليًا، والفلاتر
-    تُكتب في `get_base_queryset`. وهذا الملف يمنع الانزلاق ثانيةً.
+    The fix is structural: `get_queryset` in the mixin is effectively final, and
+    filters are written in `get_base_queryset`. This file prevents the slip from
+    happening again.
 """
 
 import inspect
@@ -23,7 +24,7 @@ from access.services import PolicyAwareQuerySetMixin
 
 
 def _policy_aware_views():
-    """كل views المشروع التي ترث الـ mixin."""
+    """Every view in the project that inherits the mixin."""
     from django.urls import get_resolver
 
     views = []
@@ -56,10 +57,10 @@ class TestMixinContract:
     @pytest.mark.django_db
     def test_no_view_overrides_get_queryset(self):
         """
-        ⚠️  **الحارس الأساسي.**
+        ⚠️  **The primary guard.**
 
-        أي view يرث الـ mixin ويعرّف `get_queryset` بنفسه يكسر
-        الفلترة بصمت. الفلاتر مكانها `get_base_queryset`.
+        Any view that inherits the mixin and defines its own `get_queryset`
+        breaks the filtering silently. Filters belong in `get_base_queryset`.
         """
         offenders = []
 

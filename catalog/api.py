@@ -1,10 +1,10 @@
 """
-واجهات الكتالوج.
+Catalogue endpoints.
 
-⚠️  كل قائمة عامة تمر بـ `PolicyAwareQuerySetMixin`.
+⚠️  Every public list passes through `PolicyAwareQuerySetMixin`.
 
-    المنتج المقيّد لا يظهر في النتائج ولا في العدد ولا يُفتح
-    بالرابط المباشر — والفلترة في الـ queryset لا في الـ serializer.
+    A restricted product appears in no results, in no count, and does not open
+    by direct link — and the filtering is in the queryset, not in the serializer.
 """
 
 from django.db.models import Q
@@ -32,15 +32,15 @@ from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
 from core.models.tax import TaxClass
-from core.permissions import IsAdminAccount
+from core.permissions import CanManageCatalog
 
 
 class PublicCatalogMixin(PreviewAwareMixin, PolicyAwareQuerySetMixin):
     """
-    الأساس المشترك لكل نقطة عامة في الكتالوج.
+    The shared base for every public catalogue endpoint.
 
-    ترتيب الوراثة مقصود: `PreviewAwareMixin` أولًا ليتجاوز
-    `get_access_user`، ثم `PolicyAwareQuerySetMixin` الذي يستدعيها.
+    The inheritance order is deliberate: `PreviewAwareMixin` first so it
+    overrides `get_access_user`, then `PolicyAwareQuerySetMixin`, which calls it.
     """
 
     permission_classes = [AllowAny]
@@ -48,7 +48,7 @@ class PublicCatalogMixin(PreviewAwareMixin, PolicyAwareQuerySetMixin):
 
 
 # ═══════════════════════════════════════════════════════════
-#  المنتجات — عام
+#  Products — public
 # ═══════════════════════════════════════════════════════════
 
 
@@ -56,8 +56,8 @@ class ProductListAPI(PublicCatalogMixin, generics.ListAPIView):
     serializer_class = s.ProductListSerializer
 
     def get_base_queryset(self):
-        # ⚠️  `get_base_queryset` لا `get_queryset` —
-        #     تجاوز الثاني يعطّل فلترة السياسات بصمت.
+        # ⚠️  `get_base_queryset`, not `get_queryset` —
+        #     overriding the latter silently disables policy filtering.
         queryset = selectors.product_base_queryset().filter(is_active=True)
         params = self.request.query_params
 
@@ -111,10 +111,10 @@ class ProductListAPI(PublicCatalogMixin, generics.ListAPIView):
 
 class ProductDetailAPI(PublicCatalogMixin, generics.RetrieveAPIView):
     """
-    ⚠️  المعرّف `slug` لا UUID — صفحة المنتج تحتاج SEO. (ADR-27)
+    ⚠️  The identifier is the `slug`, not a UUID — a product page needs SEO. (ADR-27)
 
-        والمقيّد يعيد `404` لا `403`: الفارق بينهما يكشف قائمة
-        المنتجات المقيّدة بمسح الروابط.
+        And a restricted one returns `404`, not `403`: the difference between
+        them exposes the list of restricted products by scanning URLs.
     """
 
     serializer_class = s.ProductDetailSerializer
@@ -126,9 +126,9 @@ class ProductDetailAPI(PublicCatalogMixin, generics.RetrieveAPIView):
 
 class ProductByBarcodeAPI(PublicCatalogMixin, generics.RetrieveAPIView):
     """
-    بحث بالباركود — لماسح نقطة البيع.
+    Barcode lookup — for the point-of-sale scanner.
 
-    نقطة منفصلة لأن المسار يختلف والاستجابة أخف.
+    A separate endpoint because the path differs and the response is lighter.
     """
 
     serializer_class = s.ProductDetailSerializer
@@ -139,16 +139,16 @@ class ProductByBarcodeAPI(PublicCatalogMixin, generics.RetrieveAPIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  التصنيف والبراندات
+#  Categories and brands
 # ═══════════════════════════════════════════════════════════
 
 
 class CategoryTreeAPI(APIView):
     """
-    شجرة القائمة كاملة.
+    The complete menu tree.
 
-    ⚠️  استعلام واحد ثم بناء الشجرة في الذاكرة.
-        بناؤها بالاستعلامات = استعلام لكل عقدة.
+    ⚠️  One query, then the tree is built in memory.
+        Building it with queries = one query per node.
     """
 
     permission_classes = [AllowAny]
@@ -199,17 +199,17 @@ class ManufacturerListAPI(generics.ListAPIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن
+#  Admin
 # ═══════════════════════════════════════════════════════════
 
 
 class AdminProductListCreateAPI(generics.ListCreateAPIView):
     """
-    ⚠️  **بلا فلترة سياسات** — الأدمن يدير كل المنتجات بما فيها
-        المقيّدة. لهذا لا يرث `PublicCatalogMixin`.
+    ⚠️  **No policy filtering** — the admin manages every product, including the
+        restricted ones. That is why this does not inherit `PublicCatalogMixin`.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageCatalog]
     serializer_class = s.AdminProductSerializer
     pagination_class = AdminPageNumberPagination
 
@@ -229,11 +229,11 @@ class AdminProductListCreateAPI(generics.ListCreateAPIView):
                 | Q(barcode__iexact=search)
             )
 
-        # ⚠️  `is_active` هو ما ترسله الواجهة.
+        # ⚠️  `is_active` is what the frontend sends.
         #
-        #     كان الخادم يقرأ `inactive` وحده، فيمرّ فلتر الحالة
-        #     بلا أثر: الشاشة تعرض «مفعّل» والنتائج تشمل الموقوف.
-        #     الفلتر الذي لا يفلتر أسوأ من غيابه — لأنه يُصدَّق.
+        #     The server used to read `inactive` alone, so the status filter passed
+        #     through with no effect: the screen showed "active" while the results
+        #     included the discontinued. A filter that does not filter is worse than none — it gets believed.
         if (is_active := params.get("is_active")) in ("true", "false"):
             queryset = queryset.filter(is_active=is_active == "true")
 
@@ -251,16 +251,16 @@ class AdminProductListCreateAPI(generics.ListCreateAPIView):
 
 
 class AdminProductDetailAPI(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageCatalog]
     serializer_class = s.AdminProductSerializer
     queryset = Product.all_objects.all()
 
     def perform_destroy(self, instance):
         """
-        حذف ناعم دائمًا.
+        Always a soft delete.
 
-        ⚠️  المنتج المباع تشير إليه طلبات تاريخية وحركات مخزون —
-            حذفه فعليًا يكسر كل تقرير ماضٍ.
+        ⚠️  A sold product is referenced by historical orders and stock
+            movements — deleting it for real breaks every past report.
         """
         instance.delete()
 
@@ -275,15 +275,16 @@ class AdminProductDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
 class RestoreProductAPI(APIView):
     """
-    إرجاع منتج محذوف ناعمًا.
+    Restore a soft-deleted product.
 
-    ⚠️  الحذف الناعم بلا استرجاع حذفٌ نهائي من منظور المستخدم.
+    ⚠️  A soft delete with no restore is a permanent delete from the user's point of view.
 
-        الصف باقٍ في قاعدة البيانات، لكن إعادته كانت تحتاج مطوّرًا
-        أو لوحة Django — وأول سؤال بعد حذف بالخطأ هو «كيف أرجعه؟».
+        The row remains in the database, but bringing it back used to need a
+        developer or the Django panel — and the first question after an
+        accidental delete is "how do I get it back?".
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageCatalog]
 
     def post(self, request, pk):
         product = Product.all_objects.filter(pk=pk).first()
@@ -311,35 +312,35 @@ class RestoreProductAPI(APIView):
 
 class ProductFormOptionsAPI(APIView):
     """
-    كل ما تحتاجه شاشة إنشاء منتج — في نداء واحد.
+    Everything the create-product screen needs — in one call.
 
-    ⚠️  **القوائم من الخادم لا مكرّرة في الواجهة.**
+    ⚠️  **The lists come from the server, never duplicated in the frontend.**
 
-        تثبيت الأشكال الدوائية أو التصنيفات التنظيمية في كود
-        الواجهة يجعل إضافة قيمة في الخادم لا تظهر للأدمن، وحذفها
-        يترك خيارًا يفشل عند الحفظ. المصدر واحد.
+        Hard-coding dosage forms or regulatory classifications in frontend code
+        means a value added on the server never reaches the admin, and a value
+        removed leaves an option that fails on save. There is one source.
 
-    ⚠️  و**الفئات مسطّحة بمسارها الكامل** لا شجرة.
+    ⚠️  And **the categories are flattened with their full path**, not a tree.
 
-        قائمة اختيار لا تعرض شجرة؛ و«أقراص» وحدها غامضة حين توجد
-        تحت «أدوية» و«مكمّلات» معًا. المسار يحسم أيّهما.
+        A select list does not render a tree; and "Tablets" alone is ambiguous
+        when it exists under both "Medicines" and "Supplements". The path settles which.
 
-    ⚠️  وتشمل الفئات غير الظاهرة في القائمة العامة.
+    ⚠️  And it includes categories not visible in the public menu.
 
-        نقطة الفئات العامة تُصفّي بـ `show_in_menu`، وهو تصنيف
-        **عرضي** لا تصنيف صلاحية: فئة مخفية عن قائمة المتجر تبقى
-        فئة صالحة لمنتج. الاعتماد عليها هنا كان يمنع الأدمن من
-        اختيار فئات موجودة.
+        The public categories endpoint filters by `show_in_menu`, which is a
+        **display** classification, not a permission one: a category hidden from
+        the store menu is still a valid category for a product. Relying on it
+        here stopped the admin choosing categories that exist.
 
-    ⚠️  و`access_policies` **جزء من النموذج لا إعداد متقدّم**.
+    ⚠️  And `access_policies` is **part of the form, not an advanced setting**.
 
-        هي جواب السؤال «مَن يرى هذا المنتج؟» — عام أم طلاب أم
-        مهنيون موثّقون أم صيدليات. حذفها من شاشة الإنشاء يجعل كل
-        منتج جديد يرث الافتراضية بصمت: دواء مقيّد يُنشر للجميع،
-        ولا يُكتشف إلا حين يشتريه من لا يحقّ له.
+        It is the answer to "who sees this product?" — public, students, verified
+        professionals or pharmacies. Dropping it from the create screen makes
+        every new product silently inherit the default: a restricted medicine
+        published to everyone, discovered only when someone not entitled to it buys it.
     """
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageCatalog]
 
     def get(self, request):
         return Response(
@@ -357,8 +358,8 @@ class ProductFormOptionsAPI(APIView):
                     {"id": str(maker.id), "name_ar": maker.name_ar, "name_en": maker.name_en}
                     for maker in Manufacturer.objects.filter(is_active=True).order_by("name_ar")
                 ],
-                # ⚠️  عبر `access.services` لا `access.models` — الواجهة
-                #     العامة لكل نطاق هي خدماته.
+                # ⚠️  Through `access.services`, not `access.models` — a domain's public
+                #     interface is its services.
                 "access_policies": [
                     {
                         "id": str(policy.id),
@@ -367,8 +368,8 @@ class ProductFormOptionsAPI(APIView):
                         "name_en": policy.name_en,
                         "level": policy.level,
                         "is_default": policy.is_default,
-                        # ⚠️  الشرطان يُعرضان مع الاسم: «مهنيون موثّقون»
-                        #     وحدها لا تقول إن الطبيب غير الموثّق ممنوع.
+                        # ⚠️  Both conditions are displayed alongside the name: "verified
+                        #     professionals" alone does not say that an unverified doctor is blocked.
                         "requires_verification": policy.requires_verification,
                         "allowed_account_types": policy.allowed_account_types,
                         "description_ar": policy.description_ar,
@@ -394,21 +395,21 @@ class ProductFormOptionsAPI(APIView):
 
 def _choices(choices_class) -> list[dict]:
     """
-    ⚠️  التسمية العربية من `TextChoices` لا من قاموس في الواجهة —
-        فلا يوجد موضعان يختلفان في تسمية نفس القيمة.
+    ⚠️  The Arabic label comes from `TextChoices`, not from a dictionary in the
+        frontend — so there are never two places naming the same value differently.
     """
     return [{"value": value, "label": str(label)} for value, label in choices_class.choices]
 
 
 def _flat_categories() -> list[dict]:
-    """الفئات النشطة مسطّحة، ولكل واحدة مسارها المقروء."""
+    """The active categories, flattened, each with its readable path."""
     categories = list(Category.objects.filter(is_active=True).order_by("path", "display_order"))
     names = {category.pk: category for category in categories}
 
     def label(category) -> str:
         parts, node, guard = [], category, 0
-        # ⚠️  حارس العمق: مسار تالف بأب يشير إلى نفسه يعلّق الطلب
-        #     إلى الأبد بلا أثر في أي سجل.
+        # ⚠️  A depth guard: a corrupt path with a parent pointing at itself hangs
+        #     the request forever with no trace in any log.
         while node is not None and guard < 8:
             parts.append(node.name_ar)
             node = names.get(node.parent_id)
@@ -427,23 +428,23 @@ def _flat_categories() -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن — التصنيف المرجعي
+#  Admin — reference classification
 # ═══════════════════════════════════════════════════════════
 #
-#  ⚠️  الحذف في الثلاثة **يُرفض عند الاستعمال** لا يُنفَّذ بصمت.
+#  ⚠️  Deletion in all three is **refused when in use**, never carried out silently.
 #
-#      العلاقات `PROTECT` تمنعه في قاعدة البيانات أصلًا، لكن الخطأ
-#      يصل عندها كانهيار ٥٠٠ لا كرسالة. الفحص هنا يحوّله إلى «هذه
-#      الفئة بها ١٢ منتجًا» — وهو ما يحتاجه الأدمن ليقرّر.
+#      The `PROTECT` relations already prevent it in the database, but the error
+#      arrives there as a 500 crash rather than a message. The check here turns
+#      it into "this category has 12 products" — which is what the admin needs to decide.
 
 
 class _ReferenceAdmin:
-    """الأساس المشترك: صلاحية الأدمن، وبلا ترقيم، وتسجيل تدقيق."""
+    """The shared base: admin permission, no pagination, and audit logging."""
 
-    permission_classes = [IsAdminAccount]
+    permission_classes = [CanManageCatalog]
     pagination_class = None
 
-    #: يظهر في سجل التدقيق
+    #: Appears in the audit log
     label = ""
 
     def _audit(self, instance, action):
@@ -457,13 +458,13 @@ class _ReferenceAdmin:
 
 class AdminCategoryListCreateAPI(_ReferenceAdmin, generics.ListCreateAPIView):
     """
-    ⚠️  مسطّحة لا شجرة — والترتيب بالمسار يجعلها تُقرأ كشجرة.
+    ⚠️  Flat, not a tree — and ordering by path makes it read as a tree.
 
-        الشجرة المتداخلة تحتاج تسطيحًا في الواجهة لكل قائمة اختيار،
-        والمسار (`path`) يعطي الترتيب الشجري مجانًا.
+        A nested tree needs flattening in the frontend for every select list,
+        and the `path` gives the tree ordering for free.
 
-    ⚠️  وتشمل غير الظاهرة في القائمة العامة: `show_in_menu` تصنيف
-        **عرضي** لا صلاحية.
+    ⚠️  And it includes those not visible in the public menu: `show_in_menu` is a
+        **display** classification, not a permission.
     """
 
     serializer_class = s.AdminCategorySerializer
@@ -492,9 +493,9 @@ class AdminCategoryDetailAPI(_ReferenceAdmin, generics.RetrieveUpdateDestroyAPIV
 
     def perform_destroy(self, instance):
         """
-        ⚠️  الفئة المستعمَلة لا تُحذف — والرسالة **تعدّ** ما يمنعها.
+        ⚠️  A category in use is not deleted — and the message **counts** what blocks it.
 
-            «لا يمكن الحذف» وحدها تجعل الأدمن يبحث عن السبب بالتجربة.
+            "Cannot delete" alone makes the admin hunt for the reason by trial.
         """
         products = instance.products.count()
         children = instance.children.count()

@@ -1,10 +1,11 @@
 """
-اختبارات التواجد اللحظي  (ADR-17).
+Live presence tests  (ADR-17).
 
-⚠️  الخاصية المحروسة هنا ليست «الرقم صحيح» بل **أن الرقم يتحرّك
-    أصلًا**. كان `touch_activity` يُستدعى عند الدخول وحده ولا مهمة
-    تُفرّغه، فكان «من متصل الآن» يعني عمليًا «من دخل في آخر خمس
-    دقائق» — رقمًا يقارب الصفر مهما كان الضغط على النظام.
+⚠️  The property guarded here is not "the number is correct" but **that the
+    number moves at all**. `touch_activity` used to be called on login alone
+    with no task to flush it, so "who is online now" effectively meant "who
+    logged in during the last five minutes" — a figure close to zero however
+    much load the system was under.
 """
 
 from datetime import timedelta
@@ -35,7 +36,7 @@ def _registry() -> dict:
 
 
 def _age_heartbeat(user, delta: timedelta) -> None:
-    """يُقدِّم نبضة مخزّنة إلى الوراء بلا انتظار حقيقي."""
+    """Ages a stored heartbeat backwards without really waiting."""
     registry = _registry()
     stamp = timezone.now() - delta
     registry[str(user.pk)] = stamp.isoformat()
@@ -43,7 +44,7 @@ def _age_heartbeat(user, delta: timedelta) -> None:
 
 
 # ═══════════════════════════════════════════════════════════
-#  النبضة
+#  The heartbeat
 # ═══════════════════════════════════════════════════════════
 
 
@@ -52,7 +53,7 @@ class TestHeartbeat:
     def test_heartbeat_marks_user_live_without_touching_database(
         self, user, django_assert_num_queries
     ):
-        """⚠️  نبضة تكلّف استعلامًا واحدًا تقتل القاعدة تحت الضغط."""
+        """⚠️  A heartbeat costing one query kills the database under load."""
         with django_assert_num_queries(0):
             services.touch_activity(user.pk)
 
@@ -81,7 +82,7 @@ class TestHeartbeat:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الاتحاد بين الكاش والقاعدة
+#  The union of cache and database
 # ═══════════════════════════════════════════════════════════
 
 
@@ -92,7 +93,7 @@ class TestOnlineSet:
         assert user.pk in services.online_user_ids()
 
     def test_a_heartbeat_survives_an_empty_session_table(self, user):
-        """⚠️  سقوط الكاش لا يجوز أن يمحو من هو متصل، والعكس."""
+        """⚠️  A cache outage must not erase who is online, and vice versa."""
         services.touch_activity(user.pk)
         assert not UserSession.objects.exists()
         assert user.pk in services.online_user_ids()
@@ -105,7 +106,7 @@ class TestOnlineSet:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الخروج
+#  Logout
 # ═══════════════════════════════════════════════════════════
 
 
@@ -128,7 +129,7 @@ class TestPresenceRelease:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التفريغ الدوري
+#  Periodic flushing
 # ═══════════════════════════════════════════════════════════
 
 
@@ -140,7 +141,7 @@ class TestFlush:
             last_activity=timezone.now() - timedelta(hours=2)
         )
 
-        assert services.flush_presence() == 0  # لا نبضة بعد
+        assert services.flush_presence() == 0  # no heartbeat yet
 
         services.touch_activity(user.pk)
         assert services.flush_presence() == 1
@@ -161,7 +162,7 @@ class TestFlush:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الطلب الحقيقي
+#  A real request
 # ═══════════════════════════════════════════════════════════
 
 
@@ -169,9 +170,9 @@ class TestFlush:
 class TestRequestHeartbeat:
     def test_an_authenticated_request_refreshes_presence(self, user):
         """
-        ⛔ الكسر القديم: النبضة كانت عند الدخول وحده، فمستخدم يعمل
-           في النظام ساعةً كاملة كان يختفي من «المتصلون الآن» بعد
-           خمس دقائق.
+        ⛔ The legacy breakage: the heartbeat fired on login alone, so a user
+           working in the system for a full hour disappeared from "online now"
+           after five minutes.
         """
         client = APIClient()
         tokens = services.issue_jwt(user)

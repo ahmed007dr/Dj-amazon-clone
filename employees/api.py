@@ -262,6 +262,76 @@ class AdminRoleListCreateAPI(generics.ListCreateAPIView):
     def get_queryset(self):
         return EmployeeRole.objects.annotate(permission_count=Count("permissions"))
 
+    def perform_create(self, serializer):
+        role = serializer.save()
+        services.sync_role_permissions(role)
+
+
+class AdminRoleDetailAPI(generics.RetrieveUpdateAPIView):
+    """
+    تعديل دور — **وصلاحياته**.
+
+    ⚠️  **المزامنة بعد كل حفظ وإلا كانت الصلاحيات زينة.**
+
+        `has_perm` يقرأ مجموعات المستخدم لا جدول `EmployeeRole`
+        (ADR-53). الحفظ بلا `sync_role_permissions` يجعل الشاشة
+        تعرض دورًا مضبوطًا وكل فحص صلاحية يفشل.
+
+    ⚠️  و**بلا حذف**: الدور مفتاح إلزامي على كل موظف؛ حذفه يقطع
+        انتماء من يحمله. التعطيل (`is_active`) هو المسار.
+    """
+
+    permission_classes = [CanManageEmployees]
+    serializer_class = s.EmployeeRoleSerializer
+
+    def get_queryset(self):
+        return EmployeeRole.objects.annotate(permission_count=Count("permissions"))
+
+    def perform_update(self, serializer):
+        role = serializer.save()
+        services.sync_role_permissions(role)
+
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditAction.UPDATE,
+            object_repr=f"صلاحيات الدور {role.code}",
+            ip_address=self.request.META.get("REMOTE_ADDR"),
+            changes={"permissions": sorted(
+                f"{p.content_type.app_label}.{p.codename}"
+                for p in role.permissions.select_related("content_type")
+            )},
+        )
+
+
+class AdminPermissionCatalogueAPI(APIView):
+    """
+    دليل الصلاحيات — **مُنتقى بأسماء تقول ما تفتحه**.
+
+    ⚠️  عرض جدول `auth.Permission` كما هو يجعل الشاشة غير قابلة
+        للاستعمال (مئتا سطر بأسماء تقنية)، والأخطر أنه يجعل منح
+        `delete_user` سهوًا أمرًا وارد الحدوث بضغطة.
+    """
+
+    permission_classes = [CanManageEmployees]
+
+    def get(self, request):
+        from core.permissions import PERMISSION_CATALOGUE
+
+        return Response(
+            [
+                {
+                    "key": group["key"],
+                    "label_ar": group["label_ar"],
+                    "label_en": group["label_en"],
+                    "permissions": [
+                        {"code": code, "label_ar": label_ar, "label_en": label_en}
+                        for code, label_ar, label_en in group["permissions"]
+                    ],
+                }
+                for group in PERMISSION_CATALOGUE
+            ]
+        )
+
 
 class AdminEmployeeListAPI(generics.ListAPIView):
     permission_classes = [CanManageEmployees]

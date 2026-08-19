@@ -1,4 +1,4 @@
-"""مسارات بوابة الأدمن — /api/v1/administration/"""
+"""Admin portal routes — /api/v1/administration/"""
 
 from django.urls import path
 
@@ -7,7 +7,7 @@ from administration import api, tax_api
 app_name = "administration"
 
 urlpatterns = [
-    # الحسابات
+    # Accounts
     path("accounts/", api.AccountListAPI.as_view(), name="accounts"),
     path("accounts/<uuid:pk>/", api.AccountDetailAPI.as_view(), name="account-detail"),
     path(
@@ -25,7 +25,7 @@ urlpatterns = [
         api.AccountStatusHistoryAPI.as_view(),
         name="account-status-history",
     ),
-    # المراقبة
+    # Monitoring
     path("online-now/", api.OnlineNowAPI.as_view(), name="online-now"),
     path(
         "accounts/<uuid:pk>/sessions/",
@@ -38,7 +38,7 @@ urlpatterns = [
         name="account-activity",
     ),
     path("audit-log/", api.AuditLogListAPI.as_view(), name="audit-log"),
-    # ── الضريبة — نسبة متغيّرة · فئات معفاة · إيقاف كلي ────
+    # ── Tax — variable rate · exempt classes · full shutdown ──
     path("tax/settings/", tax_api.TaxSettingsAPI.as_view(), name="tax-settings"),
     path("tax/classes/", tax_api.TaxClassListCreateAPI.as_view(), name="tax-classes"),
     path(

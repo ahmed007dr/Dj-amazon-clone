@@ -5,7 +5,7 @@ import '@/styles/tokens.css';
 import '@/styles/base.css';
 import '@/styles/layout.css';
 
-// ⚠️  قبل أي مكوّن — `i18n` يجب أن يكون مهيّأً عند أول رسمة
+// ⚠️  Before any component — `i18n` must be initialised by the first render
 import '@/shared/i18n/config';
 
 import { Providers } from './app/Providers';

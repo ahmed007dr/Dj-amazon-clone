@@ -1,4 +1,4 @@
-"""عقود الـ API لنطاق العملاء."""
+"""API contracts for the customer domain."""
 
 from rest_framework import serializers
 
@@ -30,10 +30,10 @@ class CustomerAddressSerializer(serializers.ModelSerializer):
 
 class CustomerDocumentSerializer(serializers.ModelSerializer):
     """
-    ⚠️  `file` للكتابة فقط.
+    ⚠️  `file` is write-only.
 
-    المسار المباشر لا يُرجَع أبدًا — التقديم عبر رابط موقّع
-    بصلاحية زمنية من `download_url`.
+    The direct path is never returned — serving happens through a time-limited
+    signed URL from `download_url`.
     """
 
     file = serializers.FileField(write_only=True)
@@ -66,11 +66,11 @@ class CustomerDocumentSerializer(serializers.ModelSerializer):
 
     def get_signed_url_endpoint(self, obj) -> str | None:
         """
-        ⚠️  لا يُرجَع رابط التحميل مباشرةً.
+        ⚠️  The download URL is not returned directly.
 
-        الرابط الموقّع يُطلب عند الحاجة فقط — إدراجه في كل استجابة
-        قائمة يعني توليد توقيعات لملفات قد لا تُفتح، وتسريبها في
-        سجلات وتخزين مؤقت بلا داعٍ.
+        The signed URL is requested only when needed — including it in every
+        list response means generating signatures for files that may never be
+        opened, and leaking them into logs and caches for no reason.
         """
         request = self.context.get("request")
         if request is None:
@@ -84,8 +84,8 @@ class CustomerDocumentSerializer(serializers.ModelSerializer):
 
 class CustomerProfileSerializer(serializers.ModelSerializer):
     """
-    ⚠️  `notes` مستبعد — ملاحظات داخلية لا يراها العميل.
-        و`segment` للقراءة: تصنيف تجاري يحدده النظام لا العميل.
+    ⚠️  `notes` is excluded — internal notes the customer never sees.
+        And `segment` is read-only: a commercial classification the system sets, not the customer.
     """
 
     email = serializers.EmailField(source="user.email", read_only=True)
@@ -121,7 +121,7 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
 
 
 class AdminCustomerProfileSerializer(CustomerProfileSerializer):
-    """نسخة الأدمن — تُضيف الحقول الداخلية."""
+    """The admin version — it adds the internal fields."""
 
     account_status = serializers.CharField(source="user.status", read_only=True)
     verification_status = serializers.CharField(source="user.verification_status", read_only=True)

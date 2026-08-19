@@ -1,4 +1,4 @@
-"""عقود واجهات إدارة النظام."""
+"""System administration endpoint contracts."""
 
 from rest_framework import serializers
 
@@ -7,7 +7,7 @@ from administration.models import AdminProfile, AdminRole
 
 
 class AccountListSerializer(serializers.ModelSerializer):
-    """صف في جدول «المستخدمون» بلوحة الأدمن."""
+    """A row in the "Users" table of the admin panel."""
 
     full_name = serializers.CharField(read_only=True)
     is_online = serializers.SerializerMethodField()
@@ -38,8 +38,8 @@ class AccountListSerializer(serializers.ModelSerializer):
 
 class AccountDetailSerializer(AccountListSerializer):
     """
-    صفحة تفصيل الحساب — تجيب على أسئلة الأدمن الأربعة:
-    من متصل الآن · آخر ظهور · **آخر عملية** · مدة الاستخدام.
+    The account detail page — it answers the admin's four questions:
+    who is online now · last seen · **last action** · total time used.
     """
 
     total_usage_seconds = serializers.SerializerMethodField()
@@ -64,10 +64,11 @@ class AccountDetailSerializer(AccountListSerializer):
 
     def get_last_action(self, obj):
         """
-        ⚠️  يأتي من `core.audit` لا من الجلسات.
+        ⚠️  Comes from `core.audit`, not from the sessions.
 
-        الجلسة تقول «متى ظهر»؛ سجل التدقيق يقول **«ماذا فعل»**.
-        شاشة الأدمن تركّب المصدرين، ولا يستورد أحدهما الآخر.
+        A session says "when did they appear"; the audit log says **"what did
+        they do"**. The admin screen composes both sources, and neither imports
+        the other.
         """
         entry = self.context.get("last_action_map", {}).get(obj.pk)
         if entry is None:
@@ -81,10 +82,10 @@ class AccountDetailSerializer(AccountListSerializer):
 
 class AdminSessionSerializer(serializers.ModelSerializer):
     """
-    عرض الجلسة للأدمن.
+    Session display for the admin.
 
-    ⚠️  `session_key` غير مُدرَج — من يعرفه ينتحل الجلسة،
-        ولا حاجة له في أي شاشة عرض.
+    ⚠️  `session_key` is not included — anyone who knows it can hijack the
+        session, and no display screen needs it.
     """
 
     user_email = serializers.EmailField(source="user.email", read_only=True)
@@ -125,7 +126,7 @@ class AccountStatusChangeSerializer(serializers.ModelSerializer):
 
 
 class SuspendAccountSerializer(serializers.Serializer):
-    """السبب إلزامي — إيقاف بلا سبب موثّق لا يُدافَع عنه لاحقًا."""
+    """The reason is mandatory — a suspension with no documented reason cannot be defended later."""
 
     reason = serializers.CharField(min_length=3, max_length=500)
     status = serializers.ChoiceField(

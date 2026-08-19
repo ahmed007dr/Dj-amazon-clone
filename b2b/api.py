@@ -1,11 +1,11 @@
 """
-واجهات B2B.
+B2B endpoints.
 
-⚠️  **كل نقطة عميل تشتق الملف من المستخدم لا من مُعامل.**
+⚠️  **Every customer endpoint derives the profile from the user, never from a parameter.**
 
-    قبول معرّف العميل هنا يعني أن صيدلية تقرأ كشف حساب منافستها
-    بتغيير رقم في الرابط. نقاط الأدمن وحدها تأخذ المعرّف صراحةً،
-    وهي خلف صلاحية أخرى.
+    Accepting a customer id here means one pharmacy reads its competitor's
+    account statement by changing a number in the URL. Only the admin endpoints
+    take the id explicitly, and they sit behind a different permission.
 """
 
 from __future__ import annotations
@@ -32,10 +32,11 @@ from core.money import ZERO, quantize
 
 class BusinessMixin:
     """
-    ⚠️  الملف التجاري يُشتق من المستخدم — دائمًا.
+    ⚠️  The business profile is derived from the user — always.
 
-        وغيابه ليس خطأ خادم: حساب صيدلية سجّل للتو ولم يُنشأ ملفه
-        بعد. الرسالة تقول ما يفعله لا «حدث خطأ».
+        And its absence is not a server error: a pharmacy account that has just
+        registered has no profile yet. The message says what to do about it
+        rather than "an error occurred".
     """
 
     def get_business(self) -> BusinessProfile:
@@ -55,12 +56,12 @@ class BusinessMixin:
 
 
 # ═══════════════════════════════════════════════════════════
-#  بوابة العميل التجاري
+#  Business customer portal
 # ═══════════════════════════════════════════════════════════
 
 
 class MyAccountAPI(BusinessMixin, APIView):
-    """لوحة الحساب — الرصيد والمتاح وحالة الترخيص معًا."""
+    """The account dashboard — balance, available credit and licence status together."""
 
     permission_classes = [IsTradeAccount]
     serializer_class = s.AccountSummarySerializer
@@ -79,10 +80,10 @@ class MyAccountAPI(BusinessMixin, APIView):
                 "payment_terms_days": business.payment_terms_days,
                 "license_expires_on": business.license_expires_on,
                 "license_is_valid": business.license_is_valid,
-                # ⚠️  المتأخر يُعرَض للعميل صراحةً — لا يُخفى.
+                # ⚠️  Overdue amounts are shown to the customer explicitly — never hidden.
                 #
-                #     العميل الذي يُرفض طلبه بلا أن يرى سببه يتصل
-                #     بالدعم؛ والذي يرى فاتورته المتأخرة يسدّدها.
+                #     A customer whose order is refused without seeing why calls support;
+                #     one who sees their overdue invoice pays it.
                 "overdue_count": overdue.count(),
                 "overdue_total": str(quantize(sum((invoice.total for invoice in overdue), ZERO))),
             }
@@ -99,12 +100,12 @@ class MyProfileAPI(BusinessMixin, generics.RetrieveUpdateAPIView):
 
 class MyStatementAPI(BusinessMixin, APIView):
     """
-    كشف الحساب — **مستند يُرسَل ويُحتكَم إليه**.
+    The account statement — **a document that gets sent and relied upon**.
 
-    ⚠️  الافتراضي آخر ٩٠ يومًا لا كل التاريخ.
+    ⚠️  The default is the last 90 days, not all history.
 
-        كشف بخمس سنوات يُحمَّل ببطء ولا يُقرأ؛ والفترة تُختار
-        صراحةً حين تُطلَب.
+        A five-year statement loads slowly and goes unread; the period is chosen
+        explicitly when it is wanted.
     """
 
     permission_classes = [IsTradeAccount]
@@ -151,13 +152,13 @@ class MyInvoicesAPI(BusinessMixin, generics.ListAPIView):
 
 class CreditCheckAPI(BusinessMixin, APIView):
     """
-    فحص مسبق قبل بناء السلة.
+    A pre-check before building the cart.
 
-    ⚠️  **يمنع الرفض المتأخر.**
+    ⚠️  **It prevents a late refusal.**
 
-        اكتشاف تجاوز الحد عند آخر ضغطة — بعد بناء سلة بأربعين
-        صنفًا — يجعل العميل يفرّغها ويعيد. والفحص المسبق يخبره
-        بالمتاح قبل أن يبدأ.
+        Discovering the limit is exceeded on the final click — after building a
+        cart of forty items — makes the customer empty it and start again. The
+        pre-check tells them what is available before they begin.
     """
 
     permission_classes = [IsTradeAccount]
@@ -181,12 +182,12 @@ class CreditCheckAPI(BusinessMixin, APIView):
 
 class QuickReorderAPI(BusinessMixin, APIView):
     """
-    أكثر ما يطلبه هذا العميل — **لإعادة الطلب بضغطة**.
+    What this customer orders most — **for one-click reordering**.
 
-    ⚠️  قائمة مقترحات لا سلّة جاهزة.
+    ⚠️  A list of suggestions, not a ready-made cart.
 
-        ملء السلة تلقائيًا يجعل العميل يشتري ما لم يقصده حين
-        يتغيّر استهلاكه. الاقتراح يبقي القرار له.
+        Filling the cart automatically makes the customer buy what they did not
+        intend once their consumption changes. A suggestion leaves the decision with them.
     """
 
     permission_classes = [IsTradeAccount]
@@ -198,24 +199,24 @@ class QuickReorderAPI(BusinessMixin, APIView):
 
 class CreditCheckoutAPI(BusinessMixin, APIView):
     """
-    إتمام شراء **على الحساب**.
+    Checkout **on account**.
 
-    ⚠️  **نقطة منفصلة عن `/orders/checkout/` — وهذا ليس تكرارًا.**
+    ⚠️  **A separate endpoint from `/orders/checkout/` — and this is not duplication.**
 
-        الآجل يعيش في `b2b`، و`orders` **تحته** في ترتيب الطبقات
-        فلا يجوز أن يستورده. وضع فرع «ائتمان» داخل إتمام المتجر
-        كان يقلب الاتجاه ويكسر العقد — ويجعل نطاق الطلبات يعرف
-        الحدود الائتمانية والتراخيص.
+        Credit terms live in `b2b`, and `orders` sits **below** it in the layer
+        order, so it must not import it. Putting a "credit" branch inside the
+        store checkout would have inverted the direction and broken the contract
+        — and made the orders domain know about credit limits and licences.
 
-        المشترك بينهما (`create_from_cart` · `resolve_address`)
-        يُستدعى من `orders.services` لا يُنسَخ.
+        What they share (`create_from_cart` · `resolve_address`) is called from
+        `orders.services`, never copied.
 
-    ⚠️  والترتيب مقصود: **الطلب أولًا ثم القيد**.
+    ⚠️  And the order is deliberate: **the order first, then the charge**.
 
-        القيد قبل الطلب يترك مديونية بلا بضاعة لو فشل التسعير أو
-        نفد المخزون. وكلاهما داخل معاملة واحدة: فشل القيد
-        الائتماني يتراجع بالطلب كاملًا — لأن البضاعة لم تخرج بعد،
-        بخلاف بيعة الكاونتر.
+        Charging before the order leaves debt with no goods if pricing fails or
+        stock runs out. And both sit inside one transaction: a failed credit
+        charge rolls the whole order back — because the goods have not left yet,
+        unlike a counter sale.
     """
 
     permission_classes = [IsTradeAccount]
@@ -259,7 +260,7 @@ class CreditCheckoutAPI(BusinessMixin, APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن
+#  Admin
 # ═══════════════════════════════════════════════════════════
 
 
@@ -279,8 +280,8 @@ class AdminBusinessListAPI(generics.ListAPIView):
         if value := params.get("search"):
             queryset = queryset.filter(legal_name__icontains=value)
 
-        # ⚠️  المتعثّرون أولًا حين يُطلَب: الشاشة تُفتح للمتابعة
-        #     لا للتصفح.
+        # ⚠️  Defaulters first when asked for: the screen is opened to chase them,
+        #     not to browse.
         if params.get("overdue") == "true":
             queryset = (
                 queryset.filter(
@@ -302,7 +303,7 @@ class AdminBusinessDetailAPI(generics.RetrieveUpdateAPIView):
 
 class AdminGrantCreditAPI(APIView):
     """
-    ⚠️  المنح **فعل موثَّق** — «من رفع الحد ومتى؟» يُجاب من السجل.
+    ⚠️  Granting is **a documented act** — "who raised the limit, and when?" is answered from the log.
     """
 
     permission_classes = [CanManageCredit]
@@ -365,13 +366,13 @@ class AdminSuspendCreditAPI(APIView):
 
 class AdminRecordPaymentAPI(APIView):
     """
-    تسجيل سداد وارد من العميل.
+    Record an incoming payment from the customer.
 
-    ⚠️  يُسجَّل من الأدمن لا من العميل.
+    ⚠️  Recorded by the admin, not by the customer.
 
-        السداد يقع خارج النظام (تحويل بنكي · شيك · نقد للمندوب)،
-        ويُقيَّد هنا بعد تأكيده. تركه للعميل يعني رصيدًا يعتمد على
-        إقرار من عليه الدين.
+        Payment happens outside the system (bank transfer · cheque · cash to the
+        rep) and is entered here after confirmation. Leaving it to the customer
+        means a balance that depends on the debtor's own declaration.
     """
 
     permission_classes = [CanManageCredit]

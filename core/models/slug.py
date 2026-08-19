@@ -1,11 +1,12 @@
 """
-المعرّفات النصية (slugs).
+Textual identifiers (slugs).
 
-⚠️  كانت في `catalog` فاستوردها `academic` — وهما صنوان مستقلان في
-    نفس الطبقة، فرفضه `import-linter`.
+⚠️  These used to live in `catalog`, and `academic` imported them — two
+    independent siblings on the same layer, so `import-linter` refused it.
 
-    وهو محق: توليد slug فريد وثابت **بنية تحتية عامة** لا منطق
-    كتالوج. مكانها `core` حيث يصل إليها الجميع نازلًا.
+    And it was right: generating a unique, stable slug is **general
+    infrastructure**, not catalogue logic. Its place is `core`, where everyone
+    reaches it downward.
 """
 
 from django.db import models
@@ -15,11 +16,11 @@ from django.utils.translation import gettext_lazy as _
 
 def unique_slug(model, base: str, instance_pk=None) -> str:
     """
-    slug فريد **وثابت**.
+    A unique **and stable** slug.
 
-    ⚠️  الكود القديم كان يعيد توليد الـ slug في **كل حفظ** — أي أن
-        تعديل اسم منتج يكسر رابطه وكل ما أشار إليه من فهرسة وروابط
-        خارجية.
+    ⚠️  The legacy code regenerated the slug on **every save** — meaning editing
+        a product's name broke its URL and everything that pointed at it,
+        indexing and external links alike.
     """
     candidate = slugify(base, allow_unicode=True) or "item"
 
@@ -37,7 +38,7 @@ def unique_slug(model, base: str, instance_pk=None) -> str:
 
 
 class SlugMixin(models.Model):
-    """يولّد الـ slug عند الإنشاء فقط ثم لا يمسّه."""
+    """Generates the slug on creation only, and never touches it again."""
 
     slug = models.SlugField(
         _("المعرّف النصي"),

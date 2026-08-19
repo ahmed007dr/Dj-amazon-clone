@@ -1,5 +1,5 @@
 """
-خدمات نطاق العملاء — الواجهة العامة الوحيدة.
+Customer domain services — the only public interface.
 """
 
 from __future__ import annotations
@@ -18,10 +18,11 @@ from customers.models import (
 
 def get_or_create_profile(user) -> CustomerProfile:
     """
-    ⚠️  يُستدعى عند الحاجة لا بإشارة `post_save` على `User`.
+    ⚠️  Called on demand rather than by a `post_save` signal on `User`.
 
-    الإشارة كانت تنشئ ملفًا لكل مستخدم بلا استثناء — بما فيهم
-    المديرون والموظفون. النتيجة صفوف يتيمة وأرقام عملاء مهدورة.
+    The signal created a profile for every user without exception — including
+    administrators and employees. The result was orphan rows and wasted customer
+    numbers.
     """
     profile, _created = CustomerProfile.objects.get_or_create(user=user)
     return profile
@@ -30,10 +31,10 @@ def get_or_create_profile(user) -> CustomerProfile:
 @transaction.atomic
 def set_default_address(address: CustomerAddress) -> CustomerAddress:
     """
-    تعيين عنوان افتراضي.
+    Set a default address.
 
-    القيد في قاعدة البيانات يمنع اثنين — فالسحب من الحالي أولًا
-    إلزامي لا تحسين.
+    The database constraint forbids two — so unsetting the current one first is
+    mandatory, not an optimisation.
     """
     CustomerAddress.objects.filter(customer=address.customer, is_default=True).exclude(
         pk=address.pk
@@ -55,11 +56,11 @@ def review_document(
     reason: str = "",
 ) -> CustomerDocument:
     """
-    اعتماد أو رفض وثيقة تحقق.
+    Approve or reject a verification document.
 
-    لا يغيّر `verification_status` للمستخدم تلقائيًا — قرار التوثيق
-    يعتمد على مجموعة الوثائق المطلوبة لنوع الحساب، وتلك قاعدة عمل
-    تُحسم في المرحلة ٢.
+    It does not change the user's `verification_status` automatically — the
+    verification decision depends on the set of documents required for the
+    account type, and that is a business rule settled in phase 2.
     """
     previous = document.status
     document.status = DocumentStatus.APPROVED if approved else DocumentStatus.REJECTED
@@ -79,10 +80,10 @@ def review_document(
 
 def record_order(profile: CustomerProfile, amount, when=None) -> CustomerProfile:
     """
-    تحديث الإحصاءات المُخزَّنة مسبقًا.
+    Update the pre-stored statistics.
 
-    يُستدعى من مستمع `order_completed` — لا من `orders` مباشرةً،
-    فالاتجاه يبقى نازلًا.
+    Called from the `order_completed` listener — not from `orders` directly, so
+    the direction stays downward.
     """
     when = when or timezone.now()
 

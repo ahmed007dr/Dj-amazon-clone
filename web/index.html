@@ -1,9 +1,10 @@
 <!doctype html>
 <!--
-  ⚠️  `lang` و`dir` قيمتان ابتدائيتان فقط.
+  ⚠️  `lang` and `dir` are initial values only.
 
-      يضبطهما `useDirection` عند الإقلاع وعند كل تبديل لغة. تثبيتهما
-      هنا وحدهما يعني صفحة عربية بتخطيط إنجليزي للحظة أولى مرئية.
+      `useDirection` sets them at startup and on every language switch. Fixing
+      them here alone means an Arabic page with an English layout for the first
+      visible moment.
 -->
 <html lang="ar" dir="rtl">
   <head>
@@ -14,9 +15,9 @@
     <title>المتجر الطبي</title>
 
     <!--
-      ⚠️  خطوط محلية لا طلب خارجي حاجب.
-          سقوط شبكة الخطوط الخارجية يترك النص بلا محارف عربية
-          مناسبة، وهو أسوأ من خط نظام مباشر.
+      ⚠️  Local fonts, no blocking external request.
+          An outage of the external font network leaves the text without
+          suitable Arabic glyphs, which is worse than a plain system font.
     -->
     <style>
       /* لون الخلفية قبل تحميل الثيم — يمنع وميضًا أبيض في الوضع الداكن */

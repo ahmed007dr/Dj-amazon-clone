@@ -1,14 +1,14 @@
 """
-بذرة حسابات البريد.
+Mail account seed.
 
-⚠️  **المحوّل `CONSOLE` لا SMTP** — البذرة لا تخترع خادمًا.
+⚠️  **The `CONSOLE` backend, not SMTP** — the seed does not invent a server.
 
-    حساب SMTP مبذور بمضيف وهمي يبدو مضبوطًا ويفشل عند أول إرسال،
-    فيقضي المطوّر وقته يبحث عن خطأ في الشبكة. والطرفية تقول ما تفعله:
-    الرسالة تُطبع ولا تُرسَل.
+    An SMTP account seeded with a fictitious host looks configured and fails on
+    the first send, so the developer spends their time hunting a network fault.
+    The console says what it does: the message is printed, not sent.
 
-⚠️  وحسابان لا واحد — ليرى المشغّل الفرق الذي وُجدت الشاشة لأجله:
-    الأمان والتسويق لا يخرجان من مكان واحد (ADR-76).
+⚠️  And two accounts, not one — so the operator sees the difference the screen
+    exists for: security and marketing do not go out from the same place (ADR-76).
 """
 
 from mailing.models import EmailAccount, MailRoute, MailTransport
@@ -50,12 +50,12 @@ def seed():
         data = dict(payload)
         code = data.pop("code")
 
-        # ⚠️  لا يُفرَض الافتراضي على إعداد حيّ.
+        # ⚠️  The default is not forced onto a live configuration.
         #
-        #     لو كان المشغّل قد جعل حسابًا آخر افتراضيًا، فإعادة تشغيل
-        #     البذرة تسحبه بلا سؤال — وتحوّل بريد الأمان كله إلى حساب
-        #     لم يختره. القيد يسمح بواحد فقط، فالفرض هنا لا يفشل بل
-        #     يبدّل بصمت.
+        #     Had the operator made another account the default, re-running the seed
+        #     would take it away unasked — moving all security mail to an account
+        #     they never chose. The constraint permits only one, so forcing here does
+        #     not fail: it switches silently.
         if data["is_default"]:
             existing = EmailAccount.objects.filter(is_default=True).first()
             data["is_default"] = existing is None or existing.code == code

@@ -1,11 +1,12 @@
 """
-التصنيف المرجعي من لوحة الأدمن — الفئات والبراندات والمصنّعون.
+Reference classification from the admin panel — categories, brands and manufacturers.
 
-⚠️  **هذه شرطٌ لا رفاهية**: الفئة إلزامية على `Product`، فمتجر بلا
-    شاشة فئات لا يستطيع إضافة صنفه الأول من لوحته. وكانت الثلاثة
-    تُدار من لوحة Django وحدها.
+⚠️  **This is a precondition, not a luxury**: the category is mandatory on
+    `Product`, so a store with no categories screen cannot add its first item
+    from its panel. And all three used to be managed from the Django panel alone.
 
-⚠️  والمحروس هنا شيئان: الشجرة لا تُكسر، والمستعمَل لا يُحذف بصمت.
+⚠️  Two things are guarded here: the tree does not break, and what is in use is
+    not deleted silently.
 """
 
 import pytest
@@ -36,15 +37,15 @@ def admin_client(db):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الفئات — الشجرة
+#  Categories — the tree
 # ═══════════════════════════════════════════════════════════
 
 
 class TestCategoryTree:
     def test_creating_a_child_builds_its_path(self, admin_client):
         """
-        ⚠️  المسار هو ما يجعل «كل ما تحت أدوية» استعلامًا واحدًا.
-            الفئة بمسار خاطئ تختفي من كل استعلام شجري.
+        ⚠️  The path is what makes "everything under Medicines" a single query.
+            A category with a wrong path disappears from every tree query.
         """
         root = admin_client.post(
             reverse("v1:catalog:admin-categories"),
@@ -65,7 +66,7 @@ class TestCategoryTree:
         assert node.path.endswith("/painkillers")
 
     def test_moving_a_category_rebuilds_descendant_paths(self, admin_client):
-        """نقل فئة يغيّر مسار كل ما تحتها — وتجاهله يترك أحفادًا أيتامًا."""
+        """Moving a category changes the path of everything beneath it — ignoring that orphans descendants."""
         a = Category.objects.create(name_ar="أ", name_en="A")
         b = Category.objects.create(name_ar="ب", name_en="B")
         child = Category.objects.create(name_ar="ج", name_en="C", parent=a)
@@ -81,8 +82,8 @@ class TestCategoryTree:
 
     def test_a_category_cannot_be_its_own_parent(self, admin_client):
         """
-        ⚠️  الدورة تجعل إعادة بناء المسار تستدعي نفسها بلا نهاية،
-            فيعلّق الطلب إلى الأبد بلا أثر في أي سجل.
+        ⚠️  A cycle makes the path rebuild call itself endlessly, hanging the
+            request forever with no trace in any log.
         """
         node = Category.objects.create(name_ar="فئة", name_en="Cat")
 
@@ -105,7 +106,7 @@ class TestCategoryTree:
         assert response.status_code == 400
 
     def test_slug_and_path_are_computed_not_accepted(self, admin_client):
-        """قبولهما من العميل يعني شجرةً يكتبها من لا يعرف قواعدها."""
+        """Accepting them from the client means a tree written by someone who does not know its rules."""
         response = admin_client.post(
             reverse("v1:catalog:admin-categories"),
             {"name_ar": "فئة", "name_en": "Cat", "slug": "hacked", "path": "hacked", "depth": 9},
@@ -118,7 +119,7 @@ class TestCategoryTree:
         assert node.depth == 0
 
     def test_the_list_includes_categories_hidden_from_the_menu(self, admin_client):
-        """`show_in_menu` تصنيف عرضي لا صلاحية — والأدمن يدير الكل."""
+        """`show_in_menu` is a display classification, not a permission — and the admin manages everything."""
         Category.objects.create(name_ar="مخفية", name_en="Hidden", show_in_menu=False)
 
         response = admin_client.get(reverse("v1:catalog:admin-categories"))
@@ -126,16 +127,17 @@ class TestCategoryTree:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحذف المحروس
+#  Guarded deletion
 # ═══════════════════════════════════════════════════════════
 
 
 class TestGuardedDelete:
     def test_a_category_with_products_is_not_deleted(self, admin_client):
         """
-        ⚠️  العلاقة `PROTECT` تمنعه في قاعدة البيانات، لكن الخطأ
-            يصل عندها انهيارًا لا رسالة. الفحص هنا يحوّله إلى جملة
-            تحمل **العدد** — وهو ما يحتاجه الأدمن ليقرّر.
+        ⚠️  The `PROTECT` relation prevents it in the database, but the error
+            arrives there as a crash rather than a message. The check here turns
+            it into a sentence carrying **the count** — which is what the admin
+            needs to decide.
         """
         category = Category.objects.create(name_ar="فئة", name_en="Cat")
         Product.objects.create(sku="P-1", name_ar="م", name_en="P", category=category)
@@ -186,7 +188,7 @@ class TestGuardedDelete:
 
 
 # ═══════════════════════════════════════════════════════════
-#  البراندات والمصنّعون
+#  Brands and manufacturers
 # ═══════════════════════════════════════════════════════════
 
 
@@ -204,7 +206,7 @@ class TestBrandsAndManufacturers:
         assert response.data["manufacturer_name"] == "فايزر"
 
     def test_counts_make_the_impact_visible_before_deleting(self, admin_client):
-        """رؤية «١٢ منتجًا» قبل الضغط تحوّل القرار من تخمين إلى معرفة."""
+        """Seeing "12 products" before pressing turns the decision from a guess into knowledge."""
         category = Category.objects.create(name_ar="فئة", name_en="Cat")
         brand = Brand.objects.create(name_ar="براند", name_en="Brand")
         Product.objects.create(sku="P-3", name_ar="م", name_en="P", category=category, brand=brand)
@@ -228,7 +230,7 @@ class TestBrandsAndManufacturers:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الصلاحية
+#  Permissions
 # ═══════════════════════════════════════════════════════════
 
 
@@ -238,8 +240,8 @@ class TestBrandsAndManufacturers:
 )
 def test_customers_cannot_touch_the_reference_catalog(route):
     """
-    ⚠️  من يضيف فئة يضيف واجهة تصفّح للمتجر كله — ليست بيانات
-        داخلية بل هيكل الموقع.
+    ⚠️  Whoever adds a category adds a browsing surface for the whole store —
+        this is the site's structure, not internal data.
     """
     customer = User.objects.create_user(email="c@test.local", password=PASSWORD)
     customer.is_active = True

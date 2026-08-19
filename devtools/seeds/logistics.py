@@ -1,11 +1,12 @@
 """
-المواقع المخزنية ومناطق الشحن ورسومها.
+Stock locations, shipping zones and their fees.
 
-⚠️  المواقع **ثلاثة لا واحد** حتى في بيئة تطوير.
+⚠️  There are **three locations, not one**, even in a development environment.
 
-    موقع واحد يجعل كل اختبار يمرّ بالمسار السهل: لا تحويل بين
-    مخازن، ولا حجر لدفعة تالفة، ولا سؤال «مخزون أي فرع؟» في نقطة
-    البيع. الفرق يظهر أول مرة في الإنتاج — وهو أسوأ مكان لظهوره.
+    A single location makes every test take the easy path: no transfer between
+    warehouses, no quarantine for a damaged batch, and no "whose branch's stock?"
+    question at the point of sale. The difference first appears in production —
+    the worst possible place for it to appear.
 """
 
 from decimal import Decimal
@@ -35,8 +36,8 @@ LOCATIONS = [
         "is_sellable": True,
     },
     {
-        # ⚠️  التالف والمنتهي يخرجان من المخزون البائع ولا يُحذفان —
-        #     الحذف يفقد أثر ما جرى للبضاعة وقيمتها المهدرة.
+        # ⚠️  Damaged and expired goods leave the selling stock and are never deleted —
+        #     deleting loses the trace of what happened to the goods and their wasted value.
         "code": "quarantine",
         "name_ar": "الحجر",
         "name_en": "Quarantine",
@@ -91,10 +92,10 @@ ZONES = [
         "is_default": False,
     },
     {
-        # ⚠️  منطقة افتراضية إلزامية.
+        # ⚠️  A default zone is mandatory.
         #
-        #     بدونها يصير عنوان بمحافظة غير مُدرَجة طلبًا بلا رسوم
-        #     شحن — يمرّ صامتًا ويُشحن بخسارة.
+        #     Without it an address in an unlisted governorate becomes an order with no
+        #     shipping fee — it passes silently and ships at a loss.
         "code": "remote",
         "name_ar": "المناطق النائية",
         "name_en": "Remote areas",
@@ -139,7 +140,7 @@ METHODS = [
     },
 ]
 
-#: (رمز المنطقة، رمز الطريقة، الرسوم، مجاني فوق، رسوم الكيلو)
+#: (zone code, method code, fee, free above, per-kilo fee)
 RATES = [
     ("cairo-giza", "standard", "30.00", "500.00", "0.00"),
     ("cairo-giza", "express", "60.00", None, "0.00"),
@@ -148,8 +149,8 @@ RATES = [
     ("delta", "express", "85.00", None, "2.00"),
     ("upper", "standard", "60.00", "1000.00", "1.00"),
     ("upper", "express", "110.00", None, "3.00"),
-    # ⚠️  لا شحن سريع للمناطق النائية — الوعد الذي لا يُنفَّذ أسوأ
-    #     من عدم تقديمه.
+    # ⚠️  No express shipping to remote zones — a promise that cannot be kept is
+    #     worse than not offering it.
     ("remote", "standard", "90.00", None, "4.00"),
 ]
 

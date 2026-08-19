@@ -1,7 +1,7 @@
 """
-بذر سياسات الوصول القياسية.
+Seed the standard access policies.
 
-قابل للتشغيل مرارًا — يُحدّث ولا يكرّر.
+Re-runnable — it updates rather than duplicating.
 
     python manage.py seed_access_policies
 """
@@ -111,7 +111,7 @@ class Command(BaseCommand):
         for spec in POLICIES:
             code = spec.pop("code")
             _, was_created = AccessPolicy.objects.update_or_create(code=code, defaults=spec)
-            spec["code"] = code  # للتشغيل المتكرر داخل نفس العملية
+            spec["code"] = code  # For repeated runs inside the same process
 
             if was_created:
                 created += 1

@@ -1,21 +1,21 @@
 """
-تفريغ التواجد من الكاش إلى قاعدة البيانات.
+Flush presence from the cache into the database.
 
-⚠️  لماذا هذا الأمر موجود أصلًا؟  (ADR-17)
+⚠️  Why does this command exist at all?  (ADR-17)
 
-    كتابة `last_activity` في PostgreSQL على **كل طلب** تقتلها:
-    عشرة آلاف طلب في الدقيقة = عشرة آلاف كتابة على نفس الجدول.
+    Writing `last_activity` to PostgreSQL on **every request** kills it:
+    ten thousand requests a minute = ten thousand writes to the same table.
 
-    الحل: الكتابة في Redis (رخيصة، في الذاكرة)، ثم تفريغ مجمّع
-    كل ٦٠ ثانية.
+    The solution: write to Redis (cheap, in memory), then flush in bulk every
+    60 seconds.
 
-        Redis      →  التواجد الآني (ساخن)
-        PostgreSQL →  تاريخ الجلسات (دائم)
+        Redis      →  live presence (hot)
+        PostgreSQL →  session history (durable)
 
-التشغيل:
+Usage:
     */1 * * * *  python manage.py flush_presence
 
-أو حلقة دائمة:
+Or as a continuous loop:
     python manage.py flush_presence --loop --interval 60
 """
 
@@ -73,11 +73,11 @@ class Command(BaseCommand):
 
     def _collect(self) -> dict[str, datetime]:
         """
-        جمع مفاتيح التواجد من الكاش.
+        Collect the presence keys from the cache.
 
-        ⚠️  `keys()` بنمط متاح في RedisCache لا في LocMemCache.
-            في التطوير بلا Redis يُتخطّى الأمر بهدوء — التواجد
-            يُكتب وقت الدخول على أي حال.
+        ⚠️  `keys()` with a pattern is available on RedisCache, not on
+            LocMemCache. In development without Redis the command is skipped
+            quietly — presence is written at login time regardless.
         """
         try:
             keys = cache.keys(f"{PRESENCE_PREFIX}*")
@@ -117,7 +117,7 @@ class Command(BaseCommand):
             session.last_activity = entries[session.session_key]
 
         if sessions:
-            # كتابة واحدة مجمّعة — لا كتابة لكل جلسة
+            # One bulk write — not a write per session
             UserSession.objects.bulk_update(sessions, ["last_activity"])
 
         return len(sessions)
