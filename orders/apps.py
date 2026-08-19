@@ -6,7 +6,7 @@ class OrdersConfig(AppConfig):
     name = "orders"
 
     def ready(self):
-        # ⚠️  الاستيراد هنا لا في أعلى الملف — المستمعون يلمسون
-        #     موديلات `orders` و`payments`، وسجل التطبيقات لم يكتمل
-        #     بعد وقت استيراد الوحدة.
+        # ⚠️  Imported here rather than at the top of the file — the listeners touch
+        #     the `orders` and `payments` models, and the app registry is not yet
+        #     complete at module import time.
         from orders import listeners  # noqa: F401

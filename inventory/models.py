@@ -1,13 +1,13 @@
 """
-المخزون — «كم المتاح؟ وماذا جرى له؟»
+Inventory — "how much is available? and what happened to it?"
 
-⚠️  حدود صارمة:
+⚠️  Strict boundaries:
 
-        catalog    →  ما هذا المنتج؟   ← **لا حقل كمية هناك**
-        inventory  →  كم المتاح منه؟   ← هنا وحده
+        catalog    →  what is this product?      ← **no quantity field there**
+        inventory  →  how much of it is there?   ← here alone
 
-    وهذا النطاق **لا يستورد `orders`**. الطلبات تستدعي خدماته،
-    والاتجاه يبقى نازلًا.
+    And this domain **does not import `orders`**. Orders call its services, and
+    the direction stays downward.
 """
 
 from django.core.validators import MinValueValidator
@@ -30,13 +30,13 @@ def movement_reference() -> str:
 
 
 def count_reference() -> str:
-    # ⚠️  دالة مسماة لا lambda — Django لا يستطيع تسلسل الـ lambda
-    #     في ملف الترحيل.
+    # ⚠️  A named function, not a lambda — Django cannot serialise a lambda
+    #     into the migration file.
     return business_number("CNT", random_length=6)
 
 
 # ═══════════════════════════════════════════════════════════
-#  المواقع المخزنية
+#  Stock locations
 # ═══════════════════════════════════════════════════════════
 
 
@@ -49,13 +49,13 @@ class LocationKind(models.TextChoices):
 
 class StockLocation(BilingualNameMixin, BaseModel):
     """
-    موقع مخزني.
+    A stock location.
 
-    ⚠️  **يُخلق في المرحلة ٤ حتى لو كان الموقع واحدًا.** (ADR-09)
+    ⚠️  **Created in phase 4 even if there is only one location.** (ADR-09)
 
-        نقطة البيع تبيع من مخزون فرعها لا من مخزون عام، وتقارير
-        الفروع مستحيلة رجعيًا. إضافته لاحقًا تعني إعادة بناء كل
-        حركة مخزون سُجِّلت.
+        Point of sale sells from its branch's stock, not from a general stock,
+        and branch reports are impossible retrospectively. Adding it later means
+        rebuilding every stock movement ever recorded.
     """
 
     code = models.SlugField(_("الرمز"), max_length=50, unique=True)
@@ -104,19 +104,19 @@ class StockLocation(BilingualNameMixin, BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الدفعات
+#  Batches
 # ═══════════════════════════════════════════════════════════
 
 
 class Batch(BaseModel):
     """
-    دفعة بتاريخ صلاحية وتكلفة.
+    A batch with an expiry date and a cost.
 
-    ⚠️  `unit_cost` **إلزامي رغم أن مستهلكه في المرحلة ٨.**
+    ⚠️  `unit_cost` is **mandatory even though its consumer arrives in phase 8.**
 
-        حساب تكلفة البضاعة المباعة (COGS) **مستحيل رجعيًا** بلا
-        تكلفة الدفعة — لا يمكن معرفة ربح بيعة تمت قبل شهور إن لم
-        تُسجَّل تكلفتها وقتها. (ADR-09)
+        Calculating the cost of goods sold (COGS) is **retrospectively
+        impossible** without the batch cost — the profit of a sale made months
+        ago cannot be known unless its cost was recorded at the time. (ADR-09)
     """
 
     product = models.ForeignKey(
@@ -163,9 +163,9 @@ class Batch(BaseModel):
     class Meta:
         verbose_name = _("دفعة")
         verbose_name_plural = _("الدفعات")
-        # ⚠️  FEFO: الأقرب انتهاءً أولًا — لا الأقدم استلامًا.
-        #     ترتيب FIFO يترك دفعة تنتهي غدًا في المخزن بينما
-        #     تُباع دفعة صالحة لسنة.
+        # ⚠️  FEFO: nearest to expiry first — not oldest received first.
+        #     FIFO ordering leaves a batch expiring tomorrow in the warehouse
+        #     while a batch good for a year gets sold.
         ordering = ["expires_at", "received_at"]
         constraints = [
             models.CheckConstraint(
@@ -196,25 +196,25 @@ class Batch(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
-#  رصيد المخزون
+#  Stock balance
 # ═══════════════════════════════════════════════════════════
 
 
 class Stock(TimeStampedModel):
     """
-    رصيد منتج في موقع.
+    A product's balance at a location.
 
-    ⚠️  **قيد قاعدة البيانات هو خط الدفاع الأخير ضد البيع الزائد.**
+    ⚠️  **The database constraint is the last line of defence against overselling.**
 
-        القفل (`select_for_update`) يحمي من التزامن — لكنه
-        **لا يعمل على SQLite**. أما `CheckConstraint` فيعمل على
-        الاثنين ولا يمكن تجاوزه من أي مسار كود مهما أخطأ.
+        The lock (`select_for_update`) protects against concurrency — but it
+        **does nothing on SQLite**. A `CheckConstraint`, by contrast, works on
+        both engines and cannot be bypassed by any code path however wrong.
 
-        الدفاعان معًا:
-          ١. قفل الصف        →  صحة تحت التزامن (PostgreSQL)
-          ٢. قيد قاعدة البيانات →  استحالة رصيد سالب (الكل)
+        The two defences together:
+          1. the row lock          →  correctness under concurrency (PostgreSQL)
+          2. the database constraint →  a negative balance is impossible (both)
 
-    مفتاح BigInt — جدول داخلي عالي الحجم لا يظهر في رابط.
+    A BigInt key — a high-volume internal table that appears in no URL.
     """
 
     product = models.ForeignKey(
@@ -238,16 +238,16 @@ class Stock(TimeStampedModel):
         verbose_name=_("الموقع"),
     )
 
-    #: الموجود فعليًا على الرف
+    #: What is physically on the shelf
     quantity_physical = models.PositiveIntegerField(_("الكمية الفعلية"), default=0)
-    #: محجوز لطلبات لم تُشحن بعد
+    #: Reserved for orders not yet shipped
     quantity_reserved = models.PositiveIntegerField(_("المحجوز"), default=0)
-    #: تالف — موجود ولا يُباع
+    #: Damaged — present and not for sale
     quantity_damaged = models.PositiveIntegerField(_("التالف"), default=0)
-    #: منتهي الصلاحية — موجود ولا يُباع
+    #: Expired — present and not for sale
     quantity_expired = models.PositiveIntegerField(_("المنتهي"), default=0)
 
-    # ── حدود التنبيه ───────────────────────────────────────
+    # ── Alert thresholds ───────────────────────────────────
     reorder_point = models.PositiveIntegerField(
         _("حد إعادة الطلب"), default=0, help_text=_("تنبيه حين ينزل المتاح عنه")
     )
@@ -263,7 +263,7 @@ class Stock(TimeStampedModel):
                 fields=["product", "variant", "location"],
                 name="unique_stock_per_product_variant_location",
             ),
-            # ⚠️  استحالة رصيد سالب — الحارس النهائي
+            # ⚠️  A negative balance is impossible — the final guard
             models.CheckConstraint(
                 condition=models.Q(quantity_reserved__lte=models.F("quantity_physical")),
                 name="reserved_never_exceeds_physical",
@@ -280,10 +280,10 @@ class Stock(TimeStampedModel):
     @property
     def available(self) -> int:
         """
-        المتاح للبيع.
+        Available for sale.
 
-        الفعلي − المحجوز − التالف − المنتهي.
-        هذا هو الرقم الوحيد الذي يهم عند البيع.
+        Physical − reserved − damaged − expired.
+        This is the only number that matters when selling.
         """
         return max(
             0,
@@ -303,16 +303,16 @@ class Stock(TimeStampedModel):
 
 
 # ═══════════════════════════════════════════════════════════
-#  حركات المخزون
+#  Stock movements
 # ═══════════════════════════════════════════════════════════
 
 
 class MovementType(models.TextChoices):
     """
-    ⚠️  كل تغيير في المخزون يترك حركة. بلا استثناء.
+    ⚠️  Every change in stock leaves a movement. Without exception.
 
-        السجل هو ما يجيب على «أين ذهبت الخمسون علبة؟» — وبدونه
-        لا جرد يُطابَق ولا فرق يُفسَّر.
+        The log is what answers "where did the fifty boxes go?" — and without
+        it no stock count can be reconciled and no discrepancy explained.
     """
 
     RECEIPT = "RECEIPT", _("استلام")
@@ -330,7 +330,7 @@ class MovementType(models.TextChoices):
     RELEASE = "RELEASE", _("إفراج عن حجز")
 
 
-#: الحركات التي تزيد الكمية الفعلية
+#: The movements that increase the physical quantity
 INBOUND = {
     MovementType.RECEIPT,
     MovementType.RETURN_IN,
@@ -338,7 +338,7 @@ INBOUND = {
     MovementType.ADJUSTMENT_UP,
 }
 
-#: الحركات التي تنقص الكمية الفعلية
+#: The movements that decrease the physical quantity
 OUTBOUND = {
     MovementType.SALE,
     MovementType.RETURN_OUT,
@@ -349,12 +349,13 @@ OUTBOUND = {
 
 class StockMovement(models.Model):
     """
-    قيد حركة. **إضافة فقط** — لا تعديل ولا حذف.
+    A movement entry. **Append-only** — no editing and no deleting.
 
-    التصحيح يكون بحركة معاكسة لا بتحرير القديمة، وإلا فسد السجل
-    الذي يُبنى عليه الجرد والتقارير المالية.
+    Corrections go through an offsetting movement rather than editing the old
+    one, or the log the stock count and the financial reports are built on
+    becomes corrupt.
 
-    مفتاح BigInt — أضخم جدول في النظام ولا يظهر في رابط.
+    A BigInt key — the largest table in the system, and it appears in no URL.
     """
 
     reference = models.CharField(
@@ -394,7 +395,7 @@ class StockMovement(models.Model):
     )
     quantity = models.PositiveIntegerField(_("الكمية"))
 
-    #: لقطة الرصيد بعد الحركة — تسمح بمراجعة السجل بلا إعادة حساب
+    #: A snapshot of the balance after the movement — it allows reviewing the log without recomputing
     balance_after = models.IntegerField(_("الرصيد بعد الحركة"), default=0)
 
     unit_cost = MoneyField(
@@ -404,9 +405,9 @@ class StockMovement(models.Model):
         help_text=_("لقطة وقت الحركة — تُستخدم في حساب COGS"),
     )
 
-    #: مرجع خارجي نصي — **لا FK إلى `orders`**.
-    #: `inventory` في L3 و`orders` في L6؛ المفتاح الأجنبي هنا
-    #: يجعل الاتجاه صاعدًا ويكسر الحدود.
+    #: An external string reference — **no FK to `orders`**.
+    #: `inventory` is in L3 and `orders` in L6; a foreign key here
+    #: makes the direction upward and breaks the boundaries.
     reference_type = models.CharField(_("نوع المرجع"), max_length=32, blank=True)
     reference_id = models.CharField(_("معرّف المرجع"), max_length=64, blank=True)
 
@@ -424,12 +425,12 @@ class StockMovement(models.Model):
     class Meta:
         verbose_name = _("حركة مخزون")
         verbose_name_plural = _("حركات المخزون")
-        # ⚠️  `-id` مفتاح ترتيب ثانوي إلزامي.
+        # ⚠️  `-id` is a mandatory secondary sort key.
         #
-        #     حركتان تُسجَّلان في نفس الميكروثانية (بيع يستهلك
-        #     دفعتين مثلًا) يعطي `-created_at` وحده ترتيبًا غير
-        #     مستقر — يختلف بين استعلام وآخر. وفي سجل يُبنى عليه
-        #     الجرد وحساب التكلفة، الترتيب غير المستقر خطأ لا إزعاج.
+        #     Two movements recorded in the same microsecond (a sale consuming
+        #     two batches, say) leave `-created_at` alone with an unstable
+        #     ordering — differing from one query to the next. And in a log that
+        #     the stock count and cost calculation are built on, unstable ordering is a defect, not a nuisance.
         ordering = ["-created_at", "-id"]
         indexes = [
             models.Index(fields=["product", "location", "-created_at"]),
@@ -448,7 +449,7 @@ class StockMovement(models.Model):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحجز
+#  Reservations
 # ═══════════════════════════════════════════════════════════
 
 
@@ -461,12 +462,12 @@ class ReservationStatus(models.TextChoices):
 
 class StockReservation(BaseModel):
     """
-    حجز مؤقت.
+    A temporary reservation.
 
-    ⚠️  الحجز **ينتهي بمهلة**.
+    ⚠️  A reservation **expires on a timeout**.
 
-        سلة مهجورة تحجز مخزونًا إلى الأبد تعني منتجًا يبدو نافدًا
-        وهو متوفر. المهلة تُفرج تلقائيًا.
+        An abandoned cart holding stock forever means a product that looks out
+        of stock while it is available. The timeout releases it automatically.
     """
 
     product = models.ForeignKey(
@@ -492,7 +493,7 @@ class StockReservation(BaseModel):
         db_index=True,
     )
 
-    # مرجع نصي — لا FK صاعد إلى orders/cart
+    # A string reference — no upward FK to orders/cart
     reference_type = models.CharField(_("نوع المرجع"), max_length=32, blank=True)
     reference_id = models.CharField(_("معرّف المرجع"), max_length=64, blank=True)
 
@@ -517,7 +518,7 @@ class StockReservation(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الجرد
+#  Stock counting
 # ═══════════════════════════════════════════════════════════
 
 
@@ -529,7 +530,7 @@ class StockCountStatus(models.TextChoices):
 
 
 class StockCount(BaseModel):
-    """جلسة جرد."""
+    """A stock count session."""
 
     reference = models.CharField(
         _("المرجع"),
@@ -563,9 +564,10 @@ class StockCount(BaseModel):
 
 class StockCountLine(TimeStampedModel):
     """
-    سطر جرد.
+    A stock count line.
 
-    الفرق يُحسب ولا يُدخَل — إدخاله يدويًا يسمح بإخفاء العجز.
+    The discrepancy is computed and never entered — entering it by hand allows a
+    shortfall to be hidden.
     """
 
     count = models.ForeignKey(StockCount, on_delete=models.CASCADE, related_name="lines")
@@ -596,12 +598,12 @@ class StockCountLine(TimeStampedModel):
 
     @property
     def variance(self) -> int:
-        """موجب = زيادة · سالب = عجز."""
+        """Positive = surplus · negative = shortfall."""
         return self.counted_quantity - self.expected_quantity
 
 
 # ═══════════════════════════════════════════════════════════
-#  التنبيهات
+#  Alerts
 # ═══════════════════════════════════════════════════════════
 
 
@@ -615,13 +617,14 @@ class AlertType(models.TextChoices):
 
 class StockAlert(BaseModel):
     """
-    تنبيه مخزون.
+    A stock alert.
 
-    ⚠️  **منع التكرار إلزامي.**
+    ⚠️  **Deduplication is mandatory.**
 
-        منتج نافد يولّد تنبيهًا مع كل محاولة بيع — عشرات التنبيهات
-        لنفس الحالة في ساعة. القيد الفريد على (نوع · منتج · موقع)
-        بشرط `is_resolved=False` يجعل التنبيه واحدًا حتى يُحسم.
+        An out-of-stock product generates an alert on every attempted sale —
+        dozens of alerts for the same situation within an hour. The unique
+        constraint on (type · product · location) conditioned on
+        `is_resolved=False` keeps it to one alert until it is settled.
     """
 
     alert_type = models.CharField(

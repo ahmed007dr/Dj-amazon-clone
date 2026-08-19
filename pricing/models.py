@@ -1,18 +1,18 @@
 """
-التسعير — «كم يدفع **هذا** العميل مقابل **هذا** المنتج؟»
+Pricing — "what does **this** customer pay for **this** product?"
 
-⚠️  الكود القديم بعثر حساب السعر في **أربعة** مواضع بنسختين
-    متعارضتين (الانتهاك H5):
+⚠️  The legacy code scattered the price calculation across **four** places in
+    two conflicting versions (violation H5):
 
         orders/models.py:50   cart_total
-        orders/views.py:27    كوبون + توصيل + إجمالي
-        orders/api.py:55      نفس الحساب مكتوبًا ثانيةً بشكل مختلف
-        orders/api.py:97      إجمالي السطر
+        orders/views.py:27    coupon + delivery + total
+        orders/api.py:55      the same calculation written again, differently
+        orders/api.py:97      the line total
 
-    نتيجتان مختلفتان لنفس السلة حسب المسار الذي سلكه الطلب.
+    Two different results for the same cart, depending on the path the request took.
 
-    هنا **مصدر واحد**: `pricing.services.price_for()`. السلة
-    والطلب ونقطة البيع كلها تستهلك نتيجته.
+    Here there is **one source**: `pricing.services.price_for()`. The cart, the
+    order and the point of sale all consume its result.
 """
 
 from django.core.validators import MinValueValidator
@@ -39,14 +39,14 @@ class PriceListKind(models.TextChoices):
 
 class PriceList(BilingualNameMixin, BaseModel):
     """
-    قائمة أسعار.
+    A price list.
 
-    ⚠️  **قائمة منفصلة لا نسبة خصم.** (قاعدة العمل ٩)
+    ⚠️  **A separate list, not a discount percentage.** (business rule 9)
 
-        «خصم الطلاب ١٥٪» يبدو أبسط، لكنه يجعل كل سعر طالب مشتقًا
-        من سعر التجزئة — فلا يمكن تسعير منتج للطلاب بأقل من التكلفة
-        ترويجيًا، ولا تدقيق ما دفعه الطالب فعلًا بعد تغيّر السعر
-        الأصلي.
+        "A 15% student discount" looks simpler, but it makes every student price
+        derived from the retail price — so a product cannot be priced for
+        students below cost as a promotion, and what a student actually paid
+        cannot be audited after the original price changes.
     """
 
     code = models.SlugField(_("الرمز"), max_length=50, unique=True)
@@ -58,10 +58,10 @@ class PriceList(BilingualNameMixin, BaseModel):
         db_index=True,
     )
 
-    #: أنواع الحسابات التي تنطبق عليها — فارغ = الجميع
+    #: The account types it applies to — empty = everyone
     account_types = models.JSONField(_("أنواع الحسابات"), default=list, blank=True)
 
-    #: عند تطابق أكثر من قائمة، الأعلى أولوية يفوز
+    #: When more than one list matches, the highest priority wins
     priority = models.IntegerField(
         _("الأولوية"),
         default=0,
@@ -104,12 +104,12 @@ class PriceList(BilingualNameMixin, BaseModel):
 
 class PriceRule(BaseModel):
     """
-    سعر منتج في قائمة، بكمية دنيا اختيارية.
+    A product's price in a list, with an optional minimum quantity.
 
-    ⚠️  **أسعار الكميات بصفوف لا بحقول.**
+    ⚠️  **Quantity prices as rows, not as fields.**
 
-        `price_1`, `price_10`, `price_50` كحقول تعني تغيير المخطط
-        عند كل شريحة جديدة. الصفوف تسمح بأي عدد شرائح بلا هجرة.
+        `price_1`, `price_10`, `price_50` as fields mean a schema change with
+        every new tier. Rows allow any number of tiers with no migration.
     """
 
     price_list = models.ForeignKey(
@@ -145,7 +145,7 @@ class PriceRule(BaseModel):
     class Meta:
         verbose_name = _("قاعدة تسعير")
         verbose_name_plural = _("قواعد التسعير")
-        # الأكبر كمية أولًا — أول تطابق يفوز
+        # Largest quantity first — the first match wins
         ordering = ["-min_quantity"]
         constraints = [
             models.UniqueConstraint(
@@ -171,10 +171,10 @@ class DiscountKind(models.TextChoices):
 
 class PriceOverride(BaseModel):
     """
-    خصم ترويجي مؤقت على منتج.
+    A temporary promotional discount on a product.
 
-    ⚠️  منفصل عن الكوبونات: هذا يظهر في الكتالوج بلا كود، والكوبون
-        يُدخله العميل. خلطهما يعني عرضًا يُطبَّق مرتين.
+    ⚠️  Separate from coupons: this appears in the catalogue with no code, and a
+        coupon is entered by the customer. Merging them means an offer applied twice.
     """
 
     product = models.ForeignKey(

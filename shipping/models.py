@@ -1,11 +1,11 @@
 """
-الشحن — العناوين والمناطق والرسوم والشحنات.
+Shipping — addresses, zones, fees and shipments.
 
-⚠️  هذا النطاق يستقبل `Address` و`DeliveryFee` من النموذج القديم.
+⚠️  This domain takes in `Address` and `DeliveryFee` from the legacy model.
 
-    `Address` كان في `accounts` و`orders` يستورده — وهو نصف
-    التبعية الدائرية H1. نقله هنا يكسرها: `shipping` في L2 تحت
-    `orders` في L6، فالاتجاه نازل.
+    `Address` lived in `accounts` and `orders` imported it — which was half of
+    circular dependency H1. Moving it here breaks that: `shipping` is in L2,
+    below `orders` in L6, so the direction is downward.
 """
 
 from django.core.validators import MinValueValidator
@@ -23,16 +23,17 @@ def shipment_number() -> str:
 
 
 # ═══════════════════════════════════════════════════════════
-#  المناطق والطرق
+#  Zones and methods
 # ═══════════════════════════════════════════════════════════
 
 
 class ShippingZone(BilingualNameMixin, BaseModel):
     """
-    منطقة شحن — مجموعة محافظات برسوم موحّدة.
+    A shipping zone — a set of governorates on a uniform fee.
 
-    المحافظات في `JSONField` لا جدول منفصل: القائمة ثابتة ومحدودة
-    (٢٧ محافظة)، وجدول لها يعني وصلة إضافية في كل حساب رسوم.
+    The governorates live in a `JSONField` rather than a separate table: the
+    list is fixed and small (27 governorates), and a table for them means an
+    extra join in every fee calculation.
     """
 
     code = models.SlugField(_("الرمز"), max_length=50, unique=True)
@@ -64,7 +65,7 @@ class ShippingZone(BilingualNameMixin, BaseModel):
 
     @classmethod
     def for_governorate(cls, governorate: str) -> "ShippingZone | None":
-        """المنطقة التي تشمل هذه المحافظة، أو الافتراضية."""
+        """The zone covering this governorate, or the default."""
         for zone in cls.objects.filter(is_active=True):
             if governorate in (zone.governorates or []):
                 return zone
@@ -72,7 +73,7 @@ class ShippingZone(BilingualNameMixin, BaseModel):
 
 
 class ShippingMethod(BilingualNameMixin, BaseModel):
-    """طريقة شحن — عادي · سريع · استلام من الفرع."""
+    """A shipping method — standard · express · collect from branch."""
 
     code = models.SlugField(_("الرمز"), max_length=50, unique=True)
     description_ar = models.TextField(_("الوصف بالعربية"), blank=True)
@@ -100,13 +101,13 @@ class ShippingMethod(BilingualNameMixin, BaseModel):
 
 class ShippingRate(BaseModel):
     """
-    رسوم منطقة × طريقة.
+    Fees for a zone × method.
 
-    ⚠️  `free_above` **لكل صف** لا إعداد عام.
+    ⚠️  `free_above` is **per row**, not a global setting.
 
-        «شحن مجاني فوق ٥٠٠» في القاهرة قد لا يصلح للصعيد حيث
-        التكلفة الفعلية أعلى. الإعداد العام يفرض سقفًا واحدًا على
-        اقتصاديات مختلفة.
+        "Free shipping above 500" in Cairo may not work for Upper Egypt, where
+        the actual cost is higher. A global setting imposes one ceiling on
+        different economics.
     """
 
     zone = models.ForeignKey(ShippingZone, on_delete=models.CASCADE, related_name="rates")
@@ -138,7 +139,7 @@ class ShippingRate(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الشحنات
+#  Shipments
 # ═══════════════════════════════════════════════════════════
 
 
@@ -154,10 +155,11 @@ class ShipmentStatus(models.TextChoices):
 
 class Shipment(BaseModel):
     """
-    شحنة.
+    A shipment.
 
-    ⚠️  المرجع إلى الطلب **نصي**. `shipping` في L2 و`orders` في L6؛
-        المفتاح الأجنبي هنا يجعل الاتجاه صاعدًا ويكسر الحدود.
+    ⚠️  The reference to the order is **a string**. `shipping` is in L2 and
+        `orders` in L6; a foreign key here makes the direction upward and breaks
+        the boundaries.
     """
 
     number = models.CharField(_("رقم الشحنة"), max_length=32, unique=True, default=shipment_number)
@@ -182,9 +184,9 @@ class Shipment(BaseModel):
         db_index=True,
     )
 
-    # ── لقطة العنوان ───────────────────────────────────────
-    # ⚠️  منسوخة لا مرجعية: العميل قد يعدّل عنوانه بعد الشحن،
-    #     ولقطة وقت الشحن هي ما يُدافَع عنه في أي نزاع.
+    # ── Address snapshot ───────────────────────────────────
+    # ⚠️  Copied, not referenced: the customer may edit their address after
+    #     shipping, and the snapshot at shipping time is what is defended in any dispute.
     recipient_name = models.CharField(_("اسم المستلم"), max_length=200)
     recipient_phone = models.CharField(_("هاتف المستلم"), max_length=20)
     governorate = models.CharField(_("المحافظة"), max_length=100)
@@ -218,9 +220,9 @@ class Shipment(BaseModel):
 
 class ShipmentEvent(models.Model):
     """
-    حدث تتبع. **إضافة فقط.**
+    A tracking event. **Append-only.**
 
-    مفتاح BigInt — سجل داخلي لا يظهر في رابط.
+    A BigInt key — an internal log that appears in no URL.
     """
 
     shipment = models.ForeignKey(Shipment, on_delete=models.CASCADE, related_name="events")

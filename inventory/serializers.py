@@ -1,4 +1,4 @@
-"""عقود المخزون."""
+"""Inventory contracts."""
 
 from rest_framework import serializers
 
@@ -33,10 +33,10 @@ class StockLocationSerializer(serializers.ModelSerializer):
 
 class StockSerializer(serializers.ModelSerializer):
     """
-    رصيد لموقع.
+    A balance for one location.
 
-    ⚠️  `available` محسوب لا مُخزَّن — الفعلي ناقص المحجوز والتالف
-        والمنتهي. تخزينه يعني رقمين قد يتباعدان.
+    ⚠️  `available` is computed, not stored — physical minus reserved, damaged
+        and expired. Storing it means two numbers that may diverge.
     """
 
     product_sku = serializers.CharField(source="product.sku", read_only=True)
@@ -78,9 +78,10 @@ class StockSerializer(serializers.ModelSerializer):
 
 class BatchSerializer(serializers.ModelSerializer):
     """
-    ⚠️  `unit_cost` **لا يُكشف للعامة**.
+    ⚠️  `unit_cost` is **never exposed publicly**.
 
-    تكلفة الشراء تكشف هامش الربح — تُعرض في واجهات الأدمن فقط.
+    The purchase cost reveals the profit margin — it is shown in admin
+    interfaces only.
     """
 
     product_sku = serializers.CharField(source="product.sku", read_only=True)
@@ -192,7 +193,7 @@ class StockReservationSerializer(serializers.ModelSerializer):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأوامر
+#  Commands
 # ═══════════════════════════════════════════════════════════
 
 
@@ -249,13 +250,13 @@ class MarkDamagedSerializer(serializers.Serializer):
 
 class AvailabilitySerializer(serializers.Serializer):
     """
-    التوفر كما يراه المتجر.
+    Availability as the store sees it.
 
-    ⚠️  **لا يُكشف الرقم الدقيق للعامة.**
+    ⚠️  **The exact number is never exposed publicly.**
 
-        كشف «متبقٍ ٣ قطع» مفيد تسويقيًا، لكن كشف «متبقٍ ٨٤٧» يعطي
-        المنافس حجم مخزونك. العتبة تحسم: تحت الخمسة رقم، وفوقها
-        «متوفر» فقط.
+        Revealing "3 left" is useful commercially, but revealing "847 left"
+        gives a competitor your stock volume. The threshold settles it: below
+        five, a number; above it, just "in stock".
     """
 
     product_id = serializers.CharField(read_only=True)
@@ -268,7 +269,7 @@ class AvailabilitySerializer(serializers.Serializer):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الجرد
+#  Stock counting
 # ═══════════════════════════════════════════════════════════
 
 
@@ -277,7 +278,7 @@ class StockCountLineSerializer(serializers.ModelSerializer):
     product_name_ar = serializers.CharField(source="product.name_ar", read_only=True)
     product_name_en = serializers.CharField(source="product.name_en", read_only=True)
     variant_name = serializers.CharField(source="variant.name_ar", read_only=True, default=None)
-    #: ⚠️  محسوب لا مُدخَل — إدخاله يدويًا يسمح بإخفاء العجز.
+    #: ⚠️  Computed, not entered — entering it by hand allows a shortfall to be hidden.
     variance = serializers.IntegerField(read_only=True)
 
     class Meta:
@@ -303,8 +304,8 @@ class StockCountLineSerializer(serializers.ModelSerializer):
             "product_name_en",
             "variant",
             "variant_name",
-            # ⚠️  المتوقَّع لقطة وقت البدء — قبوله من الواجهة يجعل
-            #     العدّاد يكتب ما يُوازن به فرقه.
+            # ⚠️  The expected figure is a snapshot from the start time — accepting it
+            #     from the frontend lets the counter write whatever balances their discrepancy.
             "expected_quantity",
             "variance",
         ]

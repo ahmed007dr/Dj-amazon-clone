@@ -1,17 +1,17 @@
 """
-الإشعارات.
+Notifications.
 
-⚠️  **لا نطاق يستورد هذا النطاق.** (عقد `notifications-isolated`)
+⚠️  **No domain imports this domain.** (the `notifications-isolated` contract)
 
-    النطاقات تبعث إشارات؛ وهذا يستمع. الاستدعاء المباشر يعني أن
-    `inventory` يعرف بوجود البريد، و`orders` يعرف قوالب الرسائل —
-    وكل تغيير في الإشعارات يمس نطاقات لا علاقة لها به.
+    Domains emit signals; this one listens. A direct call would mean `inventory`
+    knowing email exists and `orders` knowing the message templates — and every
+    change to notifications touching domains that have nothing to do with it.
 
-        inventory يكتشف LOW_STOCK
-                ↓  إشارة
-        notifications يستمع
+        inventory detects LOW_STOCK
+                ↓  signal
+        notifications listens
                 ↓
-        إشعار داخل التطبيق + بريد
+        an in-app notification + email
 """
 
 from django.db import models
@@ -30,10 +30,10 @@ class NotificationChannel(models.TextChoices):
 
 class NotificationCategory(models.TextChoices):
     """
-    ⚠️  التصنيف يحكم التفضيلات.
+    ⚠️  The category governs the preferences.
 
-        العميل قد يوقف التسويق ويبقي إشعارات الطلبات — بلا تصنيف
-        يصير الخيار «الكل أو لا شيء»، فيوقف الجميع كل شيء.
+        A customer may disable marketing and keep order notifications — with no
+        category the choice becomes "all or nothing", so everyone disables everything.
     """
 
     ACCOUNT = "ACCOUNT", _("الحساب")
@@ -55,13 +55,14 @@ class NotificationPriority(models.TextChoices):
 
 class Notification(BaseModel):
     """
-    إشعار داخل التطبيق.
+    An in-app notification.
 
-    ⚠️  النص **منسوخ لا مرجعي**.
+    ⚠️  The text is **copied, not referential**.
 
-        الإشعار يقول «شُحن طلبك ORD-2026-7K3M9P» — وهذه لقطة وقت
-        الحدث. توليدها لاحقًا من الطلب يعطي نصًا يتغيّر مع تغيّر
-        حالته، فيقرأ العميل تاريخًا مزوّرًا.
+        The notification says "your order ORD-2026-7K3M9P has shipped" — and
+        that is a snapshot at the time of the event. Generating it later from
+        the order gives text that changes as its status changes, so the customer
+        reads a falsified history.
     """
 
     user = models.ForeignKey(
@@ -87,10 +88,10 @@ class Notification(BaseModel):
     title = models.CharField(_("العنوان"), max_length=200)
     body = models.TextField(_("النص"))
 
-    #: رابط داخل الواجهة — `/account/orders/<uuid>`
+    #: A link inside the frontend — `/account/orders/<uuid>`
     action_url = models.CharField(_("رابط الإجراء"), max_length=500, blank=True)
 
-    #: مرجع نصي — لا FK صاعد إلى أي نطاق
+    #: A string reference — no upward FK to any domain
     reference_type = models.CharField(_("نوع المرجع"), max_length=32, blank=True)
     reference_id = models.CharField(_("معرّف المرجع"), max_length=64, blank=True)
 
@@ -112,13 +113,13 @@ class Notification(BaseModel):
 
 class NotificationPreference(BaseModel):
     """
-    تفضيلات المستخدم لكل تصنيف وقناة.
+    The user's preferences per category and channel.
 
-    ⚠️  **إشعارات الحساب والأمان لا تُوقَف.**
+    ⚠️  **Account and security notifications cannot be disabled.**
 
-        «غُيّرت كلمة مرورك» و«أُوقف حسابك» ليست تسويقًا — إيقافها
-        يعني اختراقًا يمر بلا علم صاحبه. القاعدة مفروضة في الخدمة
-        لا في الواجهة.
+        "Your password was changed" and "your account was suspended" are not
+        marketing — disabling them means a compromise passing unnoticed by its
+        owner. The rule is enforced in the service, not in the frontend.
     """
 
     user = models.ForeignKey(
@@ -156,11 +157,11 @@ class DeliveryStatus(models.TextChoices):
 
 class NotificationLog(models.Model):
     """
-    سجل محاولات الإرسال.
+    The delivery attempt log.
 
-    ⚠️  يجيب على «هل وصل البريد؟» — وهو أول سؤال في أي شكوى.
+    ⚠️  It answers "did the email arrive?" — the first question in any complaint.
 
-    مفتاح BigInt — حجم كبير ولا يظهر في رابط.
+    A BigInt key — high volume, and it appears in no URL.
     """
 
     user = models.ForeignKey(

@@ -1,19 +1,20 @@
 """
-التقارير.
+Reporting.
 
-⚠️  **هذا النطاق يقرأ ولا يكتب — أبدًا.**
+⚠️  **This domain reads and never writes — ever.**
 
-    لا موديل فيه ولا `migrations`. كل رقم يُشتق من مصدره لحظة
-    الطلب: المبيعات من `orders`، والمخزون من `inventory`، والربح
-    من `finance`.
+    It has no models and no `migrations`. Every figure is derived from its source
+    at request time: sales from `orders`, stock from `inventory`, and profit
+    from `finance`.
 
-    تخزين نسخة مُجمَّعة هنا ينشئ رقمًا ثالثًا يجب أن يوازي مصدرين،
-    وأول انحراف بينهما لا يملك أحد حسمه. وحين يكبر الحجم يُضاف
-    تخزين مؤقت (cache) بمدة صلاحية — لا جدول حقيقة موازٍ.
+    Storing an aggregated copy here creates a third number that must match two
+    sources, and at the first divergence between them nobody can settle it. And
+    when the volume grows, a cache with an expiry is added — not a parallel
+    truth table.
 
-⚠️  ولا نطاق يستورد `reporting`.
+⚠️  And no domain imports `reporting`.
 
-    هو الطبقة العليا: يعرف الجميع ولا يعرفه أحد — كـ`devtools`.
+    It is the top layer: it knows everyone and nobody knows it — like `devtools`.
 """
 
 from __future__ import annotations
@@ -34,18 +35,18 @@ from django.utils import timezone
 from core.errors import BusinessError, ErrorCode
 from core.money import ZERO, quantize
 
-#: ⚠️  `unit_price × quantity` يخلط `Decimal` بعدد صحيح.
+#: ⚠️  `unit_price × quantity` mixes `Decimal` with an integer.
 #
-#     Django لا يستنتج نوع الناتج من الطرفين المختلفين، فيرفض
-#     التجميع بـ`FieldError` غامضة. التصريح بالنوع مرة واحدة هنا
-#     أوضح من تكراره في كل استعلام — والدقة المالية تتبعه.
+#     Django does not infer the result type from two different operands, so it
+#     refuses the aggregation with an obscure `FieldError`. Declaring the type
+#     once here is clearer than repeating it in every query — and the financial precision follows it.
 #
-# ⚠️  ولا تُسمَّ أي حزمة تجميع في نفس الاستدعاء `quantity`.
+# ⚠️  And no aggregate in the same call may be named `quantity`.
 #
-#     الأسماء تُحَلّ بالترتيب داخل `annotate` الواحدة: تسمية
-#     `quantity=Sum("quantity")` تجعل `F("quantity")` هنا يشير
-#     إلى **التجميع** لا إلى الحقل — فيرفض Django «تجميعًا داخل
-#     تجميع» برسالة لا تدلّ على السبب إطلاقًا. ولذلك الاسم
+#     Names are resolved in order inside a single `annotate`: naming one
+#     `quantity=Sum("quantity")` makes `F("quantity")` here refer to the
+#     **aggregate** rather than the field — so Django refuses "an aggregate
+#     inside an aggregate" with a message that gives no hint of the cause. Hence the name
 #     `units_sold`.
 LINE_REVENUE = ExpressionWrapper(
     F("unit_price") * F("quantity"),
@@ -66,9 +67,10 @@ def _money(queryset, field: str) -> Decimal:
 
 def assert_period(start: date, end: date) -> None:
     """
-    ⚠️  المدى المقلوب يُنتج تقريرًا بأصفار **يبدو حقيقيًا**.
+    ⚠️  An inverted range produces a report of zeros that **looks genuine**.
 
-        لا خطأ ولا صفوف، فيُقرأ «شهر بلا مبيعات» بدل «مدى خاطئ».
+        No error and no rows, so it reads as "a month with no sales" rather than
+        "a wrong range".
     """
     if start > end:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="بداية الفترة بعد نهايتها")
@@ -76,13 +78,13 @@ def assert_period(start: date, end: date) -> None:
 
 def _sold_orders(start: date, end: date):
     """
-    الطلبات المحتسَبة مبيعاتٍ في فترة.
+    The orders counted as sales in a period.
 
-    ⚠️  **مصدر واحد لتعريف «مبيعة»** يستخدمه كل تقرير هنا.
+    ⚠️  **One source for the definition of "a sale"**, used by every report here.
 
-        تعريفه في كل دالة يجعل تقرير المبيعات يستبعد الملغى
-        وتقرير الأصناف يشمله — فيختلف رقمان في نفس الشاشة ولا
-        يعرف أحد أيّهما صحيح.
+        Defining it in each function makes the sales report exclude cancelled
+        orders while the items report includes them — so two numbers on the same
+        screen differ and nobody knows which is right.
     """
     from orders.models import Order, OrderStatus
 
@@ -92,7 +94,7 @@ def _sold_orders(start: date, end: date):
 
 
 # ═══════════════════════════════════════════════════════════
-#  المبيعات
+#  Sales
 # ═══════════════════════════════════════════════════════════
 
 
@@ -131,7 +133,7 @@ def sales_summary(start: date, end: date) -> SalesSummary:
         gross_sales=gross,
         returns_total=returns_total,
         net_sales=quantize(gross - returns_total),
-        # ⚠️  حارس القسمة على صفر — فترة بلا طلبات حالة عادية
+        # ⚠️  A division-by-zero guard — a period with no orders is a normal state
         average_order=quantize(gross / count) if count else ZERO,
         customers_count=sold.values("customer").distinct().count(),
     )
@@ -139,10 +141,10 @@ def sales_summary(start: date, end: date) -> SalesSummary:
 
 def sales_by_day(start: date, end: date) -> list[dict]:
     """
-    ⚠️  استعلام واحد بالتجميع لا استعلام لكل يوم.
+    ⚠️  One aggregated query, not one query per day.
 
-        حلقة على ثلاثين يومًا تعني ثلاثين استعلامًا في كل فتح
-        للوحة — وهي أول شاشة يفتحها الأدمن كل صباح.
+        A loop over thirty days means thirty queries on every dashboard open —
+        and it is the first screen the admin opens each morning.
     """
     assert_period(start, end)
 
@@ -183,28 +185,31 @@ def sales_by_channel(start: date, end: date) -> list[dict]:
     ]
 
 
-#: ترتيب «الأكثر طلبًا» — القيمة أو العدد.
+#: The "most ordered" ordering — by value or by count.
 TOP_PRODUCT_ORDERINGS = {"revenue": "-revenue", "quantity": "-units_sold"}
 
 
 def top_products(start: date, end: date, limit: int = 20, by: str = "revenue") -> list[dict]:
     """
-    الأصناف الأكثر طلبًا.
+    The most ordered items.
 
-    ⚠️  **المقياسان مختلفان وكلاهما صحيح.**
+    ⚠️  **The two measures differ and both are correct.**
 
-        بالقيمة: علبة كمامات بجنيهين تُباع ألف مرة لا تسبق جهازًا
-        بألف جنيه بيع عشرين — والقرار الشرائي يُبنى على القيمة.
+        By value: a two-pound box of masks sold a thousand times does not
+        outrank a thousand-pound device sold twenty times — and the purchasing
+        decision is built on value.
 
-        بالعدد: «الأكثر طلبًا» بمعناه الحرفي، وهو ما يُبنى عليه
-        قرار المخزون ومساحة الرفّ.
+        By count: "most ordered" in its literal sense, and it is what the stock
+        and shelf-space decision is built on.
 
-        ولذلك الرقمان يُعرضان معًا دائمًا، والفرز خيار لا حكم.
+        The two figures are therefore always displayed together, and the sort is
+        a choice rather than a verdict.
 
-    ⚠️  والمفتاح غير المعروف **يُرفض ولا يُتجاهَل**.
+    ⚠️  And an unknown key **is refused, not ignored**.
 
-        السقوط الصامت على الافتراضي يجعل `?by=units` يُرجع ترتيبًا
-        بالقيمة بلا أي إشارة — فيقرأ الأدمن جدولًا يظن أنه فرزه.
+        Silently falling back to the default makes `?by=units` return an ordering
+        by value with no indication at all — so the admin reads a table they
+        believe they sorted.
     """
     from orders.models import OrderLine
 
@@ -264,11 +269,11 @@ def sales_by_category(start: date, end: date, limit: int = 20) -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════
-#  أوقات الضغط
+#  Peak hours
 # ═══════════════════════════════════════════════════════════
 
 
-#: أيام الأسبوع بترتيب ISO — الاثنين ١ والأحد ٧.
+#: The days of the week in ISO order — Monday 1 and Sunday 7.
 WEEKDAY_NAMES = {
     1: ("الاثنين", "Monday"),
     2: ("الثلاثاء", "Tuesday"),
@@ -282,24 +287,26 @@ WEEKDAY_NAMES = {
 
 def peak_hours(start: date, end: date) -> dict:
     """
-    توزيع الطلبات على ساعات الأسبوع — ١٦٨ خلية (٧ أيام × ٢٤ ساعة).
+    The distribution of orders across the hours of the week — 168 cells (7 days × 24 hours).
 
-    ⚠️  **بالتوقيت المحلي لا UTC.**
+    ⚠️  **In local time, not UTC.**
 
-        «أكثر ساعة ضغطًا ١٧:٠٠ UTC» رقم لا يُبنى عليه جدول
-        مناوبات في القاهرة. `Extract` يحوّل إلى المنطقة الفعّالة
-        تلقائيًا حين `USE_TZ`، والمنطقة تُقرأ من الإعدادات.
+        "The busiest hour is 17:00 UTC" is not a figure a shift rota in Cairo can
+        be built on. `Extract` converts to the effective timezone automatically
+        when `USE_TZ` is set, and the timezone is read from the settings.
 
-    ⚠️  والشبكة **مكتملة دائمًا**.
+    ⚠️  And the grid is **always complete**.
 
-        الاستعلام لا يُرجع صفًا لساعة بلا طلبات، وخريطة حرارية
-        بخلايا ناقصة تُرسم مشوّهة. الأصفار تُملأ هنا مرة واحدة
-        لا في كل واجهة تستهلك التقرير.
+        The query returns no row for an hour with no orders, and a heatmap with
+        missing cells renders distorted. The zeros are filled in here once,
+        rather than in every frontend consuming the report.
 
-    ⚠️  والأساس **وقت إنشاء الطلب** لا وقت الدفع أو التسليم.
+    ⚠️  And the basis is **the order's creation time**, not the payment or
+        delivery time.
 
-        الضغط الذي نقيسه ضغط على المتجر والمخزون لحظة الشراء؛
-        وقت التسليم يقيس ضغطًا على الشحن — سؤال آخر.
+        The load we are measuring is the load on the store and the stock at the
+        moment of purchase; delivery time measures load on shipping — a
+        different question.
     """
     assert_period(start, end)
 
@@ -353,8 +360,8 @@ def peak_hours(start: date, end: date) -> dict:
     by_weekday = _rollup("weekday", range(1, 8))
 
     def _busiest(rows_: list[dict]) -> dict | None:
-        # ⚠️  فترة بلا طلبات تُرجع `None` لا الخلية الأولى صفرًا —
-        #     «ذروتك الاثنين ١٢ ص بصفر طلب» أسوأ من لا إجابة.
+        # ⚠️  A period with no orders returns `None` rather than the first cell at zero —
+        #     "your peak is Monday 12am with zero orders" is worse than no answer.
         top = max(rows_, key=lambda item: item["orders"], default=None)
         return top if top and top["orders"] else None
 
@@ -373,16 +380,17 @@ def peak_hours(start: date, end: date) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════
-#  المخزون
+#  Stock
 # ═══════════════════════════════════════════════════════════
 
 
 def inventory_summary() -> dict:
     """
-    ⚠️  **قيمة المخزون بالتكلفة لا بسعر البيع.**
+    ⚠️  **Stock value at cost, not at the selling price.**
 
-        التقييم بسعر البيع يُظهر ربحًا لم يتحقّق كأنه أصل مملوك —
-        وهو خطأ محاسبي أساسي، ورقم يُقدَّم للبنك أحيانًا.
+        Valuing at the selling price shows unrealised profit as though it were
+        an owned asset — a fundamental accounting error, and a figure sometimes
+        presented to a bank.
     """
     from inventory.models import Batch, Stock
 
@@ -408,12 +416,13 @@ def inventory_summary() -> dict:
 
 def expiry_report(days: int = 90, limit: int = 100) -> list[dict]:
     """
-    دفعات توشك على الانتهاء.
+    Batches approaching expiry.
 
-    ⚠️  **المنتهية تُدرَج أيضًا لا تُستبعَد.**
+    ⚠️  **The expired are included too, not excluded.**
 
-        استبعادها يجعل الشاشة تعرض ما «سينتهي» ويخفي ما **انتهى
-        وما زال في المخزن** — وهو الأخطر: بضاعة قد تُباع.
+        Excluding them makes the screen show what "will expire" and hide what
+        **has expired and is still in the warehouse** — which is the more
+        dangerous: goods that might be sold.
     """
     from inventory.models import Batch
 
@@ -441,7 +450,7 @@ def expiry_report(days: int = 90, limit: int = 100) -> list[dict]:
             "quantity": batch.quantity_remaining,
             "expires_at": batch.expires_at.isoformat(),
             "days_left": (batch.expires_at - today).days,
-            # ⚠️  علامة صريحة: المنتهي يُبرَز لا يُقرأ كأنه «قريب»
+            # ⚠️  An explicit marker: the expired is highlighted rather than read as "approaching"
             "is_expired": batch.expires_at < today,
             "value_at_cost": str(quantize(batch.quantity_remaining * batch.unit_cost)),
         }
@@ -450,16 +459,17 @@ def expiry_report(days: int = 90, limit: int = 100) -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════
-#  سلوك العملاء
+#  Customer behaviour
 # ═══════════════════════════════════════════════════════════
 
 
 def customer_behaviour(start: date, end: date, limit: int = 20) -> dict:
     """
-    ⚠️  **العميل الجديد يُقاس بأول طلب لا بتاريخ التسجيل.**
+    ⚠️  **A new customer is measured by their first order, not by their registration date.**
 
-        من سجّل قبل سنة واشترى اليوم أول مرة هو عميل جديد تجاريًا؛
-        وعدّه قديمًا يجعل كل حملة تسويق تبدو بلا أثر.
+        Someone who registered a year ago and bought today for the first time is
+        commercially a new customer; counting them as existing makes every
+        marketing campaign look ineffective.
     """
     from customers.models import CustomerProfile
 
@@ -519,15 +529,15 @@ def segment_breakdown(start: date, end: date) -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════
-#  أداء الموظفين والموردين
+#  Employee and supplier performance
 # ═══════════════════════════════════════════════════════════
 
 
 def employee_leaderboard(start: date, end: date, limit: int = 20) -> list[dict]:
     """
-    ⚠️  المنسوب هو `owner_employee` لا `created_by` — نفس تعريف
-        `employees.services.performance`، وأي اختلاف بينهما يجعل
-        المندوب يرى رقمين متعارضين في شاشتين.
+    ⚠️  What is attributed is `owner_employee`, not `created_by` — the same
+        definition as `employees.services.performance`, and any difference
+        between them makes the rep see two contradictory figures on two screens.
     """
     from employees.models import EmployeeProfile
 
@@ -559,7 +569,7 @@ def employee_leaderboard(start: date, end: date, limit: int = 20) -> list[dict]:
 
 
 def supplier_purchases(start: date, end: date, limit: int = 20) -> list[dict]:
-    """ما اشتريناه من كل مورّد — من أوامر الشراء المرسَلة."""
+    """What we bought from each supplier — from the purchase orders sent."""
     from suppliers.models import PurchaseOrder, PurchaseOrderStatus
 
     assert_period(start, end)
@@ -588,17 +598,17 @@ def supplier_purchases(start: date, end: date, limit: int = 20) -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════
-#  اللوحة الجامعة
+#  The combined dashboard
 # ═══════════════════════════════════════════════════════════
 
 
 def overview(start: date, end: date) -> dict:
     """
-    ⚠️  **الربح يُقرأ من `finance` لا يُحسب هنا.**
+    ⚠️  **The profit is read from `finance`, not computed here.**
 
-        حسابه ثانيةً يُنتج رقمًا يخالف قائمة الأرباح، ولا أحد
-        يعرف أيّهما يُصدَّق — وهو نفس المبدأ الذي منع حساب التكلفة
-        في `commissions`.
+        Computing it again produces a figure that contradicts the profit
+        statement, and nobody knows which to believe — the same principle that
+        prevented the cost being computed in `commissions`.
     """
     from finance import services as finance_services
 
@@ -616,7 +626,7 @@ def overview(start: date, end: date) -> dict:
         "net_sales": str(sales.net_sales),
         "average_order": str(sales.average_order),
         "customers_count": sales.customers_count,
-        # من `finance` — مصدر واحد للربح
+        # From `finance` — one source for profit
         "cogs": str(pnl.cogs),
         "gross_profit": str(pnl.gross_profit),
         "gross_margin": str(pnl.gross_margin),
@@ -624,7 +634,7 @@ def overview(start: date, end: date) -> dict:
         "net_profit": str(pnl.net_profit),
         "profit_is_reliable": pnl.is_reliable,
         "inventory": inventory_summary(),
-        # ⚠️  خمسة لا عشرون — هذه لوحة لا تقرير. القائمة الكاملة
-        #     في `/reports/sales/` بفرزها وحدّها.
+        # ⚠️  Five, not twenty — this is a dashboard, not a report. The full list
+        #     lives in `/reports/sales/` with its sorting and its limit.
         "top_products": top_products(start, end, limit=5),
     }

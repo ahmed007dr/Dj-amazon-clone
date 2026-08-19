@@ -1,4 +1,4 @@
-"""لوحة الكوبونات."""
+"""Coupons admin panel."""
 
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
@@ -25,8 +25,8 @@ class CouponAdmin(DomainModelAdmin):
     filter_horizontal = ("products", "categories")
     date_hierarchy = "starts_at"
 
-    # ⚠️  العدّاد يزيده الاستهلاك داخل معاملة الطلب — تعديله يدويًا
-    #     يفتح الكوبون لاستعمال زائد عن حده.
+    # ⚠️  The counter is incremented by redemption inside the order's transaction —
+    #     editing it by hand opens the coupon to use beyond its limit.
     readonly_fields = ("id", "created_at", "updated_at", "deleted_at", "usage_count")
 
     fieldsets = (

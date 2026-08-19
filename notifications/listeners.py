@@ -1,17 +1,19 @@
 """
-مستمعو الأحداث.
+Event listeners.
 
-⚠️  **هذا الملف هو الجهة الوحيدة التي تعرف الطرفين.**
+⚠️  **This file is the only party that knows both sides.**
 
-    `orders` يبعث `order_completed` ولا يعرف من يستمع.
-    `notifications` يستمع ولا يُستورَد من أحد.
+    `orders` emits `order_completed` and does not know who listens.
+    `notifications` listens and is imported by nobody.
 
-    الربط هنا يقلب الاتجاه: بدل أن يستورد `orders` نطاق الإشعارات
-    (استيراد صاعد)، يستورد `notifications` نطاق الطلبات (نازل).
+    Wiring it here inverts the direction: instead of `orders` importing the
+    notifications domain (an upward import), `notifications` imports the orders
+    domain (a downward one).
 
-⚠️  وفشل أي مستمع **لا يُفشل العملية التجارية**.
+⚠️  And a failure in any listener **does not fail the business operation**.
 
-    بريد لم يُرسَل يجب ألا يلغي طلبًا اكتمل. الفشل يُسجَّل ويُبتلع.
+    An email that was not sent must not cancel a completed order. The failure is
+    logged and swallowed.
 """
 
 from __future__ import annotations
@@ -30,10 +32,10 @@ logger = logging.getLogger(__name__)
 
 def _safe(handler):
     """
-    يبتلع أي فشل في المستمع ويسجّله.
+    Swallows any failure in the listener and logs it.
 
-    ⚠️  المستمع يعمل داخل معاملة العملية الأصلية — استثناء غير
-        ملتقط يتراجع بالطلب كله لأجل بريد لم يُرسَل.
+    ⚠️  The listener runs inside the original operation's transaction — an
+        uncaught exception rolls the whole order back over an email that was not sent.
     """
 
     def wrapper(*args, **kwargs):
@@ -48,18 +50,19 @@ def _safe(handler):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الطلبات
+#  Orders
 # ═══════════════════════════════════════════════════════════
 
 
 def _order_context(order) -> dict:
     """
-    سياق قوالب بريد الطلب.
+    The context for the order mail templates.
 
-    ⚠️  **كل رقم من الطلب المخزَّن** — لقطة وقت البيع (ADR-30).
+    ⚠️  **Every figure comes from the stored order** — a snapshot at the time of
+        sale (ADR-30).
 
-        إعادة حساب أي مبلغ هنا تنتج رسالة تخالف الفاتورة، والعميل
-        يقارنهما.
+        Recomputing any amount here produces a message that contradicts the
+        invoice, and the customer compares the two.
     """
     from accounts.services import frontend_url
 
@@ -79,12 +82,12 @@ def _register_order_listeners():
     @receiver(order_completed, weak=False)
     @_safe
     def on_order_completed(sender, order, **kwargs):
-        # ⚠️  بيعة الكاونتر بلا عميل مسجَّل — لا أحد يُشعَر.
+        # ⚠️  A counter sale with no registered customer — there is nobody to notify.
         #
-        #     المشتري أخذ بضاعته وإيصاله ومضى؛ ولا بريد نرسل إليه
-        #     ولا حساب يرى الإشعار. تجاهل ذلك كان يرفع `AttributeError`
-        #     في كل بيعة نقطة بيع — يبتلعه `_safe` فيبدو النظام سليمًا
-        #     بينما السجل يمتلئ بأخطاء.
+        #     The buyer took their goods and their receipt and left; there is no
+        #     email to send to and no account to see the notification. Ignoring that
+        #     raised an `AttributeError` on every point-of-sale sale — swallowed by
+        #     `_safe`, so the system looked healthy while the log filled with errors.
         if order.customer is None:
             return
 
@@ -105,12 +108,13 @@ def _register_order_listeners():
     @_safe
     def on_order_status_changed(sender, instance, created, **kwargs):
         """
-        ⚠️  إشعار عند التغييرات ذات المعنى للعميل فقط.
+        ⚠️  A notification on changes that mean something to the customer only.
 
-            إشعار عند كل حفظ يغرق العميل برسائل لا تخصّه —
-            «قيد التجهيز» تعنيه، أما تعديل ملاحظة داخلية فلا.
+            A notification on every save floods the customer with messages that
+            do not concern them — "processing" concerns them, editing an
+            internal note does not.
 
-        ⚠️  وبيعة الكاونتر بلا عميل: لا مستقبِل للإشعار أصلًا.
+        ⚠️  And a counter sale has no customer: there is no recipient at all.
         """
         if instance.customer is None:
             return
@@ -131,12 +135,12 @@ def _register_order_listeners():
             )
             return
 
-        # ⚠️  القالب جزء من الرسالة لا إضافة عليها.
+        # ⚠️  The template is part of the message, not an addition to it.
         #
-        #     المستمع كان يُنشئ إشعارًا داخل التطبيق بلا بريد، فكان
-        #     العميل الذي لا يفتح الموقع لا يعرف أن طلبه شُحن.
-        #     `notify` ترسل البريد **حين يُمرَّر قالب** — والغياب
-        #     كان يُقرأ كأنه اختيار.
+        #     The listener used to create an in-app notification with no email, so
+        #     a customer who does not open the website never knew their order shipped.
+        #     `notify` sends the email **when a template is passed** — and its absence
+        #     was read as though it were a choice.
         messages = {
             OrderStatus.CONFIRMED: (
                 "تأكد طلبك",
@@ -180,7 +184,7 @@ def _register_order_listeners():
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحساب
+#  The account
 # ═══════════════════════════════════════════════════════════
 
 
@@ -191,9 +195,9 @@ def _register_account_listeners():
     @_safe
     def on_account_status_changed(sender, instance, created, **kwargs):
         """
-        ⚠️  تصنيف `ACCOUNT` **إلزامي** — لا يُوقَف بتفضيل.
+        ⚠️  The `ACCOUNT` category is **mandatory** — it is not disabled by a preference.
 
-            إيقاف حساب يمر بلا علم صاحبه يعني اختراقًا صامتًا.
+            An account suspension passing unnoticed by its owner means a silent compromise.
         """
         if not created:
             return
@@ -223,7 +227,7 @@ def _register_account_listeners():
 
 
 # ═══════════════════════════════════════════════════════════
-#  المخزون — للأدمن
+#  Inventory — for the admin
 # ═══════════════════════════════════════════════════════════
 
 
@@ -234,10 +238,10 @@ def _register_inventory_listeners():
     @_safe
     def on_stock_alert(sender, instance, created, **kwargs):
         """
-        ⚠️  إشعار للأدمن لا للعميل.
+        ⚠️  A notification for the admin, not for the customer.
 
-            نفاد صنف شأن تشغيلي — إبلاغ العملاء به يعطي المنافس
-            صورة عن مخزونك.
+            An item running out is an operational matter — telling customers
+            about it gives a competitor a picture of your stock.
         """
         if not created:
             return
@@ -262,7 +266,7 @@ def _register_inventory_listeners():
 
 
 # ═══════════════════════════════════════════════════════════
-#  التسجيل
+#  Registration
 # ═══════════════════════════════════════════════════════════
 
 _register_order_listeners()

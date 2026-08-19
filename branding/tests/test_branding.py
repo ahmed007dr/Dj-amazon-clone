@@ -9,6 +9,8 @@ Visual identity tests.
 """
 
 import pytest
+
+from core.testing import grant_all_domains
 from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.urls import reverse
@@ -57,6 +59,7 @@ def admin_client(db):
     admin.is_active = True
     admin.save()
     _model("administration", "AdminProfile").objects.create(user=admin)
+    grant_all_domains(admin)
 
     client = APIClient()
     client.force_authenticate(user=admin)

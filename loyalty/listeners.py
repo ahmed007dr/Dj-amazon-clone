@@ -1,15 +1,16 @@
 """
-مستمعو الولاء.
+Loyalty listeners.
 
-⚠️  **`orders` و`pos` لا يعرفان بوجود الولاء.**
+⚠️  **`orders` and `pos` know nothing about loyalty.**
 
-    كلاهما يبعث إشارة، وهذا الملف يترجمها إلى نقاط. الاستيراد
-    نازل: `loyalty` يعرف الطلبات ولا العكس.
+    Both emit a signal, and this file translates it into points. The import is
+    downward: `loyalty` knows orders, never the reverse.
 
-⚠️  وفشل المنح **لا يُفشل الطلب**.
+⚠️  And a failed award **does not fail the order**.
 
-    نقطة لم تُقيَّد تُصلَح بإعادة التقاط؛ طلبٌ تراجع لأجل نقطة
-    خسارةٌ لا تُصلَح. الفشل يُسجَّل ويُبتلع.
+    A point that was not posted is fixed by re-running the capture; an order
+    rolled back for the sake of a point is a loss that cannot be fixed. The
+    failure is logged and swallowed.
 """
 
 from __future__ import annotations
@@ -26,10 +27,11 @@ logger = logging.getLogger(__name__)
 
 def _safe(handler):
     """
-    ⚠️  المستمع يعمل داخل معاملة العملية الأصلية.
+    ⚠️  The listener runs inside the original operation's transaction.
 
-        استثناء غير ملتقط يتراجع بالبيعة كلها لأجل نقاط لم
-        تُمنَح — والبضاعة قد سُلِّمت فعلًا على الكاونتر.
+        An uncaught exception rolls the whole sale back for the sake of points
+        that were not awarded — and the goods have already been handed over at
+        the counter.
     """
 
     def wrapper(*args, **kwargs):
@@ -57,19 +59,20 @@ def _register():
     @_safe
     def on_order_saved(sender, instance, created, **kwargs):
         """
-        ⚠️  **بيعة الكاونتر لا تمرّ بـ `order_completed`.**
+        ⚠️  **A counter sale does not pass through `order_completed`.**
 
-            نقطة البيع تُنشئ الطلب في حالته النهائية مباشرةً بلا
-            مرور بآلة الحالة، فلا إشارة اكتمال تُبعَث. الاكتفاء
-            بالإشارة يعني أن **عميل الفرع لا يكسب شيئًا** بينما
-            عميل الموقع يكسب على الطلب نفسه — تفاوتٌ يُقرأ عطلًا.
+            Point of sale creates the order directly in its final state without
+            passing through the state machine, so no completion signal is
+            emitted. Relying on the signal means **the branch's customer earns
+            nothing** while the website's customer earns on the same order — a
+            disparity that reads as a fault.
 
-        ⚠️  والمرتجع يُلتقط من هنا أيضًا: `REFUNDED` حالة تُكتب
-            على الطلب لا حدثًا مستقلًا. بدون السحب يبقى المسار
-            المفتوح: يشتري · يكسب · يُرجِع · ويحتفظ بالنقاط.
+        ⚠️  And returns are captured here too: `REFUNDED` is a state written on
+            the order, not an independent event. Without the withdrawal the
+            open path remains: buy · earn · return · and keep the points.
 
-        ⚠️  الازدواج لا يمنعه هذا الفحص بل القيد الفريد على
-            (الطلب، النوع) في الدفتر: الطلب يُحفَظ مرات.
+        ⚠️  Duplication is prevented not by this check but by the unique
+            constraint on (order, type) in the ledger: the order is saved several times.
         """
         if instance.status == OrderStatus.REFUNDED:
             services.reverse_for_order(instance)

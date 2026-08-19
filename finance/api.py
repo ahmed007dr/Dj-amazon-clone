@@ -1,10 +1,11 @@
 """
-واجهات المالية — للأدمن حصرًا (قاعدة العمل ١٤).
+Finance endpoints — admin only (business rule 14).
 
-⚠️  **بلا نقطة واحدة للعميل.**
+⚠️  **Not one customer-facing endpoint.**
 
-    لا شيء هنا يخصّ مشتريًا. وضع أي منها خلف صلاحية عميل — ولو
-    بالخطأ — يكشف هوامش الربح وتكاليف الشراء للمنافس بحساب مجاني.
+    Nothing here concerns a buyer. Putting any of it behind a customer
+    permission — even by mistake — exposes profit margins and purchase costs to
+    a competitor with a free account.
 """
 
 from __future__ import annotations
@@ -29,15 +30,16 @@ from finance.permissions import CanApproveExpenses, CanManageExpenses, CanViewFi
 
 def _period_from(request) -> tuple[date, date]:
     """
-    الفترة من مُعاملات الاستعلام — الشهر الحالي افتراضًا.
+    The period from the query parameters — the current month by default.
 
-    ⚠️  البداية بعد النهاية تُرفض صراحةً.
+    ⚠️  A start after the end is rejected explicitly.
 
-        تمريرها تُنتج تقريرًا بأصفار يبدو **حقيقيًا**: لا خطأ، ولا
-        صفوف، فيُقرأ كشهر بلا مبيعات بدل مدى مقلوب.
+        Letting it through produces a report of zeros that looks **genuine**: no
+        error, no rows, so it reads as a month with no sales rather than an
+        inverted range.
     """
-    # ⚠️  `localdate()` لا `now().date()`: تقرير «اليوم» بتاريخ UTC
-    #     يعرض مبيعات أمس في أولى ساعات اليوم بتوقيت القاهرة.
+    # ⚠️  `localdate()`, not `now().date()`: a "today" report on the UTC date
+    #     shows yesterday's sales during the first hours of the day in Cairo time.
     today = timezone.localdate()
 
     raw_start = request.query_params.get("start")
@@ -53,15 +55,16 @@ def _period_from(request) -> tuple[date, date]:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التقارير
+#  Reports
 # ═══════════════════════════════════════════════════════════
 
 
 class ProfitAndLossAPI(APIView):
     """
-    قائمة الأرباح والخسائر.
+    The profit and loss statement.
 
-    ⚠️  كل رقم هنا **مجموع صفوف قابلة للفتح** لا حساب صندوق أسود.
+    ⚠️  Every number here is **a sum of rows that can be opened**, not a
+        black-box calculation.
     """
 
     permission_classes = [CanViewFinance]
@@ -84,8 +87,8 @@ class ProfitAndLossAPI(APIView):
                 "gross_margin": str(report.gross_margin),
                 "expenses": str(report.expenses),
                 "net_profit": str(report.net_profit),
-                # ⚠️  يُرسَلان دائمًا لا عند وجودهما فقط: واجهة
-                #     تقرأ الغياب كصفر تُظهر تقريرًا ناقصًا كأنه تام.
+                # ⚠️  Both are always sent, not only when present: a frontend that
+                #     reads absence as zero shows an incomplete report as though it were complete.
                 "unknown_cost_units": report.unknown_cost_units,
                 "is_reliable": report.is_reliable,
                 "pending_expenses": str(report.pending_expenses),
@@ -114,7 +117,7 @@ class CashFlowAPI(APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  بنود المصروفات
+#  Expense categories
 # ═══════════════════════════════════════════════════════════
 
 
@@ -134,11 +137,12 @@ class ExpenseCategoryDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_destroy(self, instance):
         """
-        ⚠️  البند المستخدَم **لا يُحذف** — يُعطَّل.
+        ⚠️  A category in use is **never deleted** — it is disabled.
 
-            حذفه يترك مصروفات بلا بند، فتختفي من تفصيل «أين صُرف
-            المال» ويبقى مجموعها في الإجمالي. الفرق بينهما هو
-            بالضبط الرقم الذي لا يستطيع أحد تفسيره لاحقًا.
+            Deleting it leaves expenses with no category, so they vanish from
+            the "where did the money go" breakdown while their sum remains in
+            the total. The difference between the two is precisely the number
+            nobody can explain later.
         """
         if instance.expenses.exists():
             raise BusinessError(
@@ -152,7 +156,7 @@ class ExpenseCategoryDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  المصروفات
+#  Expenses
 # ═══════════════════════════════════════════════════════════
 
 
@@ -177,13 +181,13 @@ class ExpenseListCreateAPI(generics.ListCreateAPIView):
         return queryset
 
     def perform_create(self, serializer):
-        # ⚠️  الفترة المقفلة ترفض الإدخال — قبل الحفظ لا بعده.
+        # ⚠️  A closed period rejects entry — before the save, not after.
         services.assert_period_open(serializer.validated_data["incurred_on"])
 
         expense = serializer.save(
             entered_by=self.request.user,
-            # ⚠️  الحالة تُفرَض هنا لا تُقرأ من الطلب: المُدخِل لا
-            #     يعتمد مصروفه بنفسه.
+            # ⚠️  The status is forced here rather than read from the request: whoever
+            #     enters an expense does not approve it themselves.
             status=ExpenseStatus.DRAFT,
         )
 
@@ -203,10 +207,11 @@ class ExpenseDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_update(self, serializer):
         """
-        ⚠️  المعتمد **لا يُعدَّل**.
+        ⚠️  An approved expense is **never edited**.
 
-            تعديله يغيّر رقمًا دخل تقريرًا صدر فعلًا. التصحيح
-            بمصروف معاكس أو بإلغاء الاعتماد أولًا.
+            Editing it changes a number that has entered a report already
+            issued. Corrections go through an offsetting expense, or by
+            un-approving first.
         """
         if serializer.instance.status == ExpenseStatus.APPROVED:
             raise BusinessError(
@@ -227,10 +232,10 @@ class ExpenseDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
 class ExpenseDecisionAPI(APIView):
     """
-    اعتماد أو رفض مصروف.
+    Approve or reject an expense.
 
-    ⚠️  صلاحية **منفصلة** عن الإدخال: من يُدخل ويعتمد بنفسه يجعل
-        الاعتماد توقيعًا على بياض.
+    ⚠️  A **separate** permission from entry: someone who enters and approves
+        their own expense makes approval a signature on a blank page.
     """
 
     permission_classes = [CanApproveExpenses]
@@ -260,7 +265,7 @@ class ExpenseDecisionAPI(APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الفترات
+#  Periods
 # ═══════════════════════════════════════════════════════════
 
 
@@ -273,13 +278,14 @@ class FiscalPeriodListAPI(generics.ListAPIView):
 
 class ClosePeriodAPI(APIView):
     """
-    إقفال شهر.
+    Close a month.
 
-    ⚠️  **لا رجعة فيه من الواجهة.**
+    ⚠️  **Irreversible from the frontend.**
 
-        فتحه ثانيةً يعني أن تقريرًا صدر واتُّخذ عليه قرار قد يتغيّر
-        بأثر رجعي — وهو ما تمنعه الفترة أصلًا. إعادة الفتح تبقى
-        ممكنة من `manage.py` بقرار واعٍ لا بضغطة.
+        Reopening it means a report that was issued and acted upon could change
+        retroactively — which is exactly what the period exists to prevent.
+        Reopening remains possible from `manage.py`, as a deliberate decision
+        rather than a click.
     """
 
     permission_classes = [CanApproveExpenses]
@@ -295,10 +301,10 @@ class ClosePeriodAPI(APIView):
         if period.is_closed:
             raise BusinessError(ErrorCode.CONFLICT, detail="الفترة مقفلة سلفًا", status_code=409)
 
-        # ⚠️  مصروف مسوّدة داخل الفترة يمنع الإقفال.
+        # ⚠️  A draft expense inside the period blocks closing.
         #
-        #     إقفالها يجعله غير قابل للاعتماد ولا للتعديل ولا
-        #     للحذف — يعلق إلى الأبد خارج كل تقرير.
+        #     Closing it makes that expense impossible to approve, edit or
+        #     delete — it hangs forever outside every report.
         pending = Expense.objects.filter(
             status=ExpenseStatus.DRAFT,
             incurred_on__year=data["year"],

@@ -1,11 +1,12 @@
 """
-واجهات بوابة الموظفين.
+Staff portal endpoints.
 
-⚠️  **كل نقطة موظف مُصفّاة بإسناده — بلا استثناء واحد.**
+⚠️  **Every staff endpoint is filtered by their assignment — without a single exception.**
 
-    نسيان التصفية في نقطة واحدة يكشف قائمة العملاء كاملة لمندوب
-    أُسند له ثلاثة. ولذلك المرور كله من `services.assigned_customers`
-    و`assert_may_act_for`، لا من استعلام مكتوب في كل view.
+    Forgetting the filter on one endpoint exposes the entire customer list to a
+    rep assigned three. That is why everything goes through
+    `services.assigned_customers` and `assert_may_act_for`, rather than a query
+    written in each view.
 """
 
 from __future__ import annotations
@@ -47,7 +48,7 @@ class EmployeeMixin:
 
 
 def _period_from(request) -> tuple[date, date]:
-    """الشهر الحالي افتراضًا — وهو ما يقيس المندوب نفسه به."""
+    """The current month by default — which is what the rep measures themselves by."""
     today = timezone.localdate()
 
     raw_start = request.query_params.get("start")
@@ -63,7 +64,7 @@ def _period_from(request) -> tuple[date, date]:
 
 
 # ═══════════════════════════════════════════════════════════
-#  بوابة الموظف
+#  The employee portal
 # ═══════════════════════════════════════════════════════════
 
 
@@ -78,17 +79,18 @@ class MyProfileAPI(EmployeeMixin, APIView):
 
 class MyDashboardAPI(EmployeeMixin, APIView):
     """
-    لوحة أداء المندوب.
+    The rep's performance dashboard.
 
-    ⚠️  **الأداء وحده — بلا هدف ولا عمولة.**
+    ⚠️  **Performance alone — no target and no commission.**
 
-        `targets` و`commissions` **فوق** هذا النطاق في ترتيب
-        الطبقات، فلا يجوز أن يستوردهما. وضع حقول فارغة لهما هنا
-        كان حلًّا مؤقتًا صار كذبًا بعد بنائهما: حقل اسمه `target`
-        يعود `null` دائمًا يُقرأ «لا هدف» لا «اسأل مكانًا آخر».
+        `targets` and `commissions` sit **above** this domain in the layer
+        order, so it must not import them. Putting empty fields for them here
+        was a stopgap that became a lie once they were built: a field called
+        `target` that always returns `null` reads as "no target", not "ask
+        somewhere else".
 
-        الشاشة تركّب من ثلاث نقاط: هذه و`/targets/me/`
-        و`/commissions/me/` — ثلاثة استعلامات متوازية صغيرة.
+        The screen composes three endpoints: this one, `/targets/me/` and
+        `/commissions/me/` — three small parallel queries.
     """
 
     permission_classes = [HasEmployeeProfile]
@@ -120,13 +122,13 @@ class MyDashboardAPI(EmployeeMixin, APIView):
 
 class MyCustomersAPI(EmployeeMixin, generics.ListAPIView):
     """
-    عملاء المندوب — **وحدهم**.
+    The rep's customers — **theirs alone**.
 
-    ⚠️  البحث يعمل **داخل** المُسنَد لا فوقه.
+    ⚠️  Search works **inside** the assignment, never above it.
 
-        بحث يتجاوز التصفية يجعل المندوب يعثر على أي عميل باسمه،
-        فيقرأ هاتفه وحجم مشترياته — وهي بالضبط بيانات المنافسة
-        الداخلية بين المندوبين.
+        A search that bypasses the filter lets the rep find any customer by
+        name, reading their phone number and purchase volume — which is exactly
+        the data reps compete over internally.
     """
 
     permission_classes = [HasEmployeeProfile]
@@ -149,7 +151,7 @@ class MyCustomersAPI(EmployeeMixin, generics.ListAPIView):
 
 
 class MyCustomerOrdersAPI(EmployeeMixin, APIView):
-    """طلبات عميل مُسنَد."""
+    """An assigned customer's orders."""
 
     permission_classes = [HasEmployeeProfile]
 
@@ -160,7 +162,7 @@ class MyCustomerOrdersAPI(EmployeeMixin, APIView):
         employee = self.get_employee()
         customer = get_object_or_404(CustomerProfile, pk=pk)
 
-        # ⚠️  الحارس قبل أي قراءة — لا بعد جلب البيانات.
+        # ⚠️  The guard comes before any read — not after fetching the data.
         services.assert_may_act_for(employee, customer)
 
         from orders.models import Order
@@ -171,17 +173,19 @@ class MyCustomerOrdersAPI(EmployeeMixin, APIView):
 
 class CreateOrderForCustomerAPI(EmployeeMixin, APIView):
     """
-    إنشاء طلب نيابةً عن عميل مُسنَد.
+    Create an order on behalf of an assigned customer.
 
-    ⚠️  **`owner_employee` يُملأ هنا — وهو أساس العمولة لاحقًا.**
+    ⚠️  **`owner_employee` is filled in here — and it is the basis of the commission later.**
 
-        تركه فارغًا يجعل الطلب بلا نسبة، فيسقط من أداء المندوب
-        ومن حساب عمولته في المرحلة ١١ — ويُكتشف في نهاية الشهر.
+        Leaving it empty makes the order unattributed, so it drops out of the
+        rep's performance and out of their commission calculation in phase 11 —
+        and it is discovered at the end of the month.
 
-    ⚠️  والسلة سلة **الموظف** لا العميل.
+    ⚠️  And the cart is the **employee's** cart, not the customer's.
 
-        استخدام سلة العميل يعني أن المندوب يعدّل ما يبنيه العميل
-        على هاتفه في نفس اللحظة. الأسطر تُرسَل صراحةً هنا.
+        Using the customer's cart means the rep edits what the customer is
+        building on their phone at that very moment. The lines are sent
+        explicitly here.
     """
 
     permission_classes = [HasEmployeeProfile]
@@ -204,9 +208,9 @@ class CreateOrderForCustomerAPI(EmployeeMixin, APIView):
         customer = get_object_or_404(CustomerProfile, pk=data["customer"])
         services.assert_may_act_for(employee, customer)
 
-        # ⚠️  سلة مؤقتة باسم العميل: التسعير يعتمد على **من يشتري**
-        #     لا على من يكتب. بناؤها على المندوب كان يطبّق أسعار
-        #     التجزئة على صيدلية.
+        # ⚠️  A temporary cart in the customer's name: pricing depends on **who buys**,
+        #     not on who types. Building it on the rep applied retail prices
+        #     to a pharmacy.
         cart = cart_services.get_active_cart(user=customer.user)
         cart_services.clear(cart)
 
@@ -231,7 +235,7 @@ class CreateOrderForCustomerAPI(EmployeeMixin, APIView):
             customer_note=data.get("customer_note", ""),
         )
 
-        # ⚠️  النسبة بعد الإنشاء مباشرةً وفي نفس المعاملة.
+        # ⚠️  The attribution happens immediately after creation and in the same transaction.
         order.owner_employee = request.user
         order.save(update_fields=["owner_employee", "updated_at"])
 
@@ -250,7 +254,7 @@ class CreateOrderForCustomerAPI(EmployeeMixin, APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن
+#  Admin
 # ═══════════════════════════════════════════════════════════
 
 
@@ -269,16 +273,17 @@ class AdminRoleListCreateAPI(generics.ListCreateAPIView):
 
 class AdminRoleDetailAPI(generics.RetrieveUpdateAPIView):
     """
-    تعديل دور — **وصلاحياته**.
+    Edit a role — **and its permissions**.
 
-    ⚠️  **المزامنة بعد كل حفظ وإلا كانت الصلاحيات زينة.**
+    ⚠️  **Synchronise after every save, or the permissions are decoration.**
 
-        `has_perm` يقرأ مجموعات المستخدم لا جدول `EmployeeRole`
-        (ADR-53). الحفظ بلا `sync_role_permissions` يجعل الشاشة
-        تعرض دورًا مضبوطًا وكل فحص صلاحية يفشل.
+        `has_perm` reads the user's groups, not the `EmployeeRole` table
+        (ADR-53). Saving without `sync_role_permissions` makes the screen show a
+        configured role while every permission check fails.
 
-    ⚠️  و**بلا حذف**: الدور مفتاح إلزامي على كل موظف؛ حذفه يقطع
-        انتماء من يحمله. التعطيل (`is_active`) هو المسار.
+    ⚠️  And **no deletion**: the role is a mandatory key on every employee;
+        deleting it severs the affiliation of whoever holds it. Deactivation
+        (`is_active`) is the path.
     """
 
     permission_classes = [CanManageEmployees]
@@ -305,11 +310,11 @@ class AdminRoleDetailAPI(generics.RetrieveUpdateAPIView):
 
 class AdminPermissionCatalogueAPI(APIView):
     """
-    دليل الصلاحيات — **مُنتقى بأسماء تقول ما تفتحه**.
+    The permission catalogue — **curated, under names that say what they open**.
 
-    ⚠️  عرض جدول `auth.Permission` كما هو يجعل الشاشة غير قابلة
-        للاستعمال (مئتا سطر بأسماء تقنية)، والأخطر أنه يجعل منح
-        `delete_user` سهوًا أمرًا وارد الحدوث بضغطة.
+    ⚠️  Displaying the `auth.Permission` table as-is makes the screen unusable
+        (two hundred rows of technical names), and worse, it makes granting
+        `delete_user` by oversight a real possibility, one click away.
     """
 
     permission_classes = [CanManageEmployees]
@@ -414,12 +419,12 @@ class AdminAssignmentListAPI(generics.ListAPIView):
 
 class AdminAssignCustomerAPI(APIView):
     """
-    إسناد عميل إلى موظف.
+    Assign a customer to an employee.
 
-    ⚠️  النقل يُنهي الإسناد السابق ولا يحذفه.
+    ⚠️  A transfer ends the previous assignment rather than deleting it.
 
-        العمولة تُحسب على من كان مسؤولًا **وقت البيع**؛ وحذف
-        السجل القديم يجعل كل طلب سابق بلا نسبة.
+        Commission is calculated on whoever was responsible **at the time of
+        sale**; deleting the old record leaves every previous order unattributed.
     """
 
     permission_classes = [CanManageEmployees]
@@ -467,12 +472,12 @@ class AdminEndAssignmentAPI(APIView):
 
 class AdminUnassignedCustomersAPI(generics.ListAPIView):
     """
-    عملاء بلا مسؤول.
+    Customers with no owner.
 
-    ⚠️  الشاشة التي تمنع ضياع العملاء بين المندوبين.
+    ⚠️  The screen that stops customers being lost between reps.
 
-        عميل بلا إسناد لا يتابعه أحد ولا يظهر في لوحة أي مندوب —
-        ولا شيء ينبّه إليه إلا هذه القائمة.
+        An unassigned customer is followed up by nobody and appears on no rep's
+        dashboard — and nothing draws attention to them but this list.
     """
 
     permission_classes = [CanManageEmployees]

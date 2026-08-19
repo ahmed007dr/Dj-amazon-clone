@@ -1,14 +1,15 @@
 """
-اختبارات التقارير.
+Reporting tests.
 
-⚠️  بوابة الخروج للمرحلة ١٣:
+⚠️  The exit gate for phase 13:
 
-        كل رقم يوازي مصدره · لا مصدر حقيقة ثانٍ · المدى المقلوب
-        يُرفض لا يُنتج أصفارًا تبدو حقيقية.
+        every figure matches its source · no second source of truth · an
+        inverted range is refused rather than producing zeros that look genuine.
 
-    وأخطر ما تحرسه: أن يُقيَّم المخزون بسعر البيع فيظهر ربح لم
-    يتحقّق كأصل مملوك · أن يُخفي تقرير الصلاحية ما **انتهى فعلًا**
-    وما زال في المخزن · أن يخالف رقم الربح هنا قائمة الأرباح.
+    And the greatest dangers it guards: stock being valued at the selling price
+    so unrealised profit appears as an owned asset · the expiry report hiding
+    what **has actually expired** and is still in the warehouse · the profit
+    figure here contradicting the profit statement.
 """
 
 from datetime import timedelta
@@ -21,6 +22,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import AccountType, User
 from administration.models import AdminProfile
+from core.testing import grant_all_domains
 from catalog.models import Category, Product
 from core.errors import BusinessError
 from customers.models import CustomerProfile
@@ -76,6 +78,7 @@ def viewer(db):
     user.is_active = True
     user.save()
     AdminProfile.objects.create(user=user)
+    grant_all_domains(user)
     user.user_permissions.add(Permission.objects.get(codename="view_revenueentry"))
     return User.objects.get(pk=user.pk)
 
@@ -105,7 +108,7 @@ def today_range():
 
 
 # ═══════════════════════════════════════════════════════════
-#  المبيعات
+#  Sales
 # ═══════════════════════════════════════════════════════════
 
 
@@ -132,7 +135,7 @@ class TestSales:
         assert result.average_order == Decimal("0.00")
 
     def test_inverted_range_is_refused(self, db):
-        """⚠️  المدى المقلوب يُنتج تقريرًا بأصفار يبدو حقيقيًا."""
+        """⚠️  An inverted range produces a report of zeros that looks genuine."""
         today = timezone.localdate()
 
         with pytest.raises(BusinessError):
@@ -150,10 +153,10 @@ class TestSales:
 
     def test_top_products_rank_by_revenue_not_count(self, customer, product, location):
         """
-        ⚠️  الترتيب بالعدد يضع أرخص صنف أولًا دائمًا.
+        ⚠️  Ordering by count always puts the cheapest item first.
 
-            علبة بجنيهين تُباع ألف مرة تسبق جهازًا بألف بيع عشرين
-            — والقرار الشرائي يُبنى على القيمة.
+            A two-pound box sold a thousand times outranks a thousand-pound
+            device sold twenty times — and the purchasing decision is built on value.
         """
         category = product.category
         cheap = Product.objects.create(
@@ -191,7 +194,7 @@ class TestSales:
 
 
 # ═══════════════════════════════════════════════════════════
-#  المخزون
+#  Stock
 # ═══════════════════════════════════════════════════════════
 
 
@@ -199,20 +202,20 @@ class TestSales:
 class TestInventory:
     def test_stock_is_valued_at_cost_not_sale_price(self, product):
         """
-        ⚠️  **خطأ محاسبي أساسي لو عُكس.**
+        ⚠️  **A fundamental accounting error if reversed.**
 
-            التقييم بسعر البيع يُظهر ربحًا لم يتحقّق كأنه أصل
-            مملوك — ورقم يُقدَّم للبنك أحيانًا.
+            Valuing at the selling price shows unrealised profit as though it
+            were an owned asset — a figure sometimes presented to a bank.
         """
         summary = services.inventory_summary()
 
-        # ٤٠ وحدة × ٦٠ تكلفة = ٢٤٠٠ (لا ٤٠ × ١٠٠ = ٤٠٠٠)
+        # 40 units × 60 cost = 2400 (not 40 × 100 = 4000)
         assert summary["stock_value_at_cost"] == "2400.00"
 
     def test_expiry_report_includes_already_expired_batches(self, product, location):
         """
-        ⚠️  استبعاد المنتهية يُخفي ما **انتهى وما زال في المخزن** —
-            وهو الأخطر: بضاعة قد تُباع.
+        ⚠️  Excluding the expired hides what **has expired and is still in the
+            warehouse** — the more dangerous case: goods that might be sold.
         """
         from inventory.models import Batch
 
@@ -238,7 +241,7 @@ class TestInventory:
 
 
 # ═══════════════════════════════════════════════════════════
-#  العملاء
+#  Customers
 # ═══════════════════════════════════════════════════════════
 
 
@@ -246,8 +249,9 @@ class TestInventory:
 class TestCustomers:
     def test_new_customers_are_measured_by_first_order(self, customer):
         """
-        ⚠️  من سجّل قبل سنة واشترى اليوم أول مرة هو عميل **جديد**
-            تجاريًا؛ وعدّه قديمًا يجعل كل حملة تبدو بلا أثر.
+        ⚠️  Someone who registered a year ago and bought today for the first
+            time is commercially a **new** customer; counting them as existing
+            makes every campaign look ineffective.
         """
         customer.first_order_at = timezone.now()
         customer.save()
@@ -276,7 +280,7 @@ class TestCustomers:
 
 
 # ═══════════════════════════════════════════════════════════
-#  اللوحة الجامعة
+#  The combined dashboard
 # ═══════════════════════════════════════════════════════════
 
 
@@ -284,10 +288,10 @@ class TestCustomers:
 class TestOverview:
     def test_profit_comes_from_finance_not_recomputed(self, customer, product, location):
         """
-        ⚠️  **مصدر واحد للربح.**
+        ⚠️  **One source for profit.**
 
-            حسابه هنا ثانيةً يُنتج رقمًا يخالف قائمة الأرباح، ولا
-            أحد يعرف أيّهما يُصدَّق.
+            Computing it here again produces a figure that contradicts the
+            profit statement, and nobody knows which to believe.
         """
         from finance import services as finance_services
 
@@ -307,7 +311,7 @@ class TestOverview:
         assert report["net_profit"] == str(pnl.net_profit)
 
     def test_overview_surfaces_profit_reliability(self, customer):
-        """تقرير فيه تكلفة مجهولة يقول ذلك صراحةً."""
+        """A report containing unknown cost says so explicitly."""
         start, end = today_range()
         report = services.overview(start, end)
 
@@ -315,7 +319,7 @@ class TestOverview:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الصلاحيات
+#  Permissions
 # ═══════════════════════════════════════════════════════════
 
 
@@ -330,8 +334,9 @@ class TestPermissions:
 
     def test_a_plain_admin_is_refused(self, db):
         """
-        ⚠️  التقارير تكشف المبيعات والأرباح وأداء كل موظف بالاسم —
-            وربطها بدخول اللوحة يفتحها لمن يفتحها لسبب آخر.
+        ⚠️  The reports reveal sales, profits and every employee's performance by
+            name — and tying them to panel access opens them to anyone who
+            opened it for another reason.
         """
         staff = User.objects.create_user(
             email="plain@test.local", password=PASSWORD, account_type=AccountType.ADMIN
@@ -339,6 +344,7 @@ class TestPermissions:
         staff.is_active = True
         staff.save()
         AdminProfile.objects.create(user=staff)
+        grant_all_domains(staff)
 
         assert client_for(staff).get(reverse("v1:reporting:overview")).status_code == 403
 
@@ -358,10 +364,10 @@ class TestPermissions:
 @pytest.mark.django_db
 def test_reporting_has_no_models():
     """
-    ⚠️  **هذا النطاق يقرأ ولا يكتب — والاختبار يحرس ذلك.**
+    ⚠️  **This domain reads and never writes — and the test guards that.**
 
-        أول موديل يُضاف هنا ينشئ مصدر حقيقة ثانيًا يجب أن يوازي
-        مصادره، وأول انحراف لا يملك أحد حسمه.
+        The first model added here creates a second source of truth that must
+        match its sources, and at the first divergence nobody can settle it.
     """
     from django.apps import apps
 
@@ -369,16 +375,16 @@ def test_reporting_has_no_models():
 
 
 # ═══════════════════════════════════════════════════════════
-#  أوقات الضغط
+#  Peak hours
 # ═══════════════════════════════════════════════════════════
 
 
 def place_order_at(customer, moment, total="500.00"):
     """
-    ⚠️  `created_at` حقل `auto_now_add` — لا يُقبل في `create`.
+    ⚠️  `created_at` is an `auto_now_add` field — it is not accepted in `create`.
 
-        الطريق الوحيد لطلب في وقت ماضٍ هو تحديثه بعد إنشائه،
-        وبدونه لا يمكن اختبار توزيع زمني إطلاقًا.
+        The only way to place an order at a past time is to update it after
+        creation, and without that no time distribution can be tested at all.
     """
     order = make_order(customer, total)
     Order.objects.filter(pk=order.pk).update(created_at=moment)
@@ -388,7 +394,7 @@ def place_order_at(customer, moment, total="500.00"):
 @pytest.mark.django_db
 class TestPeakHours:
     def test_the_grid_is_always_complete(self, db):
-        """⚠️  خريطة حرارية بخلايا ناقصة تُرسم مشوّهة."""
+        """⚠️  A heatmap with missing cells renders distorted."""
         start, end = today_range()
         result = services.peak_hours(start, end)
 
@@ -397,7 +403,7 @@ class TestPeakHours:
         assert len(result["by_weekday"]) == 7
 
     def test_an_empty_period_has_no_peak(self, db):
-        """«ذروتك الاثنين ١٢ ص بصفر طلب» أسوأ من لا إجابة."""
+        """"Your peak is Monday 12am with zero orders" is worse than no answer."""
         start, end = today_range()
         result = services.peak_hours(start, end)
 
@@ -407,14 +413,14 @@ class TestPeakHours:
 
     def test_orders_land_in_their_local_hour(self, customer):
         """
-        ⚠️  أخطر خطأ في هذا التقرير: القراءة بتوقيت UTC.
+        ⚠️  The most dangerous defect in this report: reading in UTC.
 
-            القاهرة تسبق UTC بساعتين صيفًا؛ طلب الساعة ١٠ مساءً
-            محليًا يقع في اليوم **السابق** بتوقيت UTC. جدول مناوبات
-            يُبنى على ذلك يضع الموظفين في الوردية الخطأ.
+            Cairo is two hours ahead of UTC in summer; an order at 10pm local
+            time falls on the **previous** day in UTC. A shift rota built on
+            that puts staff on the wrong shift.
 
-        ⚠️  و`override` لا `activate` — الثانية تسرّب المنطقة إلى
-            كل اختبار بعدها.
+        ⚠️  And `override`, not `activate` — the latter leaks the timezone into
+            every test after it.
         """
         with timezone.override("Africa/Cairo"):
             local = timezone.localtime(timezone.now()).replace(hour=22, minute=30)
@@ -442,7 +448,7 @@ class TestPeakHours:
         assert result["orders_count"] == 2
 
     def test_cancelled_orders_are_not_pressure(self, customer):
-        """⚠️  نفس تعريف «مبيعة» في كل تقرير — لا تعريف ثانٍ هنا."""
+        """⚠️  The same definition of "a sale" in every report — no second definition here."""
         local = timezone.localtime(timezone.now()).replace(hour=14, minute=0)
         order = make_order(customer, "900.00", status=OrderStatus.CANCELLED)
         Order.objects.filter(pk=order.pk).update(created_at=local)
@@ -458,7 +464,7 @@ class TestPeakHours:
 
 
 # ═══════════════════════════════════════════════════════════
-#  ترتيب الأكثر طلبًا
+#  The most-ordered ordering
 # ═══════════════════════════════════════════════════════════
 
 
@@ -491,7 +497,7 @@ class TestTopProductOrdering:
         return product, cheap
 
     def test_value_and_count_give_different_leaders(self, two_products):
-        """⚠️  المقياسان مختلفان وكلاهما صحيح — ولذلك الفرز خيار."""
+        """⚠️  The two measures differ and both are correct — hence the sort is a choice."""
         expensive, cheap = two_products
         start, end = today_range()
 
@@ -506,7 +512,7 @@ class TestTopProductOrdering:
         assert row["revenue"] == "400.00"
 
     def test_an_unknown_ordering_is_refused(self, db):
-        """⚠️  السقوط الصامت على الافتراضي يُري الأدمن فرزًا لم يقع."""
+        """⚠️  Silently falling back to the default shows the admin a sort that never happened."""
         start, end = today_range()
 
         with pytest.raises(BusinessError):

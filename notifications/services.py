@@ -1,10 +1,11 @@
 """
-محرك الإشعارات.
+The notification engine.
 
-⚠️  نقطة دخول واحدة: `notify()`.
+⚠️  One entry point: `notify()`.
 
-    تقرر القنوات حسب التصنيف وتفضيل المستخدم، وترسل، وتسجّل.
-    الاستدعاء المباشر لأي قناة يتجاوز التفضيلات والسجل معًا.
+    It decides the channels from the category and the user's preference, sends,
+    and records. Calling any channel directly bypasses both the preferences and
+    the log.
 """
 
 from __future__ import annotations
@@ -28,16 +29,16 @@ from notifications.models import (
 
 logger = logging.getLogger(__name__)
 
-#: ⚠️  تصنيفات **لا تُوقَف**.
+#: ⚠️  Categories that **cannot be disabled**.
 #:
-#:     «غُيّرت كلمة مرورك» و«أُوقف حسابك» ليست تسويقًا — إيقافها
-#:     يعني اختراقًا يمر بلا علم صاحبه.
+#:     "Your password was changed" and "your account was suspended" are not
+#:     marketing — disabling them means a compromise passing unnoticed by its owner.
 MANDATORY_CATEGORIES = {
     NotificationCategory.ACCOUNT,
     NotificationCategory.SYSTEM,
 }
 
-#: القنوات الافتراضية لكل تصنيف
+#: The default channels per category
 DEFAULT_CHANNELS = {
     NotificationCategory.ACCOUNT: (NotificationChannel.IN_APP, NotificationChannel.EMAIL),
     NotificationCategory.ORDER: (NotificationChannel.IN_APP, NotificationChannel.EMAIL),
@@ -59,9 +60,9 @@ class NotificationResult:
 
 def is_enabled(user, category: str, channel: str) -> bool:
     """
-    هل هذه القناة مفعّلة لهذا التصنيف؟
+    Is this channel enabled for this category?
 
-    ⚠️  التصنيفات الإلزامية تتجاوز التفضيل — لا خيار فيها.
+    ⚠️  Mandatory categories override the preference — there is no choice in them.
     """
     if category in MANDATORY_CATEGORIES:
         return True
@@ -70,7 +71,7 @@ def is_enabled(user, category: str, channel: str) -> bool:
         user=user, category=category, channel=channel
     ).first()
 
-    # الغياب يعني القبول — الافتراضي مفعّل
+    # Absence means acceptance — the default is enabled
     return preference.is_enabled if preference is not None else True
 
 
@@ -90,12 +91,12 @@ def notify(
     channels: tuple | None = None,
 ) -> NotificationResult:
     """
-    إرسال إشعار عبر القنوات المناسبة.
+    Send a notification through the appropriate channels.
 
-    ⚠️  فشل قناة **لا يوقف الباقي**.
+    ⚠️  A failure in one channel **does not stop the rest**.
 
-        بريد يفشل يجب ألا يمنع الإشعار داخل التطبيق — والعميل
-        يرى الخبر بطريقة ما.
+        A failing email must not prevent the in-app notification — and the
+        customer sees the news one way or another.
     """
     channels = channels or DEFAULT_CHANNELS.get(category, (NotificationChannel.IN_APP,))
     context = template_context or {}
@@ -125,17 +126,17 @@ def notify(
 
         elif channel == NotificationChannel.EMAIL:
             if not template_key:
-                # بلا قالب لا بريد — الإشعار داخل التطبيق يكفي
+                # With no template there is no email — the in-app notification is enough
                 skipped.append(channel)
                 continue
 
-            # ⚠️  **`PENDING` لا `SENT`** — البريد يُقيَّد في طابور
-            #     `mailing` ويُسلَّم بعد إيداع المعاملة.
+            # ⚠️  **`PENDING`, not `SENT`** — the mail is enqueued in the
+            #     `mailing` queue and delivered after the transaction commits.
             #
-            #     تسجيله «أُرسل» لحظة التقييد كان يجعل السجل يجيب
-            #     «نعم وصل» عن رسالة لم تغادر بعد — وهو أول سؤال في
-            #     كل شكوى، وأسوأ جواب أن يكون واثقًا وخاطئًا.
-            #     مصير التسليم يعرفه صفّ الصادر.
+            #     Recording it as "sent" at enqueue time made the log answer
+            #     "yes, it arrived" about a message that had not left yet — and that
+            #     is the first question in every complaint, where the worst answer is a confident wrong one.
+            #     The delivery outcome is known from the outbox row.
             queued = mail_services.send_to_user(template_key, user, context)
             sent.append(channel) if queued else skipped.append(channel)
             _log(
@@ -148,7 +149,7 @@ def notify(
             )
 
         else:
-            # SMS · PUSH · WHATSAPP — البنية جاهزة، القنوات لاحقًا
+            # SMS · PUSH · WHATSAPP — the structure is ready, the channels come later
             skipped.append(channel)
             _log(user, channel, category, template_key, DeliveryStatus.SKIPPED)
 
@@ -173,7 +174,7 @@ def _log(user, channel, category, template_key, status, *, recipient="", error="
 
 
 # ═══════════════════════════════════════════════════════════
-#  القراءة
+#  Reading
 # ═══════════════════════════════════════════════════════════
 
 
@@ -200,10 +201,11 @@ def mark_all_read(user) -> int:
 @transaction.atomic
 def set_preference(user, category: str, channel: str, *, enabled: bool) -> NotificationPreference:
     """
-    ضبط تفضيل.
+    Set a preference.
 
-    ⚠️  محاولة إيقاف تصنيف إلزامي تُرفض صراحةً لا تُقبل ثم تُتجاهَل.
-        القبول الصامت يعطي المستخدم انطباعًا خاطئًا بأنه أوقفها.
+    ⚠️  An attempt to disable a mandatory category is refused explicitly rather
+        than accepted and then ignored. Silent acceptance gives the user the
+        false impression that they disabled it.
     """
     from core.errors import BusinessError, ErrorCode
 

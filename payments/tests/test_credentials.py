@@ -1,11 +1,11 @@
 """
-تشفير بيانات اعتماد البوابات.
+Encryption of gateway credentials.
 
-⚠️  **ما يهم فعلًا هنا هو ما في قاعدة البيانات لا ما في بايثون.**
+⚠️  **What matters here is what is in the database, not what is in Python.**
 
-    اختبار `credential.value == "secret"` وحده يمرّ حتى لو لم
-    يُشفَّر شيء — فهو يقرأ ما كتبه للتو. الاختبار الحقيقي يقرأ
-    العمود بـ SQL خام ويتأكد أن السر ليس فيه.
+    Testing `credential.value == "secret"` alone passes even if nothing was
+    encrypted — it reads back what it just wrote. The real test reads the column
+    with raw SQL and confirms the secret is not in it.
 """
 
 import pytest
@@ -30,7 +30,7 @@ def provider():
 
 
 def raw_value(credential) -> str:
-    """القيمة كما هي في العمود — بلا مرور بفكّ تشفير الحقل."""
+    """The value exactly as it sits in the column — bypassing the field's decryption."""
     table = ProviderCredential._meta.db_table
     with connection.cursor() as cursor:
         cursor.execute(f"SELECT value FROM {table} WHERE id = %s", [credential.pk])  # noqa: S608
@@ -38,17 +38,16 @@ def raw_value(credential) -> str:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التخزين
+#  Storage
 # ═══════════════════════════════════════════════════════════
 
 
 class TestStorage:
     def test_secret_is_not_stored_in_plain_text(self, provider):
         """
-        ⚠️  **الاختبار الأهم في الملف.**
+        ⚠️  **The most important test in the file.**
 
-            نسخة احتياطية أو تسريب SQL يجب ألا يعطي مفتاحًا قابلًا
-            للاستعمال.
+            A backup or a SQL leak must not hand over a usable key.
         """
         credential = ProviderCredential.objects.create(
             provider=provider, key="api_key", value="sk-live-super-secret"
@@ -63,14 +62,14 @@ class TestStorage:
             provider=provider, key="api_key", value="sk-live-super-secret"
         )
 
-        # قراءة جديدة من قاعدة البيانات لا من الكائن المحفوظ
+        # A fresh read from the database, not from the saved object
         fetched = ProviderCredential.objects.get(provider=provider, key="api_key")
         assert fetched.value == "sk-live-super-secret"
 
     def test_same_secret_encrypts_differently_each_time(self, provider):
         """
-        ⚠️  التشفير الحتمي يسرّب التساوي: من يرى العمود يعرف أن
-            بوابتين تستخدمان نفس المفتاح.
+        ⚠️  Deterministic encryption leaks equality: whoever sees the column
+            learns that two gateways use the same key.
         """
         first = ProviderCredential.objects.create(
             provider=provider, key="api_key", value="same-secret"
@@ -84,8 +83,8 @@ class TestStorage:
 
     def test_adapter_receives_the_plain_secret(self, provider):
         """
-        ⚠️  التشفير الذي يصل البوابة نصًّا مشفّرًا يكسر كل عملية دفع.
-            هذا الاختبار يمسك ذلك عند مسار البناء الحقيقي.
+        ⚠️  Encryption that reaches the gateway as ciphertext breaks every
+            payment. This test catches that on the real build path.
         """
         from payments.services import _build_adapter
 
@@ -105,16 +104,16 @@ class TestStorage:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الاستعلام
+#  Querying
 # ═══════════════════════════════════════════════════════════
 
 
 class TestQuerying:
     def test_filtering_by_value_is_refused(self, provider):
         """
-        ⚠️  **الفشل الصامت هو الخطر**: التشفير عشوائي، فـ
-            `filter(value="k")` كان سيعيد صفرًا دائمًا بلا خطأ —
-            ويبدو ذلك كـ«لا يوجد» لا كـ«لا يصح السؤال».
+        ⚠️  **Silent failure is the danger**: the encryption is randomised, so
+            `filter(value="k")` would have returned zero forever with no error —
+            and that reads as "there is none" rather than "the question is invalid".
         """
         ProviderCredential.objects.create(provider=provider, key="api_key", value="k")
 
@@ -122,23 +121,23 @@ class TestQuerying:
             list(ProviderCredential.objects.filter(value="k"))
 
     def test_null_check_still_works(self, provider):
-        """الفحص على مستوى `NULL` لا يمسّ المحتوى — فيبقى مسموحًا."""
+        """A check at the `NULL` level does not touch the content — so it stays permitted."""
         ProviderCredential.objects.create(provider=provider, key="api_key", value="k")
         assert ProviderCredential.objects.filter(value__isnull=False).count() == 1
 
 
 # ═══════════════════════════════════════════════════════════
-#  المفتاح
+#  The key
 # ═══════════════════════════════════════════════════════════
 
 
 class TestKeyHandling:
     def test_writing_without_a_key_is_refused(self, provider, settings):
         """
-        ⚠️  **لا سقوط إلى نص صريح.**
+        ⚠️  **No fallback to plaintext.**
 
-            الحفظ الصامت بلا تشفير هو بالضبط الحالة التي أُصلحت:
-            حقل موصوف بأنه «مشفّر» ومحتواه مكشوف.
+            Saving silently without encryption is exactly the situation that was
+            fixed: a field described as "encrypted" whose contents are exposed.
         """
         settings.FIELD_ENCRYPTION_KEY = ""
 
@@ -147,11 +146,11 @@ class TestKeyHandling:
 
     def test_wrong_key_reads_empty_instead_of_crashing(self, provider, settings):
         """
-        ⚠️  المفتاح الخاطئ يقع على **قوائم**: رفع الاستثناء يُسقط
-            شاشة البوابات كلها بدل صف واحد.
+        ⚠️  A wrong key happens on **lists**: raising takes down the whole
+            gateways screen instead of one row.
 
-            والقيمة الفارغة تجعل المحوّل يفشل بـ «بيانات اعتماد
-            ناقصة» — وهو فشل آمن: لا تحصيل بمفتاح لم يُقرأ.
+            And the empty value makes the adapter fail with "incomplete
+            credentials" — a safe failure: no charging with a key that was not read.
         """
         credential = ProviderCredential.objects.create(
             provider=provider, key="api_key", value="secret"
@@ -163,8 +162,8 @@ class TestKeyHandling:
 
     def test_rotation_reads_old_and_writes_new(self, provider, settings):
         """
-        ⚠️  بلا تدوير، مفتاح مسرَّب يعني قاعدة بيانات لا تُنقَذ بلا
-            توقّف. الأول يشفّر وكلها تفكّ.
+        ⚠️  Without rotation, a leaked key means a database that cannot be
+            rescued without downtime. The first encrypts and all of them decrypt.
         """
         old_key = settings.FIELD_ENCRYPTION_KEY
         credential = ProviderCredential.objects.create(
@@ -174,19 +173,19 @@ class TestKeyHandling:
         new_key = Fernet.generate_key().decode()
         settings.FIELD_ENCRYPTION_KEY = f"{new_key},{old_key}"
 
-        # القديم ما زال مقروءًا
+        # The old one is still readable
         fetched = ProviderCredential.objects.get(pk=credential.pk)
         assert fetched.value == "written-with-old-key"
 
-        # وإعادة الحفظ تنقله إلى الجديد
+        # And re-saving moves it onto the new one
         fetched.save(update_fields=["value"])
         settings.FIELD_ENCRYPTION_KEY = new_key
         assert ProviderCredential.objects.get(pk=credential.pk).value == "written-with-old-key"
 
     def test_malformed_key_names_the_setting(self, provider, settings):
         """
-        رسالة `cryptography` الأصلية لا تذكر اسم المتغيّر، فيبحث
-        المشغّل عنها في الكود لا في ملف البيئة.
+        `cryptography`'s original message does not name the variable, so the
+        operator hunts for it in the code rather than the environment file.
         """
         settings.FIELD_ENCRYPTION_KEY = "not-a-fernet-key"
 
@@ -195,16 +194,16 @@ class TestKeyHandling:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الصفوف القديمة
+#  Legacy rows
 # ═══════════════════════════════════════════════════════════
 
 
 class TestLegacyRows:
     def test_plain_text_rows_stay_readable(self, provider):
         """
-        ⚠️  الصف المكتوب قبل الترحيل بلا علامة تشفير — قراءته يجب
-            أن تعمل، وإلا توقّف الدفع لحظة النشر وقبل أن يمرّ
-            ترحيل البيانات.
+        ⚠️  A row written before the migration carries no encryption marker —
+            reading it must work, or payment stops the moment it deploys and
+            before the data migration has run.
         """
         credential = ProviderCredential.objects.create(
             provider=provider, key="api_key", value="new-value"
@@ -221,8 +220,8 @@ class TestLegacyRows:
 
     def test_re_encrypting_an_encrypted_value_is_a_no_op(self):
         """
-        ⚠️  يجعل ترحيل البيانات قابلًا لإعادة التشغيل: تشفير مزدوج
-            كان ينتج قيمة لا يفكّها أحد.
+        ⚠️  It makes the data migration re-runnable: double encryption produced
+            a value nobody could decrypt.
         """
         once = encryption.encrypt("secret")
         assert encryption.encrypt(once) == once

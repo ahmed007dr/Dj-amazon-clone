@@ -1,14 +1,14 @@
 """
-اختبارات محوّلَي Paymob و Fawry.
+Tests for the Paymob and Fawry adapters.
 
-⚠️  **ما يمكن اختباره بلا حساب حقيقي هو ما يهم فعلًا:**
+⚠️  **What can be tested without a real account is what actually matters:**
 
-        · التوقيعات   ⟵ خطأ فيها يقبل حدثًا مزوَّرًا أو يرفض صحيحًا
-        · حساب المبالغ ⟵ خطأ فيه يحصّل مبلغًا خاطئًا
-        · سلوك الفشل  ⟵ النجاح الصامت يعلّم طلبًا كمدفوع بلا مال
+        · the signatures    ⟵ an error there accepts a forged event or refuses a valid one
+        · amount arithmetic ⟵ an error there collects the wrong amount
+        · failure behaviour ⟵ silent success marks an order paid with no money
 
-    أما المسار السعيد فيحتاج البيئة التجريبية، وهو مذكور صراحةً في
-    `payments/gateways/__init__.py` ولا يُدّعى أنه مُختبَر.
+    The happy path needs the sandbox, and that is stated explicitly in
+    `payments/gateways/__init__.py` and is not claimed to be tested.
 """
 
 import hashlib
@@ -32,16 +32,16 @@ def test_both_gateways_are_registered():
 
 
 # ═══════════════════════════════════════════════════════════
-#  بيانات الاعتماد الناقصة
+#  Missing credentials
 # ═══════════════════════════════════════════════════════════
 
 
 class TestMissingCredentials:
     """
-    ⚠️  الفشل يسمّي المفتاح الناقص.
+    ⚠️  The failure names the missing key.
 
-        «فشل الدفع» وحدها تجعل الأدمن يبحث في البوابة بينما المشكلة
-        حقل لم يُملأ في لوحته.
+        "Payment failed" alone makes the admin hunt through the gateway while
+        the problem is a field left blank in their own panel.
     """
 
     def test_paymob_names_the_missing_key(self):
@@ -60,13 +60,13 @@ class TestMissingCredentials:
         assert "merchant_code" in result.failure_message
 
     def test_webhooks_are_rejected_without_a_secret(self):
-        """بلا مفتاح لا تحقّق — والقبول الافتراضي يعني تعليم أي طلب كمدفوع."""
+        """With no key there is no verification — and accepting by default means marking any order paid."""
         assert PaymobAdapter({}, sandbox=True).verify_webhook({}, "anything") is False
         assert FawryAdapter({}, sandbox=True).verify_webhook({}, "anything") is False
 
 
 # ═══════════════════════════════════════════════════════════
-#  Paymob — التوقيع والمبالغ
+#  Paymob — signature and amounts
 # ═══════════════════════════════════════════════════════════
 
 
@@ -111,9 +111,9 @@ class TestPaymobSignature:
 
     def test_tampered_amount_is_rejected(self):
         """
-        ⚠️  **الهجوم الحقيقي**: تعديل المبلغ مع إبقاء التوقيع.
+        ⚠️  **The real attack**: altering the amount while keeping the signature.
 
-            بلا تحقّق يستطيع أي طرف تعليم طلب بمئة ألف كمدفوع بجنيه.
+            Without verification, any party can mark a hundred-thousand order paid with one pound.
         """
         adapter = PaymobAdapter({"hmac_secret": self.SECRET}, sandbox=True)
         payload = self._payload()
@@ -131,7 +131,7 @@ class TestPaymobSignature:
 
     def test_booleans_serialise_lowercase(self):
         """
-        ⚠️  `str(True)` ينتج `True` بحرف كبير فيكسر كل توقيع بصمت.
+        ⚠️  `str(True)` produces `True` with a capital letter and breaks every signature silently.
         """
         assert _lookup({"success": True}, "success") == "true"
         assert _lookup({"success": False}, "success") == "false"
@@ -142,7 +142,7 @@ class TestPaymobSignature:
         assert _lookup({}, "order.id") == ""
 
     def test_field_order_is_part_of_the_contract(self):
-        """إعادة ترتيب الحقول تنتج توقيعًا مختلفًا — ولذلك الترتيب ثابت."""
+        """Reordering the fields produces a different signature — which is why the order is fixed."""
         payload = self._payload()
         forward = "".join(_lookup(payload["obj"], f) for f in HMAC_FIELDS)
         reversed_order = "".join(_lookup(payload["obj"], f) for f in reversed(HMAC_FIELDS))
@@ -152,7 +152,7 @@ class TestPaymobSignature:
 class TestPaymobAmounts:
     def test_amount_is_converted_to_piastres(self):
         """
-        ⚠️  إرسال ١٥٠.٠٠ بدل ١٥٠٠٠ يحصّل جنيهًا ونصفًا بدل مئة وخمسين.
+        ⚠️  Sending 150.00 instead of 15000 collects one and a half pounds instead of a hundred and fifty.
         """
         captured = {}
 
@@ -179,8 +179,8 @@ class TestPaymobAmounts:
 
     def test_failure_at_any_step_fails_the_whole_charge(self):
         """
-        ⚠️  ثلاث خطوات متتابعة: نجاح جزئي ينتج رابطًا بمفتاح ناقص
-            يفشل عند العميل لا عندنا.
+        ⚠️  Three consecutive steps: a partial success produces a link with an
+            incomplete key that fails at the customer's end rather than at ours.
         """
         adapter = PaymobAdapter(
             {"api_key": "k", "integration_id": "1", "iframe_id": "9"}, sandbox=True
@@ -201,15 +201,15 @@ class TestPaymobAmounts:
 
 
 # ═══════════════════════════════════════════════════════════
-#  Fawry — التوقيع والمبالغ
+#  Fawry — signature and amounts
 # ═══════════════════════════════════════════════════════════
 
 
 class TestFawry:
     def test_amount_always_has_two_decimals(self):
         """
-        ⚠️  `150` بدل `150.00` في سلسلة التوقيع يجعل الخادم يحسب
-            توقيعًا مختلفًا — ويفشل بلا رسالة مفيدة.
+        ⚠️  `150` instead of `150.00` in the signature string makes the server
+            compute a different signature — and it fails with no useful message.
         """
         assert _money(Decimal("150")) == "150.00"
         assert _money(Decimal("150.5")) == "150.50"
@@ -223,10 +223,10 @@ class TestFawry:
 
     def test_http_200_with_error_body_is_a_failure(self):
         """
-        ⚠️  **الفخّ الأخطر**: Fawry تعيد ٢٠٠ ورمز الفشل في الجسم.
+        ⚠️  **The most dangerous trap**: Fawry returns 200 with the failure code in the body.
 
-            الاستنتاج من رمز HTTP وحده يعلّم طلبًا كمدفوع بينما
-            الجسم يقول «بيانات غير صالحة».
+            Inferring from the HTTP code alone marks an order paid while the
+            body says "invalid data".
         """
         adapter = FawryAdapter({"merchant_code": "MC", "secure_key": "SK"}, sandbox=True)
 
@@ -246,9 +246,10 @@ class TestFawry:
 
     def test_successful_charge_is_not_payment(self):
         """
-        ⚠️  `PAYATFAWRY` يعطي **رقمًا مرجعيًا** يدفع به العميل لاحقًا.
+        ⚠️  `PAYATFAWRY` gives a **reference number** the customer pays with later.
 
-            المال لم يُقبض بعد؛ التحصيل يتأكد بالويب‌هوك وحده.
+            The money has not been taken yet; the capture is confirmed by the
+            webhook alone.
         """
         adapter = FawryAdapter({"merchant_code": "MC", "secure_key": "SK"}, sandbox=True)
 
@@ -267,21 +268,21 @@ class TestFawry:
 
     def test_sandbox_and_live_use_different_hosts(self):
         """
-        ⚠️  مضيف الإنتاج في وضع التجريب يحصّل مالًا حقيقيًا في اختبار.
+        ⚠️  A production host in test mode collects real money during a test.
         """
         assert FawryAdapter({}, sandbox=True).base_url != FawryAdapter({}, sandbox=False).base_url
         assert "staging" in FawryAdapter({}, sandbox=True).base_url
 
 
 # ═══════════════════════════════════════════════════════════
-#  النقل
+#  Transport
 # ═══════════════════════════════════════════════════════════
 
 
 class TestTransport:
     def test_network_failure_never_raises(self):
         """
-        ⚠️  رفع الاستثناء يترك الطلب معلّقًا بين «دُفع» و«لم يُدفع».
+        ⚠️  Raising leaves the order suspended between "paid" and "not paid".
         """
         import requests
 
@@ -294,7 +295,7 @@ class TestTransport:
         assert response.status == 0
 
     def test_html_response_is_captured_not_crashed(self):
-        """بوابة في وضع صيانة تعيد HTML — الانهيار عليه يخفي السبب."""
+        """A gateway in maintenance returns HTML — crashing on it hides the cause."""
         from payments.gateways.transport import post_json
 
         class FakeResponse:
@@ -315,9 +316,10 @@ class TestTransport:
 @pytest.mark.django_db
 def test_gateways_need_credentials_before_activation():
     """
-    ⚠️  بوابة خارجية مفعّلة بلا مفاتيح تفشل عند أول عملية شراء.
+    ⚠️  An external gateway enabled with no keys fails on the first purchase.
 
-        محوّلات النقد والتحويل معفاة لأن الدفع يتم خارج أي بوابة.
+        The cash and transfer adapters are exempt because the payment happens
+        outside any gateway.
     """
     from payments.serializers import _CREDENTIAL_FREE_ADAPTERS
 

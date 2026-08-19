@@ -1,18 +1,18 @@
 """
-الكوبونات والعروض.
+Coupons and offers.
 
-⚠️  الكود القديم نفّذ منطق الكوبون **مرتين** بشكل متباعد
-    (الانتهاك H7):
+⚠️  The legacy code implemented the coupon logic **twice**, in two places that
+    had drifted apart (violation H7):
 
-        orders/views.py:20-43   نسخة
-        orders/api.py:44-67     نسخة أخرى مختلفة
+        orders/views.py:20-43   one copy
+        orders/api.py:44-67     another, different copy
 
-    كوبون يُقبل من مسار ويُرفض من آخر. وتعديل قاعدة في أحدهما
-    يترك الآخر على السلوك القديم.
+    A coupon accepted on one path and refused on another. And editing a rule in
+    one left the other on the old behaviour.
 
-⚠️  وعيب ثانٍ في النموذج القديم: `Coupon.save()` كان يدهس
-    `end_date` بسبعة أيام **في كل حفظ** — أي أن أي تعديل على
-    كوبون يعيد تمديده.
+⚠️  And a second defect in the legacy model: `Coupon.save()` overwrote
+    `end_date` with seven days **on every save** — meaning any edit to a coupon
+    extended it again.
 """
 
 from django.core.validators import MinValueValidator
@@ -33,16 +33,16 @@ class CouponKind(models.TextChoices):
 
 class Coupon(BilingualNameMixin, BaseModel):
     """
-    كوبون خصم.
+    A discount coupon.
 
-    ⚠️  الحدود ثلاثة مستويات ومنفصلة عمدًا:
+    ⚠️  The limits are three levels and deliberately separate:
 
-          `usage_limit`          إجمالي الاستخدام لكل العملاء
-          `usage_limit_per_user` لكل عميل
-          `min_order_amount`     الحد الأدنى للطلب
+          `usage_limit`          total uses across all customers
+          `usage_limit_per_user` per customer
+          `min_order_amount`     the order minimum
 
-        دمجها في حقل واحد يمنع «١٠٠٠ استخدام إجمالًا، مرة واحدة
-        لكل عميل» — وهي أشيع صيغة حملة.
+        Merging them into one field makes "1000 uses in total, once per
+        customer" impossible — and that is the most common campaign shape.
     """
 
     code = models.CharField(_("الكود"), max_length=32, unique=True, db_index=True)
@@ -65,7 +65,7 @@ class Coupon(BilingualNameMixin, BaseModel):
         help_text=_("للنسبة المئوية — يمنع خصمًا ضخمًا على طلب كبير"),
     )
 
-    # ── الأهلية ────────────────────────────────────────────
+    # ── Eligibility ────────────────────────────────────────
     min_order_amount = MoneyField(_("الحد الأدنى للطلب"), default=0)
     account_types = models.JSONField(
         _("أنواع الحسابات"),
@@ -75,13 +75,13 @@ class Coupon(BilingualNameMixin, BaseModel):
     )
     first_order_only = models.BooleanField(_("للطلب الأول فقط"), default=False)
 
-    #: ⚠️  كوبون **مملوك لشخص بعينه** — فارغ = حملة عامة.
+    #: ⚠️  A coupon **owned by a specific person** — empty = a general campaign.
     #:
-    #:     كوبون استبدال النقاط ثمنُه رصيدٌ استُهلك فعلًا من دفتر
-    #:     العميل. بلا مالك يكفي أن يُصوَّر الكود ويُرسَل لأي أحد
-    #:     ليصرفه — فيخسر صاحبه نقاطه ويأخذ الخصمَ غيرُه.
+    #:     A points-redemption coupon was paid for with a balance actually consumed
+    #:     from the customer's ledger. With no owner it is enough to photograph the
+    #:     code and send it to anyone to spend — so its owner loses their points and someone else takes the discount.
     #:
-    #:     و`usage_limit=1` لا يكفي: هو يحدّ العدد لا الشخص.
+    #:     And `usage_limit=1` is not enough: it limits the count, not the person.
     owner = models.ForeignKey(
         "accounts.User",
         on_delete=models.CASCADE,
@@ -106,13 +106,13 @@ class Coupon(BilingualNameMixin, BaseModel):
         verbose_name=_("فئات محددة"),
     )
 
-    # ── الحدود ─────────────────────────────────────────────
+    # ── Limits ─────────────────────────────────────────────
     usage_limit = models.PositiveIntegerField(_("حد الاستخدام الكلي"), null=True, blank=True)
     usage_limit_per_user = models.PositiveIntegerField(_("حد الاستخدام لكل عميل"), default=1)
-    #: مُخزَّن مسبقًا — العدّ اللحظي على جدول ضخم لا يتوسّع
+    #: Pre-stored — counting on the fly over a huge table does not scale
     usage_count = models.PositiveIntegerField(_("عدد الاستخدامات"), default=0)
 
-    # ── الصلاحية ───────────────────────────────────────────
+    # ── Validity ───────────────────────────────────────────
     starts_at = models.DateTimeField(_("يبدأ في"), default=timezone.now)
     ends_at = models.DateTimeField(
         _("ينتهي في"),
@@ -136,13 +136,14 @@ class Coupon(BilingualNameMixin, BaseModel):
 
     def save(self, *args, **kwargs):
         """
-        ⚠️  الكود يُخزَّن بحروف كبيرة.
+        ⚠️  The code is stored in upper case.
 
-        بلا توحيد، `SUMMER10` و`summer10` كوبونان مختلفان — والعميل
-        الذي يكتبه بحروف صغيرة يُرفض بلا سبب مفهوم.
+        Without normalisation, `SUMMER10` and `summer10` are two different
+        coupons — and a customer who types it in lower case is refused for no
+        comprehensible reason.
 
-        ⚠️  ولا يُمَس `ends_at` هنا إطلاقًا. النموذج القديم كان
-            يدهسه بسبعة أيام في كل حفظ فيمدّد الكوبون بلا قصد.
+        ⚠️  And `ends_at` is never touched here. The legacy model overwrote it
+            with seven days on every save, extending the coupon unintentionally.
         """
         self.code = self.code.strip().upper()
         super().save(*args, **kwargs)
@@ -167,12 +168,12 @@ class Coupon(BilingualNameMixin, BaseModel):
 
 class CouponRedemption(BaseModel):
     """
-    استخدام كوبون. **سجل دائم.**
+    A coupon use. **A permanent record.**
 
-    ⚠️  يبقى بعد إلغاء الطلب — التدقيق يحتاج معرفة من استخدم ماذا
-        ومتى، والإحصاء يحتاج تمييز الاستخدام من الاستخدام الملغى.
+    ⚠️  It survives the order's cancellation — auditing needs to know who used
+        what and when, and the statistics need to tell a use from a cancelled one.
 
-    المرجع نصي لا FK — `promotions` في L4 و`orders` في L6.
+    The reference is a string, not an FK — `promotions` is in L4 and `orders` in L6.
     """
 
     coupon = models.ForeignKey(

@@ -1,11 +1,12 @@
 """
-صلاحيات الموردين.
+Supplier permissions.
 
-⚠️  **الشراء صلاحية صريحة لا تتبع دخول اللوحة.**
+⚠️  **Purchasing is an explicit permission, not a consequence of panel access.**
 
-    من يُنشئ أمر شراء يلتزم بمال المتجر لدى طرف ثالث. جعلها
-    متاحة لكل أدمن يعني أن مدير كتالوج يطلب بضاعة بمئة ألف —
-    ولا شيء يمنعه إلا أنه لم يفكّر في ذلك.
+    Whoever creates a purchase order commits the store's money to a third party.
+    Making it available to every admin means a catalogue manager ordering a
+    hundred thousand pounds of goods — with nothing stopping them but the fact
+    that it did not occur to them.
 """
 
 from rest_framework.permissions import BasePermission

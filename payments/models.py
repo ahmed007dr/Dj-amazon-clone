@@ -1,20 +1,20 @@
 """
-الدفع — سجل بوابات **قابل للضبط من لوحة الأدمن**.
+Payments — a gateway registry **configurable from the admin panel**.
 
-⚠️  المتطلب الصريح: إضافة وتفعيل بوابة أو أكثر بلا تعديل كود ولا
-    إعادة نشر. (ADR-15)
+⚠️  The explicit requirement: add and enable one or more gateways with no code
+    change and no redeployment. (ADR-15)
 
-    البنية:
+    The structure:
 
         orders / pos
-             ↓  واجهة مجرّدة — لا يعرفان أي بوابة
+             ↓  an abstract interface — neither knows any gateway
         payments.services.charge()
              ↓
-        PaymentRouter  ← يختار حسب القناة والطريقة والعملة والترتيب
+        PaymentRouter  ← selects by channel, method, currency and order
              ↓
         Provider adapter
              ↓
-        البوابة الفعلية
+        the actual gateway
 """
 
 from django.core.validators import MinValueValidator
@@ -47,10 +47,10 @@ class PaymentMethodKind(models.TextChoices):
 
 class PaymentProvider(BilingualNameMixin, BaseModel):
     """
-    بوابة دفع مسجّلة.
+    A registered payment gateway.
 
-    ⚠️  `adapter_key` يشير إلى محوّل في الكود؛ وكل ما عداه بيانات
-        يحرّرها الأدمن. إضافة بوابة = محوّل جديد + صف هنا.
+    ⚠️  `adapter_key` points at an adapter in the code; everything else is data
+        the admin edits. Adding a gateway = a new adapter + a row here.
     """
 
     code = models.SlugField(_("الرمز"), max_length=50, unique=True)
@@ -72,7 +72,7 @@ class PaymentProvider(BilingualNameMixin, BaseModel):
         help_text=_("ONLINE · POS · EMPLOYEE — فارغ = الكل"),
     )
 
-    # ── الحدود ─────────────────────────────────────────────
+    # ── Limits ─────────────────────────────────────────────
     min_amount = MoneyField(_("الحد الأدنى"), default=0)
     max_amount = MoneyField(_("الحد الأقصى"), null=True, blank=True)
 
@@ -104,22 +104,22 @@ class PaymentProvider(BilingualNameMixin, BaseModel):
 
 class ProviderCredential(BaseModel):
     """
-    بيانات اعتماد بوابة.
+    A gateway's credentials.
 
-    ⚠️  **مفصولة عن `PaymentProvider` عمدًا.**
+    ⚠️  **Deliberately separated from `PaymentProvider`.**
 
-        جدول منفصل يسمح بصلاحية قراءة مختلفة: من يدير البوابات
-        ليس بالضرورة من يملك مفاتيحها السرية.
+        A separate table allows a different read permission: whoever manages the
+        gateways is not necessarily whoever holds their secret keys.
 
-    ⚠️  **القيمة لا تُرجَع في أي API إطلاقًا — حتى للأدمن.** (ADR-15)
+    ⚠️  **The value is never returned in any API — not even to the admin.** (ADR-15)
 
-        الحقل للكتابة فقط، والعرض يظهر آخر أربعة محارف مقنّعة.
+        The field is write-only, and the display shows the last four characters masked.
 
-    ⚠️  **ومشفّرة في قاعدة البيانات** بـ `FIELD_ENCRYPTION_KEY`.
+    ⚠️  **And it is encrypted in the database** with `FIELD_ENCRYPTION_KEY`.
 
-        حجب القيمة عن الـ API وحده كان يحمي من مسار واحد ويترك
-        الآخر مفتوحًا: نسخة احتياطية أو تسريب SQL يعطي المفاتيح
-        كاملة. انظر `core.encryption`.
+        Withholding the value from the API alone protected one path and left the
+        other open: a backup or a SQL leak hands over the keys in full. See
+        `core.encryption`.
     """
 
     provider = models.ForeignKey(
@@ -148,7 +148,7 @@ class ProviderCredential(BaseModel):
 
     @property
     def masked_value(self) -> str:
-        """التمثيل الوحيد المسموح بعرضه."""
+        """The only representation permitted to be displayed."""
         if len(self.value) <= 4:
             return "••••"
         return f"••••••••{self.value[-4:]}"
@@ -165,11 +165,12 @@ class TransactionStatus(models.TextChoices):
 
 class PaymentTransaction(BaseModel):
     """
-    معاملة دفع.
+    A payment transaction.
 
-    ⚠️  المرجع إلى الطلب **نصي** — `payments` في L7 و`orders` في L6،
-        لكن الاعتماد المباشر يجعل الطلب يعرف بوابة بعينها. المرجع
-        النصي يبقي `payments` مستقلًا قابلًا للاستخراج لاحقًا.
+    ⚠️  The reference to the order is **a string** — `payments` is in L7 and
+        `orders` in L6, but a direct dependency would make the order know a
+        specific gateway. A string reference keeps `payments` independent and
+        extractable later.
     """
 
     reference = models.CharField(
@@ -213,13 +214,13 @@ class PaymentTransaction(BaseModel):
     provider_reference = models.CharField(
         _("مرجع البوابة"), max_length=200, blank=True, db_index=True
     )
-    #: ⚠️  قد تحتوي بيانات حساسة — لا تُرجَع في أي API
+    #: ⚠️  It may contain sensitive data — never returned in any API
     provider_response = models.JSONField(_("استجابة البوابة"), default=dict, blank=True)
 
     failure_code = models.CharField(_("كود الفشل"), max_length=100, blank=True)
     failure_message = models.TextField(_("رسالة الفشل"), blank=True)
 
-    #: يمنع تكرار العملية عند نقرة مزدوجة أو إعادة محاولة
+    #: Prevents the operation repeating on a double-click or a retry
     idempotency_key = models.CharField(
         _("مفتاح المنع التكراري"),
         max_length=64,
@@ -279,12 +280,12 @@ class RefundStatus(models.TextChoices):
 
 class Refund(BaseModel):
     """
-    استرداد — كلي أو جزئي.
+    A refund — full or partial.
 
-    ⚠️  مربوط بالمعاملة الأصلية لا بالطلب.
+    ⚠️  Tied to the original transaction, not to the order.
 
-        طلب قد يُدفع بمعاملتين (دفع مقسّم)؛ الاسترداد يعود إلى
-        المصدر الذي جاء منه المال لا إلى الطلب مبهمًا.
+        An order may be paid by two transactions (a split payment); the refund
+        goes back to the source the money came from, not to the order in the abstract.
     """
 
     reference = models.CharField(_("المرجع"), max_length=32, unique=True, default=refund_reference)
@@ -327,14 +328,15 @@ class Refund(BaseModel):
 
 class WebhookEvent(models.Model):
     """
-    حدث وارد من بوابة.
+    An inbound event from a gateway.
 
-    ⚠️  **يُسجَّل قبل معالجته.**
+    ⚠️  **Recorded before it is processed.**
 
-        البوابة تعيد إرسال الحدث عند غياب الرد. بلا سجل، الطلب
-        يُعلَّم مدفوعًا مرتين — ومع الاسترداد يصير المبلغ مضاعفًا.
+        The gateway resends the event when no response arrives. Without a
+        record, the order is marked paid twice — and with a refund the amount is
+        doubled.
 
-    مفتاح BigInt — حجم كبير ولا يظهر في رابط.
+    A BigInt key — high volume, and it appears in no URL.
     """
 
     provider = models.ForeignKey(

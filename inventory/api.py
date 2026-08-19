@@ -1,8 +1,8 @@
 """
-واجهات المخزون.
+Inventory endpoints.
 
-⚠️  كل الكتابة عبر `services` — لا تعديل مباشر لأي موديل.
-    الواجهات هنا تحقق المدخلات وتستدعي، لا أكثر.
+⚠️  All writes go through `services` — no direct edit of any model.
+    The endpoints here validate the inputs and call, nothing more.
 """
 
 from django.db.models import Case, Count, F, IntegerField, Q, When
@@ -36,16 +36,16 @@ def _resolve(model, value, default=None):
 
 
 # ═══════════════════════════════════════════════════════════
-#  عام — التوفر فقط
+#  Public — availability only
 # ═══════════════════════════════════════════════════════════
 
 
 class AvailabilityAPI(APIView):
     """
-    توفر مجموعة منتجات.
+    Availability for a set of products.
 
-    ⚠️  استعلام واحد مجمّع مهما كان عدد المنتجات — هذه هي الدالة
-        التي تمنع عودة الـ N+1 إلى قوائم الكتالوج.
+    ⚠️  A single aggregated query however many products there are — this is the
+        function that keeps N+1 out of the catalogue lists.
     """
 
     permission_classes = [AllowAny]
@@ -69,7 +69,7 @@ class AvailabilityAPI(APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن — القراءة
+#  Admin — reading
 # ═══════════════════════════════════════════════════════════
 
 
@@ -102,7 +102,7 @@ class StockListAPI(generics.ListAPIView):
         if search := params.get("search"):
             queryset = queryset.filter(product__sku__icontains=search)
 
-        # الفلاتر المحسوبة تُطبَّق في بايثون — `available` ليس عمودًا
+        # The computed filters are applied in Python — `available` is not a column
         status_filter = params.get("status")
         if status_filter in ("low", "critical", "out"):
             matching = [
@@ -118,7 +118,7 @@ class StockListAPI(generics.ListAPIView):
 
 
 class StockDetailAPI(generics.RetrieveUpdateAPIView):
-    """تعديل حدود التنبيه فقط — الكميات لا تُعدَّل يدويًا."""
+    """Editing the alert thresholds only — quantities are never edited by hand."""
 
     permission_classes = [CanManageInventory]
     serializer_class = s.StockSerializer
@@ -155,15 +155,16 @@ class BatchListAPI(generics.ListAPIView):
         elif params.get("status") == "active":
             queryset = queryset.filter(quantity_remaining__gt=0, is_quarantined=False)
 
-        # FEFO — الأقرب انتهاءً أولًا
+        # FEFO — nearest to expiry first
         return queryset
 
 
 class StockMovementListAPI(generics.ListAPIView):
     """
-    سجل الحركات.
+    The movement log.
 
-    ⚠️  للقراءة فقط — السجل إضافة فقط، والتصحيح بحركة معاكسة.
+    ⚠️  Read-only — the log is append-only, and corrections go through an
+        offsetting movement.
     """
 
     permission_classes = [CanManageInventory]
@@ -217,7 +218,7 @@ class ReservationListAPI(generics.ListAPIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن — الأوامر
+#  Admin — commands
 # ═══════════════════════════════════════════════════════════
 
 
@@ -311,9 +312,9 @@ class MarkDamagedAPI(APIView):
 
 class RunMaintenanceAPI(APIView):
     """
-    تشغيل يدوي للمهام الدورية.
+    Manual execution of the periodic tasks.
 
-    تعمل تلقائيًا بجدولة، وهذه النقطة للتشغيل عند الحاجة.
+    They run automatically on a schedule; this endpoint is for running them on demand.
     """
 
     permission_classes = [CanManageInventory]
@@ -329,7 +330,7 @@ class RunMaintenanceAPI(APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الجرد
+#  Stock counting
 # ═══════════════════════════════════════════════════════════
 
 
@@ -341,10 +342,10 @@ class StockCountListAPI(generics.ListAPIView):
     def get_queryset(self):
         queryset = StockCount.objects.select_related("location").annotate(
             line_count=Count("lines", distinct=True),
-            # ⚠️  عدّ الفروق في الاستعلام لا في بايثون.
+            # ⚠️  Count the discrepancies in the query, not in Python.
             #
-            #     جرّ كل أسطر كل جلسة لعدّها يجعل القائمة تُحمّل
-            #     آلاف الصفوف لتعرض رقمًا واحدًا لكل صف.
+            #     Dragging every line of every session in to count them makes the
+            #     list load thousands of rows to display one number per row.
             variance_count=Count(
                 Case(
                     When(~Q(lines__counted_quantity=F("lines__expected_quantity")), then=1),
@@ -373,12 +374,13 @@ class StockCountDetailAPI(generics.RetrieveAPIView):
 
 class OpenStockCountAPI(APIView):
     """
-    فتح جلسة جرد **وأخذ لقطة الأرصدة فورًا**.
+    Open a stock count session **and take the balance snapshot immediately**.
 
-    ⚠️  الخطوتان معًا لا منفصلتين.
+    ⚠️  Both steps together, not separately.
 
-        جلسة مفتوحة بلا لقطة تبقى فارغة، ويظنّها العدّاد جاهزة
-        فيبدأ العدّ على ورق — واللقطة تُؤخذ لاحقًا برصيد تغيّر.
+        A session opened with no snapshot stays empty, and the counter assumes
+        it is ready and starts counting on paper — while the snapshot is taken
+        later against a balance that has changed.
     """
 
     permission_classes = [CanManageInventory]
@@ -417,7 +419,7 @@ class RecordCountedAPI(APIView):
         count = get_object_or_404(StockCount, pk=pk)
         line = StockCountLine.objects.filter(pk=data["line"], count=count).first()
         if line is None:
-            # ⚠️  مُصفّى بالجلسة: معرّف سطر جلسة أخرى كان يُعدَّل هنا
+            # ⚠️  Filtered by session: another session's line id used to be editable here
             raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
 
         services.record_counted(count, line, data["counted_quantity"], note=data.get("note", ""))
@@ -426,9 +428,10 @@ class RecordCountedAPI(APIView):
 
 class ApplyStockCountAPI(APIView):
     """
-    اعتماد الجرد — **يسوّي الفروق بحركات مسجَّلة**.
+    Approve the stock count — **it settles the discrepancies with recorded movements**.
 
-    ⚠️  لا رجعة فيه: الفروق تصير حركات، والتصحيح بجرد جديد.
+    ⚠️  Irreversible: the discrepancies become movements, and correction goes
+        through a new count.
     """
 
     permission_classes = [CanManageInventory]

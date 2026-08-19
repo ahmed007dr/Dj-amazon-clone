@@ -1,24 +1,24 @@
 """
-صلاحيات بوابة الموظفين.
+Staff portal permissions.
 
-⚠️  **الموظف لا يُمنَح صلاحيات الأدمن — ولو «مؤقتًا».**
+⚠️  **An employee is never granted admin permissions — not even "temporarily".**
 
-    مندوب المبيعات يرى عملاءه هو ويُنشئ لهم طلبات. ولا يرى قائمة
-    العملاء كاملة، ولا يعدّل الأسعار، ولا يوقف حسابات. و«مؤقتًا»
-    هي الكلمة التي تسبق أطول الثغرات عمرًا.
+    A sales rep sees their own customers and creates orders for them. They do
+    not see the full customer list, do not edit prices, and do not suspend
+    accounts. And "temporarily" is the word that precedes the longest-lived holes.
 
-⚠️  والصلاحيات **دقيقة لا حزمة واحدة**.
+⚠️  And the permissions are **fine-grained, not one bundle**.
 
-    «موظف» ليست صلاحية: مندوب المبيعات يُنشئ طلبات ولا يرى
-    الأرباح؛ وموظف المخزن يرى المخزون ولا يُنشئ طلبًا. حزمة واحدة
-    تعني أن كل موظف يملك ما يملكه أوسعهم صلاحية.
+    "Employee" is not a permission: a sales rep creates orders and does not see
+    profits; a warehouse employee sees the stock and creates no orders. A single
+    bundle means every employee holds what the broadest of them holds.
 """
 
 from rest_framework.permissions import BasePermission
 
 from accounts.models import AccountType
 
-#: الصلاحيات الدقيقة — تُسنَد للأدوار من اللوحة لا للأشخاص
+#: The fine-grained permissions — assigned to roles from the panel, never to people
 VIEW_DASHBOARD = "employees.view_employeeprofile"
 VIEW_CUSTOMERS = "employees.view_customerassignment"
 CREATE_ORDER = "orders.add_order"
@@ -27,11 +27,11 @@ MANAGE_TEAM = "employees.change_customerassignment"
 
 class IsEmployee(BasePermission):
     """
-    ⚠️  الأدمن يمرّ أيضًا — لكن لسبب محدَّد.
+    ⚠️  Admins pass too — but for a specific reason.
 
-        مدير المبيعات أدمن بحساب، ويحتاج فتح بوابة الموظفين
-        ليرى ما يراه فريقه قبل أن يقرّر. المنع الكامل كان يجبره
-        على إنشاء حساب موظف وهمي لنفسه.
+        The sales manager is an admin by account, and needs to open the staff
+        portal to see what their team sees before deciding. Blocking them
+        outright forced them to create a dummy employee account for themselves.
     """
 
     message = "بوابة الموظفين للموظفين والمديرين"
@@ -45,11 +45,12 @@ class IsEmployee(BasePermission):
 
 class HasEmployeeProfile(IsEmployee):
     """
-    ⚠️  الملف **وهو على رأس العمل** — الشرطان معًا.
+    ⚠️  The profile **and being currently employed** — both conditions together.
 
-        موظف انتهت خدمته وحسابه ما زال نشطًا بتوكن صالح في يده
-        هو أوضح ثغرة في أي نظام مبيعات. `is_active` على الملف
-        يُغلقها في أول طلب لا عند انتهاء التوكن.
+        An employee who has left while their account is still active with a
+        valid token in their hand is the most obvious hole in any sales system.
+        `is_active` on the profile closes it on the first request rather than
+        when the token expires.
     """
 
     message = "لا ملف موظف نشط لهذا الحساب"
@@ -63,7 +64,7 @@ class HasEmployeeProfile(IsEmployee):
 
 
 class CanManageEmployees(BasePermission):
-    """إدارة الموظفين والأدوار والإسناد — للأدمن بصلاحية صريحة."""
+    """Managing employees, roles and assignment — for admins with an explicit permission."""
 
     message = "إدارة الموظفين تحتاج صلاحية صريحة"
 

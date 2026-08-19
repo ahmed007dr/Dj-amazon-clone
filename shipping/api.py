@@ -1,4 +1,4 @@
-"""واجهات الشحن."""
+"""Shipping endpoints."""
 
 from decimal import Decimal, InvalidOperation
 
@@ -16,7 +16,7 @@ from shipping.models import Shipment, ShippingMethod
 
 
 class ShippingQuoteAPI(APIView):
-    """عروض الشحن المتاحة لهذه المحافظة — تُحسب من المصدر."""
+    """The shipping quotes available for this governorate — computed from the source."""
 
     permission_classes = [AllowAny]
 
@@ -43,12 +43,14 @@ class ShippingMethodListAPI(generics.ListAPIView):
 
 class TrackShipmentAPI(APIView):
     """
-    تتبع بالرقم.
+    Tracking by number.
 
-    ⚠️  عام عمدًا — العميل يشارك الرقم مع من يستلم عنه.
+    ⚠️  Deliberately public — the customer shares the number with whoever
+        receives on their behalf.
 
-        ولهذا بالضبط لا تكشف الاستجابة العنوان الكامل ولا الهاتف:
-        رقم يُشارَك يجب ألا يحمل بيانات شخصية.
+        And for exactly that reason the response exposes neither the full
+        address nor the phone number: a number that gets shared must carry no
+        personal data.
     """
 
     permission_classes = [AllowAny]
@@ -79,10 +81,10 @@ class AdminShipmentListAPI(generics.ListAPIView):
 
 class AdminTransitionShipmentAPI(APIView):
     """
-    ⚠️  الانتقال غير المسموح يُرفض من آلة الحالة بـ `409`.
+    ⚠️  A disallowed transition is refused by the state machine with `409`.
 
-        شحنة «سُلّمت» لا تعود إلى «قيد التجهيز» — وإلا فسد كل
-        تقرير تسليم.
+        A "delivered" shipment does not go back to "processing" — or every
+        delivery report is corrupted.
     """
 
     permission_classes = [CanManageShipping]

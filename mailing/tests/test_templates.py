@@ -1,17 +1,17 @@
 """
-اختبارات القوالب المحرَّرة.
+Edited template tests.
 
-⚠️  **فتح القوالب للتحرير يفتح معها ثلاثة أبواب — وكلها تُغلَق هنا:**
+⚠️  **Opening the templates for editing opens three doors with them — and all are closed here:**
 
-    ١. `str.format` يقبل `{link.__class__}`: تعبير يتنقّل في خصائص
-       الكائنات. مقبول ما دام النص في الكود، وثغرة قراءة ذاكرة لحظة
-       يصير حقلًا يحرّره الأدمن.
+    1. `str.format` accepts `{link.__class__}`: an expression walking through an
+       object's attributes. Tolerable while the text lives in code, and a
+       memory-read hole the moment it becomes a field the admin edits.
 
-    ٢. حرف زائد في `{totall}` كان يرفع `KeyError` فتُفقَد الرسالة —
-       تحرير بريء يوقف بريد النظام كله.
+    2. One extra character in `{totall}` raised `KeyError` and the message was
+       lost — an innocent edit stopping the whole system's mail.
 
-    ٣. من يحرّر العربية وينسى الإنجليزية لا يكتشف ذلك أبدًا: لا يقرأ
-       بريده بالإنجليزية.
+    3. Whoever edits the Arabic and forgets the English never discovers it: they
+       do not read their mail in English.
 """
 
 import pytest
@@ -24,7 +24,7 @@ from mailing.templates import TEMPLATES, placeholders, render_text
 
 class TestSafeRenderer:
     def test_attribute_traversal_is_not_a_placeholder(self):
-        """⚠️  البابان الأخطر: `{x.__class__}` و`{x[0]}` لا يُطابَقان أصلًا."""
+        """⚠️  The two most dangerous doors: `{x.__class__}` and `{x[0]}` do not match at all."""
         assert placeholders("{link.__class__.__mro__} و {items[0]}") == set()
 
     def test_attribute_expression_is_left_untouched(self):
@@ -34,8 +34,9 @@ class TestSafeRenderer:
 
     def test_typo_survives_instead_of_losing_the_message(self):
         """
-        ⚠️  `{totall}` ظاهرًا في رسالة وصلت قبيحٌ ومحرج — لكنه يُقرأ
-            ويُبلَّغ عنه. أما الرسالة المفقودة فلا يعرف أحد أنها كانت.
+        ⚠️  A visible `{totall}` in a message that arrived is ugly and
+            embarrassing — but it gets read and reported. Whereas nobody knows a
+            lost message ever existed.
         """
         assert render_text("إجمالي {totall}", {"total": "450"}) == "إجمالي {totall}"
 
@@ -43,7 +44,7 @@ class TestSafeRenderer:
         assert render_text("مرحبًا {name}", {"name": "أحمد"}) == "مرحبًا أحمد"
 
     def test_every_shipped_template_declares_its_variables(self):
-        """قالب بمتغيّر لا يعرفه أحد لا يمكن تحريره بأمان."""
+        """A template with a variable nobody knows cannot be edited safely."""
         for key, template in TEMPLATES.items():
             assert template.variables or key, key
 
@@ -63,8 +64,9 @@ class TestOverrideValidation:
 
     def test_unknown_variable_is_rejected_at_save(self):
         """
-        ⚠️  الكود وحده يعرف ما يضعه في السياق: متغيّر خارج قائمته يصل
-            إلى المستلم نصًّا خامًا. الرفض هنا يمنعه قبل أول رسالة.
+        ⚠️  Only the code knows what it puts in the context: a variable outside
+            its list reaches the recipient as raw text. Rejecting here prevents
+            it before the first message.
         """
         override = self._override(body_ar="مرحبًا {name}، رصيدك {balance}")
 
@@ -78,7 +80,7 @@ class TestOverrideValidation:
             self._override(key="no-such-template").full_clean()
 
     def test_both_languages_are_required(self):
-        """من يحرّر العربية وينسى الإنجليزية لا يكتشف ذلك أبدًا."""
+        """Whoever edits the Arabic and forgets the English never discovers it."""
         with pytest.raises(ValidationError) as exc:
             self._override(body_en="").full_clean()
 
@@ -105,8 +107,8 @@ class TestOverrideResolution:
 
     def test_disabling_the_override_restores_the_original(self):
         """
-        ⚠️  تحرير فاسد وقت الضغط يجب أن يُلغى بضغطة — لا بإعادة كتابة
-            النص الأصلي من الذاكرة ولا باستعادة نسخة احتياطية.
+        ⚠️  A bad edit made under pressure must be undone with one click — not
+            by retyping the original text from memory, nor by restoring a backup.
         """
         TemplateOverride.objects.create(
             key="password_changed",
@@ -122,7 +124,7 @@ class TestOverrideResolution:
         assert subject == TEMPLATES["password_changed"].subject_ar
 
     def test_no_override_at_all_is_a_valid_state(self):
-        """الجدول تجاوزات لا قوالب: النظام يعمل كاملًا وهو فارغ."""
+        """The table holds overrides, not templates: the system works fully while it is empty."""
         assert TemplateOverride.objects.count() == 0
 
         subject, body = services.render("password_changed", "ar", {"name": "أحمد"})
@@ -131,13 +133,15 @@ class TestOverrideResolution:
 
     def test_a_broken_override_falls_back_to_code_instead_of_dropping_the_mail(self, monkeypatch):
         """
-        ⚠️  التجاوز يحرّره إنسان، وإنسان يخطئ. وخلل فيه يجب ألا يمنع
-            وصول «إعادة تعيين كلمة المرور» — النسخة الأصلية قائمة
-            دائمًا، فاستعمالها أرخص من إسقاط الرسالة.
+        ⚠️  The override is edited by a human, and humans make mistakes. And a
+            defect in it must not stop "password reset" arriving — the original
+            version is always there, and using it is cheaper than dropping the
+            message.
 
-            والعطل هنا مُحاكى بحقن استثناء في التصيير: القيود تمنع
-            الصفّ التالف من الكتابة، وتبقى الطرق الأخرى إليه (ترحيل
-            بيانات · تعديل SQL مباشر · خلل مستقبلي في التصيير).
+            The fault here is simulated by injecting an exception into the
+            rendering: the constraints prevent a corrupt row being written, and
+            the other routes to it remain (a data migration · a direct SQL edit ·
+            a future defect in the rendering).
         """
         TemplateOverride.objects.create(
             key="password_changed",

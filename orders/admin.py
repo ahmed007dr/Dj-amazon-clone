@@ -1,15 +1,16 @@
 """
-لوحة الطلبات.
+Orders admin panel.
 
-⚠️  **الحالة لا تُعدَّل من نموذج التحرير.**
+⚠️  **The status is never edited from the change form.**
 
-    `orders.services.transition` هو ما يفحص الانتقال المسموح، ويكتب
-    `OrderStatusHistory`، ويثبّت الحجوزات أو يحرّرها، ويبعث الإشارات.
-    قلب الحقل في اللوحة يفعل شيئًا واحدًا: يكذب على بقية النظام.
-    لذلك الحالة والمبالغ للقراءة، والتغيير عبر الإجراءات أدناه.
+    `orders.services.transition` is what checks the permitted transition, writes
+    `OrderStatusHistory`, fulfils or releases the reservations, and emits the
+    signals. Flipping the field in the panel does one thing: it lies to the rest
+    of the system. So the status and the amounts are read-only, and changes go
+    through the actions below.
 
-⚠️  سطور الطلب لقطة تاريخية (اسم · سعر · ضريبة وقت الشراء). تعديلها
-    يعيد كتابة الماضي ويكسر مطابقة الفواتير.
+⚠️  Order lines are a historical snapshot (name · price · tax at the time of
+    purchase). Editing them rewrites the past and breaks invoice reconciliation.
 """
 
 from django.contrib import admin
@@ -175,16 +176,16 @@ class OrderAdmin(DomainModelAdmin):
 
     def _run(self, request, queryset, action):
         """
-        كل طلب على حدة: انتقال مرفوض في واحد لا يجب أن يوقف الباقي،
-        والسبب يُعرض كما رفعته الخدمة.
+        Each order separately: a refused transition on one must not stop the
+        rest, and the reason is shown exactly as the service raised it.
         """
         done, failed = 0, []
         for order in queryset:
             try:
                 action(order)
                 done += 1
-            # ⚠️  الالتقاط العام مقصود: نعرض سبب الرفض كما هو بدل
-            #     إسقاط الإجراء الجماعي كله على أول طلب يرفضه.
+            # ⚠️  The broad catch is deliberate: we show the refusal reason as it is
+            #     rather than dropping the whole bulk action on the first order that refuses.
             except Exception as exc:
                 failed.append(f"{order.number}: {exc}")
 

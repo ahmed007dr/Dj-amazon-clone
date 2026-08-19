@@ -1,7 +1,7 @@
 """
-واجهات الطلبات وإتمام الشراء.
+Order and checkout endpoints.
 
-⚠️  كل queryset مُصفّى بالعميل — الهوية من التوكن لا من الرابط.
+⚠️  Every queryset is filtered by customer — the identity comes from the token, not the URL.
 """
 
 from django.db import transaction
@@ -25,7 +25,7 @@ class MyOrderListAPI(generics.ListAPIView):
     serializer_class = s.OrderListSerializer
 
     def get_queryset(self):
-        # ⚠️  خط الدفاع الأول — لا طلب لغير صاحبه يصل أصلًا
+        # ⚠️  The first line of defence — no order belonging to someone else arrives at all
         profile = customer_services.get_or_create_profile(self.request.user)
         queryset = services.orders_for(profile)
 
@@ -46,13 +46,14 @@ class MyOrderDetailAPI(generics.RetrieveAPIView):
 
 class CheckoutAPI(APIView):
     """
-    إتمام الشراء.
+    Checkout.
 
-    ⚠️  **إعادة تحقق كاملة قبل الإنشاء.**
+    ⚠️  **A full re-validation before creation.**
 
-        `create_from_cart` تعيد تسعير السلة وتفحص كل سطر: المنتج
-        مفعّل · الوصول مسموح · المخزون كافٍ · الكوبون صالح. طلب
-        بسعر قديم أو مخزون ناقص يُرفض هنا لا بعد الشحن.
+        `create_from_cart` reprices the cart and checks every line: the product
+        is active · access is permitted · stock is sufficient · the coupon is
+        valid. An order at a stale price or with missing stock is refused here,
+        not after shipping.
     """
 
     permission_classes = [IsAuthenticated]
@@ -93,16 +94,16 @@ class CheckoutAPI(APIView):
         )
 
     def _resolve_address(self, profile, data) -> dict:
-        # ⚠️  في `services` لا هنا: إتمام الآجل يستخدم نفس التصفية،
-        #     ونسختان منها تعنيان أن إحداهما تُنسى عند أول تعديل.
+        # ⚠️  In `services`, not here: credit checkout uses the same filtering,
+        #     and two copies of it mean one gets forgotten at the first edit.
         return services.resolve_address(profile, data)
 
     def _charge(self, request, order, method):
         """
-        ⚠️  `Idempotency-Key` يمنع الدفع المكرر.
+        ⚠️  `Idempotency-Key` prevents a duplicate payment.
 
-            نقرة مزدوجة أو إعادة محاولة على شبكة ضعيفة يجب ألا
-            تنتج عمليتي دفع.
+            A double-click or a retry on a weak connection must not produce two
+            payment operations.
         """
         from payments import services as payment_services
 
@@ -118,8 +119,8 @@ class CheckoutAPI(APIView):
                 idempotency_key=request.headers.get("Idempotency-Key", ""),
             )
         except BusinessError:
-            # الطلب أُنشئ؛ الدفع يُعاد من صفحة الطلب.
-            # رفع الاستثناء هنا يتراجع بالطلب كله لأجل بوابة متعثّرة.
+            # The order was created; payment is retried from the order page.
+            # Raising here would roll the whole order back over a struggling gateway.
             return None
 
 
@@ -143,7 +144,7 @@ class CancelOrderAPI(APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن
+#  Admin
 # ═══════════════════════════════════════════════════════════
 
 
@@ -184,10 +185,10 @@ class AdminOrderDetailAPI(generics.RetrieveAPIView):
 
 class AdminTransitionAPI(APIView):
     """
-    نقل الطلب إلى حالة جديدة.
+    Move the order to a new status.
 
-    ⚠️  الانتقال غير المسموح يُرفض بـ `409` من آلة الحالة —
-        لا تُكرَّر القواعد هنا.
+    ⚠️  A disallowed transition is refused with `409` by the state machine —
+        the rules are not duplicated here.
     """
 
     permission_classes = [CanManageOrders]

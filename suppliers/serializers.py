@@ -1,4 +1,4 @@
-"""عقود الموردين — المبالغ نصًا (ADR-31)."""
+"""Supplier contracts — amounts as strings (ADR-31)."""
 
 from decimal import Decimal
 
@@ -25,8 +25,8 @@ class MoneySerializerField(serializers.DecimalField):
 class SupplierSerializer(serializers.ModelSerializer):
     offer_count = serializers.IntegerField(read_only=True, default=0)
 
-    # ⚠️  تأتي من التجميع في `services.annotated_suppliers` — لا
-    #     تُحسب لكل صف على حدة (N+1 في أكثر شاشة تُفتح).
+    # ⚠️  These come from the aggregation in `services.annotated_suppliers` — they
+    #     are not computed per row (N+1 on the most frequently opened screen).
     payable = MoneySerializerField(read_only=True, default=None)
     total_purchases = MoneySerializerField(read_only=True, default=None)
     has_overdue = serializers.BooleanField(read_only=True, default=False)
@@ -111,12 +111,12 @@ class PurchaseOrderLineSerializer(serializers.ModelSerializer):
             "quantity_ordered",
             "quantity_received",
             "quantity_returned",
-            # ⚠️  المستلَم بعد خصم المرتجع — سقف ما يُمكن إرجاعه.
-            #     الشاشة تبني عليه حدّ حقل الإرجاع.
+            # ⚠️  Received minus returned — the ceiling on what can be returned.
+            #     The screen builds the return field's limit on it.
             "quantity_on_hand",
             "outstanding",
             "unit_cost",
-            # ⚠️  سعر العرض والفارق: «بكم كان معروضًا وكم دفعنا؟»
+            # ⚠️  The offer price and the difference: "what was it offered at and what did we pay?"
             "list_cost",
             "cost_variance",
             "total",
@@ -147,8 +147,8 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             "note",
             "lines",
         ]
-        # ⚠️  الحالة والإجمالي يُشتقّان من الخدمة لا من الواجهة:
-        #     أمر «مستلَم» يُرسله العميل كان يُخفي بضاعة لم تصل.
+        # ⚠️  The status and the total are derived from the service, not from the frontend:
+        #     a "received" order sent by the client used to hide goods that never arrived.
         read_only_fields = [
             "id",
             "number",
@@ -165,8 +165,8 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 class PurchaseOrderLineInputSerializer(serializers.Serializer):
     product = serializers.UUIDField()
     quantity = serializers.IntegerField(min_value=1, max_value=999999)
-    #: ⚠️  اختياري: يُملأ من العرض حين يُترك فارغًا، ويُسجَّل فارقه
-    #:     في سجل التدقيق حين يُرسَل. انظر `services.create_order`.
+    #: ⚠️  Optional: filled in from the offer when left blank, and its difference is
+    #:     recorded in the audit log when sent. See `services.create_order`.
     unit_cost = serializers.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -177,7 +177,7 @@ class PurchaseOrderLineInputSerializer(serializers.Serializer):
 
 
 class CreatePurchaseOrderSerializer(serializers.Serializer):
-    """⚠️  السعر اختياري: من العرض افتراضًا، ويقبل تفاوضًا مُدقَّقًا."""
+    """⚠️  The price is optional: from the offer by default, and it accepts an audited negotiation."""
 
     supplier = serializers.UUIDField()
     location = serializers.UUIDField()
@@ -228,8 +228,9 @@ class SupplierPaymentSerializer(serializers.Serializer):
 
 class ReturnToSupplierSerializer(serializers.Serializer):
     """
-    ⚠️  السبب إلزامي: إرجاع بلا سبب مكتوب يجعل تقييم المورّد
-        مستحيلًا — لا نعرف أكانت البضاعة تالفة أم خاطئة أم زائدة.
+    ⚠️  The reason is mandatory: a return with no written reason makes assessing
+        the supplier impossible — we do not know whether the goods were damaged,
+        wrong or surplus.
     """
 
     line = serializers.UUIDField()

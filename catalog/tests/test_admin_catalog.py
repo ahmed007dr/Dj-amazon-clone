@@ -14,6 +14,8 @@ Catalogue management from the admin portal.
 from decimal import Decimal
 
 import pytest
+
+from core.testing import grant_all_domains
 from django.apps import apps
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -71,6 +73,7 @@ def admin_client(db):
     admin.save()
     # A string reference — no import that would break the two domains' isolation
     apps.get_model("administration", "AdminProfile").objects.create(user=admin)
+    grant_all_domains(admin)
 
     client = APIClient()
     client.force_authenticate(user=admin)

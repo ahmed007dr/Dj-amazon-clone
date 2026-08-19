@@ -1,4 +1,4 @@
-"""لوحة الإشعارات."""
+"""Notifications admin panel."""
 
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
@@ -39,7 +39,7 @@ class NotificationPreferenceAdmin(DomainModelAdmin):
 
 @admin.register(NotificationLog)
 class NotificationLogAdmin(LogAdmin):
-    """محاولات الإرسال الفعلية — لماذا لم يصل البريد؟"""
+    """The actual delivery attempts — why did the email not arrive?"""
 
     list_display = (
         "created_at",

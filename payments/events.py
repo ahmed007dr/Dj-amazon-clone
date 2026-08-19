@@ -1,31 +1,31 @@
 """
-أحداث نطاق الدفع.
+Payment domain events.
 
-⚠️  **`payments` لا يعرف من يستمع — ولا يستطيع أن يعرف.**
+⚠️  **`payments` does not know who listens — and cannot know.**
 
-    الطبقات تضع `payments` **تحت** `orders` (انظر عقد import-linter
-    في `pyproject.toml`): الطلب يستدعي الدفع، والدفع لا يعرف بوجود
-    الطلبات إطلاقًا — مرجعه نصي.
+    The layers place `payments` **below** `orders` (see the import-linter
+    contract in `pyproject.toml`): the order calls payment, and payment knows
+    nothing at all about orders — its reference is a string.
 
-    ولذلك لا يجوز أن يعلّم الويب‌هوك طلبًا كمدفوع باستيراد `orders`.
-    الإشارة تقلب الاتجاه: الدفع يعلن، ومن هو أعلى منه يستمع.
+    So the webhook must not mark an order paid by importing `orders`. The signal
+    inverts the direction: payment announces, and whoever is above it listens.
 
-⚠️  وتُبعَث **بعد** حفظ المعاملة لا قبله.
+⚠️  And they are emitted **after** the transaction is saved, not before.
 
-    مستمع يقرأ حالة لم تُحفظ بعد يبني قرارًا على قيمة قد يتراجع
-    عنها الـ rollback.
+    A listener reading a status not yet saved builds a decision on a value the
+    rollback may take back.
 """
 
 import django.dispatch
 
-#: صُرِّح بالمبلغ ولم يُحصَّل بعد — البطاقة حجزت الرصيد
+#: The amount was authorised and not yet captured — the card has held the funds
 payment_authorized = django.dispatch.Signal()
 
-#: **المال قُبض فعلًا** — يستهلكه: orders (تعليم الطلب مدفوعًا) · finance
+#: **The money was actually taken** — consumed by: orders (marking the order paid) · finance
 payment_captured = django.dispatch.Signal()
 
-#: فشل الدفع أو أُلغي أو انتهت مهلته
+#: The payment failed, was cancelled, or timed out
 payment_failed = django.dispatch.Signal()
 
-#: استرداد أكّدته البوابة عبر حدث وارد
+#: A refund the gateway confirmed through an inbound event
 payment_refunded = django.dispatch.Signal()

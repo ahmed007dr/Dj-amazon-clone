@@ -1,8 +1,9 @@
 """
-لوحة الشحن.
+Shipping admin panel.
 
-⚠️  `Shipment.reference_*` مرجع نصي لا مفتاح أجنبي — الشحن لا يعرف
-    الطلبات. لذلك لا `autocomplete` عليه، والبحث نصي.
+⚠️  `Shipment.reference_*` is a string reference, not a foreign key — shipping
+    does not know about orders. So there is no `autocomplete` on it, and the
+    search is textual.
 """
 
 from django.contrib import admin
@@ -34,7 +35,7 @@ class ShipmentEventInline(admin.TabularInline):
     show_change_link = False
 
     def has_add_permission(self, request, obj=None):
-        """المسار الزمني تكتبه خدمة الشحن — لا يُلفّق يدويًا."""
+        """The timeline is written by the shipping service — it is never fabricated by hand."""
         return False
 
 

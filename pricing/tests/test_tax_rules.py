@@ -1,21 +1,21 @@
 """
-اختبارات التحكم بالضريبة.
+Tax control tests.
 
-⚠️  قاعدة العمل المُعتمدة (2026-08-14):
+⚠️  The approved business rule (2026-08-14):
 
-        النسبة **متغيّرة**، وقد **لا توجد ضريبة أصلًا** —
-        لبعض المنتجات أو لكلها.
+        the rate is **variable**, and there may be **no tax at all** —
+        for some products or for all of them.
 
-    الاختبارات هنا تحرس الحالات الثلاث، وتحرس ما هو أهم منها:
-    أن الصفر **قرار صريح** لا نتيجة غياب أو سهو.
+    The tests here guard all three cases, and something more important still:
+    that zero is **an explicit decision**, not the result of an absence or an oversight.
 
-⚠️  مكانها `pricing` لا `administration` رغم أنها تختبر واجهة الأدمن.
+⚠️  They live in `pricing`, not `administration`, even though they exercise the admin API.
 
-    القاعدة المعتمدة: **الاختبار يسكن في أعلى نطاق يلمسه.** وهو
-    يلمس ثلاثة — `administration` (الواجهة) و`catalog` (المنتج)
-    و`pricing` (الحساب) — و`pricing` أعلاها في مخطط الطبقات.
-    وضعها في `administration` يجعله يستورد ما هو فوقه، وقد رفضه
-    `import-linter` فعلًا.
+    The standing rule: **a test lives in the highest domain it touches.** And it
+    touches three — `administration` (the interface), `catalog` (the product)
+    and `pricing` (the calculation) — and `pricing` is the highest of them in
+    the layer diagram. Putting them in `administration` makes it import what is
+    above it, and `import-linter` genuinely refused it.
 """
 
 from datetime import timedelta
@@ -28,6 +28,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import AccountType, User
 from administration.models import AdminProfile
+from core.testing import grant_all_domains
 from catalog.models import Category, Product
 from core.models.settings import SystemSetting
 from core.models.tax import TaxClass
@@ -44,6 +45,7 @@ def admin_client(db):
     admin.is_active = True
     admin.save()
     AdminProfile.objects.create(user=admin)
+    grant_all_domains(admin)
 
     client = APIClient()
     client.force_authenticate(user=admin)
@@ -87,14 +89,14 @@ def tax_enabled(db):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحالات الثلاث للقاعدة
+#  The rule's three cases
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 class TestVariableTax:
     def test_rate_is_variable_per_class(self, standard, exempt, category):
-        """نسبة مختلفة لكل فئة — لا رقم مثبَّت في الكود."""
+        """A different rate per class — not a figure fixed in code."""
         taxed = make_product(category, standard, "T-1")
         free = make_product(category, exempt, "T-2")
 
@@ -104,10 +106,10 @@ class TestVariableTax:
 
     def test_changing_a_rate_affects_only_future_pricing(self, standard, category):
         """
-        ⚠️  النسبة **لقطة**. (ADR-30)
+        ⚠️  The rate is **a snapshot**. (ADR-30)
 
-            تغييرها لا يمسّ ما سُعِّر قبلها — وإلا تغيّرت كل فاتورة
-            قديمة بقرار حكومي جديد.
+            Changing it does not touch what was priced before it — or every old
+            invoice would change with a new government decree.
         """
         product = make_product(category, standard)
         before = pricing.price_for(product)
@@ -122,7 +124,7 @@ class TestVariableTax:
         assert after.tax_rate == Decimal("15.00")
 
     def test_tax_can_be_disabled_for_everything(self, standard, category):
-        """«قد لا تكون موجودة … لكل المنتجات» — مفتاح واحد."""
+        """"It may not exist … for any product" — a single switch."""
         product = make_product(category, standard)
         assert pricing.price_for(product).tax_amount > 0
 
@@ -134,17 +136,18 @@ class TestVariableTax:
 
     def test_a_product_without_a_class_uses_the_default(self, standard, category):
         """
-        ⚠️  الحقل الفارغ يعني «قياسي» لا «معفى».
+        ⚠️  An empty field means "standard", not "exempt".
 
-            وهو الافتراضي الصحيح: أغلب السلع خاضعة. الإعفاء يُسنَد
-            صراحةً بفئة نسبتها صفر — فلا يصير سهوٌ إعفاءً.
+            And that is the correct default: most goods are taxable. Exemption
+            is assigned explicitly through a zero-rate class — so an oversight
+            never becomes an exemption.
         """
         product = make_product(category, None)
         assert pricing.price_for(product).tax_rate == Decimal("14.00")
 
 
 # ═══════════════════════════════════════════════════════════
-#  الصفر قرار لا غياب
+#  Zero is a decision, not an absence
 # ═══════════════════════════════════════════════════════════
 
 
@@ -152,12 +155,12 @@ class TestVariableTax:
 class TestZeroIsDeliberate:
     def test_expired_class_falls_back_instead_of_going_untaxed(self, standard, category):
         """
-        ⚠️  **الفخّ الذي أُصلح.**
+        ⚠️  **The trap that was fixed.**
 
-            الأدمن يضبط `valid_to` عند تغيير النسبة وينسى إعادة
-            تصنيف المنتجات. السلوك القديم كان يجعلها كلها معفاة
-            بصمت — ولا يُكتشف إلا في مراجعة ضريبية. ونقص التحصيل
-            مسؤولية قانونية بخلاف زيادته.
+            The admin sets `valid_to` when changing the rate and forgets to
+            reclassify the products. The old behaviour made them all silently
+            exempt — discovered only in a tax audit. And under-collecting is a
+            legal liability, unlike over-collecting.
         """
         yesterday = timezone.localdate() - timedelta(days=1)
         old = TaxClass.objects.create(
@@ -176,7 +179,7 @@ class TestZeroIsDeliberate:
         assert priced.tax_amount > 0
 
     def test_future_class_falls_back_too(self, standard, category):
-        """نسبة مجدولة للعام القادم لا تجعل المنتج معفى اليوم."""
+        """A rate scheduled for next year does not make the product exempt today."""
         future = TaxClass.objects.create(
             code="next-year",
             name_ar="قادمة",
@@ -189,7 +192,7 @@ class TestZeroIsDeliberate:
         assert pricing.price_for(product).tax_rate == Decimal("14.00")
 
     def test_explicit_zero_class_really_is_zero(self, standard, exempt, category):
-        """الإعفاء الصريح يبقى إعفاءً — لا يسقط إلى الافتراضية."""
+        """An explicit exemption stays an exemption — it does not fall back to the default."""
         product = make_product(category, exempt)
 
         priced = pricing.price_for(product)
@@ -198,7 +201,7 @@ class TestZeroIsDeliberate:
 
 
 # ═══════════════════════════════════════════════════════════
-#  واجهة الأدمن
+#  The admin interface
 # ═══════════════════════════════════════════════════════════
 
 
@@ -248,7 +251,7 @@ class TestTaxAdminAPI:
         assert entry.changes["rate"] == {"old": "14.00", "new": "16.00"}
 
     def test_class_in_use_cannot_be_deleted(self, admin_client, standard, category):
-        """حذفها يسقط منتجاتها إلى نسبة أخرى بلا أن يقصد أحد ذلك."""
+        """Deleting it drops its products to a different rate with nobody intending it."""
         make_product(category, standard)
 
         response = admin_client.delete(
@@ -264,7 +267,7 @@ class TestTaxAdminAPI:
         assert response.status_code == 409
 
     def test_inverted_validity_window_is_rejected(self, admin_client, standard):
-        """فترة مقلوبة تجعل الفئة غير سارية أبدًا — أي إعفاءً صامتًا."""
+        """An inverted period makes the class never effective — that is, a silent exemption."""
         today = timezone.localdate()
         response = admin_client.post(
             reverse("v1:administration:tax-classes"),
@@ -281,7 +284,7 @@ class TestTaxAdminAPI:
         assert response.status_code == 400
 
     def test_product_count_is_visible_before_editing(self, admin_client, standard, category):
-        """رؤية عدد المنتجات المتأثرة تحوّل القرار من تخمين إلى معرفة."""
+        """Seeing the number of affected products turns the decision from a guess into knowledge."""
         make_product(category, standard, "P-1")
         make_product(category, standard, "P-2")
 

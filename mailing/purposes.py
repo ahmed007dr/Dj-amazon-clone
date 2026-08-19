@@ -1,12 +1,13 @@
 """
-الأغراض — وحدة الإسناد في شاشة المسؤوليات.
+Purposes — the unit of assignment on the responsibilities screen.
 
-⚠️  **وحدة ورقية عمدًا** (لا تستورد شيئًا من النطاق).
+⚠️  **Deliberately a leaf module** (it imports nothing from the domain).
 
-    الغرض يحتاجه طرفان: `models` ليكون خيارات حقل، و`templates`
-    ليعلنه كل قالب. ووضعه في أحدهما كان يجعل الآخر يستورده —
-    ثم يستورده الأول بدوره حين احتاج القوالب للتحقق، فتُغلَق دائرة
-    لا يكسرها إلا استيراد داخل دالة: إخفاء للدائرة لا حلّ لها.
+    The purpose is needed by two parties: `models`, to be a field's choices, and
+    `templates`, so every template can declare one. Putting it in either made
+    the other import it — and then the first imported it back when the templates
+    needed validation, closing a cycle breakable only by an import inside a
+    function: hiding the cycle rather than resolving it.
 """
 
 from django.db import models
@@ -25,8 +26,8 @@ class MailPurpose(models.TextChoices):
     SYSTEM = "SYSTEM", _("النظام")
 
 
-#: ⚠️  الأغراض التي لا تُسنَد إلى حساب تسويقي أبدًا (ADR-76).
+#: ⚠️  The purposes that are never assigned to a marketing account (ADR-76).
 #:
-#:     «غُيّرت كلمة مرورك» و«فعّل حسابك» ليست تسويقًا: خروجها من
-#:     حساب مُدرَج في القوائم السوداء يحجب المستخدم عن حسابه.
+#:     "Your password was changed" and "activate your account" are not
+#:     marketing: sending them from a blacklisted account locks the user out of their account.
 SECURITY_PURPOSES = frozenset({MailPurpose.ACCOUNT, MailPurpose.SYSTEM})

@@ -1,8 +1,9 @@
 """
-لوحة التسعير.
+Pricing admin panel.
 
-⚠️  ما يظهر هنا مدخلات التسعير لا نتيجته. السعر النهائي يحسبه
-    `pricing.services` وقت الطلب من القائمة والقاعدة والتجاوز معًا.
+⚠️  What appears here are the pricing inputs, not its result. The final price is
+    computed by `pricing.services` at request time from the list, the rule and
+    the override together.
 """
 
 from django.contrib import admin

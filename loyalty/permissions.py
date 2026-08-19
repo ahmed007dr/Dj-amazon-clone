@@ -1,13 +1,14 @@
 """
-صلاحيات الولاء.
+Loyalty permissions.
 
-⚠️  **ضبط البرنامج صلاحية صريحة لا تتبع دخول اللوحة.**
+⚠️  **Configuring the programme is an explicit permission, not a consequence of panel access.**
 
-    من يعدّل `point_value` يغيّر التزام المتجر كله بضربة واحدة:
-    ضرب القيمة في عشرة يجعل كل نقطة قائمة تساوي عشرة أضعاف،
-    والالتزام يصير رقمًا لم يوافق عليه أحد.
+    Whoever edits `point_value` changes the whole store's liability in one
+    stroke: multiplying the value by ten makes every outstanding point worth ten
+    times as much, and the liability becomes a figure nobody approved.
 
-⚠️  والتسوية اليدوية أخطر: نقاط تُخلَق أو تُمحى بلا طلب يقابلها.
+⚠️  And the manual adjustment is more dangerous still: points created or erased
+    with no order against them.
 """
 
 from rest_framework.permissions import BasePermission

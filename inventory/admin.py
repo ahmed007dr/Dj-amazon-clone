@@ -1,12 +1,13 @@
 """
-لوحة المخزون.
+Inventory admin panel.
 
-⚠️  الكميات **تُقرأ ولا تُكتب** من هنا.
+⚠️  Quantities are **read and never written** from here.
 
-    كل رصيد في `Stock` هو حصيلة حركات `StockMovement` وحجوزات
-    `StockReservation`. تعديل الرقم مباشرةً يفصله عن سجل حركته،
-    فيصير الجرد غير قابل للتفسير. التسوية تتم بجرد (`StockCount`)
-    أو بحركة صريحة عبر `inventory.services`.
+    Every balance in `Stock` is the result of `StockMovement` movements and
+    `StockReservation` reservations. Editing the number directly severs it from
+    its movement log, so the stock count becomes inexplicable. Adjustment
+    happens through a stock count (`StockCount`) or an explicit movement via
+    `inventory.services`.
 """
 
 from django.contrib import admin
@@ -88,7 +89,7 @@ class StockAdmin(TimeStampedAdmin):
     search_fields = ("product__name_ar", "product__sku", "location__code")
     autocomplete_fields = ("product", "variant", "location")
 
-    # الحدود سياسة إعادة طلب — تُضبط يدويًا. الأرصدة نتيجة حركة.
+    # Thresholds are a reorder policy — set by hand. Balances are the result of movement.
     readonly_fields = (
         "created_at",
         "updated_at",
@@ -103,7 +104,7 @@ class StockAdmin(TimeStampedAdmin):
     )
 
     def has_add_permission(self, request):
-        """صف الرصيد تنشئه أول حركة على المنتج في الموقع."""
+        """The balance row is created by the first movement on the product at that location."""
         return False
 
     def has_delete_permission(self, request, obj=None):

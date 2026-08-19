@@ -1,11 +1,12 @@
 """
-قياس تحقيق الأهداف.
+Measuring target achievement.
 
-⚠️  **المُحقَّق يُقاس من الطلبات — ولا يُخزَّن قبل الإقفال.**
+⚠️  **Achievement is measured from the orders — and is not stored before closing.**
 
-    رقم مخزَّن يُحدَّث بكل طلب ينحرف عند أول إلغاء أو مرتجع لا يمرّ
-    بمسار التحديث. والقياس اللحظي يعيد الحقيقة دائمًا؛ والإقفال
-    وحده يُجمّدها لأنها صارت مستندًا.
+    A stored figure updated with every order drifts at the first cancellation or
+    return that does not pass through the update path. And live measurement
+    always returns the truth; closing alone freezes it, because it has become a
+    document.
 """
 
 from __future__ import annotations
@@ -26,10 +27,10 @@ from targets.models import MonthlyTarget, TargetStatus, TargetType
 
 def month_bounds(year: int, month: int) -> tuple[date, date]:
     """
-    ⚠️  آخر يوم من `calendar.monthrange` لا رقمًا مكتوبًا.
+    ⚠️  The last day from `calendar.monthrange`, not a written number.
 
-        «٣٠» تكسر يناير، و«٣١» تكسر فبراير — والخطأ يظهر كطلب
-        يسقط من قياس شهره أو يُحتسب مرتين.
+        "30" breaks January and "31" breaks February — and the error shows up as
+        an order dropping out of its month's measurement or being counted twice.
     """
     last = calendar.monthrange(year, month)[1]
     return date(year, month, 1), date(year, month, last)
@@ -38,10 +39,11 @@ def month_bounds(year: int, month: int) -> tuple[date, date]:
 @dataclass(frozen=True)
 class Achievement:
     """
-    قياس تحقيق — **بكل مدخلاته**.
+    An achievement measurement — **with all of its inputs**.
 
-    ⚠️  «كم حقّق؟» سؤال يُجاب برقم؛ و«لماذا؟» يُجاب بهذه الحقول.
-        حجبها يجعل كل خلاف مع المندوب بلا مرجع.
+    ⚠️  "How much did they achieve?" is answered with a number; "why?" is
+        answered with these fields. Withholding them leaves every dispute with
+        the rep with no reference.
     """
 
     target: MonthlyTarget
@@ -76,13 +78,14 @@ def _money(queryset, field: str) -> Decimal:
 
 def measure(target: MonthlyTarget) -> Achievement:
     """
-    يقيس تحقيق هدف من طلبات صاحبه في شهره.
+    Measures a target's achievement from its owner's orders in its month.
 
-    ⚠️  **المرتجعات تُخصم من المُحقَّق** (قاعدة العمل ١٦ — توصية).
+    ⚠️  **Returns are deducted from the achievement** (business rule 16 — a recommendation).
 
-        عدم خصمها يجعل مندوبًا يبيع ويُرجِع ويبيع ثانيةً يحقّق
-        هدفه مرتين على نفس البضاعة. والخصم من الموظف **الأصلي**
-        لا من مَن عالج المرتجع: هو صاحب البيعة التي انعكست.
+        Not deducting them lets a rep who sells, takes a return, and sells again
+        hit their target twice on the same goods. And the deduction comes from
+        the **original** employee, not whoever handled the return: they own the
+        sale that was reversed.
     """
     from orders.models import Order, OrderStatus
 
@@ -94,8 +97,8 @@ def measure(target: MonthlyTarget) -> Achievement:
         created_at__date__lte=end,
     )
 
-    # ⚠️  الملغى خارج القياس كليًا: لم يُبَع شيء فيه.
-    #     أما المرتجع فقد بيع ثم عاد — يُطرح ولا يُتجاهَل.
+    # ⚠️  Cancelled orders are outside the measurement entirely: nothing was sold in them.
+    #     A return, however, was sold and then came back — it is subtracted, not ignored.
     sold = period.exclude(status__in=[OrderStatus.CANCELLED, OrderStatus.REFUNDED])
     returned = period.filter(status=OrderStatus.REFUNDED)
 
@@ -115,7 +118,7 @@ def measure(target: MonthlyTarget) -> Achievement:
         TargetType.CUSTOMER_COUNT: Decimal(customers_count),
     }[target.target_type]
 
-    # ⚠️  حارس القسمة على صفر: هدف بقيمة صفر ممكن (شهر تدريب).
+    # ⚠️  A division-by-zero guard: a target of zero is possible (a training month).
     percent = (
         quantize(achieved / target.target_value * Decimal("100"))
         if target.target_value > ZERO
@@ -139,22 +142,24 @@ def measure(target: MonthlyTarget) -> Achievement:
 
 def _gross_profit(sold, returned) -> Decimal:
     """
-    مجمل الربح = صافي المبيعات − تكلفة البضاعة المباعة.
+    Gross profit = net sales − cost of goods sold.
 
-    ⚠️  **التكلفة من `finance` لا من حساب موازٍ.**
+    ⚠️  **The cost comes from `finance`, not from a parallel calculation.**
 
-        `COGSEntry` محسوبة من الدفعة التي خرجت فعلًا (FEFO).
-        إعادة حسابها هنا تُنتج رقم ربح يخالف قائمة الأرباح — ولا
-        أحد يعرف أيّهما يُصدَّق حين تُصرَف عمولة على أحدهما.
+        `COGSEntry` is computed from the batch that actually shipped (FEFO).
+        Recomputing it here produces a profit figure that contradicts the profit
+        statement — and nobody knows which to believe once a commission is paid
+        against one of them.
 
-    ⚠️  والطلب **مجهول التكلفة يخرج من الحساب كليًا**.
+    ⚠️  And an order **of unknown cost is excluded from the calculation entirely**.
 
-        قيد تكلفة بكمية صفر يعني أنه لم يُعثر على حركة مخزون
-        للطلب — لا أن بضاعته مجانية. إدخاله بتكلفة صفر يجعل ربحه
-        **يساوي ثمن بيعه كاملًا**، فتُصرف عمولة على ربح لم يتحقّق.
+        A cost entry with a zero quantity means no stock movement was found for
+        the order — not that its goods were free. Including it at zero cost
+        makes its profit **equal to its full selling price**, so a commission is
+        paid on profit that never materialised.
 
-        الاستبعاد هو الاتجاه الآمن: عمولة أقل من المستحق تُصحَّح
-        بقيد؛ أما المصروفة على وهم فلا تُسترد.
+        Exclusion is the safe direction: a commission short of what is due is
+        corrected with an entry; one paid on a phantom is never recovered.
     """
     from finance.models import COGSEntry, RevenueEntry, RevenueSource
 
@@ -164,24 +169,24 @@ def _gross_profit(sold, returned) -> Decimal:
 
     entries = RevenueEntry.objects.filter(source=RevenueSource.ORDER, order_id__in=sold_ids)
 
-    # ⚠️  الطلبات ذات التكلفة **المُثبَتة** وحدها.
+    # ⚠️  Only orders with **established** cost.
     #
-    #     `quantity > 0` تعني أن حركات مخزون وُجدت فعلًا،
-    #     و`unknown_quantity = 0` تعني أن كل وحدة منها عُرفت
-    #     تكلفتها. ما عدا ذلك ربح غير قابل للإثبات.
+    #     `quantity > 0` means stock movements were genuinely found,
+    #     and `unknown_quantity = 0` means every unit of them had a known
+    #     cost. Anything else is profit that cannot be proved.
     priced = COGSEntry.objects.filter(revenue_entry__in=entries, quantity__gt=0, unknown_quantity=0)
     entries = entries.filter(cogs__in=priced)
 
     net_revenue = _money(entries, "net")
     cost = _money(priced, "amount")
 
-    # المرتجعات تُخصم من الربح أيضًا — بصافيها لا بإجماليها
+    # Returns are deducted from the profit too — by their net, not their gross
     returned_ids = list(returned.values_list("id", flat=True))
     if returned_ids:
         refunds = RevenueEntry.objects.filter(
             source=RevenueSource.REFUND, order_id__in=returned_ids
         )
-        # قيود المرتجع سالبة أصلًا فتُجمَع
+        # Return entries are already negative, so they are added
         net_revenue = quantize(net_revenue + _money(refunds, "net"))
 
     return quantize(net_revenue - cost)
@@ -190,10 +195,10 @@ def _gross_profit(sold, returned) -> Decimal:
 @transaction.atomic
 def close_target(target: MonthlyTarget, *, by=None) -> MonthlyTarget:
     """
-    ⚠️  الإقفال **مرة واحدة** — وإعادته ترفض صراحةً.
+    ⚠️  Closing happens **once** — and repeating it is refused explicitly.
 
-        اللقطة تُبنى عليها عمولة تُصرَف؛ وإعادة كتابتها تغيّر
-        مبلغًا خرج من الخزينة.
+        A commission that gets paid is built on the snapshot; rewriting it
+        changes an amount that has left the treasury.
     """
     if target.is_closed:
         raise BusinessError(ErrorCode.CONFLICT, detail="الهدف مقفل سلفًا", status_code=409)
@@ -223,10 +228,10 @@ def activate(target: MonthlyTarget) -> MonthlyTarget:
 
 def current_target(employee, on_date: date | None = None) -> MonthlyTarget | None:
     """
-    هدف الشهر الجاري — **النشط وحده**.
+    The current month's target — **the active one alone**.
 
-    ⚠️  المسوّدة لا تُعرَض للمندوب: رقم لم يُعتمَد بعد يبني عليه
-        توقّعًا ثم يتغيّر.
+    ⚠️  A draft is not shown to the rep: a figure not yet approved is one they
+        build an expectation on and it then changes.
     """
     today = on_date or date.today()
     return MonthlyTarget.objects.filter(
@@ -239,12 +244,12 @@ def current_target(employee, on_date: date | None = None) -> MonthlyTarget | Non
 
 def bulk_create_month(year: int, month: int, rows: list[dict], *, actor=None) -> int:
     """
-    إنشاء أهداف شهر لفريق كامل.
+    Create a month's targets for a whole team.
 
-    ⚠️  الموجود **يُتخطّى لا يُكتب فوقه**.
+    ⚠️  Existing ones are **skipped, not overwritten**.
 
-        الإنشاء الجماعي يُشغَّل مرارًا لإضافة موظف جديد؛ والكتابة
-        فوق الموجود تمحو تعديلًا يدويًا على هدف مندوب بعينه.
+        The bulk creation is run repeatedly to add a new employee; and
+        overwriting the existing ones erases a manual edit to a particular rep's target.
     """
     from employees.models import EmployeeProfile
 

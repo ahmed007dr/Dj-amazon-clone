@@ -1,19 +1,20 @@
 """
-خدمات نقطة البيع.
+Point-of-sale services.
 
-⚠️  **المبدأ الحاكم: POS قناة بيع لا نظام موازٍ.**
+⚠️  **The governing principle: POS is a sales channel, not a parallel system.**
 
         pos.services.checkout()
                 ↓
         orders.services.create_pos_order(channel=POS, location=…)
                 ↓
-            Order عادي
+            an ordinary Order
 
-    تقرير مبيعات واحد · مخزون واحد · مالية واحدة.
+    One sales report · one stock · one set of finances.
 
-⚠️  ولا تجاوز لأي قاعدة: سياسات الوصول والتسعير والمخزون تُطبَّق
-    كما هي. «الكاشير أمام العميل ومستعجل» ليس سببًا لبيع صنف
-    ممنوع أو غير متوفر — وهو بالضبط ما يجعل الجرد لا يوازن.
+⚠️  And no rule is bypassed: access policies, pricing and stock apply exactly as
+    they are. "The cashier is in front of the customer and in a hurry" is not a
+    reason to sell a forbidden or unavailable item — and it is exactly what
+    makes the stock count fail to balance.
 """
 
 from __future__ import annotations
@@ -45,46 +46,46 @@ from pricing import services as pricing_services
 
 logger = logging.getLogger(__name__)
 
-#: مفاتيح الإعدادات القابلة للضبط من اللوحة
+#: The setting keys configurable from the panel
 VARIANCE_THRESHOLD = "pos.cash_variance_threshold"
 MAX_DISCOUNT_PERCENT = "pos.max_discount_percent"
 
 
 def variance_threshold() -> Decimal:
     """
-    الحد الذي يصير فوقه تفسير الفرق إلزاميًا.
+    The threshold above which explaining the discrepancy becomes mandatory.
 
-    ⚠️  قاعدة العمل ١٢ لم تُحسم بعد — القيمة الافتراضية توصية
-        مكتوبة في `docs/shared/04-DECISIONS.md`، وقابلة للضبط
-        من اللوحة بلا نشر.
+    ⚠️  Business rule 12 is not yet settled — the default value is a
+        recommendation written in `docs/shared/04-DECISIONS.md`, and it is
+        configurable from the panel with no deployment.
     """
     return Decimal(str(SystemSetting.get(VARIANCE_THRESHOLD, default="20.00")))
 
 
 def max_discount_percent() -> Decimal:
     """
-    سقف الخصم اليدوي للكاشير.
+    The cap on a cashier's manual discount.
 
-    ⚠️  قاعدة العمل ١١ لم تُحسم — الافتراضي **صفر**: لا خصم بلا
-        اعتماد. الافتراضي المتساهل يفتح بابًا يصعب إغلاقه بعد أن
-        يعتاده الكاشير.
+    ⚠️  Business rule 11 is not settled — the default is **zero**: no discount
+        without approval. A permissive default opens a door that is hard to
+        close once the cashier has grown used to it.
     """
     return Decimal(str(SystemSetting.get(MAX_DISCOUNT_PERCENT, default="0")))
 
 
 # ═══════════════════════════════════════════════════════════
-#  الوردية
+#  The shift
 # ═══════════════════════════════════════════════════════════
 
 
 @transaction.atomic
 def open_session(register: Register, cashier, *, opening_float: Decimal = ZERO) -> POSSession:
     """
-    فتح وردية.
+    Open a shift.
 
-    ⚠️  الجهاز الموقوف لا يفتح وردية، والوردية المفتوحة لا تُفتح
-        ثانيةً — القيد في قاعدة البيانات هو الحارس النهائي، وهذا
-        الفحص يعطي رسالة مفهومة بدل خطأ تكامل.
+    ⚠️  A disabled register does not open a shift, and an open shift is not
+        opened again — the database constraint is the final guard, and this
+        check gives a comprehensible message instead of an integrity error.
     """
     if not register.is_active:
         raise BusinessError(ErrorCode.CONFLICT, detail="هذا الجهاز موقوف", status_code=409)
@@ -106,13 +107,13 @@ def open_session(register: Register, cashier, *, opening_float: Decimal = ZERO) 
 
 def expected_cash_for(session: POSSession) -> Decimal:
     """
-    النقد المتوقَّع في الدرج.
+    The cash expected in the drawer.
 
-    ⚠️  محسوب من **حركات الصندوق** لا من مبيعات الوردية.
+    ⚠️  Computed from **the drawer movements**, not from the shift's sales.
 
-        بيعة بالبطاقة لا تضع نقدًا في الدرج؛ وحسابها ضمن المتوقَّع
-        يُنتج عجزًا وهميًا بحجم كل مبيعات البطاقات — ويُتَّهم
-        الكاشير بما لم يفعله.
+        A card sale puts no cash in the drawer; counting it in the expected
+        figure produces a phantom shortfall the size of all card sales — and the
+        cashier is accused of something they did not do.
     """
     total = session.cash_movements.aggregate(
         cash_in=Sum("amount", filter=__kind_in(CASH_IN)),
@@ -146,17 +147,17 @@ def close_session(
     variance_note: str = "",
 ) -> POSSession:
     """
-    إغلاق وردية بتسوية نقدية.
+    Close a shift with a cash reconciliation.
 
-    ⚠️  **الفرق فوق الحد يوجب تفسيرًا.**
+    ⚠️  **A discrepancy above the threshold requires an explanation.**
 
-        قاعدة العمل ١٢. فرق بلا تفسير يتراكم شهورًا ثم يُكتشف
-        كعجز لا يعرف أحد مصدره — والتفسير وقت الإغلاق هو الوقت
-        الوحيد الذي يتذكّر فيه الكاشير ما جرى.
+        Business rule 12. A discrepancy with no explanation accumulates for
+        months and is then discovered as a shortfall nobody can trace — and
+        closing time is the only moment the cashier still remembers what happened.
 
-    ⚠️  والوردية المغلقة لا تُغلق ثانيةً: الإغلاق المكرر كان
-        سيعيد كتابة `expected_cash` بلقطة جديدة، فتتغيّر تسوية
-        مُعتمدة بأثر رجعي.
+    ⚠️  And a closed shift is not closed again: a repeated close would have
+        rewritten `expected_cash` with a fresh snapshot, changing an approved
+        reconciliation retroactively.
     """
     if not session.is_open:
         raise BusinessError(ErrorCode.CONFLICT, detail="هذه الوردية مغلقة بالفعل", status_code=409)
@@ -192,8 +193,8 @@ def close_session(
         ]
     )
 
-    # ⚠️  الحدث بعد الحفظ لا قبله: المستمع (المالية لاحقًا) يقرأ
-    #     وردية مغلقة فعلًا لا واحدة قد يفشل حفظها.
+    # ⚠️  The event after the save, not before: the listener (finance, later) reads
+    #     a genuinely closed shift rather than one whose save may fail.
     pos_session_closed.send(sender=POSSession, session=session)
 
     return session
@@ -210,9 +211,9 @@ def record_cash(
     reference_id: str = "",
 ) -> CashMovement:
     """
-    تسجيل حركة نقدية.
+    Record a cash movement.
 
-    ⚠️  الوردية المغلقة لا تقبل حركات — وإلا تغيّر متوقَّع مُسوّى.
+    ⚠️  A closed shift accepts no movements — or a settled expected figure changes.
     """
     if not session.is_open:
         raise BusinessError(
@@ -236,13 +237,13 @@ def record_cash(
 
 
 # ═══════════════════════════════════════════════════════════
-#  البيع
+#  Selling
 # ═══════════════════════════════════════════════════════════
 
 
 @dataclass(frozen=True)
 class SaleLine:
-    """سطر في بيعة — المنتج والكمية فقط، والسعر يحسبه `pricing`."""
+    """A line in a sale — the product and the quantity only, and `pricing` computes the price."""
 
     product: object
     quantity: int
@@ -252,11 +253,11 @@ class SaleLine:
 @dataclass(frozen=True)
 class SplitPayment:
     """
-    جزء من دفع مقسّم.
+    Part of a split payment.
 
-    ⚠️  الدفع المقسّم حالة يومية على الكاونتر: نصفه نقدًا ونصفه
-        بالبطاقة. حصره في طريقة واحدة يجبر الكاشير على تسجيل
-        بيعتين لعملية واحدة — فينكسر الإيصال والمرتجع معًا.
+    ⚠️  Split payment is a daily occurrence at the counter: half cash and half
+        by card. Confining it to one method forces the cashier to record two
+        sales for one operation — breaking the receipt and the return together.
     """
 
     method: str
@@ -273,13 +274,14 @@ class SaleResult:
 @dataclass(frozen=True)
 class Quote:
     """
-    تسعير بيعة قبل إتمامها.
+    Price a sale before completing it.
 
-    ⚠️  **نفس الحساب الذي سيُحصَّل — لا نسخة منه.**
+    ⚠️  **The same calculation that will be charged — not a copy of it.**
 
-        شاشة الكاشير تعرض إجماليًا، والخادم يحصّل إجماليًا. حسابهما
-        في مكانين يعني أنهما يتباعدان عند أول تغيير في التسعير،
-        فيقول الجهاز رقمًا ويطبع الإيصال آخر — والعميل هو من يكتشف.
+        The cashier's screen shows a total, and the server charges a total.
+        Computing them in two places means they diverge at the first change in
+        pricing, so the terminal says one figure and the receipt prints another
+        — and the customer is the one who discovers it.
     """
 
     lines: list
@@ -297,12 +299,13 @@ def quote(
     discount_percent: Decimal = ZERO,
 ) -> Quote:
     """
-    يسعّر السلة بلا أي أثر: لا مخزون يُخصم ولا طلب يُنشأ.
+    Prices the basket with no effect at all: no stock deducted and no order created.
 
-    ⚠️  سقف الخصم يُفحَص هنا أيضًا.
+    ⚠️  The discount cap is checked here too.
 
-        تركه للإتمام وحده يجعل الكاشير يبني بيعة كاملة أمام العميل
-        ثم يُرفض في آخر ضغطة — والأصل أن يُمنع الخصم لحظة إدخاله.
+        Leaving it to checkout alone makes the cashier build a whole sale in
+        front of the customer and then be refused on the last press — when the
+        discount should be blocked the moment it is entered.
     """
     cap = max_discount_percent()
     if discount_percent > cap:
@@ -341,11 +344,11 @@ def quote(
 
 def _assert_payments_cover(total: Decimal, payments: list[SplitPayment]) -> None:
     """
-    ⚠️  مجموع الدفعات **يساوي** الإجمالي بالضبط.
+    ⚠️  The sum of the payments **equals** the total exactly.
 
-        الأقل يعني بيعة غير مسدَّدة تُسجَّل كمكتملة؛ والأكثر يعني
-        فائضًا لا يعرف النظام أين يذهب. الباقي للعميل يُحسبه
-        الكاشير خارج النظام كما هو الحال في كل صندوق.
+        Less means an unsettled sale recorded as complete; more means a surplus
+        the system does not know where to put. The customer's change is worked
+        out by the cashier outside the system, as at every till.
     """
     paid = quantize(sum((entry.amount for entry in payments), ZERO))
 
@@ -368,19 +371,19 @@ def checkout(
     note: str = "",
 ) -> SaleResult:
     """
-    إتمام بيعة على الكاونتر.
+    Complete a sale at the counter.
 
-    ⚠️  الترتيب مقصود وغير قابل للتبديل:
+    ⚠️  The order is deliberate and not interchangeable:
 
-          ١. تسعير من `pricing`      ← لا سعر يدخل من الواجهة
-          ٢. خصم المخزون فورًا       ← بلا حجز، البيع لحظي
-          ٣. إنشاء الطلب             ← `channel=POS`
-          ٤. تسجيل الدفعات
-          ٥. حركة صندوق للنقدي وحده
+          1. price from `pricing`      ← no price comes in from the frontend
+          2. deduct stock immediately  ← no reservation, the sale is instantaneous
+          3. create the order          ← `channel=POS`
+          4. record the payments
+          5. a drawer movement for the cash portion alone
 
-        خصم المخزون **قبل** إنشاء الطلب: لو نفد صنف تُلغى المعاملة
-        كلها بلا طلب يتيم. والعكس يترك طلبًا مسجَّلًا لبضاعة لم
-        تُسلَّم.
+        Stock is deducted **before** the order is created: if an item runs out
+        the whole transaction is rolled back with no orphan order. The reverse
+        leaves a recorded order for goods that were never handed over.
     """
     if not session.is_open:
         raise BusinessError(
@@ -392,11 +395,11 @@ def checkout(
 
     location = session.register.location
 
-    # ── ١. التسعير ─────────────────────────────────────────
-    # ⚠️  **نفس الدالة التي تغذّي شاشة الكاشير.**
+    # ── 1. Pricing ─────────────────────────────────────────
+    # ⚠️  **The same function that feeds the cashier's screen.**
     #
-    #     تكرار الحساب هنا كان يعني إجماليين ينفصلان عند أول تعديل
-    #     في التسعير — أحدهما على الشاشة والآخر على الإيصال.
+    #     Duplicating the calculation here would have meant two totals diverging at
+    #     the first change in pricing — one on the screen and the other on the receipt.
     priced = quote(session, lines, customer=customer, discount_percent=discount_percent)
     priced_lines = priced.lines
     subtotal = priced.subtotal
@@ -405,13 +408,13 @@ def checkout(
 
     _assert_payments_cover(total, payments)
 
-    # ── ٢. خصم المخزون فورًا ───────────────────────────────
+    # ── 2. Deduct stock immediately ────────────────────────
     #
-    # ⚠️  المرجع هنا **الوردية** لأن الطلب لم يُنشأ بعد.
+    # ⚠️  The reference here is **the shift**, because the order does not exist yet.
     #
-    #     الترتيب مقصود: لو نفد صنف تُلغى المعاملة بلا طلب يتيم.
-    #     لكنه يترك الحركات مربوطة بالوردية لا بالبيعة — ويُعاد
-    #     توجيهها إلى الطلب بعد إنشائه مباشرةً (الخطوة ٣ب).
+    #     The order is deliberate: if an item runs out the transaction is rolled back with no orphan order.
+    #     But it leaves the movements tied to the shift rather than to the sale — and they are
+    #     redirected to the order immediately after it is created (step 3b).
     movements = []
     for line, _priced in priced_lines:
         movements.extend(
@@ -426,7 +429,7 @@ def checkout(
             )
         )
 
-    # ── ٣. الطلب ───────────────────────────────────────────
+    # ── 3. The order ───────────────────────────────────────
     from orders import services as order_services
 
     order = order_services.create_pos_order(
@@ -454,34 +457,34 @@ def checkout(
         note=note,
     )
 
-    # ── ٣ب. إعادة توجيه حركات المخزون إلى الطلب ────────────
+    # ── 3b. Redirecting the stock movements to the order ───
     #
-    # ⚠️  **بدونها تغيب تكلفة كل بيعة كاونتر عن قائمة الأرباح.**
+    # ⚠️  **Without it, the cost of every counter sale is absent from the profit statement.**
     #
-    #     المالية تحسب تكلفة البضاعة المباعة من حركات المخزون
-    #     المرتبطة بالطلب (`reference_type="order"`). حركات نقطة
-    #     البيع كانت مربوطة بالوردية، فكانت مبيعات الفرع تُقيَّد
-    #     إيرادًا **بتكلفة صفر** — أي بربح يساوي ثمن البيع كاملًا.
-    #     وهو خطأ في الاتجاه الأسوأ: يجعل التقرير يبدو ممتازًا.
+    #     Finance computes the cost of goods sold from the stock movements
+    #     linked to the order (`reference_type="order"`). Point-of-sale movements
+    #     were tied to the shift, so branch sales were posted as
+    #     revenue **at zero cost** — that is, at a profit equal to the full selling price.
+    #     An error in the worst direction: it makes the report look excellent.
     #
-    # ⚠️  والوردية تبقى في `note` لا تضيع.
+    # ⚠️  And the shift is preserved in `note` rather than lost.
     #
-    #     لا مفتاح أجنبي من `Order` إلى `POSSession`: `orders`
-    #     **تحت** `pos` في ترتيب الطبقات، والمفتاح كان سيقلب
-    #     الاتجاه ويكسر العقد. النص يكفي للتتبع اليدوي، والربط
-    #     التحليلي يمرّ عبر `CashMovement` التي تحمل معرّف الطلب.
+    #     There is no foreign key from `Order` to `POSSession`: `orders` sits
+    #     **below** `pos` in the layer order, and the key would have inverted
+    #     the direction and broken the contract. The text suffices for manual
+    #     tracing, and the analytical link runs through `CashMovement`, which carries the order id.
     if movements:
         touched = StockMovement.objects.filter(pk__in=[m.pk for m in movements])
         touched.update(reference_type="order", reference_id=str(order.pk))
 
-        # ⚠️  الملاحظة الفارغة وحدها تُكتب.
+        # ⚠️  Only an empty note is written over.
         #
-        #     الحركة بلا دفعة تحمل «بلا دفعة مرتبطة» — وهي أثر
-        #     بضاعة مجهولة التكلفة. الكتابة فوقها تمحو التفسير
-        #     الوحيد لبند سيظهر في التقرير بتكلفة ناقصة.
+        #     A movement with no batch carries "no linked batch" — the trace of
+        #     goods of unknown cost. Overwriting it erases the only explanation
+        #     for a line that will appear in the report with a missing cost.
         touched.filter(note="").update(note=f"وردية {session.number}")
 
-    # ── ٤. الدفعات ─────────────────────────────────────────
+    # ── 4. The payments ────────────────────────────────────
     transactions = []
     for entry in payments:
         transactions.append(
@@ -492,13 +495,13 @@ def checkout(
                 reference_type="order",
                 reference_id=str(order.pk),
                 customer=customer,
-                # ⚠️  مفتاح فريد لكل جزء: نقرة مزدوجة على «تحصيل»
-                #     كانت ستنتج دفعتين لنفس البيعة.
+                # ⚠️  A unique key per part: a double-click on "charge"
+                #     would have produced two payments for the same sale.
                 idempotency_key=f"pos-{order.pk}-{entry.method}-{entry.amount}",
             )
         )
 
-    # ── ٥. النقد في الدرج ──────────────────────────────────
+    # ── 5. The cash in the drawer ──────────────────────────
     cash_total = quantize(sum((entry.amount for entry in payments if entry.method == "CASH"), ZERO))
 
     movement = None
@@ -518,7 +521,7 @@ def checkout(
 
 
 # ═══════════════════════════════════════════════════════════
-#  المرتجع
+#  Returns
 # ═══════════════════════════════════════════════════════════
 
 
@@ -532,15 +535,16 @@ def refund_sale(
     performed_by=None,
 ):
     """
-    مرتجع داخل نقطة البيع.
+    A return inside the point of sale.
 
-    ⚠️  المرتجع يُنتج **حركة مخزون عكسية** لا حذفًا للطلب.
+    ⚠️  A return produces **a reversing stock movement**, not a deletion of the order.
 
-        حذف الطلب يمحو بيعة وقعت فعلًا، فينكسر تقرير اليوم وتختفي
-        الضريبة المحصَّلة عليها. الطلب يبقى ويُعلَّم `REFUNDED`.
+        Deleting the order erases a sale that actually happened, breaking the
+        day's report and losing the tax collected on it. The order remains and
+        is marked `REFUNDED`.
 
-    ⚠️  والنقد المُعاد يخرج من الدرج بحركة مسجَّلة — وإلا بدا
-        الفرق عجزًا عند الإغلاق.
+    ⚠️  And the cash returned leaves the drawer as a recorded movement — or the
+        discrepancy looks like a shortfall at closing.
     """
     if not session.is_open:
         raise BusinessError(ErrorCode.CONFLICT, detail="لا مرتجع على وردية مغلقة", status_code=409)
@@ -549,7 +553,7 @@ def refund_sale(
 
     order = order_services.refund_pos_order(order, reason=reason, actor=performed_by)
 
-    # إعادة الأصناف إلى مخزون الموقع
+    # Returning the items to the location's stock
     for line in order.lines.select_related("product", "variant").all():
         inventory_services.adjust(
             line.product,

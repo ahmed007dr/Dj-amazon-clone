@@ -1,4 +1,4 @@
-"""عقود الأهداف."""
+"""Target contracts."""
 
 from rest_framework import serializers
 
@@ -27,8 +27,8 @@ class MonthlyTargetSerializer(serializers.ModelSerializer):
             "achievement_percent",
             "closed_at",
         ]
-        # ⚠️  اللقطة للقراءة فقط: كتابتها من الواجهة تعني تحقيقًا
-        #     يُعلَن بلا قياس — وعمولة تُبنى عليه.
+        # ⚠️  The snapshot is read-only: writing it from the frontend means an
+        #     achievement declared with no measurement — and a commission built on it.
         read_only_fields = [
             "id",
             "employee_number",

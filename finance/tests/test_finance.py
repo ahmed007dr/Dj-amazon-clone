@@ -1,14 +1,14 @@
 """
-اختبارات المالية.
+Finance tests.
 
-⚠️  بوابة الخروج للمرحلة ٨:
+⚠️  The exit gate for phase 8:
 
-        P&L **يوازن** مقابل بيانات الطلبات والمصروفات ·
-        كل رقم قابل للتتبع إلى مصدره · لا حساب صندوق أسود.
+        the P&L **balances** against the orders and expenses data ·
+        every number is traceable to its source · no black-box calculation.
 
-    وأخطر ما تحرسه هذه الاختبارات ليس المعادلة بل ما يحيط بها:
-    ألّا يُحتسب إيراد الطلب مرتين · ألّا تُحتسب الضريبة ربحًا ·
-    ألّا تُقرأ البضاعة مجهولة التكلفة كأنها مجانية.
+    And the greatest dangers these tests guard are not the equation but what
+    surrounds it: an order's revenue being counted twice · tax being counted as
+    profit · goods of unknown cost being read as though they were free.
 """
 
 from datetime import date, timedelta
@@ -21,6 +21,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import AccountType, User
 from administration.models import AdminProfile
+from core.testing import grant_all_domains
 from catalog.models import Category, Product
 from core.errors import BusinessError
 from core.models.settings import SystemSetting
@@ -43,13 +44,13 @@ PASSWORD = "Str0ng-Test-Pass!23"
 
 
 # ═══════════════════════════════════════════════════════════
-#  التجهيز
+#  Setup
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.fixture
 def tax_free(db):
-    """أرقام مستديرة تجعل فشل المعادلة مقروءًا."""
+    """Round numbers, so a failure of the equation is legible."""
     SystemSetting.set("tax.enabled", False, value_type="BOOL", label_ar="ض", label_en="t")
     TaxClass.objects.create(
         code="zero", name_ar="صفري", name_en="Zero", rate=Decimal("0"), is_default=True
@@ -70,7 +71,7 @@ def location(db):
 
 @pytest.fixture
 def product(db, tax_free, location):
-    """صنف بتكلفة ٣٠ وسعر ٥٠ — هامش ٢٠ للوحدة."""
+    """An item costing 30 and selling at 50 — a margin of 20 per unit."""
     category = Category.objects.create(slug="fin", name_ar="فئة", name_en="Cat")
     item = Product.objects.create(
         sku="FIN-1",
@@ -91,6 +92,7 @@ def staff(db):
     user.is_active = True
     user.save()
     AdminProfile.objects.create(user=user)
+    grant_all_domains(user)
     return user
 
 
@@ -100,7 +102,7 @@ def category(db):
 
 
 def make_order(location, *, subtotal="100.00", tax="0.00", discount="0.00", channel="ONLINE"):
-    """طلب مباشر — بلا مرور بآلة الحالة، لاختبار الالتقاط وحده."""
+    """A direct order — bypassing the state machine, to test the capture alone."""
     subtotal_d = Decimal(subtotal)
     grand = subtotal_d + Decimal(tax) - Decimal(discount)
     return Order.objects.create(
@@ -117,7 +119,7 @@ def make_order(location, *, subtotal="100.00", tax="0.00", discount="0.00", chan
 
 
 # ═══════════════════════════════════════════════════════════
-#  التقاط الإيراد
+#  Revenue capture
 # ═══════════════════════════════════════════════════════════
 
 
@@ -132,11 +134,11 @@ class TestRevenueCapture:
 
     def test_the_same_order_is_never_counted_twice(self, location):
         """
-        ⚠️  **أخطر خطأ ممكن في هذا النطاق.**
+        ⚠️  **The most dangerous possible defect in this domain.**
 
-            `order_completed` تُبعَث مرتين بإعادة محاولة أو تصحيح
-            يدوي أو مستمع سُجّل مرتين. وبلا حارس يقول التقرير ضعف
-            ما بيع — ولا يُكتشف إلا بمطابقة يدوية.
+            `order_completed` is emitted twice by a retry, a manual correction,
+            or a listener registered twice. And with no guard the report says
+            double what was sold — discovered only by a manual reconciliation.
         """
         order = make_order(location)
 
@@ -147,7 +149,7 @@ class TestRevenueCapture:
         assert RevenueEntry.objects.filter(order=order).count() == 1
 
     def test_duplicate_is_blocked_by_the_database_not_only_by_code(self, location):
-        """الفحص في الكود يخسر السباق؛ القيد الفريد يحسمه."""
+        """A check in code loses the race; the unique constraint settles it."""
         from django.db import IntegrityError, transaction
 
         order = make_order(location)
@@ -164,10 +166,10 @@ class TestRevenueCapture:
 
     def test_tax_is_not_revenue(self, location):
         """
-        ⚠️  المتجر يحصّل الضريبة نيابةً عن الدولة ولا يملكها.
+        ⚠️  The store collects the tax on the state's behalf and does not own it.
 
-            احتسابها إيرادًا يضخّم الربح بنسبتها كاملة — وهو خطأ
-            يمرّ صامتًا لأن الرقم يبدو أكبر لا أصغر.
+            Counting it as revenue inflates the profit by its full rate — an
+            error that passes silently because the number looks larger, not smaller.
         """
         order = make_order(location, subtotal="100.00", tax="14.00")
 
@@ -179,8 +181,8 @@ class TestRevenueCapture:
 
     def test_entry_uses_the_completion_date_not_today(self, location):
         """
-        ⚠️  إعادة تشغيل الالتقاط لطلبات قديمة كانت ستكدّسها كلها
-            في شهر واحد فتشوّه كل مقارنة بين الفترات.
+        ⚠️  Re-running the capture for old orders would have piled them all into
+            one month, distorting every comparison between periods.
         """
         order = make_order(location)
         order.completed_at = timezone.now() - timedelta(days=40)
@@ -188,13 +190,13 @@ class TestRevenueCapture:
 
         entry = services.record_order_revenue(order)
 
-        # ⚠️  `localdate(...)` لا `.date()`: الثانية تاريخ UTC، وهو
-        #     يوم الأمس المحاسبي في أولى ساعات اليوم بالقاهرة.
+        # ⚠️  `localdate(...)`, not `.date()`: the latter is the UTC date, which is
+        #     the previous accounting day during the first hours of the day in Cairo.
         assert entry.occurred_on == timezone.localdate(order.completed_at)
 
 
 # ═══════════════════════════════════════════════════════════
-#  المرتجعات
+#  Returns
 # ═══════════════════════════════════════════════════════════
 
 
@@ -202,8 +204,8 @@ class TestRevenueCapture:
 class TestRefunds:
     def test_refund_is_a_negative_entry_not_a_deletion(self, location):
         """
-        ⚠️  حذف قيد الإيراد يمحو أن البيعة وقعت أصلًا — فيختل عدد
-            الطلبات ومتوسط قيمتها وكل ما يُبنى عليهما.
+        ⚠️  Deleting the revenue entry erases that the sale ever happened — so
+            the order count, its average value and everything built on them break.
         """
         order = make_order(location)
         services.record_order_revenue(order)
@@ -232,7 +234,7 @@ class TestRefunds:
 
 
 # ═══════════════════════════════════════════════════════════
-#  تكلفة البضاعة المباعة
+#  Cost of goods sold
 # ═══════════════════════════════════════════════════════════
 
 
@@ -252,12 +254,12 @@ class TestCOGS:
 
     def test_two_batches_at_different_costs_are_summed_not_averaged(self, location, product):
         """
-        ⚠️  FEFO يستهلك الأقدم أولًا، وكل حركة تحمل تكلفة دفعتها.
+        ⚠️  FEFO consumes the oldest first, and every movement carries its batch's cost.
 
-            حساب المتوسط بدلها يعطي ربحًا لا يطابق أي بيعة وقعت —
-            ويتغيّر بأثر رجعي كلما وصلت دفعة جديدة.
+            Computing an average instead gives a profit matching no sale that
+            happened — and it changes retroactively every time a new batch arrives.
         """
-        # الدفعة الأولى ١٠٠ وحدة بتكلفة ٣٠ · الثانية بتكلفة ٤٠
+        # The first batch: 100 units at a cost of 30 · the second at a cost of 40
         inventory_services.receive(product, 50, Decimal("40.00"), location=location)
 
         order = make_order(location)
@@ -267,20 +269,20 @@ class TestCOGS:
 
         entry = services.record_order_revenue(order)
 
-        # ١٠٠ × ٣٠ + ٢٠ × ٤٠ = ٣٨٠٠
+        # 100 × 30 + 20 × 40 = 3800
         assert entry.cogs.amount == Decimal("3800.00")
 
     def test_stock_without_a_batch_is_flagged_not_treated_as_free(self, location, product):
         """
-        ⚠️  **الاتجاه الأسوأ للخطأ.**
+        ⚠️  **The worst direction for the error.**
 
-            معاملة التكلفة المجهولة كصفر تجعل الربح يظهر أعلى من
-            حقيقته بثمن البضاعة كاملًا — فيبدو التقرير ممتازًا.
+            Treating unknown cost as zero makes the profit appear higher than
+            reality by the full price of the goods — so the report looks excellent.
         """
         from inventory.models import Batch, MovementType, StockMovement
 
         order = make_order(location)
-        # حركة بيع بلا دفعة — كما يحدث لمخزون أُدخل بلا استلام
+        # A sale movement with no batch — as happens for stock entered without a receipt
         stock_movement = StockMovement.objects.create(
             product=product,
             location=location,
@@ -319,7 +321,7 @@ class TestCOGS:
 
 
 # ═══════════════════════════════════════════════════════════
-#  قائمة الأرباح — بوابة الخروج
+#  The profit statement — the exit gate
 # ═══════════════════════════════════════════════════════════
 
 
@@ -327,11 +329,10 @@ class TestCOGS:
 class TestProfitAndLoss:
     def test_the_equation_balances(self, location, product, staff, category):
         """
-        ⚠️  **بوابة الخروج:** P&L يوازن مقابل بيانات الطلبات
-            والمصروفات.
+        ⚠️  **The exit gate:** the P&L balances against the orders and expenses data.
 
-            بيعة ١٠ وحدات بـ٥٠ = ٥٠٠ · تكلفتها ١٠ × ٣٠ = ٣٠٠ ·
-            مجمل الربح ٢٠٠ · مصروف ٥٠ ⟵ صافي ١٥٠.
+            A sale of 10 units at 50 = 500 · its cost 10 × 30 = 300 ·
+            gross profit 200 · an expense of 50 ⟵ net 150.
         """
         order = make_order(location, subtotal="500.00")
         inventory_services.sell_immediately(
@@ -358,10 +359,11 @@ class TestProfitAndLoss:
 
     def test_refunds_reduce_net_sales_exactly_once(self, location, product):
         """
-        ⚠️  المرتجع **قيد سالب أصلًا** فيُجمَع لا يُطرَح.
+        ⚠️  A return is **already a negative entry**, so it is added, not subtracted.
 
-            طرحه مرة ثانية يضاعف أثره — خطأ إشارة لا يظهر إلا حين
-            يقع مرتجع، أي بعد أن يكون التقرير قد صدر مرارًا.
+            Subtracting it a second time doubles its effect — a sign error that
+            surfaces only when a return occurs, after the report has been issued
+            repeatedly.
         """
         first = make_order(location, subtotal="300.00")
         second = make_order(location, subtotal="200.00")
@@ -378,9 +380,9 @@ class TestProfitAndLoss:
 
     def test_draft_expenses_stay_out_but_stay_visible(self, location, staff, category):
         """
-        ⚠️  رقم الربح لا يتحرّك كلما كتب موظف مصروفًا لم يُراجَع —
-            لكن إخفاءه تمامًا يجعل الأدمن يقرأ ربحًا سيتغيّر بلا
-            إنذار.
+        ⚠️  The profit figure does not move every time an employee writes down an
+            unreviewed expense — but hiding it entirely makes the admin read a
+            profit that will change without warning.
         """
         Expense.objects.create(
             category=category,
@@ -396,10 +398,10 @@ class TestProfitAndLoss:
 
     def test_expenses_are_counted_in_the_month_they_belong_to(self, location, staff, category):
         """
-        ⚠️  إيجار مارس يُدخَل في أبريل ويجب أن يظهر في أرباح مارس.
+        ⚠️  March's rent is entered in April and must appear in March's profit.
 
-            الخلط بين تاريخ الاستحقاق والإدخال يُظهر شهرًا رابحًا
-            وآخر خاسرًا بلا سبب حقيقي.
+            Conflating the incurred date with the entry date shows one
+            profitable month and one loss-making one for no real reason.
         """
         last_month = date.today().replace(day=1) - timedelta(days=1)
 
@@ -439,7 +441,7 @@ class TestProfitAndLoss:
 
 
 # ═══════════════════════════════════════════════════════════
-#  المصروفات والاعتماد
+#  Expenses and approval
 # ═══════════════════════════════════════════════════════════
 
 
@@ -479,14 +481,14 @@ class TestExpenseApproval:
 
 
 # ═══════════════════════════════════════════════════════════
-#  إقفال الفترات
+#  Closing periods
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 class TestFiscalPeriods:
     def test_a_missing_period_is_open(self):
-        """⚠️  اعتبار الغياب إقفالًا كان يمنع أول مصروف في النظام."""
+        """⚠️  Treating absence as closed blocked the very first expense in the system."""
         services.assert_period_open(date.today())
 
     def test_a_closed_period_rejects_new_expenses(self, staff, category):
@@ -499,8 +501,8 @@ class TestFiscalPeriods:
 
     def test_a_closed_period_rejects_approval(self, staff, category):
         """
-        ⚠️  تقرير صدر واتُّخذ عليه قرار ثم تغيّر بأثر رجعي هو أسوأ
-            ما يقع في نظام مالي.
+        ⚠️  A report that was issued, acted upon, and then changed retroactively
+            is the worst thing that can happen in a financial system.
         """
         today = date.today()
         expense = Expense.objects.create(
@@ -516,7 +518,7 @@ class TestFiscalPeriods:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الصلاحيات — قاعدة العمل ١٤
+#  Permissions — business rule 14
 # ═══════════════════════════════════════════════════════════
 
 
@@ -529,11 +531,11 @@ class TestFinancePermissions:
 
     def test_a_plain_admin_cannot_read_the_pnl(self, staff):
         """
-        ⚠️  **رؤية الأرباح ليست صلاحية أدمن تلقائية.**
+        ⚠️  **Seeing profits is not an automatic admin permission.**
 
-            لوحة الأدمن يفتحها مدير كتالوج وخدمة عملاء ومسؤول
-            مخزن — ولا واحد منهم يحتاج معرفة الهوامش ولا الرواتب
-            ولا إيجار المحل.
+            The admin panel is opened by a catalogue manager, customer service
+            and a warehouse supervisor — and none of them needs to know the
+            margins, the salaries or the shop's rent.
         """
         response = self._client(staff).get(reverse("v1:finance:pnl"))
 
@@ -543,7 +545,7 @@ class TestFinancePermissions:
         from django.contrib.auth.models import Permission
 
         staff.user_permissions.add(Permission.objects.get(codename="view_revenueentry"))
-        staff = User.objects.get(pk=staff.pk)  # تفريغ كاش الصلاحيات
+        staff = User.objects.get(pk=staff.pk)  # clear the permissions cache
 
         response = self._client(staff).get(reverse("v1:finance:pnl"))
 
@@ -557,14 +559,14 @@ class TestFinancePermissions:
         assert self._client(customer).get(reverse("v1:finance:pnl")).status_code == 403
 
     def test_the_owner_always_passes(self, db):
-        """بدونه لا يستطيع أول مستخدم منح الصلاحيات — حلقة مفرغة."""
+        """Without it the first user cannot grant the permissions — a deadlock."""
         owner = User.objects.create_superuser(email="owner-fin@test.local", password=PASSWORD)
 
         assert self._client(owner).get(reverse("v1:finance:pnl")).status_code == 200
 
 
 # ═══════════════════════════════════════════════════════════
-#  الالتقاط التلقائي عبر الأحداث
+#  Automatic capture through the events
 # ═══════════════════════════════════════════════════════════
 
 
@@ -572,11 +574,11 @@ class TestFinancePermissions:
 class TestAutomaticCapture:
     def test_a_pos_sale_is_captured_even_without_the_completion_event(self, location, product):
         """
-        ⚠️  **بيعة الكاونتر لا تمرّ بـ `order_completed`.**
+        ⚠️  **A counter sale does not pass through `order_completed`.**
 
-            نقطة البيع تُنشئ الطلب في حالته النهائية مباشرةً بلا
-            آلة حالة. الاكتفاء بالإشارة كان يعني أن كل مبيعات
-            الفرع تغيب عن قائمة الأرباح بينما التقرير يبدو سليمًا.
+            Point of sale creates the order directly in its final state with no
+            state machine. Relying on the signal alone meant all branch sales
+            were absent from the profit statement while the report looked sound.
         """
         order = Order.objects.create(
             channel=OrderChannel.POS,
@@ -608,7 +610,8 @@ class TestAutomaticCapture:
 
     def test_a_failing_capture_never_breaks_the_sale(self, location, monkeypatch):
         """
-        ⚠️  قيد محاسبي لم يُكتب يجب ألا يلغي بيعةً سُلِّمت بضاعتها.
+        ⚠️  An accounting entry that was not written must not cancel a sale whose
+            goods have been handed over.
         """
 
         def explode(*args, **kwargs):
@@ -632,15 +635,16 @@ class TestAutomaticCapture:
 @pytest.mark.django_db
 class TestPOSCostIsNotZero:
     """
-    ⚠️  **الفخّ الذي أوقعنا فيه الترتيب فعلًا.**
+    ⚠️  **The trap the ordering genuinely caught us in.**
 
-        نقطة البيع تخصم المخزون قبل إنشاء الطلب، فتُربط الحركات
-        بالوردية. و`post_save` على الطلب يسبق إعادة توجيهها إليه،
-        فوقع أول حساب للتكلفة على صفر حركات — وقُيِّدت البيعة
-        بربح يساوي ثمن البيع كاملًا.
+        Point of sale deducts stock before creating the order, so the movements
+        are linked to the shift. And `post_save` on the order fires before they
+        are redirected to it, so the first cost calculation happened on zero
+        movements — and the sale was posted at a profit equal to the full
+        selling price.
 
-        الاختبار يقيس الأثر المالي لا آلية الإصلاح: لو عاد
-        الترتيب إلى ما كان، تسقط هذه الحالة.
+        The test measures the financial effect, not the mechanism of the fix: if
+        the ordering reverted to what it was, this case fails.
     """
 
     @pytest.fixture
@@ -687,7 +691,7 @@ class TestPOSCostIsNotZero:
         assert entry.net == Decimal("250.00")
 
     def test_counter_profit_is_not_the_whole_sale_price(self, counter, product):
-        """الربح ١٠٠ لا ٢٥٠ — الفرق هو الخطأ الذي كان يقع."""
+        """The profit is 100, not 250 — the difference is the defect that used to occur."""
         from pos import services as pos_services
 
         result = pos_services.checkout(
@@ -703,7 +707,7 @@ class TestPOSCostIsNotZero:
 
 @pytest.mark.django_db
 def test_cogs_is_deleted_with_its_revenue_entry(location, product):
-    """قيد التكلفة تابع لقيد الإيراد — لا يبقى يتيمًا يشوّه المجاميع."""
+    """The cost entry belongs to the revenue entry — it does not linger as an orphan distorting the totals."""
     order = make_order(location)
     entry = services.record_order_revenue(order)
 

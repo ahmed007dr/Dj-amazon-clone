@@ -1,5 +1,5 @@
 """
-خدمات التقييمات.
+Review services.
 """
 
 from __future__ import annotations
@@ -17,13 +17,13 @@ from reviews.models import ProductRating, Review, ReviewHelpfulVote, ReviewStatu
 @transaction.atomic
 def recalculate_rating(product_id) -> ProductRating:
     """
-    يعيد حساب التجميع لمنتج واحد.
+    Recomputes the aggregate for a single product.
 
-    ⚠️  المنشور فقط يدخل الحساب. تقييم قيد المراجعة أو مرفوض لا
-        يؤثر على المتوسط — وإلا لأثّرت الإساءات على الترتيب قبل
-        أن يراها أحد.
+    ⚠️  Only published reviews enter the calculation. A review under moderation
+        or rejected does not affect the average — or abuse would influence the
+        ranking before anyone had seen it.
 
-    استعلام تجميعي واحد لا حلقة على الصفوف.
+    One aggregate query, not a loop over the rows.
     """
     approved = Review.objects.filter(product_id=product_id, status=ReviewStatus.APPROVED)
 
@@ -55,9 +55,10 @@ def recalculate_rating(product_id) -> ProductRating:
 @transaction.atomic
 def moderate(review: Review, *, approved: bool, moderator, reason: str = "") -> Review:
     """
-    اعتماد أو رفض تقييم.
+    Approve or reject a review.
 
-    التجميع يُعاد حسابه بعدها — القرار يغيّر ما يدخل المتوسط.
+    The aggregate is recomputed afterwards — the decision changes what enters
+    the average.
     """
     previous = review.status
 
@@ -81,9 +82,9 @@ def moderate(review: Review, *, approved: bool, moderator, reason: str = "") -> 
 @transaction.atomic
 def toggle_helpful(review: Review, user) -> tuple[Review, bool]:
     """
-    تبديل صوت الإفادة. يعيد `(التقييم, هل صار مُصوَّتًا)`.
+    Toggle a helpfulness vote. Returns `(the review, whether it is now voted)`.
 
-    العدّاد مُخزَّن مسبقًا لأنه يُقرأ في كل عرض ويُكتب نادرًا.
+    The counter is pre-stored because it is read on every display and written rarely.
     """
     vote = ReviewHelpfulVote.objects.filter(review=review, user=user).first()
 
@@ -101,11 +102,11 @@ def toggle_helpful(review: Review, user) -> tuple[Review, bool]:
 
 def mark_verified_purchases(user, product_ids) -> int:
     """
-    يعلّم تقييمات المستخدم لهذه المنتجات كشراء موثّق.
+    Marks the user's reviews of these products as a verified purchase.
 
-    ⚠️  يُستدعى من مستمع `order_completed` — لا من `orders` مباشرةً.
-        `reviews` في L3 و`orders` في L6؛ الاستيراد المباشر استيراد
-        صاعد.
+    ⚠️  Called from the `order_completed` listener — not from `orders` directly.
+        `reviews` is in L3 and `orders` in L6; a direct import would be an
+        upward import.
     """
     return Review.objects.filter(
         user=user, product_id__in=product_ids, is_verified_purchase=False

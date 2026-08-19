@@ -1,20 +1,21 @@
 """
-نقطة البيع.
+Point of sale.
 
-⚠️  **POS قناة بيع لا نظام موازٍ.**
+⚠️  **POS is a sales channel, not a parallel system.**
 
-    كل بيعة تُنتج `Order` بـ `channel=POS`. النموذج الموازي
-    (`POSOrder`) يعني تقريرَي مبيعات ومخزونين ومصدرَي حقيقة —
-    وأول سؤال محاسبي يكشف الفجوة بينهما بلا طريقة لحسمها.
+    Every sale produces an `Order` with `channel=POS`. A parallel model
+    (`POSOrder`) means two sales reports, two stock figures and two sources of
+    truth — and the first accounting question exposes the gap between them with
+    no way to settle it.
 
-    ولذلك **لا موديل طلب هنا**: الموديلات أدناه تصف الوردية
-    والصندوق والجهاز فقط، وهي أشياء لا يعرفها نطاق الطلبات.
+    Hence **there is no order model here**: the models below describe the shift,
+    the drawer and the register only — things the orders domain knows nothing about.
 
-⚠️  والوردية المغلقة **لا تُعدَّل**.
+⚠️  And a closed shift **is never edited**.
 
-    التصحيح بقيد جديد لا بتحرير القديم. الوردية سجل مالي يُبنى
-    عليه الجرد النقدي، وتحريرها بعد الإغلاق يجعل كل تسوية سابقة
-    غير جديرة بالثقة.
+    Corrections go through a new entry, not by editing the old one. The shift is
+    a financial record the cash count is built on, and editing it after closing
+    makes every previous reconciliation untrustworthy.
 """
 
 from decimal import Decimal
@@ -39,19 +40,19 @@ def register_code() -> str:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الجهاز
+#  The register
 # ═══════════════════════════════════════════════════════════
 
 
 class Register(BilingualNameMixin, BaseModel):
     """
-    جهاز نقطة بيع مربوط بموقع مخزني.
+    A point-of-sale register tied to a stock location.
 
-    ⚠️  الربط بالموقع **إلزامي وغير قابل للتغيير عمليًا**.
+    ⚠️  The link to the location is **mandatory and practically immutable**.
 
-        الجهاز يبيع من مخزون فرعه لا من مخزون عام. تغييره بعد
-        بيعات مسجَّلة يجعل حركات المخزون تشير إلى موقع لم تقع فيه،
-        فينكسر جرد الفرعين معًا.
+        The register sells from its branch's stock, not from a general stock.
+        Changing it after sales have been recorded makes the stock movements
+        point at a location they did not occur in, breaking both branches' counts.
     """
 
     code = models.SlugField(_("رمز الجهاز"), max_length=50, unique=True, default=register_code)
@@ -80,7 +81,7 @@ class Register(BilingualNameMixin, BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الوردية
+#  The shift
 # ═══════════════════════════════════════════════════════════
 
 
@@ -91,17 +92,19 @@ class SessionStatus(models.TextChoices):
 
 class POSSession(BaseModel):
     """
-    وردية كاشير.
+    A cashier's shift.
 
-    ⚠️  **وردية مفتوحة واحدة لكل جهاز.**
+    ⚠️  **One open shift per register.**
 
-        جهاز بورديتين مفتوحتين يعني بيعات تُنسب لأيّهما شاء
-        الاستعلام، وتسوية نقدية لا تُوازن أبدًا. يفرضه قيد فريد.
+        A register with two open shifts means sales attributed to whichever the
+        query prefers, and a cash reconciliation that never balances. Enforced
+        by a unique constraint.
 
-    ⚠️  و`expected_cash` **محسوب لا مُدخَل**.
+    ⚠️  And `expected_cash` is **computed, not entered**.
 
-        الرصيد الافتتاحي + المقبوض نقدًا − المصروف نقدًا. تركه
-        للكاشير يجعل الفرق صفرًا دائمًا — أي يلغي الغرض من التسوية.
+        The opening float + cash taken − cash paid out. Leaving it to the
+        cashier makes the discrepancy always zero — that is, it removes the
+        point of the reconciliation.
     """
 
     number = models.CharField(
@@ -139,7 +142,7 @@ class POSSession(BaseModel):
         help_text=_("قد يكون مديرًا لا الكاشير نفسه"),
     )
 
-    # ── النقد ──────────────────────────────────────────────
+    # ── Cash ───────────────────────────────────────────────
     opening_float = MoneyField(
         _("الرصيد الافتتاحي"),
         default=Decimal("0.00"),
@@ -155,8 +158,8 @@ class POSSession(BaseModel):
         help_text=_("ما عدّه الكاشير فعليًا عند الإغلاق"),
     )
 
-    #: ⚠️  لقطة محسوبة وقت الإغلاق — لا تُعاد من الحركات لاحقًا،
-    #:     لأن حركة تُضاف بأثر رجعي كانت ستغيّر فرقًا مُسوّى.
+    #: ⚠️  A snapshot computed at closing time — never recomputed from the movements
+    #:     later, because a movement added retroactively would change a settled discrepancy.
     expected_cash = MoneyField(_("النقد المتوقَّع"), null=True, blank=True)
 
     variance_note = models.TextField(
@@ -172,7 +175,7 @@ class POSSession(BaseModel):
         verbose_name_plural = _("الورديات")
         ordering = ["-opened_at"]
         constraints = [
-            # ⚠️  وردية مفتوحة واحدة لكل جهاز — الحارس الحقيقي
+            # ⚠️  One open shift per register — the real guard
             models.UniqueConstraint(
                 fields=["register"],
                 condition=models.Q(status="OPEN", deleted_at__isnull=True),
@@ -194,11 +197,11 @@ class POSSession(BaseModel):
     @property
     def variance(self) -> Decimal | None:
         """
-        موجب = زيادة · سالب = عجز.
+        Positive = surplus · negative = shortfall.
 
-        ⚠️  `None` قبل الإغلاق — لا صفر.
+        ⚠️  `None` before closing — not zero.
 
-            الصفر يُقرأ «وازنت»، والوردية المفتوحة لم تُعدّ بعد.
+            Zero reads as "it balanced", and an open shift has not been counted yet.
         """
         if self.counted_cash is None or self.expected_cash is None:
             return None
@@ -206,16 +209,16 @@ class POSSession(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
-#  حركة الصندوق
+#  Drawer movement
 # ═══════════════════════════════════════════════════════════
 
 
 class CashMovementKind(models.TextChoices):
     """
-    ⚠️  كل نقد يدخل الدرج أو يخرج منه يترك حركة. بلا استثناء.
+    ⚠️  Every note entering or leaving the drawer leaves a movement. Without exception.
 
-        السجل هو ما يجيب على «من أين جاء الفرق؟» — وبدونه تصير
-        التسوية تخمينًا.
+        The log is what answers "where did the discrepancy come from?" — and
+        without it the reconciliation becomes a guess.
     """
 
     SALE = "SALE", _("بيع نقدي")
@@ -224,15 +227,15 @@ class CashMovementKind(models.TextChoices):
     PAY_OUT = "PAY_OUT", _("سحب من الدرج")
 
 
-#: الحركات التي تزيد النقد
+#: The movements that increase the cash
 CASH_IN = {CashMovementKind.SALE, CashMovementKind.PAY_IN}
 
 
 class CashMovement(TimeStampedModel):
     """
-    حركة نقدية في درج الوردية. **إضافة فقط.**
+    A cash movement in the shift's drawer. **Append-only.**
 
-    مفتاح BigInt — سجل داخلي عالي الحجم لا يظهر في رابط.
+    A BigInt key — a high-volume internal log that appears in no URL.
     """
 
     session = models.ForeignKey(POSSession, on_delete=models.CASCADE, related_name="cash_movements")
@@ -240,8 +243,8 @@ class CashMovement(TimeStampedModel):
     kind = models.CharField(_("النوع"), max_length=8, choices=CashMovementKind.choices)
     amount = MoneyField(_("المبلغ"), validators=[MinValueValidator(Decimal("0"))])
 
-    #: مرجع نصي — **لا FK إلى `orders`**.
-    #: `pos` فوق `orders` في المخطط، والمفتاح الأجنبي هنا يقلب الاتجاه.
+    #: A string reference — **no FK to `orders`**.
+    #: `pos` sits above `orders` in the diagram, and a foreign key here inverts the direction.
     reference_type = models.CharField(_("نوع المرجع"), max_length=32, blank=True)
     reference_id = models.CharField(_("معرّف المرجع"), max_length=64, blank=True)
 
@@ -254,8 +257,8 @@ class CashMovement(TimeStampedModel):
     class Meta:
         verbose_name = _("حركة صندوق")
         verbose_name_plural = _("حركات الصندوق")
-        # ⚠️  `-id` ثانويًا: حركتان في نفس الميكروثانية تعطيان
-        #     ترتيبًا غير مستقر في سجل تُبنى عليه تسوية مالية.
+        # ⚠️  `-id` as a secondary key: two movements in the same microsecond give
+        #     an unstable ordering in a log a financial reconciliation is built on.
         ordering = ["-created_at", "-id"]
         indexes = [models.Index(fields=["session", "-created_at"])]
 

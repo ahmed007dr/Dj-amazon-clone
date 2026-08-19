@@ -1,4 +1,4 @@
-"""عقود الشحن."""
+"""Shipping contracts."""
 
 from rest_framework import serializers
 
@@ -7,12 +7,12 @@ from shipping.models import Shipment, ShipmentEvent, ShipmentStatus, ShippingMet
 
 class ShippingQuoteSerializer(serializers.Serializer):
     """
-    عرض سعر شحن.
+    A shipping quote.
 
-    ⚠️  يُحسب من المصدر عند كل استعلام.
+    ⚠️  Computed from the source on every request.
 
-        الواجهة لا ترسل الرسوم ولا يُصدَّق عليها — إرسالها من
-        العميل يعني شحنًا مجانيًا بتعديل حقل في المتصفح.
+        The frontend does not send the fee and is not trusted for it — sending
+        it from the client means free shipping by editing a field in the browser.
     """
 
     method_code = serializers.CharField(read_only=True)
@@ -52,10 +52,10 @@ class ShipmentEventSerializer(serializers.ModelSerializer):
 
 class ShipmentSerializer(serializers.ModelSerializer):
     """
-    ⚠️  العنوان الكامل والهاتف **لا يُكشفان في التتبع**.
+    ⚠️  The full address and the phone number are **not exposed in tracking**.
 
-        رقم التتبع يُشارَك مع من يستلم عن العميل؛ عنوانه لا.
-        تُعرض المحافظة والمدينة فقط.
+        The tracking number is shared with whoever receives on the customer's
+        behalf; their address is not. Only the governorate and the city are shown.
     """
 
     events = ShipmentEventSerializer(many=True, read_only=True)

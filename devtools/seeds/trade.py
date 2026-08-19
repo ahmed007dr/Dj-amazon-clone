@@ -1,12 +1,12 @@
 """
-الحسابات التجارية وحدودها الائتمانية.
+Business accounts and their credit limits.
 
-⚠️  **ثلاث حالات ائتمانية لا واحدة.**
+⚠️  **Three credit situations, not one.**
 
-    حساب واحد بائتمان سليم يجعل كل اختبار يمرّ بالمسار السهل: لا
-    تجاوز حد · لا فاتورة متأخرة · لا ترخيص منتهٍ. والحالات الثلاث
-    هي بالضبط ما تُبنى عليه شاشات المنع — وهي التي لا تُرى في
-    التطوير إن لم تُبذَر.
+    A single account with sound credit makes every test take the easy path: no
+    limit exceeded · no overdue invoice · no expired licence. And those three
+    situations are precisely what the blocking screens are built on — and are
+    the ones never seen in development unless they are seeded.
 """
 
 from datetime import timedelta
@@ -28,7 +28,7 @@ PROFILES = [
         "payment_terms_days": 30,
     },
     {
-        # ⚠️  ترخيص منتهٍ — الحالة التي تمنع الآجل ولا تمنع البيع
+        # ⚠️  An expired licence — the state that blocks credit and does not block the sale
         "email": "trader@dev.local",
         "kind": BusinessKind.TRADER,
         "legal_name": "مؤسسة الشفاء للتجارة",
@@ -39,7 +39,7 @@ PROFILES = [
         "payment_terms_days": 45,
     },
     {
-        # ⚠️  بلا ائتمان — الحالة الافتراضية لأي حساب جديد
+        # ⚠️  No credit — the default state of any new account
         "email": "wholesale@dev.local",
         "kind": BusinessKind.WAREHOUSE,
         "legal_name": "مخزن الدلتا للأدوية",
@@ -53,17 +53,17 @@ PROFILES = [
 
 
 def seed(users: dict) -> dict:
-    """`users` خريطة `{email: User}` من بذرة الأشخاص."""
+    """`users` is a `{email: User}` map from the people seed."""
     from customers.models import CustomerProfile
 
     businesses = {}
     today = timezone.localdate()
 
-    # ⚠️  الملف التجاري لحساب تجاري فقط.
+    # ⚠️  A business profile is for a business account only.
     #
-    #     منحه لحساب موظف — كما وقع فعلًا مع `warehouse@dev.local`
-    #     الذي هو موظف مخزن لا مخزن — يُنشئ صفًّا لا معنى له،
-    #     وتردّ عليه كل نقاط B2B بـ٤٠٣ لأن نوع الحساب لا يطابق.
+    #     Giving one to an employee account — as genuinely happened with
+    #     `warehouse@dev.local`, who is a warehouse employee rather than a
+    #     warehouse — creates a meaningless row, and every B2B endpoint answers it with 403 because the account type does not match.
     from accounts.models import AccountType
 
     trade_types = {

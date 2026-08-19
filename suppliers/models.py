@@ -1,19 +1,21 @@
 """
-الموردون وأوامر الشراء.
+Suppliers and purchase orders.
 
-⚠️  **المورّد ليس المصنّع** — والفصل مقصود.
+⚠️  **A supplier is not a manufacturer** — and the separation is deliberate.
 
-    `catalog.Manufacturer` يجيب «من صنع هذا الدواء؟» وهو سؤال
-    تنظيمي يظهر على العبوة. والمورّد يجيب «ممن نشتريه؟» — وقد
-    نشتري منتج نفس المصنّع من ثلاثة موزّعين بأسعار مختلفة.
+    `catalog.Manufacturer` answers "who made this medicine?", a regulatory
+    question that appears on the box. And the supplier answers "who do we buy it
+    from?" — and we may buy the same manufacturer's product from three
+    distributors at different prices.
 
-    دمجهما كان يجعل تغيير الموزّع يبدو تغييرًا في بيانات الدواء.
+    Merging them made changing distributor look like a change in the medicine's data.
 
-⚠️  و**أمر الشراء يدخل المخزون عبر `inventory` لا بنفسه.**
+⚠️  And **a purchase order enters stock through `inventory`, not by itself.**
 
-    الاستلام يُنشئ دفعة بتكلفتها وصلاحيتها عبر
-    `inventory.services.receive`. كتابة الدفعة من هنا كانت تُنشئ
-    مسارًا ثانيًا للمخزون لا يمرّ بفحوصه ولا يُسجَّل في حركاته.
+    Receiving creates a batch with its cost and expiry through
+    `inventory.services.receive`. Writing the batch from here created a second
+    path into stock that passes none of its checks and is recorded in none of
+    its movements.
 """
 
 from __future__ import annotations
@@ -35,10 +37,10 @@ def purchase_order_number() -> str:
 
 class Supplier(BaseModel):
     """
-    مورّد — من نشتري منه.
+    A supplier — who we buy from.
 
-    ⚠️  الموقوف **لا يُحذف**: أوامر شرائه ودفعاته تبقى مرجعًا
-        لتكلفة بضاعة ما زالت في المخزن.
+    ⚠️  A disabled one is **never deleted**: its purchase orders and batches
+        remain the reference for the cost of goods still in the warehouse.
     """
 
     code = models.SlugField(_("الرمز"), max_length=64, unique=True)
@@ -53,10 +55,10 @@ class Supplier(BaseModel):
     tax_number = models.CharField(_("الرقم الضريبي"), max_length=50, blank=True)
     commercial_register = models.CharField(_("السجل التجاري"), max_length=50, blank=True)
 
-    #: ⚠️  مهلة السداد **لنا نحن**: كم يومًا نتأخر في الدفع له.
-    #:     عكس `payment_terms_days` في B2B التي تخصّ عملاءنا.
+    #: ⚠️  The payment terms are **ours**: how many days we take to pay them.
+    #:     The opposite of `payment_terms_days` in B2B, which concerns our customers.
     payment_terms_days = models.PositiveSmallIntegerField(_("مهلة السداد (يوم)"), default=0)
-    #: مهلة التوريد — من الطلب إلى الاستلام، تُستخدم في تخطيط الشراء
+    #: Lead time — from order to receipt, used in purchase planning
     lead_time_days = models.PositiveSmallIntegerField(_("مهلة التوريد (يوم)"), default=0)
 
     is_active = models.BooleanField(_("مفعّل"), default=True, db_index=True)
@@ -73,19 +75,20 @@ class Supplier(BaseModel):
 
 class SupplierProduct(BaseModel):
     """
-    عرض مورّد لمنتج — **أساس الـ Marketplace**.
+    A supplier's offer for a product — **the basis of the marketplace**.
 
-    ⚠️  **هذا الجدول هو ما يجعل «منتج من عدة موردين» ممكنًا.**
+    ⚠️  **This table is what makes "one product from several suppliers" possible.**
 
-        بلا وسيط بين المورّد والمنتج يكون لكل منتج مورّد واحد
-        مثبَّت، وتغييره يفقد تاريخ الشراء من السابق. والجدول هنا
-        يحمل ما يختلف بين الموردين لنفس المنتج: السعر · الحد
-        الأدنى للطلب · مهلة التوريد · رمزه لديهم.
+        With no intermediary between the supplier and the product, every product
+        has one fixed supplier, and changing it loses the purchase history from
+        the previous one. And this table carries what differs between suppliers
+        for the same product: the price · the minimum order · the lead time ·
+        their own code for it.
 
-    ⚠️  ومورّد **مفضَّل واحد** لكل منتج يفرضه قيد.
+    ⚠️  And **one preferred supplier** per product, enforced by a constraint.
 
-        اثنان مفضَّلان يعنيان أن أمر الشراء التلقائي لا يعرف من
-        يختار — ويصير الاختيار تابعًا لترتيب الاستعلام.
+        Two preferred ones mean the automatic purchase order does not know which
+        to choose — and the choice becomes a matter of query ordering.
     """
 
     supplier = models.ForeignKey(
@@ -101,7 +104,7 @@ class SupplierProduct(BaseModel):
         verbose_name=_("المنتج"),
     )
 
-    #: رمز المنتج لدى المورّد — يختلف عن رمزنا ويُكتب في أمر الشراء
+    #: The product's code at the supplier — it differs from ours and is written on the purchase order
     supplier_sku = models.CharField(_("رمز المورّد"), max_length=64, blank=True)
 
     unit_cost = MoneyField(_("سعر الشراء"), validators=[MinValueValidator(ZERO)])
@@ -121,7 +124,7 @@ class SupplierProduct(BaseModel):
                 condition=models.Q(deleted_at__isnull=True),
                 name="unique_offer_per_supplier_product",
             ),
-            # ⚠️  مفضَّل واحد لكل منتج — وإلا لم يعرف أمر الشراء من يختار
+            # ⚠️  One preferred supplier per product — or the purchase order would not know which to choose
             models.UniqueConstraint(
                 fields=["product"],
                 condition=models.Q(is_preferred=True, deleted_at__isnull=True),
@@ -135,10 +138,11 @@ class SupplierProduct(BaseModel):
 
 class PurchaseOrderStatus(models.TextChoices):
     """
-    ⚠️  `PARTIAL` حالة أولى لا استثناء.
+    ⚠️  `PARTIAL` is a first-class state, not an exception.
 
-        المورّد يرسل ما توفّر لديه ويُكمل لاحقًا؛ وبلا حالة جزئية
-        يُقفَل الأمر بكامله أو يبقى مفتوحًا كأن شيئًا لم يصل.
+        The supplier sends what they have and completes it later; and with no
+        partial state the order is either closed in full or stays open as though
+        nothing had arrived.
     """
 
     DRAFT = "DRAFT", _("مسوّدة")
@@ -148,19 +152,19 @@ class PurchaseOrderStatus(models.TextChoices):
     CANCELLED = "CANCELLED", _("ملغى")
 
 
-#: الحالات التي يجوز الاستلام عليها
+#: The states on which receiving is permitted
 RECEIVABLE_STATUSES = [PurchaseOrderStatus.SENT, PurchaseOrderStatus.PARTIAL]
 
 
 class PurchaseOrder(BaseModel):
     """
-    أمر شراء.
+    A purchase order.
 
-    ⚠️  **الإجماليات لقطة تُحسب عند الإرسال** لا عند العرض.
+    ⚠️  **The totals are a snapshot computed on sending**, not at display time.
 
-        سعر المورّد يتغيّر؛ وإعادة حساب أمر أُرسل من أسعار اليوم
-        تُنتج مستندًا يخالف ما اتُّفق عليه — وهو ما يُقدَّم عند
-        الخلاف على فاتورة.
+        The supplier's price changes; and recomputing a sent order from today's
+        prices produces a document that contradicts what was agreed — the one
+        presented when an invoice is disputed.
     """
 
     number = models.CharField(
@@ -226,22 +230,23 @@ class PurchaseOrder(BaseModel):
     @property
     def is_fully_received(self) -> bool:
         """
-        ⚠️  يُقاس من الأسطر لا من الحالة.
+        ⚠️  Measured from the lines, not from the status.
 
-            الحالة تُحدَّث بعد الاستلام؛ وقياسها بنفسها يجعل خطأً
-            في التحديث يُخفي بضاعة لم تصل.
+            The status is updated after receiving; measuring it by itself makes
+            a defect in that update hide goods that never arrived.
         """
         return all(line.is_complete for line in self.lines.all())
 
 
 class PurchaseOrderLine(BaseModel):
     """
-    سطر أمر شراء.
+    A purchase order line.
 
-    ⚠️  **الكمية المستلمة منفصلة عن المطلوبة.**
+    ⚠️  **The received quantity is separate from the ordered one.**
 
-        دمجهما يعني أن الاستلام الجزئي يُعدّل الطلب نفسه — فيختفي
-        أن المورّد لم يورّد ما وعد به، وهو أهم ما يُقيَّم به.
+        Merging them means a partial receipt edits the order itself — so the
+        fact that the supplier did not deliver what they promised disappears,
+        and that is the main thing they are judged on.
     """
 
     order = models.ForeignKey(
@@ -263,14 +268,14 @@ class PurchaseOrderLine(BaseModel):
     quantity_received = models.PositiveIntegerField(_("الكمية المستلمة"), default=0)
     quantity_returned = models.PositiveIntegerField(_("الكمية المرتجعة"), default=0)
 
-    #: ⚠️  لقطة سعر وقت الإرسال — لا تُقرأ من عرض المورّد اليوم
+    #: ⚠️  A price snapshot at send time — never read from the supplier's offer today
     unit_cost = MoneyField(_("سعر الوحدة"), validators=[MinValueValidator(ZERO)])
 
-    #: ⚠️  سعر العرض وقت الإنشاء — **للمقارنة لا للحساب**.
+    #: ⚠️  The offer price at creation time — **for comparison, not for calculation**.
     #:
-    #:     المشتري يفاوض فيدخل سعرًا يخالف العرض. بلا حفظ الأصل
-    #:     يصير سؤال «بكم كان معروضًا وكم دفعنا؟» بلا جواب بعد
-    #:     أول تحديث للعرض — وهو السؤال الذي يُقيَّم به المشتري.
+    #:     The buyer negotiates and enters a price differing from the offer. Without
+    #:     storing the original, "what was it offered at and what did we pay?" has no
+    #:     answer after the first offer update — and that is the question the buyer is judged on.
     list_cost = MoneyField(
         _("سعر العرض وقت الإنشاء"), null=True, blank=True, validators=[MinValueValidator(ZERO)]
     )
@@ -289,7 +294,7 @@ class PurchaseOrderLine(BaseModel):
 
     @property
     def outstanding(self) -> int:
-        """المتبقي — لا يقلّ عن صفر ولو زاد المستلَم."""
+        """What remains — never below zero, even if more was received."""
         return max(self.quantity_ordered - self.quantity_received, 0)
 
     @property
@@ -299,20 +304,21 @@ class PurchaseOrderLine(BaseModel):
     @property
     def quantity_on_hand(self) -> int:
         """
-        المستلَم بعد خصم المرتجع — **سقف ما يُمكن إرجاعه**.
+        What was received minus what was returned — **the ceiling on what can be returned**.
 
-        ⚠️  الإرجاع مرتين لنفس الكمية يُنشئ إشعارَي دائن على بضاعة
-            واحدة، فيصير المورّد دائنًا لنا بما لم نُعده.
+        ⚠️  Returning the same quantity twice creates two credit notes for one
+            lot of goods, so the supplier ends up crediting us for what we never returned.
         """
         return max(self.quantity_received - self.quantity_returned, 0)
 
     @property
     def cost_variance(self):
         """
-        الفارق بين المدفوع وسعر العرض — **موجب يعني دفعنا أكثر**.
+        The difference between what was paid and the offer price — **positive means we paid more**.
 
-        ⚠️  `None` حين لا لقطة عرض (أوامر أُنشئت قبل هذا الحقل).
-            الصفر يعني «طابق العرض»، والفارق بين الحالتين معنى.
+        ⚠️  `None` when there is no offer snapshot (orders created before this
+            field). Zero means "it matched the offer", and the difference
+            between the two states is meaningful.
         """
         if self.list_cost is None:
             return None
@@ -326,19 +332,21 @@ class SupplierLedgerKind(models.TextChoices):
     ADJUSTMENT = "ADJUSTMENT", _("تسوية")
 
 
-#: الحركات التي **تزيد** ما علينا للمورّد
+#: The movements that **increase** what we owe the supplier
 CREDIT_KINDS = {SupplierLedgerKind.INVOICE, SupplierLedgerKind.ADJUSTMENT}
 
 
 class SupplierLedgerEntry(BaseModel):
     """
-    حركة حساب مورّد — **إضافة فقط**.
+    A supplier account movement — **append-only**.
 
-    ⚠️  الاتجاه **معكوس** عن دفتر العميل: هنا نحن المدينون.
+    ⚠️  The direction is **inverted** relative to the customer ledger: here we
+        are the debtor.
 
-        الفاتورة تزيد ما علينا، والسداد ينقصه. خلط الاتجاهين بين
-        الدفترين هو أسهل خطأ ممكن — ولذلك الثوابت مسمّاة صراحةً
-        (`CREDIT_KINDS`) لا مستنتجة.
+        An invoice increases what we owe, and a payment reduces it. Confusing
+        the two directions between the two ledgers is the easiest possible
+        mistake — which is why the constants are named explicitly
+        (`CREDIT_KINDS`) rather than inferred.
     """
 
     supplier = models.ForeignKey(
@@ -384,7 +392,7 @@ class SupplierLedgerEntry(BaseModel):
             models.Index(fields=["supplier", "-occurred_on"]),
         ]
         constraints = [
-            # ⚠️  أمر شراء واحد لا يُفوتَر مرتين
+            # ⚠️  One purchase order is never invoiced twice
             models.UniqueConstraint(
                 fields=["purchase_order", "kind"],
                 condition=models.Q(deleted_at__isnull=True, purchase_order__isnull=False),
@@ -404,7 +412,7 @@ class SupplierLedgerEntry(BaseModel):
         return self.amount if self.increases_debt else -self.amount
 
     def save(self, *args, **kwargs):
-        """⚠️  إضافة فقط — التصحيح بتسوية معاكسة."""
+        """⚠️  Append-only — corrections go through an offsetting adjustment."""
         if not self._state.adding:
             raise ValueError("حركات حساب المورّد لا تُعدَّل — سجّل تسوية")
         super().save(*args, **kwargs)

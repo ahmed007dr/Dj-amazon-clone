@@ -1,8 +1,8 @@
 """
-عقود المالية.
+Finance contracts.
 
-⚠️  المبالغ تُرسَل **نصًا** لا رقمًا (ADR-31) — `JSON.parse` يحوّل
-    الرقم إلى `double` فتضيع الدقة في أول جمع.
+⚠️  Amounts are sent **as strings**, not numbers (ADR-31) — `JSON.parse`
+    converts the number to a `double`, so precision is lost at the first addition.
 """
 
 from rest_framework import serializers
@@ -68,11 +68,11 @@ class ExpenseSerializer(serializers.ModelSerializer):
             "note",
             "created_at",
         ]
-        # ⚠️  الحالة والمُعتمِد **للقراءة فقط**.
+        # ⚠️  The status and the approver are **read-only**.
         #
-        #     قبولهما في الإنشاء يجعل المُدخِل يرسل
-        #     `status="APPROVED"` فيعتمد مصروفه بنفسه — ويسقط كل
-        #     معنى خطوة الاعتماد بلا أن يظهر خطأ.
+        #     Accepting them at creation lets whoever enters an expense send
+        #     `status="APPROVED"` and approve their own — which drops the entire
+        #     meaning of the approval step with no error showing.
         read_only_fields = [
             "id",
             "status",
@@ -90,11 +90,11 @@ class ExpenseSerializer(serializers.ModelSerializer):
 
 
 class ExpenseDecisionSerializer(serializers.Serializer):
-    """اعتماد أو رفض."""
+    """Approve or reject."""
 
     decision = serializers.ChoiceField(choices=["APPROVE", "REJECT"])
-    #: ⚠️  السبب إلزامي عند الرفض — يفحصه `validate` لا الحقل،
-    #:     لأنه غير مطلوب عند الاعتماد.
+    #: ⚠️  The reason is mandatory on rejection — checked in `validate` rather than
+    #:     on the field, because it is not required on approval.
     reason = serializers.CharField(required=False, allow_blank=True, max_length=1000)
 
     def validate(self, attrs):
@@ -119,7 +119,7 @@ class ClosePeriodSerializer(serializers.Serializer):
 
 
 class PendingExpenseFilter(serializers.Serializer):
-    """مرشّحات قائمة المصروفات."""
+    """Expense list filters."""
 
     status = serializers.ChoiceField(choices=ExpenseStatus.choices, required=False)
     category = serializers.UUIDField(required=False)

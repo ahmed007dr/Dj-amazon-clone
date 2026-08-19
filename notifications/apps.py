@@ -6,7 +6,7 @@ class NotificationsConfig(AppConfig):
     name = "notifications"
 
     def ready(self):
-        # ⚠️  ربط المستمعين هنا لا في الاستيراد العادي.
-        #     `notifications` يستمع ولا يُستدعى — والربط في `ready`
-        #     يضمن تحميل كل النطاقات قبل تسجيل المستمعين.
+        # ⚠️  The listeners are wired here rather than at ordinary import time.
+        #     `notifications` listens and is never called — and wiring in `ready`
+        #     guarantees every domain is loaded before the listeners are registered.
         from notifications import listeners  # noqa: F401

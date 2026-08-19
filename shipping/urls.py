@@ -1,4 +1,4 @@
-"""مسارات الشحن — /api/v1/shipping/"""
+"""Shipping routes — /api/v1/shipping/"""
 
 from django.urls import path
 
@@ -9,7 +9,7 @@ app_name = "shipping"
 urlpatterns = [
     path("quote/", api.ShippingQuoteAPI.as_view(), name="quote"),
     path("methods/", api.ShippingMethodListAPI.as_view(), name="methods"),
-    # التتبع بالرقم لا بالمعرّف — الرقم يُشارَك والاستجابة بلا بيانات شخصية
+    # Tracking by number rather than by id — the number gets shared and the response carries no personal data
     path("track/<str:number>/", api.TrackShipmentAPI.as_view(), name="track"),
     path("admin/shipments/", api.AdminShipmentListAPI.as_view(), name="admin-shipments"),
     path(

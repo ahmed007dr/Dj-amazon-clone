@@ -1,4 +1,4 @@
-"""مسارات بوابة الموظفين — /api/v1/employees/"""
+"""Staff portal routes — /api/v1/employees/"""
 
 from django.urls import path
 
@@ -7,7 +7,7 @@ from employees import api
 app_name = "employees"
 
 urlpatterns = [
-    # ── بوابة الموظف — «أنا وعملائي» بلا معرّف موظف ─────────
+    # ── The employee portal — "me and my customers", no employee id ──
     path("me/", api.MyProfileAPI.as_view(), name="me"),
     path("dashboard/", api.MyDashboardAPI.as_view(), name="dashboard"),
     path("customers/", api.MyCustomersAPI.as_view(), name="customers"),
@@ -17,9 +17,9 @@ urlpatterns = [
         name="customer-orders",
     ),
     path("orders/", api.CreateOrderForCustomerAPI.as_view(), name="create-order"),
-    # ── الأدمن ─────────────────────────────────────────────
+    # ── Admin ──────────────────────────────────────────────
     path("admin/roles/", api.AdminRoleListCreateAPI.as_view(), name="admin-roles"),
-    # ⚠️  قبل `<uuid:pk>` عمدًا: الثابت يسبق المتغيّر.
+    # ⚠️  Before `<uuid:pk>` deliberately: the literal precedes the variable.
     path(
         "admin/permissions/",
         api.AdminPermissionCatalogueAPI.as_view(),

@@ -1,11 +1,11 @@
 """
-خدمات الولاء والإحالة.
+Loyalty and referral services.
 
-⚠️  **كل مسار كسب أو استبدال يمرّ بفحص التشغيل والاستهداف.**
+⚠️  **Every earning or redemption path goes through the enablement and targeting check.**
 
-    مفتاح الإيقاف الذي يُفحَص في نقطة واحدة ويُنسى في أخرى ليس
-    مفتاحًا: يكفي مسار واحد لا يفحصه ليستمر الالتزام بالتراكم بعد
-    أن يظنّ الأدمن أنه أوقفه.
+    An off switch checked at one point and forgotten at another is not a switch:
+    one path that does not check is enough for the liability to keep
+    accumulating after the admin believes they stopped it.
 """
 
 from __future__ import annotations
@@ -37,29 +37,31 @@ from loyalty.models import (
 
 logger = logging.getLogger(__name__)
 
-#: ⚠️  بلا أحرف تلتبس بالأرقام (O/0 · I/1) — الكود يُملى هاتفيًا
+#: ⚠️  No characters confusable with digits (O/0 · I/1) — the code is dictated over the phone
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 CODE_LENGTH = 8
 
 
 # ═══════════════════════════════════════════════════════════
-#  اختيار البرنامج — بوابة التشغيل والاستهداف
+#  Programme selection — the enablement and targeting gate
 # ═══════════════════════════════════════════════════════════
 
 
 def program_for(user, customer=None) -> LoyaltyProgram | None:
     """
-    البرنامج المطبَّق على هذا العميل — **أو `None`**.
+    The programme applying to this customer — **or `None`**.
 
-    ⚠️  **هذه الدالة هي المفتاح الحقيقي.**
+    ⚠️  **This function is the real switch.**
 
-        كل كسب واستبدال يمرّ بها. إيقاف البرنامج أو تغيير استهدافه
-        يسري فورًا على كل المسارات، بلا أن يحتاج أيٌّ منها تعديلًا.
+        Every earning and redemption passes through it. Disabling the programme
+        or changing its targeting takes effect immediately across every path,
+        with none of them needing a change.
 
-    ⚠️  و`None` **ليست خطأً**.
+    ⚠️  And `None` **is not an error**.
 
-        حساب خارج الاستهداف حالة عادية مقصودة: النظام قد يكون
-        للطلاب وحدهم. المسارات تتعامل معها بالصمت لا بالاستثناء.
+        An account outside the targeting is a normal, intended state: the system
+        may be for students alone. The paths handle it with silence rather than
+        an exception.
     """
     if not (user and getattr(user, "is_authenticated", False)):
         return None
@@ -76,16 +78,16 @@ def is_earning_enabled(user, customer=None) -> bool:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الرصيد
+#  Balance
 # ═══════════════════════════════════════════════════════════
 
 
 def balance(customer) -> int:
     """
-    رصيد النقاط — **مشتق من الدفتر**.
+    The points balance — **derived from the ledger**.
 
-    ⚠️  لا حقل `points_balance` مخزَّن: انحرافه يعني عميلًا يستبدل
-        ما لا يملك أو يُمنَع مما يملك.
+    ⚠️  There is no stored `points_balance` field: its drift means a customer
+        redeeming what they do not have, or being denied what they do.
     """
     total = PointsEntry.objects.filter(customer=customer).aggregate(
         total=Coalesce(
@@ -104,11 +106,11 @@ def balance(customer) -> int:
 
 def available_batches(customer):
     """
-    دفعات النقاط الصالحة — **الأقدم انتهاءً أولًا**.
+    The valid points batches — **soonest to expire first**.
 
-    ⚠️  استهلاك الأحدث أولًا يجعل الأقدم ينتهي دائمًا بلا استعمال،
-        فيخسر العميل نقاطًا كسبها بينما يستبدل غيرها — وهو ما
-        يُقرأ غشًّا لا سياسة.
+    ⚠️  Consuming the newest first makes the oldest always expire unused, so the
+        customer loses points they earned while redeeming others — which reads
+        as cheating rather than policy.
     """
     today = timezone.localdate()
 
@@ -125,10 +127,11 @@ def available_batches(customer):
 
 def usable_points(customer) -> int:
     """
-    ⚠️  المتاح للاستبدال ≠ الرصيد الإجمالي.
+    ⚠️  Available for redemption ≠ the total balance.
 
-        الرصيد يشمل نقاطًا انتهت صلاحيتها ولم تُنظَّف بعد. عرضه
-        للاستبدال يجعل العميل يبني عليه ثم يُرفض.
+        The balance includes points that have expired and not yet been cleaned
+        up. Showing that for redemption makes the customer build on it and then
+        be refused.
     """
     total = available_batches(customer).aggregate(
         total=Coalesce(Sum("points_remaining"), Value(0))
@@ -138,10 +141,11 @@ def usable_points(customer) -> int:
 
 def tier_for(customer, program: LoyaltyProgram) -> TierLevel | None:
     """
-    فئة العميل — **بإجمالي إنفاقه المخزَّن**.
+    The customer's tier — **from their stored total spend**.
 
-    ⚠️  الحساب من الطلبات لحظيًا يجعل كل عرض للفئة يمسح تاريخ
-        العميل كاملًا. `total_spent` مُحدَّث بحدث الاكتمال أصلًا.
+    ⚠️  Computing it from the orders on the fly makes every display of the tier
+        scan the customer's entire history. `total_spent` is already updated by
+        the completion event.
     """
     spent = getattr(customer, "total_spent", ZERO) or ZERO
 
@@ -153,19 +157,20 @@ def tier_for(customer, program: LoyaltyProgram) -> TierLevel | None:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الكسب
+#  Earning
 # ═══════════════════════════════════════════════════════════
 
 
 def earnable_amount(order, program: LoyaltyProgram) -> Decimal:
     """
-    المبلغ الذي تُحسب عليه النقاط.
+    The amount points are calculated on.
 
-    ⚠️  الضريبة والشحن **خارج الحساب افتراضيًا**.
+    ⚠️  Tax and shipping are **outside the calculation by default**.
 
-        الضريبة تُحصَّل للدولة ولا نملكها، والشحن يُدفَع للناقل.
-        مكافأة العميل عليهما تكافئه على ما لم نربح منه — والفارق
-        يبلغ ربع الطلب أحيانًا.
+        Tax is collected for the state and we do not own it, and shipping is
+        paid to the carrier. Rewarding the customer on them rewards them on what
+        we did not profit from — and the difference reaches a quarter of the
+        order at times.
     """
     amount = order.grand_total
 
@@ -180,22 +185,22 @@ def earnable_amount(order, program: LoyaltyProgram) -> Decimal:
 @transaction.atomic
 def award_for_order(order) -> PointsEntry | None:
     """
-    يمنح نقاط طلب مكتمل — **مرة واحدة مهما تكرّر الحدث**.
+    Awards a completed order's points — **once, however often the event repeats**.
 
-    ⚠️  الترتيب مقصود:
+    ⚠️  The order is deliberate:
 
-          ١. البرنامج المطبَّق  ← الإيقاف والاستهداف يُفحصان أولًا
-          ٢. الحد الأدنى للطلب
-          ٣. المبلغ المؤهَّل    ← بلا ضريبة ولا شحن افتراضيًا
-          ٤. مضاعِف الفئة
-          ٥. القيد بتاريخ انتهاء
+          1. the applicable programme  ← enablement and targeting are checked first
+          2. the order minimum
+          3. the eligible amount       ← excluding tax and shipping by default
+          4. the tier multiplier
+          5. the entry with an expiry date
 
-    ⚠️  والازدواج يمنعه قيد قاعدة البيانات لا الفحص هنا وحده:
-        الفحص المسبق يخسر السباق بين حدثين متزامنين.
+    ⚠️  And duplication is prevented by a database constraint, not by the check
+        here alone: a pre-check loses the race between two concurrent events.
     """
     customer = order.customer
     if customer is None:
-        # بيعة كاونتر بلا عميل مسجَّل — لا أحد يُكافأ
+        # A counter sale with no registered customer — there is nobody to reward
         return None
 
     program = program_for(customer.user, customer)
@@ -234,10 +239,10 @@ def award_for_order(order) -> PointsEntry | None:
 
 def _expiry_for(program: LoyaltyProgram) -> date | None:
     """
-    ⚠️  صفر شهرًا = بلا انتهاء، ويُختار صراحةً.
+    ⚠️  Zero months = no expiry, and it is chosen explicitly.
 
-        الافتراضي اثنا عشر شهرًا لأن الالتزام غير المنتهي يتراكم
-        بلا سقف في الدفتر.
+        The default is twelve months, because a liability that never expires
+        accumulates uncapped in the ledger.
     """
     if program.expiry_months <= 0:
         return None
@@ -246,7 +251,7 @@ def _expiry_for(program: LoyaltyProgram) -> date | None:
     month_index = today.year * 12 + (today.month - 1) + program.expiry_months
     year, month = divmod(month_index, 12)
 
-    # ⚠️  اليوم يُقصَّ إلى آخر الشهر: ٣١ يناير + شهر ليس ٣١ فبراير
+    # ⚠️  The day is clamped to the month's end: 31 January + a month is not 31 February
     import calendar
 
     day = min(today.day, calendar.monthrange(year, month + 1)[1])
@@ -256,16 +261,16 @@ def _expiry_for(program: LoyaltyProgram) -> date | None:
 @transaction.atomic
 def reverse_for_order(order, *, reason: str = "مرتجع") -> PointsEntry | None:
     """
-    يسحب نقاط طلب مُرتجَع.
+    Withdraws the points of a returned order.
 
-    ⚠️  بدونه: يشتري · يكسب · يُرجِع · ويحتفظ بالنقاط — وهو أبسط
-        استغلال ممكن في أي نظام ولاء.
+    ⚠️  Without it: buy · earn · return · and keep the points — the simplest
+        possible exploit in any loyalty system.
 
-    ⚠️  والسحب **لا يُنقص الرصيد تحت الصفر**.
+    ⚠️  And the withdrawal **does not take the balance below zero**.
 
-        العميل قد يكون استبدل نقاطه قبل الإرجاع. الخصم إلى السالب
-        يجعله مدينًا بنقاط، وهو مفهوم لا وجود له — والفارق يُسجَّل
-        ملاحظةً بدل أن يُخترَع دين.
+        The customer may have redeemed their points before returning. Deducting
+        into the negative makes them owe points, a concept that does not exist —
+        and the difference is recorded as a note rather than inventing a debt.
     """
     if PointsEntry.objects.filter(order=order, kind=PointsKind.REVERSE).exists():
         return None
@@ -284,8 +289,8 @@ def reverse_for_order(order, *, reason: str = "مرتجع") -> PointsEntry | Non
     if points <= 0:
         return None
 
-    # ⚠️  استهلاك ما تبقّى من دفعة الكسب نفسها أولًا: تركه يجعل
-    #     نقاطًا سُحبت تبقى قابلة للاستبدال.
+    # ⚠️  Consume what remains of the earning batch itself first: leaving it makes
+    #     withdrawn points remain redeemable.
     _consume(earned.customer, points)
 
     note = reason
@@ -305,10 +310,11 @@ def reverse_for_order(order, *, reason: str = "مرتجع") -> PointsEntry | Non
 
 def _consume(customer, points: int) -> int:
     """
-    يستهلك النقاط من الدفعات — **الأقدم انتهاءً أولًا**.
+    Consumes points from the batches — **soonest to expire first**.
 
-    ⚠️  يعيد ما استُهلك فعلًا: قد يقلّ عن المطلوب حين تنقص
-        الدفعات المتاحة عن الرصيد الإجمالي (نقاط انتهت ولم تُنظَّف).
+    ⚠️  It returns what was actually consumed: it may fall short of the request
+        when the available batches total less than the overall balance (points
+        that expired and were not cleaned up).
     """
     remaining = points
 
@@ -326,7 +332,7 @@ def _consume(customer, points: int) -> int:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الاستبدال
+#  Redemption
 # ═══════════════════════════════════════════════════════════
 
 
@@ -341,10 +347,10 @@ class RedemptionQuote:
 
 def quote_redemption(customer, points: int, order_total: Decimal) -> RedemptionQuote:
     """
-    ⚠️  السقف نسبة من الطلب لا رقم مطلق.
+    ⚠️  The cap is a percentage of the order, not an absolute figure.
 
-        بلا سقف يُدفَع طلب كامل بالنقاط، فيخرج المتجر ببضاعة بلا
-        نقد — والنقاط لا تدفع أجور الموردين.
+        Without a cap a whole order is paid in points, so the store parts with
+        goods and no cash — and points do not pay suppliers' invoices.
     """
     program = program_for(customer.user, customer)
 
@@ -380,17 +386,19 @@ def quote_redemption(customer, points: int, order_total: Decimal) -> RedemptionQ
 @transaction.atomic
 def redeem(customer, points: int, order_total: Decimal, *, actor=None):
     """
-    يستبدل نقاطًا بكوبون شخصي.
+    Redeems points for a personal coupon.
 
-    ⚠️  **الاستبدال يُنتج كوبونًا لا خصمًا مباشرًا.**
+    ⚠️  **Redemption produces a coupon, not a direct discount.**
 
-        الخصم المباشر كان يتطلّب أن يعرف `orders` و`cart` بوجود
-        الولاء — وهما **تحته** في ترتيب الطبقات. والكوبون مسار
-        مُختبَر بالكامل: حدود استخدام، وصلاحية، وتصفية بالعميل.
+        A direct discount would have required `orders` and `cart` to know
+        loyalty exists — and they sit **below** it in the layer order. And the
+        coupon is a fully tested path: usage limits, validity, and filtering by
+        customer.
 
-    ⚠️  والنقاط تُخصم **قبل** إنشاء الكوبون.
+    ⚠️  And the points are deducted **before** the coupon is created.
 
-        العكس يترك كوبونًا صالحًا بلا خصم لو فشل الاستهلاك.
+        The reverse leaves a valid coupon with no deduction should the
+        consumption fail.
     """
     from promotions.models import Coupon, CouponKind
 
@@ -424,17 +432,17 @@ def redeem(customer, points: int, order_total: Decimal, *, actor=None):
         name_en=f"Redeem {points} points",
         kind=CouponKind.FIXED,
         value=result.value,
-        # ⚠️  استخدام واحد لمستخدم واحد: الكوبون ثمن نقاط استُهلكت،
-        #     ومشاركته تعني خصمًا مجانيًا لمن لم يدفع ثمنه.
+        # ⚠️  One use for one user: the coupon is the price of points consumed,
+        #     and sharing it means a free discount for someone who did not pay for it.
         usage_limit=1,
         usage_limit_per_user=1,
-        # ⚠️  مربوط بصاحبه: `usage_limit=1` وحده يحدّ العدد لا
-        #     الشخص، فيكفي أن يُصوَّر الكود ليصرفه غيرُه — ونقاطه
-        #     هو التي استُهلكت.
+        # ⚠️  Tied to its owner: `usage_limit=1` alone limits the count, not the
+        #     person, so a photograph of the code is enough for someone else to
+        #     spend it — on points that were theirs.
         owner=customer.user,
         starts_at=timezone.now(),
-        # ⚠️  صلاحية محدودة: كوبون بلا نهاية يُستبدَل اليوم ويُستعمل
-        #     بعد سنتين، فيبقى الالتزام مفتوحًا في الدفتر إلى الأبد.
+        # ⚠️  A limited validity: a coupon with no end is redeemed today and used
+        #     two years later, leaving the liability open in the ledger forever.
         ends_at=timezone.now() + timedelta(days=30),
         is_active=True,
     )
@@ -448,16 +456,18 @@ def redeem(customer, points: int, order_total: Decimal, *, actor=None):
 @transaction.atomic
 def adjust_points(customer, points: int, *, reason: str, actor=None) -> PointsEntry:
     """
-    تسوية يدوية من الأدمن — **موجبة أو سالبة**.
+    A manual adjustment by the admin — **positive or negative**.
 
-    ⚠️  **السبب إلزامي.**
+    ⚠️  **The reason is mandatory.**
 
-        تسوية بلا سبب تصير رقمًا لا يُفسَّر بعد شهر، والدفتر
-        الذي لا يُفسَّر لا يُدقَّق. وهذه أخطر حركة في النظام:
-        نقاط تُخلَق أو تُمحى بلا طلب يقابلها.
+        An adjustment with no reason becomes a number nobody can explain a month
+        later, and a ledger that cannot be explained cannot be audited. And this
+        is the most dangerous movement in the system: points created or erased
+        with no order against them.
 
-    ⚠️  والسحب **لا ينزل بالرصيد تحت الصفر**: العميل لا يَدين
-        بنقاط، والفارق يُسجَّل في الملاحظة بدل أن يُخترَع دين.
+    ⚠️  And a withdrawal **does not take the balance below zero**: a customer
+        does not owe points, and the difference is recorded in the note rather
+        than inventing a debt.
     """
     reason = (reason or "").strip()
     if not reason:
@@ -507,10 +517,11 @@ def adjust_points(customer, points: int, *, reason: str, actor=None) -> PointsEn
 
 def outstanding_liability() -> dict:
     """
-    ⚠️  **النقاط التزام لا رصيد تسويقي.**
+    ⚠️  **Points are a liability, not a marketing balance.**
 
-        كل نقطة قائمة وعدٌ بخصم مستقبلي. عرضها عددًا فقط يخفي
-        قيمتها بالجنيه — وهي ما يظهر في الميزانية حين تُصرَف.
+        Every outstanding point is a promise of a future discount. Displaying it
+        as a count alone hides its value in pounds — which is what appears on
+        the balance sheet when it is redeemed.
     """
     today = timezone.localdate()
 
@@ -540,10 +551,10 @@ def _random_code(length: int) -> str:
 @transaction.atomic
 def expire_points() -> dict:
     """
-    يُسقط النقاط المنتهية — **بحركة مسجَّلة لا بحذف**.
+    Expires the due points — **with a recorded movement, not by deletion**.
 
-    ⚠️  الحذف يجعل العميل يرى رصيده ينقص بلا سبب في كشفه.
-        الحركة تقول متى انتهت وكم كانت.
+    ⚠️  Deletion makes the customer see their balance drop with no reason in
+        their statement. The movement says when it expired and how much it was.
     """
     today = timezone.localdate()
 
@@ -580,7 +591,7 @@ def expire_points() -> dict:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الإحالة
+#  Referrals
 # ═══════════════════════════════════════════════════════════
 
 
@@ -594,10 +605,11 @@ def active_referral_program(user) -> ReferralProgram | None:
 @transaction.atomic
 def ensure_referral_code(user) -> ReferralCode:
     """
-    ⚠️  الكود يُولَّد عند الطلب لا لكل مستخدم.
+    ⚠️  The code is generated on request, not for every user.
 
-        توليده للجميع يملأ الجدول بأكواد لا تُستعمل، ويستهلك مساحة
-        الأكواد القصيرة القابلة للإملاء هاتفيًا.
+        Generating it for everyone fills the table with codes that are never
+        used, and consumes the space of short codes that can be dictated over
+        the phone.
     """
     existing = ReferralCode.objects.filter(user=user).first()
     if existing is not None:
@@ -614,17 +626,17 @@ def ensure_referral_code(user) -> ReferralCode:
 @transaction.atomic
 def register_referral(referee, code: str, *, ip: str = "") -> Referral:
     """
-    يسجّل إحالة عند التسجيل — **بلا مكافأة بعد**.
+    Records a referral at registration — **with no reward yet**.
 
-    ⚠️  **أربعة حواجز ضد التلاعب، وكلها لازمة:**
+    ⚠️  **Four barriers against abuse, all of them necessary:**
 
-          ١. لا إحالة ذاتية       ← أوضح استغلال
-          ٢. المُحال مرة واحدة    ← يفرضه قيد `OneToOne`
-          ٣. سقف لكل مُحيل        ← يحدّ من مزارع الحسابات
-          ٤. المكافأة عند أول طلب مكتمل ← البضاعة خرجت والمال دخل
+          1. no self-referral            ← the most obvious exploit
+          2. the referee is recorded once ← enforced by a `OneToOne` constraint
+          3. a cap per referrer          ← it limits account farms
+          4. the reward on the first completed order ← goods went out and money came in
 
-        إسقاط أيٍّ منها يجعل الباقي بلا معنى: من يستطيع فتح مئة
-        حساب لا يوقفه سقف وحده.
+        Dropping any of them makes the rest meaningless: someone able to open a
+        hundred accounts is not stopped by a cap alone.
     """
     referral_program = active_referral_program(referee)
     if referral_program is None:
@@ -662,12 +674,14 @@ def register_referral(referee, code: str, *, ip: str = "") -> Referral:
 @transaction.atomic
 def reward_referral(order) -> Referral | None:
     """
-    يكافئ الإحالة عند **أول طلب مكتمل** للمُحال.
+    Rewards the referral on the referee's **first completed order**.
 
-    ⚠️  «أول طلب» يُقاس بعدد طلباته المكتملة لا بتاريخ تسجيله.
+    ⚠️  "First order" is measured by their count of completed orders, not by
+        their registration date.
 
-        القياس بالتاريخ يجعل من سجّل ولم يشترِ إلا بعد سنة غير
-        مؤهَّل — وهو عميل حقيقي جلبه مُحيل حقيقي.
+        Measuring by date makes someone who registered and did not buy until a
+        year later ineligible — and they are a real customer brought in by a
+        real referrer.
     """
     customer = order.customer
     if customer is None:
@@ -687,18 +701,18 @@ def reward_referral(order) -> Referral | None:
 
     referrer_customer = CustomerProfile.objects.filter(user=referral.referrer).first()
 
-    # ⚠️  **كل طرف يُفحَص ببرنامجه هو.**
+    # ⚠️  **Each side is checked against their own programme.**
     #
-    #     منح الطرفين من برنامج المُحيل كان يثقب الاستهداف: صيدلية
-    #     داخل البرنامج تُحيل طالبًا خارجه، فيكسب الطالب نقاطًا من
-    #     برنامج لا يشمله — والأدمن الذي حصر النظام في الصيدليات
-    #     يجدها تُصرَف على غيرهم.
+    #     Awarding both sides from the referrer's programme punched a hole in the
+    #     targeting: a pharmacy inside the programme refers a student outside it,
+    #     so the student earns points from a programme that does not cover them —
+    #     and the admin who confined the system to pharmacies finds it spent on others.
     referrer_program = program_for(referral.referrer, referrer_customer)
     referee_program = program_for(customer.user, customer)
 
     if referrer_program is None and referee_program is None:
-        # ⚠️  المكافأة نقاط، وبلا برنامج ولاء نشط لا وعاء لها.
-        #     تُترك معلَّقة لا مرفوضة: تفعيل البرنامج لاحقًا يكافئها.
+        # ⚠️  The reward is points, and with no active loyalty programme there is no vessel for them.
+        #     They are left pending rather than refused: enabling the programme later rewards them.
         logger.info("إحالة %s معلَّقة — لا برنامج ولاء لأيٍّ من الطرفين", referral.pk)
         return None
 
@@ -739,7 +753,7 @@ def reward_referral(order) -> Referral | None:
 
 
 def referral_stats(user) -> dict:
-    """إحصاءات المُحيل — للوحة السفير."""
+    """Referrer statistics — for the ambassador dashboard."""
     rows = Referral.objects.filter(referrer=user)
 
     return {

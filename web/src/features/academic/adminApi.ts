@@ -4,18 +4,19 @@ import type { PagedResponse } from '@/features/orders/adminApi';
 import { http } from '@/shared/http';
 
 /**
- * الشجرة الأكاديمية والحزم — للأدمن.
+ * The academic tree and bundles — for the admin.
  *
- * ⚠️  **الشجرة شرط لتسجيل أي طالب.**
+ * ⚠️  **The tree is a precondition for registering any student.**
  *
- *     الطالب يختار جامعته وكليته قبل إنشاء حسابه. ومتجر بلا شاشة
- *     جامعات لا يستقبل طالبًا واحدًا من لوحته — تُدار البيانات من
- *     سطر الأوامر أو لا تُدار.
+ *     A student picks their university and faculty before creating their
+ *     account. And a store with no universities screen accepts not a single
+ *     student from its panel — the data is managed from the command line or not
+ *     at all.
  *
- * ⚠️  و**القوائم بلا ترقيم** (`pagination_class = None` على الخادم).
+ * ⚠️  And **the lists are unpaginated** (`pagination_class = None` on the server).
  *
- *     الشجرة صغيرة بطبعها: جامعات بالعشرات وكليات بالمئات. توقّع
- *     `results` هنا كان يعطي `undefined` صامتًا وجدولًا فارغًا.
+ *     The tree is small by nature: universities in the tens and faculties in the
+ *     hundreds. Expecting `results` here gave a silent `undefined` and an empty table.
  */
 
 export interface University {
@@ -103,7 +104,7 @@ export interface StudentRow {
   expected_graduation_year: number | null;
 }
 
-// ── القراءة ────────────────────────────────────────────────
+// ── Reading ───────────────────────────────────────────────
 
 export function useUniversities() {
   return useQuery({
@@ -157,14 +158,14 @@ export function useStudents(filters: StudentFilters) {
   });
 }
 
-// ── الكتابة ────────────────────────────────────────────────
+// ── Writing ───────────────────────────────────────────────
 
 /**
- * ⚠️  إبطال الشجرة كلها بعد أي كتابة.
+ * ⚠️  Invalidate the whole tree after any write.
  *
- *     حذف كلية يغيّر عدد كليات جامعتها، وإنشاء حزمة يغيّر عدّاد
- *     بنود لا شيء آخر يعرف به. إبطال الفرع وحده يترك الشاشة تعرض
- *     عدّادات من لحظة سابقة.
+ *     Deleting a faculty changes its university's faculty count, and creating a
+ *     bundle changes an item counter nothing else knows about. Invalidating the
+ *     branch alone leaves the screen showing counters from an earlier moment.
  */
 function useAcademicMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();
@@ -201,7 +202,7 @@ export function useDeleteFaculty() {
   return useAcademicMutation((id: string) => http.delete<void>(`/academic/admin/faculties/${id}/`));
 }
 
-/** ⚠️  الترقية **يدوية**: العام الدراسي يبدأ في مواعيد مختلفة. */
+/** ⚠️  Promotion is **manual**: the academic year starts at different dates. */
 export function usePromoteStudents() {
   return useAcademicMutation((id: string) =>
     http.post<{ faculty: string; promoted: number; note: string }>(

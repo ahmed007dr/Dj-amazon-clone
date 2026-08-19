@@ -1,19 +1,20 @@
 """
-قوالب البريد المعاملاتية — معرَّفة في الكود.
+Transactional mail templates — defined in code.
 
-⚠️  اللغة تُختار من **تفضيل المستلم**، لا من لغة الطلب الذي أطلق الحدث.
+⚠️  The language is chosen from **the recipient's preference**, not from the
+    language of the request that triggered the event.
 
-    عميل لغته العربية يطلب طلبًا من واجهة إنجليزية ⟵ يصله التأكيد
-    بالعربية. والأدمن الذي يوقف حسابًا بالإنجليزية ⟵ يصل الإشعار
-    لصاحب الحساب بلغته هو.
+    An Arabic-speaking customer placing an order through an English interface
+    ⟵ receives the confirmation in Arabic. And an admin suspending an account in
+    English ⟵ the notification reaches the account holder in their own language.
 
-    هذا يختلف عن تفاوض لغة الـ API في core.middleware — عمدًا.
+    This differs from the API language negotiation in core.middleware — deliberately.
 
-⚠️  **بيانات لا سلوك.** الإرسال في `mailing/services.py`.
+⚠️  **Data, not behaviour.** Sending lives in `mailing/services.py`.
 
-    الفصل ليس ترتيبًا: القوالب تنتقل إلى قاعدة البيانات لتصير قابلة
-    للتحرير من الشاشة، وما هنا يبقى **القيمة الافتراضية الاحتياطية**.
-    تحرير فاسد لا يجوز أن يعطّل «إعادة تعيين كلمة المرور».
+    The separation is not tidiness: the templates move into the database to
+    become editable from the screen, and what is here remains **the default
+    fallback value**. A bad edit must not be able to disable "password reset".
 """
 
 from __future__ import annotations
@@ -25,12 +26,12 @@ from mailing.purposes import MailPurpose
 
 FALLBACK_LANGUAGE = "ar"
 
-#: ⚠️  `{اسم}` وحده — لا صيغ ولا نقاط ولا فهارس.
+#: ⚠️  `{name}` alone — no format specs, no dots and no indices.
 #:
-#:     `str.format` كان يقبل `{link.__class__}` و`{user.password}`:
-#:     تعبير يتنقّل في خصائص الكائنات. وهو مقبول ما دام القالب في
-#:     الكود، وثغرة قراءة ذاكرة لحظة يصير حقلًا يحرّره الأدمن من
-#:     شاشة. المحدِّد هنا لا يطابق نقطةً أصلًا.
+#:     `str.format` accepted `{link.__class__}` and `{user.password}`:
+#:     an expression walking through an object's attributes. That is tolerable
+#:     while the template lives in code, and a memory-read hole the moment it
+#:     becomes a field the admin edits from a screen. The matcher here does not match a dot at all.
 PLACEHOLDER = re.compile(r"\{(\w+)\}")
 
 
@@ -40,16 +41,17 @@ def placeholders(text: str) -> set[str]:
 
 def render_text(text: str, context: dict) -> str:
     """
-    استبدال آمن.
+    A safe substitution.
 
-    ⚠️  **المتغيّر المجهول يبقى ظاهرًا ولا يرفع استثناء.**
+    ⚠️  **An unknown variable stays visible and raises nothing.**
 
-        `str.format` كان يرفع `KeyError` على حرف زائد واحد في
-        `{totall}` — فتُفقَد الرسالة كلها. و`{totall}` ظاهرًا في نصّ
-        وصل قبيحٌ ومحرج، لكنه يصل ويُقرأ ويُبلَّغ عنه؛ أما الرسالة
-        المفقودة فلا يعرف أحد أنها كانت.
+        `str.format` raised `KeyError` on one extra character in `{totall}` — so
+        the whole message was lost. And a visible `{totall}` in text that
+        arrived is ugly and embarrassing, but it arrives, gets read, and gets
+        reported; whereas nobody knows a lost message ever existed.
 
-        والتحقق وقت الحفظ يمنع الحالة أصلًا — وهذا حارس أخير لا أول.
+        And validation at save time prevents the situation in the first place —
+        this is a last guard, not a first one.
     """
     return PLACEHOLDER.sub(lambda match: str(context.get(match.group(1), match.group(0))), text)
 
@@ -57,20 +59,20 @@ def render_text(text: str, context: dict) -> str:
 @dataclass(frozen=True)
 class MailTemplate:
     """
-    قالب بريد ثنائي اللغة.
+    A bilingual email template.
 
-    كلا اللغتين إلزامي — قالب بلغة واحدة يعني مستخدمًا يتلقى
-    رسالة لا يفهمها.
+    Both languages are mandatory — a template in one language means a user
+    receiving a message they cannot read.
     """
 
     key: str
 
-    #: ⚠️  الغرض **يُعلَن في القالب** لا يُستنتَج من اسمه.
+    #: ⚠️  The purpose is **declared on the template**, not inferred from its name.
     #:
-    #:     الاستنتاج بالبادئة (`order_*` ← الطلبات) يبدو كافيًا حتى
-    #:     يظهر `order_cancelled` الذي يخص الطلبات و`payment_received`
-    #:     الذي لا يبدأ بها. والقالب الجديد كان سيقع في الغرض الخطأ
-    #:     بلا خطأ واحد — أي يخرج من الحساب الخطأ بصمت.
+    #:     Inferring from a prefix (`order_*` ← orders) looks sufficient until
+    #:     `order_cancelled`, which belongs to orders, and `payment_received`,
+    #:     which does not start with it. And a new template would fall into the
+    #:     wrong purpose with not one error — that is, go out from the wrong account silently.
     purpose: str
 
     subject_ar: str
@@ -92,11 +94,11 @@ class MailTemplate:
     @property
     def variables(self) -> frozenset[str]:
         """
-        المتغيّرات التي يعرفها هذا القالب — مستخرَجة من نصّه هو.
+        The variables this template knows — extracted from its own text.
 
-        ⚠️  هي **قائمة السماح** لأي تحرير من الشاشة: القالب المحرَّر
-            لا يجوز أن يطلب متغيّرًا لا يمرّره الكود، لأن الكود وحده
-            يعرف ما يضعه في السياق.
+        ⚠️  It is **the allowlist** for any edit from the screen: an edited
+            template must not request a variable the code does not pass,
+            because only the code knows what it puts in the context.
         """
         return frozenset(
             name
@@ -106,10 +108,10 @@ class MailTemplate:
 
 
 # ═══════════════════════════════════════════════════════════
-#  القوالب المعاملاتية
+#  The transactional templates
 # ═══════════════════════════════════════════════════════════
-#  تنتقل إلى قاعدة البيانات في المرحلة ٦ لتصير قابلة للتحرير
-#  من الأدمن. البنية هنا تبقى كما هي.
+#  They move into the database in phase 6 to become editable
+#  from the admin. The structure here stays as it is.
 
 TEMPLATES: dict[str, MailTemplate] = {}
 
@@ -258,18 +260,18 @@ ACCOUNT_ACTIVATED = register(
 
 
 # ═══════════════════════════════════════════════════════════
-#  الطلبات — القوالب المعاملاتية
+#  Orders — the transactional templates
 # ═══════════════════════════════════════════════════════════
 #
-#  ⚠️  **رقم الطلب في كل رسالة، ومرة في السطر الأول.**
+#  ⚠️  **The order number in every message, and once in the first line.**
 #
-#      العميل الذي يبحث في بريده عن طلب بعينه يبحث برقمه؛ ودفنه في
-#      منتصف فقرة يجعل البحث يفشل ويصير السؤال مكالمةً للدعم.
+#      A customer searching their mail for a specific order searches by its
+#      number; burying it mid-paragraph makes the search fail and turns the question into a support call.
 #
-#  ⚠️  ولا مبالغ محسوبة هنا.
+#  ⚠️  And no computed amounts here.
 #
-#      كل رقم يأتي جاهزًا من الطلب المخزَّن — لقطة وقت البيع
-#      (ADR-30). إعادة حسابه في القالب تنتج فاتورة تخالف السجل.
+#      Every figure arrives ready from the stored order — a snapshot at the
+#      time of sale (ADR-30). Recomputing it in the template produces an invoice that contradicts the record.
 
 ORDER_PLACED = register(
     MailTemplate(
@@ -361,8 +363,8 @@ ORDER_CANCELLED = register(
             "مرحبًا {name}،\n\n"
             "أُلغي طلبك رقم {number}.\n\n"
             "السبب: {reason}\n\n"
-            # ⚠️  ذكر الاسترداد صراحةً: أول سؤال بعد الإلغاء هو
-            #     «وأين مالي؟»، والصمت عنه يجعله مكالمة دعم.
+            # ⚠️  The refund is mentioned explicitly: the first question after a
+            #     cancellation is "and where is my money?", and silence makes it a support call.
             "إن كنت قد دفعت، يُعاد المبلغ خلال ٥-١٠ أيام عمل.\n\n"
             "{link}"
         ),

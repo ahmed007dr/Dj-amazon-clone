@@ -1,18 +1,19 @@
 """
-بذرة الزمن — حركة الزوار وتوزيع الطلبات على ساعات الأسبوع.
+The time seed — visitor traffic and the spread of orders across the hours of the week.
 
-⚠️  **بذرة يقع فيها كل شيء في الثانية نفسها لا تُظهر شيئًا.**
+⚠️  **A seed where everything happens in the same second shows nothing.**
 
-    شاشة الضغط تجيب «متى؟»، وبيانات كلها في لحظة الإنشاء تُنتج خلية
-    واحدة مضيئة و١٦٧ فارغة — فتبدو الشاشة معطّلة لا فارغة. ولذلك
-    هذه البذرة تُوزّع الزمن قبل أي شيء آخر.
+    The load screen answers "when?", and data all landing at the moment of
+    creation produces one lit cell and 167 empty ones — so the screen looks
+    broken rather than empty. That is why this seed distributes time before
+    anything else.
 
-⚠️  والشكل **ليس عشوائيًا منتظمًا**.
+⚠️  And the shape is **not uniform randomness**.
 
-    توزيع مسطّح يجعل الخريطة رمادية بلا ذروة، فلا يُرى الفرق بين
-    «تعمل» و«لا تعمل». الشكل هنا يحاكي متجرًا حقيقيًا: ذروة مساء،
-    وهدوء فجرًا، ونهاية أسبوع أعلى — وهو ما يجعل خطأً في حساب
-    المنطقة الزمنية **مرئيًا** بدل أن يمرّ.
+    A flat distribution makes the map grey with no peak, so the difference
+    between "working" and "not working" cannot be seen. The shape here mimics a
+    real store: an evening peak, quiet before dawn, and a higher weekend — which
+    is what makes a time-zone calculation error **visible** rather than passing unnoticed.
 """
 
 from __future__ import annotations
@@ -25,22 +26,22 @@ from django.utils import timezone
 from accounts.models import DeviceType
 from analytics.models import TrafficBucket
 
-#: عدد الأيام المبذورة — يطابق النافذة الافتراضية في شاشة الضغط.
+#: The number of days seeded — matching the default window on the load screen.
 DAYS = 30
 
-#: وزن كل ساعة (٠–٢٣) — ذروة مساء وهدوء فجرًا.
+#: The weight of each hour (0–23) — an evening peak and a quiet dawn.
 HOUR_WEIGHTS = [
     2, 1, 1, 1, 1, 2, 4, 7, 11, 14, 16, 18,
     17, 15, 14, 16, 20, 26, 30, 28, 22, 15, 9, 4,
 ]
 
-#: وزن كل يوم بترتيب ISO — الاثنين ١ … الأحد ٧.
+#: The weight of each day in ISO order — Monday 1 … Sunday 7.
 #
-# ⚠️  الجمعة أدنى: عطلة الأسبوع في السوق المصري، والذروة تسبقها
-#     وتليها. رقمٌ يخالف الواقع المحلي يجعل الشاشة تُقرأ ولا تُصدَّق.
+# ⚠️  Friday is lowest: the weekend in the Egyptian market, with the peaks
+#     before and after it. A figure contradicting local reality makes the screen read but not believed.
 WEEKDAY_WEIGHTS = {1: 1.0, 2: 1.05, 3: 1.0, 4: 1.1, 5: 0.55, 6: 0.9, 7: 0.95}
 
-#: توزيع الأجهزة — الهاتف أولًا، وهو واقع أي متجر تجزئة.
+#: The device split — phone first, which is the reality of any retail store.
 DEVICE_SHARE = {
     DeviceType.MOBILE: 0.62,
     DeviceType.DESKTOP: 0.28,
@@ -48,10 +49,10 @@ DEVICE_SHARE = {
     DeviceType.UNKNOWN: 0.02,
 }
 
-#: ⚠️  بذرة ثابتة — تشغيلان متتاليان يُنتجان نفس الشاشة.
+#: ⚠️  A fixed seed — two consecutive runs produce the same screen.
 #
-#     أرقام تتغيّر في كل تشغيل تجعل «هل تغيّر شيء بعد تعديلي؟»
-#     سؤالًا بلا إجابة.
+#     Numbers that change on every run make "did anything change after my
+#     edit?" a question with no answer.
 SEED = 20260818
 
 
@@ -62,23 +63,23 @@ def _shape(moment) -> float:
 
 def seed() -> dict:
     """
-    ⚠️  تُنادى **بعد** بذرة الطلبات لا قبلها — توزّع ما أُنشئ.
+    ⚠️  Called **after** the orders seed, not before — it distributes what was created.
     """
     from orders.models import Order
 
     rng = random.Random(SEED)
     now = timezone.localtime(timezone.now())
 
-    # ── توزيع الطلبات على الزمن ────────────────────────────
+    # ── Spreading the orders across time ───────────────────
     #
-    # ⚠️  `update` لا `save`: `created_at` حقل `auto_now_add`،
-    #     و`save()` تُعيد كتابته بلحظة الحفظ فيُلغي التوزيع كله.
+    # ⚠️  `update`, not `save`: `created_at` is an `auto_now_add` field,
+    #     and `save()` rewrites it with the save moment, cancelling the whole distribution.
     spread = 0
     for order_id in Order.objects.values_list("pk", flat=True):
         Order.objects.filter(pk=order_id).update(created_at=_pick_moment(rng, now))
         spread += 1
 
-    # ── حركة الزوار ────────────────────────────────────────
+    # ── Visitor traffic ────────────────────────────────────
     buckets = []
     for day_offset in range(DAYS):
         day = now - timedelta(days=day_offset)
@@ -97,15 +98,15 @@ def seed() -> dict:
                 if count <= 0:
                     continue
 
-                # ⚠️  الزائر المسجَّل أقلية — معظم من يتصفّح متجرًا
-                #     لا يسجّل دخولًا، وهو سبب وجود العدّ المجهول.
+                # ⚠️  Registered visitors are a minority — most people browsing a store
+                #     never log in, which is why the anonymous count exists.
                 known = int(count * 0.22)
 
                 buckets.append(
                     TrafficBucket(
                         bucket_start=moment,
                         device_type=device,
-                        # الطلبات أكثر من الزوار: كل زائر يتصفّح صفحات
+                        # More requests than visitors: every visitor browses several pages
                         requests=count * rng.randint(4, 11),
                         guest_visitors=count - known,
                         known_visitors=known,
@@ -125,11 +126,11 @@ def seed() -> dict:
 
 def _pick_moment(rng: random.Random, now):
     """
-    لحظة داخل آخر `DAYS` يومًا **موزونة بشكل المتجر**.
+    A moment within the last `DAYS` days, **weighted by the store's shape**.
 
-    ⚠️  الرفض-وإعادة-المحاولة لا الاختيار المنتظم: الأخير يجعل
-        ذروة الشراء مسطّحة بينما ذروة التصفّح حادّة — تناقضٌ في
-        نفس الشاشة يبدو خطأً في الحساب لا في البذرة.
+    ⚠️  Rejection sampling rather than a uniform draw: the latter makes the
+        buying peak flat while the browsing peak is sharp — a contradiction on
+        the same screen that looks like a calculation error rather than a seed one.
     """
     peak = max(HOUR_WEIGHTS) * max(WEEKDAY_WEIGHTS.values())
 

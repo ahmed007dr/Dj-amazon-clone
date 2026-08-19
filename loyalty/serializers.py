@@ -1,4 +1,4 @@
-"""عقود الولاء — المبالغ نصًا (ADR-31)، والمحتوى بلغتيه (ADR-34)."""
+"""Loyalty contracts — amounts as strings (ADR-31), and content in both languages (ADR-34)."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ class MoneySerializerField(serializers.DecimalField):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن — الضبط
+#  Admin — configuration
 # ═══════════════════════════════════════════════════════════
 
 
@@ -59,12 +59,12 @@ class LoyaltyProgramSerializer(serializers.ModelSerializer):
             "code",
             "name_ar",
             "name_en",
-            # ── المفتاح والاستهداف ─────────────────────────
+            # ── The switch and targeting ───────────────────
             "is_active",
             "redemption_enabled",
             "account_types",
             "customer_segments",
-            # ── قواعد الكسب ────────────────────────────────
+            # ── Earning rules ──────────────────────────────
             "currency_per_point",
             "point_value",
             "earns_on_tax",
@@ -80,11 +80,11 @@ class LoyaltyProgramSerializer(serializers.ModelSerializer):
 
     def validate_account_types(self, value):
         """
-        ⚠️  الاستهداف يُتحقَّق منه هنا لا في الواجهة وحدها.
+        ⚠️  Targeting is validated here, not in the frontend alone.
 
-            قيمة مكتوبة خطأً (`"طالب"` بدل `"STUDENT"`) لا تطابق
-            أحدًا، فيظهر البرنامج مفعَّلًا **ولا يكسب فيه أحد** —
-            وهو عطل صامت يستغرق أيامًا حتى يُلاحَظ.
+            A mistyped value (`"student"` instead of `"STUDENT"`) matches
+            nobody, so the programme appears enabled and **nobody earns from it**
+            — a silent fault that takes days to notice.
         """
         from accounts.models import AccountType
 
@@ -105,8 +105,8 @@ def _validate_choices(value, enum, label: str) -> list:
     if unknown:
         raise serializers.ValidationError(f"{label} غير معروف: {'، '.join(map(str, unknown))}")
 
-    # ⚠️  إزالة التكرار مع حفظ الترتيب — التكرار لا يضرّ المنطق
-    #     لكنه يظهر في الشاشة مرتين فيبدو عطلًا.
+    # ⚠️  Deduplication preserving order — duplicates do not harm the logic
+    #     but they appear twice on screen and look like a fault.
     return list(dict.fromkeys(value))
 
 
@@ -136,7 +136,7 @@ class ReferralProgramSerializer(serializers.ModelSerializer):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الدفتر
+#  The ledger
 # ═══════════════════════════════════════════════════════════
 
 
@@ -164,7 +164,7 @@ class PointsEntrySerializer(serializers.ModelSerializer):
 
 
 class AdminPointsEntrySerializer(PointsEntrySerializer):
-    """⚠️  اسم من سجّل التسوية يظهر للأدمن وحده — لا للعميل."""
+    """⚠️  The name of whoever recorded the adjustment is shown to the admin alone — never to the customer."""
 
     customer_name = serializers.CharField(source="customer.display_name_ar", read_only=True)
     recorded_by_name = serializers.CharField(
@@ -197,7 +197,7 @@ class ReferralSerializer(serializers.ModelSerializer):
 
 
 # ═══════════════════════════════════════════════════════════
-#  المدخلات
+#  Inputs
 # ═══════════════════════════════════════════════════════════
 
 
@@ -207,7 +207,7 @@ class RedemptionInputSerializer(serializers.Serializer):
 
 
 class AdjustmentInputSerializer(serializers.Serializer):
-    """⚠️  `points` يقبل السالب: السحب اليدوي مسار مقصود."""
+    """⚠️  `points` accepts a negative: a manual withdrawal is a deliberate path."""
 
     points = serializers.IntegerField()
     reason = serializers.CharField(max_length=500, allow_blank=False)

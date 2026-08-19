@@ -1,17 +1,17 @@
 """
-بذر الأدوار الوظيفية وصلاحياتها.
+Seed the job roles and their permissions.
 
     python manage.py seed_employee_roles
 
-⚠️  **لا دور يحمل كل الصلاحيات.**
+⚠️  **No role carries every permission.**
 
-    «موظف» ليست صلاحية: المندوب يُنشئ طلبات ولا يرى الأرباح؛
-    وموظف المخزن يرى المخزون ولا يُنشئ طلبًا. منح الجميع نفس
-    الحزمة يعني أن كل موظف يملك ما يملكه أوسعهم صلاحية — وهو ما
-    يمرّ صامتًا لأن الشاشات تعمل.
+    "Employee" is not a permission: a rep creates orders and does not see
+    profits; a warehouse employee sees the stock and creates no orders. Granting
+    everyone the same bundle means every employee holds what the broadest of
+    them holds — and it passes silently because the screens work.
 
-⚠️  ولا يُلمَس `is_active` عند التحديث: إعادة التشغيل كانت ستُعيد
-    تفعيل دور عطّلته الإدارة عمدًا.
+⚠️  And `is_active` is not touched on update: re-running would have reactivated
+    a role management deliberately disabled.
 """
 
 from django.contrib.auth.models import Permission
@@ -21,15 +21,15 @@ from django.db import transaction
 from employees import services
 from employees.models import EmployeeRole, EmployeeRoleKind
 
-#: (رمز الصلاحية، التطبيق) — صلاحيات Django القياسية لا نظام موازٍ
+#: (permission code, app) — standard Django permissions, not a parallel system
 ROLES = [
     {
         "code": "sales-rep",
         "kind": EmployeeRoleKind.SALES_REP,
         "name_ar": "مندوب مبيعات",
         "name_en": "Sales representative",
-        # ⚠️  يقرأ الكتالوج ويُنشئ طلبات لعملائه — ولا يرى ربحًا
-        #     ولا مصروفًا ولا حساب عميل غيره.
+        # ⚠️  Reads the catalogue and creates orders for their customers — and sees no
+        #     profit, no expense, and no other rep's customer account.
         "permissions": [
             "employees.view_employeeprofile",
             "employees.view_customerassignment",
@@ -43,7 +43,7 @@ ROLES = [
         "kind": EmployeeRoleKind.SENIOR_SALES,
         "name_ar": "مندوب أول",
         "name_en": "Senior sales representative",
-        # يضيف قراءة المخزون: يَعِد العميل بموعد توفّر لا بتخمين
+        # Adds stock reading: they promise the customer an availability date, not a guess
         "permissions": [
             "employees.view_employeeprofile",
             "employees.view_customerassignment",
@@ -58,8 +58,8 @@ ROLES = [
         "kind": EmployeeRoleKind.SALES_MANAGER,
         "name_ar": "مدير مبيعات",
         "name_en": "Sales manager",
-        # ⚠️  يُسنِد العملاء ويرى أداء فريقه — ولا يزال **بلا**
-        #     صلاحية مالية: الأرباح قرارها في `finance` (ADR-47).
+        # ⚠️  Assigns customers and sees their team's performance — and still **without**
+        #     any finance permission: profits are decided in `finance` (ADR-47).
         "permissions": [
             "employees.view_employeeprofile",
             "employees.change_employeeprofile",
@@ -77,7 +77,7 @@ ROLES = [
         "kind": EmployeeRoleKind.CUSTOMER_SERVICE,
         "name_ar": "خدمة عملاء",
         "name_en": "Customer service",
-        # ⚠️  يقرأ الطلبات ولا يُنشئها: الإنشاء بيع، والخدمة متابعة.
+        # ⚠️  Reads orders and does not create them: creating is selling, and service is follow-up.
         "permissions": [
             "employees.view_employeeprofile",
             "employees.view_customerassignment",
@@ -103,7 +103,7 @@ ROLES = [
         "kind": EmployeeRoleKind.FINANCE,
         "name_ar": "موظف مالي",
         "name_en": "Finance staff",
-        # ⚠️  الوحيد بصلاحية مالية — وهي صريحة لا موروثة (ADR-47)
+        # ⚠️  The only one with a finance permission — and it is explicit, not inherited (ADR-47)
         "permissions": [
             "employees.view_employeeprofile",
             "finance.view_revenueentry",
@@ -141,21 +141,21 @@ class Command(BaseCommand):
                 ).first()
 
                 if permission is None:
-                    # ⚠️  الصلاحية الغائبة تُبلَّغ ولا تُبتلع.
+                    # ⚠️  A missing permission is reported, never swallowed.
                     #
-                    #     خطأ مطبعي في اسمها كان سيُنتج دورًا ينقصه
-                    #     ما لا يلاحظه أحد حتى يشتكي موظف من شاشة
-                    #     لا تفتح.
+                    #     A typo in its name would have produced a role missing something
+                    #     nobody notices until an employee complains about a screen
+                    #     will not open.
                     missing.append(path)
                     continue
                 permissions.append(permission)
 
             role.permissions.set(permissions)
 
-            # ⚠️  المزامنة إلى مجموعة Django — بدونها الصلاحيات زينة.
+            # ⚠️  Synchronise to the Django group — without it the permissions are decoration.
             #
-            #     `has_perm` لا يعرف بوجود `EmployeeRole.permissions`؛
-            #     يقرأ صلاحيات المستخدم ومجموعاته وحدهما.
+            #     `has_perm` knows nothing about `EmployeeRole.permissions`;
+            #     it reads the user's own permissions and their groups alone.
             services.sync_role_permissions(role)
 
         self.stdout.write(

@@ -1,12 +1,13 @@
 """
-اختبارات حسابات البريد.
+Mail account tests.
 
-⚠️  **السؤال الذي تجيب عنه: من أي حساب خرجت هذه الرسالة؟**
+⚠️  **The question they answer: which account did this message go out from?**
 
-    خطأ الإسناد لا يظهر في أي سجل خطأ: الرسالة تُرسَل وتصل، لكنها
-    تخرج من حساب التسويق فتقع في «غير المرغوب» — أو تخرج رسالة
-    تسويقية من حساب الأمان فتُدرِجه في القوائم السوداء. الأثر يظهر
-    بعد أسابيع في معدّل وصول منخفض لا في استثناء.
+    An assignment error appears in no error log: the message is sent and it
+    arrives, but it goes out from the marketing account and lands in "junk" — or
+    a marketing message goes out from the security account and gets it
+    blacklisted. The effect shows up weeks later as a low delivery rate, not as
+    an exception.
 """
 
 from email.header import decode_header, make_header
@@ -53,9 +54,9 @@ def make_account(**overrides) -> EmailAccount:
 class TestResolution:
     def test_no_account_falls_back_to_environment(self):
         """
-        ⚠️  الطبقة الثالثة ليست ترفًا: تركيب جديد بقاعدة بيانات فارغة
-            لا حساب فيه، وتفعيل أول أدمن يحتاج بريد تفعيل. `None`
-            تعني «استعمل إعداد `.env`».
+        ⚠️  The third layer is not a luxury: a fresh install has an empty
+            database with no account in it, and activating the first admin needs
+            an activation email. `None` means "use the `.env` configuration".
         """
         assert services.resolve_account() is None
         assert services.connection_for(None) is None
@@ -78,7 +79,7 @@ class TestResolution:
         assert services.resolve_account() is None
 
     def test_inbound_only_account_does_not_send(self):
-        """حساب استقبال ليس حساب إرسال — والخلط يُخرج البريد من صندوق الدعم."""
+        """A receiving account is not a sending account — conflating them sends mail out of the support inbox."""
         make_account(
             code="support",
             direction=MailDirection.INBOUND,
@@ -93,9 +94,9 @@ class TestResolution:
 class TestConnection:
     def test_smtp_settings_come_from_the_row_not_from_settings(self):
         """
-        ⚠️  `settings.EMAIL_*` لا تُعدَّل وقت التشغيل: الحساب يُختار
-            لكل رسالة، وتعديل إعداد عالمي كان يجعل رسالتين متزامنتين
-            تتبادلان الحسابين تحت الحِمل.
+        ⚠️  `settings.EMAIL_*` is not modified at runtime: the account is chosen
+            per message, and modifying a global setting made two concurrent
+            messages swap accounts under load.
         """
         account = make_account(security=MailSecurity.SSL, port=465, timeout=7)
         EmailCredential.objects.create(
@@ -114,8 +115,9 @@ class TestConnection:
 
     def test_console_transport_never_reaches_a_server(self):
         """
-        `CONSOLE` مفتاح إيقاف يُبقي الإعداد: الحساب يبقى مضبوطًا
-        ويظهر الأثر في السجل بدل أن يختفي بحذف الصف.
+        `CONSOLE` is an off switch that keeps the configuration: the account
+        stays set up and the effect appears in the log instead of vanishing with
+        a deleted row.
         """
         account = make_account(transport=MailTransport.CONSOLE)
 
@@ -126,9 +128,9 @@ class TestConnection:
 class TestCredentials:
     def test_value_is_encrypted_at_rest(self):
         """
-        ⚠️  حجب القيمة عن الـ API وحده يحمي مسارًا ويترك الآخر
-            مفتوحًا: نسخة احتياطية أو تسريب SQL يعطي كلمة مرور صندوق
-            البريد — وهو مفتاح إعادة تعيين كل كلمة مرور أخرى للشركة.
+        ⚠️  Withholding the value from the API alone protects one path and
+            leaves the other open: a backup or a SQL leak hands over the mailbox
+            password — and it is the key to resetting every other company password.
         """
         account = make_account()
         credential = EmailCredential.objects.create(
@@ -142,7 +144,7 @@ class TestCredentials:
 
         assert stored.startswith(encryption.PREFIX)
         assert "plain-text-password" not in stored
-        # ويُقرأ صريحًا عبر الموديل — التشفير شفاف للكود
+        # And it is read in the clear through the model — encryption is transparent to the code
         assert EmailCredential.objects.get(pk=credential.pk).value == "plain-text-password"
 
     def test_masked_value_is_the_only_display(self):
@@ -156,8 +158,9 @@ class TestCredentials:
 
     def test_missing_credential_reads_as_empty_not_error(self):
         """
-        ⚠️  حساب بلا كلمة مرور يفشل عند الاتصال برسالة مفهومة — لا
-            عند القراءة باستثناء يُسقط شاشة الحسابات كلها.
+        ⚠️  An account with no password fails at connection time with a
+            comprehensible message — not at read time with an exception that
+            takes down the whole accounts screen.
         """
         assert make_account().password == ""
 
@@ -166,9 +169,9 @@ class TestCredentials:
 class TestValidation:
     def test_default_account_may_not_be_marketing(self):
         """
-        ⚠️  الافتراضي نهاية كل مسار لم يُسنَد صراحةً — ورسائل الأمان
-            تقع فيه. حساب تسويقي افتراضي يلتفّ على السياج كله من
-            الباب الخلفي.
+        ⚠️  The default is the end of every path not explicitly assigned — and
+            security messages land in it. A marketing default routes around the
+            entire firewall through the back door.
         """
         account = EmailAccount(
             code="promo",
@@ -210,7 +213,7 @@ class TestValidation:
         assert "imap_host" in exc.value.error_dict
 
     def test_only_one_default_account(self):
-        """«ما الحساب الافتراضي؟» سؤال بجواب واحد — يفرضه قيد لا شاشة."""
+        """"Which account is the default?" is a question with one answer — enforced by a constraint, not a screen."""
         from django.db.utils import IntegrityError
 
         make_account(code="first", is_default=True)
@@ -223,8 +226,8 @@ class TestValidation:
 class TestSending:
     def _console_as_locmem(self, monkeypatch):
         """
-        ⚠️  بديل الطرفية بذاكرة قابلة للفحص — المسار المُختبَر يبقى
-            كاملًا: التقييد ← الحجز ← الحلّ ← بناء الاتصال ← التسليم.
+        ⚠️  An inspectable in-memory substitute for the console — the tested
+            path stays complete: enqueue ← claim ← resolve ← build the connection ← deliver.
         """
         monkeypatch.setattr(services, "CONSOLE_BACKEND", LOCMEM)
 
@@ -251,16 +254,16 @@ class TestSending:
 
         message = django_mail.outbox[0]
 
-        # ⚠️  الاسم غير اللاتيني يُرمَّز في الترويسة (RFC 2047) —
-        #     و`formataddr` هو ما يفعل ذلك ويقتبس الفواصل أيضًا.
-        #     التركيب اليدوي `f"{name} <{email}>"` كان يمرّر اسمًا
-        #     فيه فاصلة كأنه **مستلمان**.
+        # ⚠️  A non-Latin name is encoded in the header (RFC 2047) —
+        #     and `formataddr` is what does that, and quotes commas too.
+        #     Building it by hand as `f"{name} <{email}>"` passed a name
+        #     containing a comma through as **two recipients**.
         name, address = parseaddr(message.from_email)
         assert address == "orders@example.com"
         assert str(make_header(decode_header(name))) == "متجر الطلبات"
 
-        # ⚠️  المرسل `noreply@` غالبًا، وردّ العميل عليه يذهب إلى العدم
-        #     وهو يظنّ أنه راسل خدمة العملاء.
+        # ⚠️  The sender is usually `noreply@`, and a customer's reply to it goes nowhere
+        #     while they believe they wrote to customer service.
         assert message.reply_to == ["support@example.com"]
 
     def test_success_resets_the_failure_counter(
@@ -282,11 +285,12 @@ class TestSending:
 
     def test_unknown_template_raises_instead_of_queueing_nothing(self):
         """
-        ⚠️  الخطأ هنا **يُرفع** خلافًا لفشل التسليم.
+        ⚠️  The error here **is raised**, unlike a delivery failure.
 
-            القالب المجهول خطأ برمجي يقع لحظة النداء ويُصلَح بتعديل
-            كود؛ ابتلاعه يجعل ميزةً كاملة صامتة في الإنتاج. أما فشل
-            SMTP فحدث تشغيلي يُعاد ولا يُفشل عملية تجارية.
+            An unknown template is a programming defect occurring at the moment
+            of the call and fixed by editing code; swallowing it makes a whole
+            feature silent in production. An SMTP failure, by contrast, is an
+            operational event that is retried and does not fail a business operation.
         """
         with pytest.raises(KeyError):
             services.send_mail("no_such_template", to="c@example.com", language="ar", context={})

@@ -1,11 +1,11 @@
 """
-اختبارات المخزون.
+Inventory tests.
 
-⚠️  المجموعات الحرجة:
-      ١. منع البيع الزائد — الخطأ الأخطر في النموذج القديم
-      ٢. FEFO — الأقرب انتهاءً أولًا لا الأقدم استلامًا
-      ٣. لقطة التكلفة — بدونها يستحيل حساب الربح لاحقًا
-      ٤. منع تكرار التنبيهات
+⚠️  The critical groups:
+      1. preventing overselling — the most serious defect in the legacy model
+      2. FEFO — nearest to expiry first, not oldest received first
+      3. the cost snapshot — without it, calculating profit later is impossible
+      4. preventing duplicate alerts
 """
 
 from datetime import timedelta
@@ -56,13 +56,13 @@ def product(db):
 
 @pytest.fixture
 def stocked(product, location):
-    """١٠٠ قطعة بتكلفة ١٠ جنيه."""
+    """100 units at a cost of 10 pounds."""
     services.receive(product, 100, Decimal("10.00"), location=location)
     return product
 
 
 # ═══════════════════════════════════════════════════════════
-#  منع البيع الزائد
+#  Preventing overselling
 # ═══════════════════════════════════════════════════════════
 
 
@@ -76,17 +76,18 @@ class TestOverselling:
 
     def test_reservations_accumulate_against_available(self, stocked, location):
         """
-        ⚠️  حجزان متتاليان لا يتجاوزان المتاح مجتمعين.
+        ⚠️  Two consecutive reservations do not exceed the available quantity between them.
 
-        الفحص ضد الكمية الفعلية بدل المتاح يسمح بحجز نفس القطعة
-        مرتين — وهو بالضبط ما يحدث عند غفلة عن `quantity_reserved`.
+        Checking against the physical quantity rather than the available one
+        allows the same unit to be reserved twice — which is exactly what
+        happens when `quantity_reserved` is overlooked.
         """
         services.reserve(stocked, 60, location=location)
 
         with pytest.raises(BusinessError):
             services.reserve(stocked, 50, location=location)
 
-        services.reserve(stocked, 40, location=location)  # المتبقي بالضبط
+        services.reserve(stocked, 40, location=location)  # exactly what remains
 
         stock = Stock.objects.get(product=stocked, location=location)
         assert stock.quantity_reserved == 100
@@ -94,11 +95,11 @@ class TestOverselling:
 
     def test_database_constraint_blocks_negative_available(self, stocked, location):
         """
-        ⚠️  **خط الدفاع الأخير.**
+        ⚠️  **The last line of defence.**
 
-        القفل يحمي من التزامن لكنه لا يعمل على SQLite. القيد في
-        قاعدة البيانات يعمل على المحركين ولا يمكن تجاوزه من أي
-        مسار كود مهما أخطأ — هذا الاختبار يتجاوز طبقة الخدمات عمدًا.
+        The lock protects against concurrency but does nothing on SQLite. The
+        database constraint works on both engines and cannot be bypassed by any
+        code path however wrong — this test deliberately bypasses the service layer.
         """
         stock = Stock.objects.get(product=stocked, location=location)
 
@@ -112,7 +113,7 @@ class TestOverselling:
             Batch.objects.filter(pk=batch.pk).update(quantity_remaining=999)
 
     def test_immediate_sale_respects_availability(self, stocked, location):
-        """بيع نقطة البيع الفوري يخضع لنفس الفحص."""
+        """The point of sale's immediate sale is subject to the same check."""
         services.reserve(stocked, 95, location=location)
 
         with pytest.raises(BusinessError):
@@ -128,14 +129,14 @@ class TestOverselling:
 
 
 # ═══════════════════════════════════════════════════════════
-#  دورة الحجز
+#  The reservation cycle
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 class TestReservationLifecycle:
     def test_reserve_reduces_available_not_physical(self, stocked, location):
-        """الحجز لا يُخرج البضاعة من الرف — يمنع بيعها لغير الحاجز."""
+        """A reservation does not take the goods off the shelf — it stops them being sold to anyone else."""
         services.reserve(stocked, 30, location=location)
 
         stock = Stock.objects.get(product=stocked, location=location)
@@ -172,7 +173,7 @@ class TestReservationLifecycle:
         assert exc.value.code == "INVALID_STATE_TRANSITION"
 
     def test_double_release_is_safe(self, stocked, location):
-        """الإفراج مرتين لا ينتج رصيدًا سالبًا."""
+        """Releasing twice does not produce a negative balance."""
         reservation = services.reserve(stocked, 20, location=location)
         services.release(reservation)
         services.release(reservation)
@@ -182,7 +183,7 @@ class TestReservationLifecycle:
 
     def test_expired_reservations_are_released(self, stocked, location):
         """
-        ⚠️  سلة مهجورة تحجز مخزونًا للأبد تجعل منتجًا متوفرًا يبدو نافدًا.
+        ⚠️  An abandoned cart holding stock forever makes an available product look out of stock.
         """
         reservation = services.reserve(stocked, 40, location=location, ttl=timedelta(seconds=-1))
         assert reservation.is_expired
@@ -203,14 +204,14 @@ class TestReservationLifecycle:
 class TestFEFO:
     def test_nearest_expiry_is_consumed_first(self, product, location):
         """
-        ⚠️  **FEFO لا FIFO.**
+        ⚠️  **FEFO, not FIFO.**
 
-        الترتيب بالأقدم استلامًا يترك دفعة تنتهي غدًا على الرف
-        بينما تُباع دفعة صالحة لسنة — فتُهدر الأولى.
+        Ordering by oldest received leaves a batch expiring tomorrow on the
+        shelf while a batch good for a year gets sold — so the first is wasted.
         """
         today = timezone.localdate()
 
-        # الأقدم استلامًا لكن الأبعد انتهاءً
+        # Received earliest but expiring latest
         old_receipt = services.receive(
             product,
             50,
@@ -218,7 +219,7 @@ class TestFEFO:
             location=location,
             expires_at=today + timedelta(days=365),
         )
-        # الأحدث استلامًا لكن الأقرب انتهاءً
+        # Received latest but expiring soonest
         near_expiry = services.receive(
             product,
             50,
@@ -232,8 +233,8 @@ class TestFEFO:
         near_expiry.refresh_from_db()
         old_receipt.refresh_from_db()
 
-        assert near_expiry.quantity_remaining == 20  # استُهلكت أولًا
-        assert old_receipt.quantity_remaining == 50  # لم تُمَس
+        assert near_expiry.quantity_remaining == 20  # consumed first
+        assert old_receipt.quantity_remaining == 50  # untouched
 
     def test_consumption_spans_batches_in_order(self, product, location):
         today = timezone.localdate()
@@ -261,7 +262,7 @@ class TestFEFO:
         assert second.quantity_remaining == 15
 
     def test_batches_without_expiry_come_last(self, product, location):
-        """الدفعة بلا تاريخ صلاحية لا تسبق دفعة تنتهي قريبًا."""
+        """A batch with no expiry date does not come before one expiring soon."""
         no_expiry = services.receive(product, 40, Decimal("10.00"), location=location)
         expiring = services.receive(
             product,
@@ -279,7 +280,7 @@ class TestFEFO:
         assert no_expiry.quantity_remaining == 40
 
     def test_expired_batch_is_skipped(self, product, location):
-        """الدفعة المنتهية لا تُباع حتى لو كانت الأقرب في الترتيب."""
+        """An expired batch is not sold even if it is first in the ordering."""
         expired = services.receive(
             product,
             30,
@@ -299,12 +300,12 @@ class TestFEFO:
 
         expired.refresh_from_db()
         valid.refresh_from_db()
-        assert expired.quantity_remaining == 30  # لم تُمَس
+        assert expired.quantity_remaining == 30  # untouched
         assert valid.quantity_remaining == 20
 
 
 # ═══════════════════════════════════════════════════════════
-#  لقطة التكلفة —  لـ COGS في المرحلة ٨
+#  The cost snapshot —  for COGS in phase 8
 # ═══════════════════════════════════════════════════════════
 
 
@@ -312,10 +313,11 @@ class TestFEFO:
 class TestCostSnapshot:
     def test_sale_movement_records_batch_cost(self, product, location):
         """
-        ⚠️  **هذا ما يجعل حساب الربح ممكنًا لاحقًا.**
+        ⚠️  **This is what makes calculating profit possible later.**
 
-        بلا لقطة التكلفة وقت البيع، لا سبيل لمعرفة ربح بيعة تمت
-        قبل شهور — تكلفة الشراء تتغيّر بين الدفعات.
+        Without the cost snapshot at the time of sale there is no way to know
+        the profit of a sale made months ago — the purchase cost changes between
+        batches.
         """
         services.receive(product, 10, Decimal("10.00"), location=location)
         services.receive(product, 10, Decimal("15.00"), location=location)
@@ -324,7 +326,7 @@ class TestCostSnapshot:
 
         sales = StockMovement.objects.filter(
             product=product, movement_type=MovementType.SALE
-        ).order_by("id")  # ترتيب مستقر — الطوابع الزمنية قد تتطابق
+        ).order_by("id")  # A stable ordering — the timestamps may be identical
 
         costs = [(m.quantity, m.unit_cost) for m in sales]
         assert costs == [(10, Decimal("10.00")), (5, Decimal("15.00"))]
@@ -339,12 +341,12 @@ class TestCostSnapshot:
             for m in StockMovement.objects.filter(product=product, movement_type=MovementType.SALE)
             if m.unit_cost is not None
         )
-        # ١٠ × ١٠ + ٥ × ٢٠ = ٢٠٠
+        # 10 × 10 + 5 × 20 = 200
         assert cogs == Decimal("200.00")
 
 
 # ═══════════════════════════════════════════════════════════
-#  سجل الحركات
+#  The movement log
 # ═══════════════════════════════════════════════════════════
 
 
@@ -362,7 +364,7 @@ class TestMovementLedger:
         assert MovementType.ADJUSTMENT_UP in types
 
     def test_movements_are_append_only(self, stocked):
-        """التصحيح بحركة معاكسة لا بتعديل — وإلا فسد السجل."""
+        """Corrections go through an offsetting movement, not an edit — or the log becomes corrupt."""
         movement = StockMovement.objects.filter(product=stocked).first()
         movement.quantity = 999
 
@@ -375,7 +377,7 @@ class TestMovementLedger:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التحويل بين المواقع
+#  Transfers between locations
 # ═══════════════════════════════════════════════════════════
 
 
@@ -392,8 +394,8 @@ class TestTransfer:
 
     def test_transfer_creates_paired_movements(self, stocked, location, branch):
         """
-        الحركتان في معاملة واحدة — الفصل يعني بضاعة تختفي من الأول
-        ولا تظهر في الثاني عند أي فشل جزئي.
+        Both movements in one transaction — separating them means goods
+        vanishing from the first and not appearing in the second on any partial failure.
         """
         services.transfer(stocked, 20, from_location=location, to_location=branch)
 
@@ -414,7 +416,7 @@ class TestTransfer:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التنبيهات
+#  Alerts
 # ═══════════════════════════════════════════════════════════
 
 
@@ -433,9 +435,9 @@ class TestAlerts:
 
     def test_alerts_are_not_duplicated(self, stocked, location):
         """
-        ⚠️  منتج نافد يولّد تنبيهًا مع كل محاولة بيع.
+        ⚠️  An out-of-stock product generates an alert on every attempted sale.
 
-        عشرات التنبيهات لنفس الحالة تجعل شاشة التنبيهات بلا فائدة.
+        Dozens of alerts for the same situation make the alerts screen useless.
         """
         services.sell_immediately(stocked, 100, location=location)
 
@@ -471,12 +473,12 @@ class TestAlerts:
         created = services.check_expiring_batches(days=90)
         assert created == 1
 
-        # التشغيل الثاني لا يكرّر
+        # The second run does not duplicate
         assert services.check_expiring_batches(days=90) == 0
 
 
 # ═══════════════════════════════════════════════════════════
-#  الصلاحية
+#  Expiry
 # ═══════════════════════════════════════════════════════════
 
 
@@ -484,7 +486,7 @@ class TestAlerts:
 class TestExpiry:
     def test_expired_batch_is_quarantined_and_removed_from_available(self, product, location):
         """
-        ⚠️  دفعة منتهية تبقى في المتاح تعني بيع دواء منتهي الصلاحية.
+        ⚠️  An expired batch remaining in available stock means selling an expired medicine.
         """
         services.receive(
             product,
@@ -499,7 +501,7 @@ class TestExpiry:
         stock = Stock.objects.get(product=product, location=location)
         assert stock.quantity_expired == 40
         assert stock.available == 0
-        assert stock.quantity_physical == 40  # ما زالت على الرف
+        assert stock.quantity_physical == 40  # still on the shelf
 
     def test_quarantine_is_idempotent(self, product, location):
         services.receive(
@@ -515,7 +517,7 @@ class TestExpiry:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأداء
+#  Performance
 # ═══════════════════════════════════════════════════════════
 
 
@@ -525,9 +527,9 @@ class TestAvailabilityBatching:
         self, location, django_assert_max_num_queries
     ):
         """
-        ⚠️  الدالة التي تمنع عودة الـ N+1 إلى الكتالوج.
+        ⚠️  The function that keeps N+1 from returning to the catalogue.
 
-        الكتالوج يستدعيها مرة لكل صفحة لا مرة لكل منتج.
+        The catalogue calls it once per page, not once per product.
         """
         category = Category.objects.create(name_ar="فئة", name_en="Category")
         products = [
@@ -550,7 +552,7 @@ class TestAvailabilityBatching:
 
 
 # ═══════════════════════════════════════════════════════════
-#  حدود النطاق
+#  Domain boundaries
 # ═══════════════════════════════════════════════════════════
 
 
@@ -558,10 +560,10 @@ class TestAvailabilityBatching:
 class TestDomainBoundaries:
     def test_movement_uses_textual_reference_not_foreign_key(self):
         """
-        ⚠️  `inventory` في L3 و`orders` في L6.
+        ⚠️  `inventory` is in L3 and `orders` in L6.
 
-        مفتاح أجنبي إلى الطلبات هنا يجعل الاتجاه صاعدًا ويكسر
-        الحدود — فالمرجع نصي.
+        A foreign key to orders here makes the direction upward and breaks the
+        boundaries — so the reference is a string.
         """
         names = {f.name for f in StockMovement._meta.get_fields()}
         assert "reference_type" in names
@@ -580,7 +582,7 @@ class TestDomainBoundaries:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التزامن —  يحتاج PostgreSQL
+#  Concurrency —  requires PostgreSQL
 # ═══════════════════════════════════════════════════════════
 
 
@@ -601,18 +603,19 @@ def _is_sqlite() -> bool:
 )
 class TestConcurrency:
     """
-    ⚠️  **الفجوة المعلنة في المرحلة ٤.**
+    ⚠️  **The gap declared in phase 4.**
 
-        SQLite لا ينفّذ `select_for_update` — يتجاهله بصمت. أي
-        اختبار تزامن هنا يمرّ بلا أن يثبت شيئًا، وهو أسوأ من غيابه:
-        يعطي ثقة زائفة في أخطر مسار في النظام.
+        SQLite does not implement `select_for_update` — it ignores it silently.
+        Any concurrency test here passes without proving anything, which is
+        worse than not having it: it gives false confidence in the most
+        dangerous path in the system.
 
-        القيد في قاعدة البيانات (`reserved <= physical`) يعمل على
-        المحركين ومُختبَر في `TestOverselling`. لكنه يمنع الفساد
-        لا التزاحم: تحت PostgreSQL يفشل الطلب الثاني بنظافة،
-        وتحت SQLite قد يفشل بخطأ سلامة خام.
+        The database constraint (`reserved <= physical`) works on both engines
+        and is covered in `TestOverselling`. But it prevents corruption, not
+        contention: under PostgreSQL the second order fails cleanly, and under
+        SQLite it may fail with a raw integrity error.
 
-        **قبل الإطلاق: ثبّت PostgreSQL وشغّل هذه المجموعة.**
+        **Before launch: install PostgreSQL and run this group.**
     """
 
     def test_concurrent_reservations_do_not_oversell(self, stocked, location):
@@ -638,7 +641,7 @@ class TestConcurrency:
         for thread in threads:
             thread.join()
 
-        # ١٠٠ متاح · طلبان بـ ٦٠ ⟵ واحد ينجح والآخر يُرفض
+        # 100 available · two orders of 60 ⟵ one succeeds and the other is refused
         assert len(successes) == 1
         assert len(errors) == 1
 
@@ -648,25 +651,26 @@ class TestConcurrency:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الجرد
+#  Stock counting
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 class TestStockCount:
     """
-    ⚠️  الموديلان كانا موجودين منذ المرحلة ٤ **بلا خدمة ولا نقطة**:
-        صفر إشارة إليهما في `services` و`api`. هذه المجموعة تحرس
-        السلوك الذي بُني حولهما.
+    ⚠️  Both models had existed since phase 4 **with no service and no endpoint**:
+        zero references to them in `services` and `api`. This group guards the
+        behaviour built around them.
     """
 
     def test_opening_takes_a_snapshot_of_current_balances(self, stocked, location):
         """
-        ⚠️  اللقطة عند البدء لا عند الاعتماد.
+        ⚠️  The snapshot is taken at the start, not at approval.
 
-            الجرد يستغرق ساعات والمخزون يتحرّك؛ قراءة المتوقَّع وقت
-            الاعتماد تقارن ما عُدَّ صباحًا برصيد المساء — فيظهر عجز
-            مقداره كل ما بيع أثناء العدّ.
+            A stock count takes hours and the stock moves; reading the expected
+            figure at approval compares what was counted in the morning against
+            the evening's balance — showing a shortfall equal to everything sold
+            during the count.
         """
         count = services.open_count(location)
         lines = services.snapshot_count(count)
@@ -678,14 +682,14 @@ class TestStockCount:
 
         line = count.lines.first()
         assert line.expected_quantity == 100
-        # ⚠️  المعدود يبدأ بالمتوقَّع لا بصفر: البدء بصفر يجعل كل
-        #     صنف لم يُعدّ بعد يبدو عجزًا كاملًا.
+        # ⚠️  The counted figure starts at the expected one, not at zero: starting at
+        #     zero makes every item not yet counted look like a total shortfall.
         assert line.counted_quantity == 100
         assert line.variance == 0
 
     def test_only_one_open_session_per_location(self, stocked, location):
         """
-        ⚠️  جلستان تعنيان عدّادين، وآخر من يعتمد يمحو عمل الأول.
+        ⚠️  Two sessions mean two counters, and whoever approves last erases the first one's work.
         """
         services.open_count(location)
 
@@ -702,10 +706,10 @@ class TestStockCount:
 
     def test_shortage_is_applied_as_a_count_movement(self, stocked, location):
         """
-        ⚠️  التسوية بحركة مسجَّلة لا بكتابة الرصيد مباشرةً.
+        ⚠️  Settlement through a recorded movement, not by writing the balance directly.
 
-            الكتابة المباشرة تجعل المحاسب يسأل «من أين جاء هذا
-            النقص؟» فلا يجد حركة.
+            A direct write makes the accountant ask "where did this shortfall
+            come from?" and find no movement.
         """
         count = services.open_count(location)
         services.snapshot_count(count)
@@ -735,8 +739,8 @@ class TestStockCount:
 
     def test_lines_without_variance_produce_no_movement(self, stocked, location):
         """
-        ⚠️  حركة بصفر لكل صنف تُغرق السجل بآلاف الصفوف عديمة
-            المعنى، فيصير البحث عن فرق حقيقي مستحيلًا.
+        ⚠️  A zero movement for every item floods the log with thousands of
+            meaningless rows, making a search for a real discrepancy impossible.
         """
         count = services.open_count(location)
         services.snapshot_count(count)
@@ -747,7 +751,7 @@ class TestStockCount:
         assert not StockMovement.objects.filter(movement_type=MovementType.COUNT).exists()
 
     def test_the_variance_is_computed_not_entered(self, stocked, location):
-        """⚠️  إدخال الفرق يدويًا يسمح بإخفاء العجز."""
+        """⚠️  Entering the discrepancy by hand allows a shortfall to be hidden."""
         count = services.open_count(location)
         services.snapshot_count(count)
         line = count.lines.first()
@@ -771,8 +775,8 @@ class TestStockCount:
 
     def test_applying_twice_is_refused(self, stocked, location):
         """
-        ⚠️  الاعتماد المكرر يطبّق الفروق مرتين — فيُخصم العجز
-            ضعفًا من رصيد صحّحته الجلسة نفسها.
+        ⚠️  A repeated approval applies the discrepancies twice — deducting the
+            shortfall twice over from a balance the session itself corrected.
         """
         count = services.open_count(location)
         services.snapshot_count(count)
@@ -783,7 +787,7 @@ class TestStockCount:
             services.apply_count(count)
 
     def test_a_completed_count_cannot_be_cancelled(self, stocked, location):
-        """⚠️  فروقه صارت حركات — وإلغاؤه يترك رصيدًا معدَّلًا بجلسة ملغاة."""
+        """⚠️  Its discrepancies have become movements — cancelling it leaves a balance adjusted by a cancelled session."""
         count = services.open_count(location)
         services.snapshot_count(count)
         services.apply_count(count)
@@ -801,7 +805,7 @@ class TestStockCount:
         assert Stock.objects.get(product=stocked, location=location).quantity_physical == 100
 
     def test_applying_refreshes_alerts(self, stocked, location):
-        """جرد يكشف نفادًا يجب أن يُطلق تنبيهه فورًا."""
+        """A stock count that reveals an out-of-stock item must fire its alert immediately."""
         count = services.open_count(location)
         services.snapshot_count(count)
         services.record_counted(count, count.lines.first(), 0)
@@ -812,7 +816,7 @@ class TestStockCount:
 
 @pytest.mark.django_db
 class TestReturnToSupplier:
-    """⚠️  `RETURN_OUT` كان معرَّفًا في الموديل ولا شيء يستدعيه."""
+    """⚠️  `RETURN_OUT` was defined on the model with nothing calling it."""
 
     def test_it_records_a_return_movement_not_an_adjustment(self, stocked, location):
         movement = services.return_to_supplier(

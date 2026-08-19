@@ -1,9 +1,9 @@
 """
-لوحة المراجعات.
+Reviews admin panel.
 
-⚠️  الاعتماد والرفض يمرّان بـ `reviews.services.moderate` لا بتحديث
-    الحقل مباشرةً — فهو ما يعيد حساب `ProductRating`. تغيير `status`
-    من نموذج التعديل وحده يترك متوسط التقييم كاذبًا.
+⚠️  Approval and rejection go through `reviews.services.moderate` rather than
+    updating the field directly — that is what recomputes `ProductRating`.
+    Changing `status` from the change form alone leaves the average rating false.
 """
 
 from django.contrib import admin
@@ -62,7 +62,7 @@ class ReviewAdmin(DomainModelAdmin):
 
 @admin.register(ProductRating)
 class ProductRatingAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
-    """تجميع محسوب — يكتبه `recalculate_rating` بعد كل مراجعة معتمدة."""
+    """A computed aggregate — written by `recalculate_rating` after every approved review."""
 
     list_display = (
         "product",

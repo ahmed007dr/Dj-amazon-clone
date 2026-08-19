@@ -1,12 +1,12 @@
 """
-اختبارات بذرة التطوير.
+Development seed tests.
 
-⚠️  البذرة ليست بيانات تجميلية — إنها **أول ما يجرّبه أي مطوّر
-    جديد**، وأول ما يبني عليه الفرونت إند شاشاته.
+⚠️  The seed is not decorative data — it is **the first thing any new developer
+    tries**, and the first thing the frontend builds its screens on.
 
-    بذرة تنكسر بصمت تعني ساعة ضائعة قبل كتابة سطر واحد؛ وبذرة
-    تتضاعف عند التشغيل الثاني تعني أرقام مخزون كاذبة يُبنى عليها
-    كل ما بعدها.
+    A seed that breaks silently means an hour lost before a single line is
+    written; and a seed that doubles on the second run means false stock figures
+    that everything afterwards is built on.
 """
 
 from decimal import Decimal
@@ -27,10 +27,10 @@ from promotions.models import Coupon
 @pytest.fixture
 def dev_mode(settings):
     """
-    ⚠️  Django يفرض `DEBUG=False` في الاختبارات دائمًا.
+    ⚠️  Django always forces `DEBUG=False` in tests.
 
-        وهو صحيح — لكنه يعني أن أي اختبار للبذرة يصطدم بحارسها.
-        الرفع هنا مقصود ومحصور في هذه الاختبارات وحدها.
+        And rightly so — but it means any test of the seed runs into its guard.
+        Lifting it here is deliberate and confined to these tests alone.
     """
     settings.DEBUG = True
 
@@ -41,17 +41,17 @@ def seeded(db, dev_mode):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأمان
+#  Safety
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 def test_refuses_to_run_outside_debug(settings):
     """
-    ⚠️  البذرة تُنشئ حسابات بكلمة مرور معروفة ومنشورة.
+    ⚠️  The seed creates accounts with a well-known, published password.
 
-        الحاجز الأول أن التطبيق غير مثبّت في الإنتاج؛ وهذا يمسك
-        الحالة التي يُثبَّت فيها بالخطأ.
+        The first barrier is that the app is not installed in production; this
+        catches the case where it is installed by mistake.
     """
     settings.DEBUG = False
 
@@ -62,17 +62,18 @@ def test_refuses_to_run_outside_debug(settings):
 
 
 # ═══════════════════════════════════════════════════════════
-#  التشغيل المتكرر
+#  Repeated runs
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 def test_reset_clears_then_rebuilds(seeded):
     """
-    ⚠️  `--reset` يحذف كل شيء.
+    ⚠️  `--reset` deletes everything.
 
-        اختباره ليس ترفًا: مساره الفاشل يترك قاعدة نصف محذوفة
-        بقيود مفاتيح أجنبية مكسورة — وهي أسوأ من قاعدة فارغة.
+        Testing it is not a luxury: its failure path leaves a half-deleted
+        database with broken foreign key constraints — which is worse than an
+        empty one.
     """
     original_ids = set(Product.objects.values_list("id", flat=True))
 
@@ -88,10 +89,11 @@ def test_reset_clears_then_rebuilds(seeded):
 @pytest.mark.django_db
 def test_running_twice_changes_nothing(seeded):
     """
-    ⚠️  **الخاصية الأهم.**
+    ⚠️  **The most important property.**
 
-        بذرة تُضاعف المخزون في كل تشغيل تجعل كل رقم بعدها كاذبًا —
-        والاكتشاف يكون بعد أسابيع حين لا يطابق الجرد شيئًا.
+        A seed that doubles the stock on every run makes every number after it
+        false — and the discovery comes weeks later, when the stock count
+        matches nothing.
     """
     before = {
         "products": Product.objects.count(),
@@ -130,7 +132,7 @@ def test_minimal_seeds_structure_without_data(db, dev_mode):
 
 
 # ═══════════════════════════════════════════════════════════
-#  البيانات صالحة للعمل
+#  The data is fit to work with
 # ═══════════════════════════════════════════════════════════
 
 
@@ -138,8 +140,8 @@ def test_minimal_seeds_structure_without_data(db, dev_mode):
 class TestSeededData:
     def test_every_seeded_account_can_sign_in(self, seeded):
         """
-        ⚠️  حساب مبذور بكلمة مرور لا تعمل أسوأ من غيابه — المطوّر
-            يظن الخطأ في المصادقة لا في البذرة.
+        ⚠️  A seeded account whose password does not work is worse than no
+            account — the developer assumes the fault is in authentication, not in the seed.
         """
         for user in User.objects.all():
             assert user.check_password(people.PASSWORD), user.email
@@ -149,7 +151,7 @@ class TestSeededData:
         assert suspended.status == AccountStatus.SUSPENDED
 
     def test_verification_queue_is_not_empty(self, seeded):
-        """طابور المراجعة اليدوية يجب أن يكون قابلًا للتجربة."""
+        """The manual review queue has to be testable."""
         assert User.objects.filter(verification_status=VerificationStatus.PENDING).exists()
         assert User.objects.filter(verification_status=VerificationStatus.REJECTED).exists()
 
@@ -158,11 +160,11 @@ class TestSeededData:
 
     def test_seeded_palettes_pass_contrast(self, seeded):
         """
-        ⚠️  اللوحة التي يرفضها فحص التباين **لا يمكن تفعيلها أصلًا**.
+        ⚠️  A palette the contrast check rejects **cannot be activated at all**.
 
-            فبذرة بألوان فاشلة تعني نظامًا لا يقلع — والاختبار يقع
-            هنا لا في `branding` لأن البذرة تسكن `devtools`، وهي
-            فوقه في مخطط الطبقات.
+            So a seed with failing colours means a system that does not boot —
+            and the test lives here rather than in `branding` because the seed
+            lives in `devtools`, which is above it in the layer diagram.
         """
         from branding.models import BrandProfile
 
@@ -170,14 +172,14 @@ class TestSeededData:
         assert profile is not None
 
         for palette in profile.palettes.all():
-            palette.clean()  # لا يرفع
+            palette.clean()  # does not raise
 
     def test_student_prices_are_independent_not_derived(self, seeded):
         """
-        ⚠️  قاعدة العمل ٩ — قائمة منفصلة لا نسبة خصم.
+        ⚠️  Business rule 9 — a separate list, not a discount percentage.
 
-            لو كانت نسبة لَكان سعر الطالب دالةً في سعر التجزئة؛
-            هنا هو رقم مستقل يُدقَّق وحده.
+            Were it a percentage, the student price would be a function of the
+            retail price; here it is an independent number audited on its own.
         """
         student = PriceList.objects.get(code="student")
         rule = student.rules.get(product__sku="STE-CLS")
@@ -187,34 +189,35 @@ class TestSeededData:
 
     def test_stock_movements_exist_for_every_batch(self, seeded):
         """
-        ⚠️  دفعة بلا حركة تعني مخزونًا بسجل فارغ — أول جرد يكشف
-            فرقًا لا يفسّره أحد. المرور بالخدمة يمنع ذلك.
+        ⚠️  A batch with no movement means stock with an empty ledger — the
+            first stock count reveals a discrepancy nobody can explain. Going
+            through the service prevents that.
         """
         assert Batch.objects.exists()
         for batch in Batch.objects.all():
             assert batch.movements.exists(), batch.number
 
     def test_edge_cases_are_present(self, seeded):
-        """الحالات التي لا يراها أحد حتى يشتكي عميل."""
+        """The cases nobody sees until a customer complains."""
         from datetime import timedelta
 
         from django.utils import timezone
 
         today = timezone.localdate()
 
-        # دفعة منتهية بالفعل
+        # An already-expired batch
         assert Batch.objects.filter(expires_at__lt=today).exists()
-        # دفعة توشك — داخل نافذة التنبيه
+        # A batch about to expire — inside the alert window
         assert Batch.objects.filter(
             expires_at__gte=today, expires_at__lte=today + timedelta(days=90)
         ).exists()
-        # كوبون منتهٍ
+        # An expired coupon
         assert Coupon.objects.filter(code="EXPIRED2025").exists()
 
     def test_a_variant_is_out_of_stock_while_its_product_is_not(self, seeded):
         """
-        ⚠️  هذا هو الفرق الذي يجعل تتبّع المخزون على النسخة ضروريًا:
-            المنتج «متوفر» ونسخة منه ليست كذلك.
+        ⚠️  This is the difference that makes tracking stock on the variant
+            necessary: the product is "available" while one of its variants is not.
         """
         from catalog.models import ProductVariant
 
@@ -230,8 +233,8 @@ class TestSeededData:
 
     def test_orders_carry_price_snapshots(self, seeded):
         """
-        ⚠️  السطر بلا لقطة سعر يجعل كل فاتورة قديمة تتغيّر بتغيّر
-            سعر المنتج اليوم. (ADR-30)
+        ⚠️  A line with no price snapshot makes every old invoice change as
+            today's product price changes. (ADR-30)
         """
         for order in Order.objects.all():
             for line in order.lines.all():
@@ -240,7 +243,7 @@ class TestSeededData:
                 assert line.unit_price > 0
 
     def test_orders_reserved_stock(self, seeded):
-        """الطلب الذي لا يحجز مخزونًا يبيع ما ليس موجودًا."""
+        """An order that reserves no stock sells what does not exist."""
         assert Stock.objects.filter(quantity_reserved__gt=0).exists()
 
     def test_payment_providers_are_available(self, seeded):

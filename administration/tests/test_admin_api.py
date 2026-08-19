@@ -12,6 +12,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import AccountStatus, User, UserSession
 from administration.models import AdminProfile
+from core.testing import grant_all_domains
 
 PASSWORD = "Str0ng-Test-Pass!23"
 
@@ -27,6 +28,7 @@ def make_user(email: str, **kwargs) -> User:
 def admin(db):
     user = make_user("admin@test.local")
     AdminProfile.objects.create(user=user, department="النظم")
+    grant_all_domains(user)
     return user
 
 

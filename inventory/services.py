@@ -1,15 +1,15 @@
 """
-خدمات المخزون — الواجهة العامة الوحيدة.
+Inventory services — the only public interface.
 
-⚠️  **النطاقات الأخرى تستدعي هذه الدوال ولا تلمس الموديلات.**
+⚠️  **Other domains call these functions and never touch the models.**
 
-    الكود القديم كان يفعل هذا في `orders/api.py`:
+    The legacy code did this in `orders/api.py`:
 
         product.quantity -= item.quantity
         product.save()
 
-    ثلاثة أخطاء في سطرين: نطاق يعدّل موديل نطاق آخر · بلا معاملة ·
-    بلا قفل. بيع زائد مؤكد تحت أي تزامن.
+    Three defects in two lines: one domain editing another domain's model · no
+    transaction · no lock. Guaranteed overselling under any concurrency.
 """
 
 from __future__ import annotations
@@ -41,16 +41,16 @@ from inventory.models import (
 
 logger = logging.getLogger(__name__)
 
-#: مهلة الحجز الافتراضية — سلة مهجورة لا تحجز مخزونًا للأبد
+#: The default reservation timeout — an abandoned cart does not hold stock forever
 DEFAULT_RESERVATION_TTL = timedelta(minutes=30)
 
-#: عتبة تنبيه قرب انتهاء الصلاحية
+#: The near-expiry alert threshold
 EXPIRY_WARNING_DAYS = 90
 
 
 @dataclass(frozen=True)
 class Availability:
-    """توفر منتج — ما يحتاجه الكتالوج والسلة."""
+    """A product's availability — what the catalogue and the cart need."""
 
     product_id: str
     available: int
@@ -63,7 +63,7 @@ class Availability:
 
 
 # ═══════════════════════════════════════════════════════════
-#  القراءة
+#  Reading
 # ═══════════════════════════════════════════════════════════
 
 
@@ -80,12 +80,12 @@ def get_or_create_stock(product, location=None, variant=None) -> Stock:
 
 def availability_for(product_ids, location=None) -> dict:
     """
-    توفر مجموعة منتجات — **استعلام واحد مجمّع**.
+    Availability for a set of products — **a single aggregated query**.
 
-    ⚠️  هذه الدالة هي ما يمنع عودة الـ N+1.
+    ⚠️  This function is what keeps N+1 from returning.
 
-        الكتالوج يستدعيها مرة لكل صفحة، لا مرة لكل منتج. تقييم كل
-        صف على حدة يعني عشرين استعلامًا في صفحة من عشرين منتجًا.
+        The catalogue calls it once per page, not once per product. Evaluating
+        each row separately means twenty queries on a page of twenty products.
     """
     queryset = Stock.objects.filter(product_id__in=product_ids)
     if location is not None:
@@ -152,21 +152,22 @@ def available_quantity(product, location=None, variant=None) -> int:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الكتابة — تحت قفل ومعاملة دائمًا
+#  Writing — always under a lock and a transaction
 # ═══════════════════════════════════════════════════════════
 
 
 def _locked_stock(product, location, variant=None) -> Stock:
     """
-    يجلب الرصيد **مقفلًا**.
+    Fetches the balance **locked**.
 
-    ⚠️  `select_for_update` **لا يفعل شيئًا على SQLite**.
+    ⚠️  `select_for_update` **does nothing on SQLite**.
 
-        لهذا لا يُعتمد عليه وحده: `Stock` يحمل `CheckConstraint`
-        يمنع المحجوز من تجاوز الفعلي، وهو يعمل على المحركين ولا
-        يمكن تجاوزه من أي مسار كود.
+        That is why it is not relied on alone: `Stock` carries a
+        `CheckConstraint` preventing reserved from exceeding physical, and it
+        works on both engines and cannot be bypassed by any code path.
 
-        القفل للصحة تحت التزامن؛ القيد للاستحالة المطلقة.
+        The lock is for correctness under concurrency; the constraint is for
+        absolute impossibility.
     """
     stock = (
         Stock.objects.select_for_update()
@@ -220,9 +221,9 @@ def receive(
     performed_by=None,
 ) -> Batch:
     """
-    استلام دفعة.
+    Receive a batch.
 
-    ⚠️  `unit_cost` إلزامية — بدونها يستحيل حساب الربح لاحقًا.
+    ⚠️  `unit_cost` is mandatory — without it calculating profit later is impossible.
     """
     if quantity <= 0:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="الكمية يجب أن تكون موجبة")
@@ -269,12 +270,13 @@ def reserve(
     ttl: timedelta | None = None,
 ) -> StockReservation:
     """
-    حجز مخزون.
+    Reserve stock.
 
-    ⚠️  **هنا يُمنع البيع الزائد.**
+    ⚠️  **This is where overselling is prevented.**
 
-        الفحص والزيادة يقعان تحت نفس القفل ونفس المعاملة. الفحص
-        خارجهما يترك نافذة يمرّ منها طلبان متزامنان بنفس القطعة.
+        The check and the increment happen under the same lock and the same
+        transaction. Checking outside them leaves a window through which two
+        concurrent orders take the same unit.
     """
     if quantity <= 0:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="الكمية يجب أن تكون موجبة")
@@ -315,14 +317,14 @@ def reserve(
 
 @transaction.atomic
 def release(reservation: StockReservation, *, expired: bool = False) -> StockReservation:
-    """إفراج عن حجز — يعيد الكمية للمتاح."""
+    """Release a reservation — it returns the quantity to available."""
     if reservation.status != ReservationStatus.ACTIVE:
         return reservation
 
     stock = _locked_stock(reservation.product, reservation.location, reservation.variant)
 
-    # ⚠️  `Greatest(..., 0)` يمنع رصيدًا سالبًا لو استُدعي الإفراج
-    #     مرتين على نفس الحجز رغم فحص الحالة أعلاه.
+    # ⚠️  `Greatest(..., 0)` prevents a negative balance should release be called
+    #     twice on the same reservation despite the status check above.
     Stock.objects.filter(pk=stock.pk).update(
         quantity_reserved=Greatest(F("quantity_reserved") - reservation.quantity, Value(0))
     )
@@ -347,9 +349,10 @@ def release(reservation: StockReservation, *, expired: bool = False) -> StockRes
 @transaction.atomic
 def commit(reservation: StockReservation, *, performed_by=None) -> list[StockMovement]:
     """
-    تنفيذ الحجز — البيع الفعلي.
+    Fulfil the reservation — the actual sale.
 
-    ينقص الفعلي والمحجوز معًا، ويستهلك الدفعات بترتيب **FEFO**.
+    It decrements physical and reserved together, and consumes the batches in
+    **FEFO** order.
     """
     if reservation.status != ReservationStatus.ACTIVE:
         raise BusinessError(
@@ -392,10 +395,11 @@ def sell_immediately(
     performed_by=None,
 ) -> list[StockMovement]:
     """
-    بيع فوري بلا حجز — **لنقطة البيع**.
+    An immediate sale with no reservation — **for the point of sale**.
 
-    الحجز يخدم سلة قد تُهجر؛ أما البيع على الكاونتر فلحظي:
-    العميل واقف والبضاعة تُسلَّم فورًا.
+    Reservation serves a cart that may be abandoned; a counter sale is
+    instantaneous: the customer is standing there and the goods are handed over
+    at once.
     """
     if quantity <= 0:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="الكمية يجب أن تكون موجبة")
@@ -427,14 +431,14 @@ def _consume_batches(
     *, stock: Stock, quantity: int, reference_type, reference_id, performed_by
 ) -> list[StockMovement]:
     """
-    استهلاك الدفعات بترتيب **FEFO** — الأقرب انتهاءً أولًا.
+    Consume batches in **FEFO** order — nearest to expiry first.
 
-    ⚠️  FEFO لا FIFO.
+    ⚠️  FEFO, not FIFO.
 
-        الترتيب بالأقدم استلامًا يترك دفعة تنتهي غدًا على الرف
-        بينما تُباع دفعة صالحة لسنة — فتُهدر الأولى.
+        Ordering by oldest received leaves a batch expiring tomorrow on the
+        shelf while a batch good for a year gets sold — so the first is wasted.
 
-    الدفعات بلا تاريخ صلاحية تأتي أخيرًا (`nulls_last`).
+    Batches with no expiry date come last (`nulls_last`).
     """
     batches = list(
         Batch.objects.select_for_update()
@@ -468,7 +472,7 @@ def _consume_batches(
                 movement_type=MovementType.SALE,
                 quantity=take,
                 batch=batch,
-                unit_cost=batch.unit_cost,  # لقطة التكلفة — لازمة لـ COGS
+                unit_cost=batch.unit_cost,  # The cost snapshot — required for COGS
                 reference_type=reference_type,
                 reference_id=reference_id,
                 performed_by=performed_by,
@@ -476,7 +480,7 @@ def _consume_batches(
         )
 
     if remaining > 0:
-        # مخزون بلا دفعات — يُسجَّل بلا مرجع دفعة
+        # Stock with no batches — recorded with no batch reference
         movements.append(
             _record_movement(
                 stock=stock,
@@ -503,9 +507,10 @@ def adjust(
     performed_by=None,
 ) -> StockMovement:
     """
-    تسوية يدوية. `quantity` موجب للزيادة وسالب للنقص.
+    A manual adjustment. `quantity` is positive for an increase and negative for a decrease.
 
-    السبب إلزامي — تسوية بلا سبب موثّق ثغرة في أي جرد لاحق.
+    The reason is mandatory — an adjustment with no documented reason is a hole
+    in any later stock count.
     """
     if quantity == 0:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="التسوية بصفر بلا معنى")
@@ -539,19 +544,20 @@ def adjust(
 
 
 # ═══════════════════════════════════════════════════════════
-#  الجرد
+#  Stock counting
 # ═══════════════════════════════════════════════════════════
 
 
 @transaction.atomic
 def open_count(location: StockLocation, *, note: str = "", actor=None) -> StockCount:
     """
-    يفتح جلسة جرد.
+    Opens a stock count session.
 
-    ⚠️  **جلسة مفتوحة واحدة لكل موقع.**
+    ⚠️  **One open session per location.**
 
-        جلستان على نفس المخزن تعنيان عدّادين يكتب كلٌّ منهما
-        كميته، وآخر من يعتمد يمحو عمل الأول — بلا أن يظهر تعارض.
+        Two sessions on the same warehouse mean two counters each writing their
+        own quantity, and whoever approves last erases the first one's work —
+        with no conflict ever showing.
     """
     existing = StockCount.objects.filter(
         location=location,
@@ -571,18 +577,20 @@ def open_count(location: StockLocation, *, note: str = "", actor=None) -> StockC
 @transaction.atomic
 def snapshot_count(count: StockCount) -> int:
     """
-    يملأ الجلسة بأرصدة الموقع **لحظة البدء**.
+    Fills the session with the location's balances **at the moment it starts**.
 
-    ⚠️  **اللقطة تُؤخذ عند البدء لا عند الاعتماد.**
+    ⚠️  **The snapshot is taken at the start, not at approval.**
 
-        الجرد يستغرق ساعات، والمخزون يتحرّك خلالها. قراءة الرصيد
-        المتوقَّع وقت الاعتماد تقارن ما عُدَّ صباحًا برصيد المساء —
-        فيظهر عجز مقداره كل ما بيع أثناء العدّ.
+        A stock count takes hours, and the stock moves during them. Reading the
+        expected balance at approval time compares what was counted in the
+        morning against the evening's balance — showing a shortfall equal to
+        everything sold during the count.
 
-    ⚠️  والكمية المعدودة تبدأ بالمتوقَّع لا بصفر.
+    ⚠️  And the counted quantity starts at the expected figure, not at zero.
 
-        البدء بصفر يجعل كل صنف لم يُعدّ بعد يبدو عجزًا كاملًا؛
-        وفي جرد جزئي يُعتمد قبل إتمامه يُخصم المخزن كله.
+        Starting at zero makes every item not yet counted look like a total
+        shortfall; and in a partial count approved before completion, the whole
+        warehouse is written down.
     """
     if count.status != StockCountStatus.DRAFT:
         raise BusinessError(
@@ -613,7 +621,8 @@ def snapshot_count(count: StockCount) -> int:
 @transaction.atomic
 def record_counted(count: StockCount, line: StockCountLine, counted: int, *, note: str = ""):
     """
-    ⚠️  الفرق **يُحسب ولا يُدخَل** — إدخاله يسمح بإخفاء العجز.
+    ⚠️  The discrepancy is **computed, never entered** — entering it allows a
+        shortfall to be hidden.
     """
     if count.status != StockCountStatus.IN_PROGRESS:
         raise BusinessError(ErrorCode.CONFLICT, detail="الجلسة غير جارية", status_code=409)
@@ -630,18 +639,19 @@ def record_counted(count: StockCount, line: StockCountLine, counted: int, *, not
 @transaction.atomic
 def apply_count(count: StockCount, *, actor=None) -> dict:
     """
-    يعتمد الجرد: **يسوّي الفروق بحركات `COUNT` ويقفل الجلسة**.
+    Approves the stock count: **it settles the discrepancies with `COUNT` movements and closes the session**.
 
-    ⚠️  التسوية بحركة مسجَّلة لا بكتابة الرصيد مباشرةً.
+    ⚠️  Settlement happens through a recorded movement, not by writing the balance directly.
 
-        الكتابة المباشرة تجعل الرصيد يتغيّر بلا أثر: يسأل المحاسب
-        «من أين جاء هذا النقص؟» فلا يجد حركة. وحركة `COUNT` تحمل
-        الفرق ومن اعتمده ومتى.
+        A direct write makes the balance change with no trace: the accountant
+        asks "where did this shortfall come from?" and finds no movement. And a
+        `COUNT` movement carries the discrepancy, who approved it, and when.
 
-    ⚠️  والأسطر بلا فرق **لا تُنتج حركة**.
+    ⚠️  And lines with no discrepancy **produce no movement**.
 
-        حركة بصفر لكل صنف في المخزن تُغرق السجل بآلاف الصفوف
-        عديمة المعنى، فيصير البحث عن فرق حقيقي مستحيلًا.
+        A zero movement for every item in the warehouse floods the log with
+        thousands of meaningless rows, making a search for a real discrepancy
+        impossible.
     """
     if count.status != StockCountStatus.IN_PROGRESS:
         raise BusinessError(ErrorCode.CONFLICT, detail="لا يُعتمد إلا جرد جارٍ", status_code=409)
@@ -693,10 +703,11 @@ def apply_count(count: StockCount, *, actor=None) -> dict:
 @transaction.atomic
 def cancel_count(count: StockCount, *, reason: str) -> StockCount:
     """
-    ⚠️  الإلغاء **لا يمسّ المخزون** — الجلسة لم تُعتمد بعد.
+    ⚠️  Cancelling **does not touch the stock** — the session was never approved.
 
-        والمكتمل لا يُلغى: فروقه صارت حركات مسجَّلة، وإلغاؤه يترك
-        رصيدًا معدَّلًا بجلسة تقول إنها ملغاة.
+        And a completed one is not cancelled: its discrepancies have become
+        recorded movements, and cancelling it leaves a balance adjusted by a
+        session that says it was cancelled.
     """
     if count.status == StockCountStatus.COMPLETED:
         raise BusinessError(
@@ -724,17 +735,17 @@ def return_to_supplier(
     performed_by=None,
 ) -> StockMovement:
     """
-    خروج بضاعة **إلى المورّد** — لا تسوية ولا بيع.
+    Goods going out **to the supplier** — neither an adjustment nor a sale.
 
-    ⚠️  حركة `RETURN_OUT` لا `ADJUSTMENT_DOWN`.
+    ⚠️  A `RETURN_OUT` movement, not `ADJUSTMENT_DOWN`.
 
-        التسوية تعني «الرصيد كان خاطئًا»؛ والمرتجع يعني «البضاعة
-        خرجت إلى جهة معلومة بمقابل مالي». خلطهما يجعل تقرير
-        الفروق يعُدّ كل مرتجع خطأ جردٍ — ويُخفي أن المخزن يردّ
-        بضاعة لمورّد بعينه بانتظام.
+        An adjustment means "the balance was wrong"; a return means "the goods
+        went out to a known party against payment". Conflating them makes the
+        discrepancy report count every return as a counting error — and hides
+        that the warehouse regularly returns goods to one particular supplier.
 
-    ⚠️  والمرجع إلزامي عمليًا: بلا `reference_id` لا يُربَط
-        المرتجع بأمر الشراء الذي جاء منه.
+    ⚠️  And the reference is mandatory in practice: without `reference_id` the
+        return is not linked to the purchase order it came from.
     """
     if quantity <= 0:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="الكمية يجب أن تكون موجبة")
@@ -778,10 +789,10 @@ def transfer(
     performed_by=None,
 ) -> tuple[StockMovement, StockMovement]:
     """
-    تحويل بين موقعين — حركتان في معاملة واحدة.
+    A transfer between two locations — two movements in one transaction.
 
-    الفصل بينهما يعني بضاعة تختفي من الأول ولا تظهر في الثاني عند
-    أي فشل جزئي.
+    Separating them means goods vanishing from the first and not appearing in
+    the second on any partial failure.
     """
     if from_location == to_location:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="الموقعان متطابقان")
@@ -826,7 +837,7 @@ def transfer(
 def mark_damaged(
     product, quantity: int, *, location=None, variant=None, reason: str, performed_by=None
 ) -> StockMovement:
-    """تعليم كمية كتالفة — تبقى في الفعلي وتخرج من المتاح."""
+    """Mark a quantity as damaged — it stays in physical and leaves available."""
     location = location or StockLocation.get_default()
     stock = _locked_stock(product, location, variant)
 
@@ -848,16 +859,16 @@ def mark_damaged(
 
 
 # ═══════════════════════════════════════════════════════════
-#  المهام الدورية
+#  Periodic tasks
 # ═══════════════════════════════════════════════════════════
 
 
 def release_expired_reservations() -> int:
     """
-    إفراج عن الحجوزات المنتهية.
+    Release expired reservations.
 
-    ⚠️  بدون هذه المهمة تتراكم حجوزات السلال المهجورة حتى يبدو
-        كل شيء نافدًا وهو متوفر.
+    ⚠️  Without this task, abandoned carts' reservations accumulate until
+        everything looks out of stock while it is available.
     """
     expired = StockReservation.objects.filter(
         status=ReservationStatus.ACTIVE, expires_at__lt=timezone.now()
@@ -877,9 +888,9 @@ def release_expired_reservations() -> int:
 @transaction.atomic
 def quarantine_expired_batches() -> int:
     """
-    نقل الدفعات المنتهية إلى المنتهي.
+    Move expired batches into expired stock.
 
-    ⚠️  دفعة منتهية تبقى في المتاح تعني بيع دواء منتهي الصلاحية.
+    ⚠️  An expired batch remaining in available stock means selling an expired medicine.
     """
     today = timezone.localdate()
     expired = Batch.objects.filter(
@@ -918,7 +929,7 @@ def quarantine_expired_batches() -> int:
 
 
 def check_expiring_batches(days: int = EXPIRY_WARNING_DAYS) -> int:
-    """تنبيه على الدفعات المقتربة من الانتهاء."""
+    """An alert on batches approaching expiry."""
     threshold = timezone.localdate() + timedelta(days=days)
     batches = Batch.objects.filter(
         expires_at__lte=threshold,
@@ -947,16 +958,17 @@ def check_expiring_batches(days: int = EXPIRY_WARNING_DAYS) -> int:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التنبيهات
+#  Alerts
 # ═══════════════════════════════════════════════════════════
 
 
 def check_alerts(product, location) -> StockAlert | None:
     """
-    ⚠️  `get_or_create` بشرط `is_resolved=False` — لا إنشاء مباشر.
+    ⚠️  `get_or_create` conditioned on `is_resolved=False` — not a direct create.
 
-        منتج نافد يولّد تنبيهًا مع كل محاولة بيع؛ عشرات التنبيهات
-        لنفس الحالة في ساعة تجعل شاشة التنبيهات بلا فائدة.
+        An out-of-stock product generates an alert on every attempted sale;
+        dozens of alerts for the same situation within an hour make the alerts
+        screen useless.
     """
     stock = Stock.objects.filter(product=product, location=location).first()
     if stock is None:
@@ -988,7 +1000,7 @@ def check_alerts(product, location) -> StockAlert | None:
 
 
 def resolve_alerts(product, location) -> int:
-    """حسم تنبيهات النفاد والانخفاض بعد عودة المخزون."""
+    """Resolve out-of-stock and low-stock alerts once the stock returns."""
     stock = Stock.objects.filter(product=product, location=location).first()
     if stock is None:
         return 0
@@ -1009,21 +1021,21 @@ def resolve_alerts(product, location) -> int:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الواجهة بالمرجع — للنطاقات العليا
+#  The reference-based interface — for the upper domains
 # ═══════════════════════════════════════════════════════════
 #
-#  ⚠️  `orders` و`cart` **لا يستوردان موديلات المخزون**.
+#  ⚠️  `orders` and `cart` **do not import the inventory models**.
 #
-#      استيراد `StockReservation` هناك للاستعلام عن حجوزات طلب
-#      يعني نطاقًا أعلى يعرف بنية جداول نطاق أدنى — فيصير أي
-#      تغيير في تلك البنية كسرًا في مكانين.
+#      Importing `StockReservation` there to query an order's reservations
+#      means an upper domain knowing a lower domain's table structure — so any
+#      change to that structure becomes a break in two places.
 #
-#      هذه الدوال تقبل المرجع النصي وتعيد النتيجة، فلا يحتاج
-#      المستدعي معرفة أي موديل.
+#      These functions take the string reference and return the result, so the
+#      caller needs to know no model at all.
 
 
 def default_location() -> StockLocation | None:
-    """الموقع الافتراضي — بلا حاجة لاستيراد `StockLocation`."""
+    """The default location — with no need to import `StockLocation`."""
     return StockLocation.get_default()
 
 
@@ -1039,7 +1051,7 @@ def active_reservations_for(reference_type: str, reference_id) -> list[StockRese
 
 @transaction.atomic
 def commit_for_reference(reference_type: str, reference_id) -> int:
-    """تنفيذ كل حجوزات مرجع — عند الشحن."""
+    """Fulfil all of a reference's reservations — on shipping."""
     count = 0
     for reservation in active_reservations_for(reference_type, reference_id):
         commit(reservation)
@@ -1049,7 +1061,7 @@ def commit_for_reference(reference_type: str, reference_id) -> int:
 
 @transaction.atomic
 def release_for_reference(reference_type: str, reference_id) -> int:
-    """الإفراج عن كل حجوزات مرجع — عند الإلغاء."""
+    """Release all of a reference's reservations — on cancellation."""
     count = 0
     for reservation in active_reservations_for(reference_type, reference_id):
         release(reservation)

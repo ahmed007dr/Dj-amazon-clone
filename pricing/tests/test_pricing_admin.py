@@ -1,17 +1,19 @@
 """
-إدارة التسعير من اللوحة.
+Pricing management from the panel.
 
-⚠️  نطاق `pricing` كان **بلا ملف `urls.py` إطلاقًا**: كل قوائم
-    الأسعار وقواعدها والخصومات تُدار من لوحة Django وحدها.
+⚠️  The `pricing` domain had **no `urls.py` at all**: every price list, rule and
+    discount was managed from the Django panel alone.
 
-⚠️  والمحروس هنا: لا نقطة عامة · الافتراضية لا تُحذف · تغيّر السعر
-    يُسجَّل بقيمته القديمة.
+⚠️  And what is guarded here: no public endpoint · the default is never deleted ·
+    a price change is recorded with its old value.
 """
 
 from datetime import timedelta
 from decimal import Decimal
 
 import pytest
+
+from core.testing import grant_all_domains
 from django.apps import apps
 from django.urls import reverse
 from django.utils import timezone
@@ -34,6 +36,7 @@ def admin_client(db):
     admin.is_active = True
     admin.save()
     apps.get_model("administration", "AdminProfile").objects.create(user=admin)
+    grant_all_domains(admin)
 
     client = APIClient()
     client.force_authenticate(user=admin)
@@ -52,7 +55,7 @@ def price_list(db):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الخصوصية
+#  Privacy
 # ═══════════════════════════════════════════════════════════
 
 
@@ -62,10 +65,11 @@ def price_list(db):
 )
 def test_pricing_is_never_public(route):
     """
-    ⚠️  **هيكل التسعير من أثمن ما يملكه المتجر.**
+    ⚠️  **The pricing structure is among the most valuable things the store owns.**
 
-        كشف قوائم الأسعار يعطي المنافس بنيتك كاملة؛ وكشف الكوبونات
-        يجعل كل زائر يجرّب أعلى خصم متاح بدل الكود الذي وصله.
+        Exposing the price lists hands a competitor your whole structure; and
+        exposing the coupons makes every visitor try the highest available
+        discount instead of the code they were sent.
     """
     assert APIClient().get(reverse(route)).status_code in (401, 403)
 
@@ -82,7 +86,7 @@ def test_a_customer_is_refused(product):
 
 
 # ═══════════════════════════════════════════════════════════
-#  قوائم الأسعار
+#  Price lists
 # ═══════════════════════════════════════════════════════════
 
 
@@ -99,8 +103,8 @@ class TestPriceLists:
 
     def test_an_end_before_start_is_refused(self, admin_client):
         """
-        ⚠️  قائمة لا تسري أبدًا تمرّ صامتة: الحقلان صالحان كلٌّ على
-            حدة، ولا يظهر الخطأ إلا حين يشكو عميل أنه لا يرى سعره.
+        ⚠️  A list that never applies passes silently: each field is valid on its
+            own, and the error only surfaces when a customer complains they cannot see their price.
         """
         today = timezone.localdate()
 
@@ -120,7 +124,7 @@ class TestPriceLists:
         assert "valid_to" in response.data["fields"]
 
     def test_the_default_list_is_not_deleted(self, admin_client):
-        """حذفها يترك كل عميل بلا قائمة تنطبق عليه — فلا سعر لأي منتج."""
+        """Deleting it leaves every customer with no applicable list — so no product has a price."""
         default = PriceList.objects.create(
             code="base", name_ar="أساسية", name_en="Base", is_default=True
         )
@@ -140,21 +144,22 @@ class TestPriceLists:
 
     def test_rule_count_exposes_an_empty_list(self, admin_client, price_list):
         """
-        ⚠️  قائمة مفعّلة بلا قواعد تعني عملاءها يرون سعر التجزئة
-            وهم يظنون أنهم على سعر الجملة — ولا شيء يشير إلى الخطأ.
+        ⚠️  An enabled list with no rules means its customers see the retail
+            price while believing they are on the wholesale price — with nothing
+            to indicate the mistake.
         """
         response = admin_client.get(reverse("v1:pricing:lists"))
         assert response.data[0]["rule_count"] == 0
 
 
 # ═══════════════════════════════════════════════════════════
-#  قواعد التسعير
+#  Pricing rules
 # ═══════════════════════════════════════════════════════════
 
 
 class TestPriceRules:
     def test_quantity_tiers_are_rows_not_fields(self, admin_client, price_list, product):
-        """أي عدد شرائح بلا هجرة — وهذا سبب اختيار الصفوف."""
+        """Any number of tiers with no migration — which is why rows were chosen."""
         for quantity, price in ((1, "20.00"), (10, "18.00"), (50, "15.00")):
             response = admin_client.post(
                 reverse("v1:pricing:rules"),
@@ -172,8 +177,8 @@ class TestPriceRules:
 
     def test_rules_are_listed_largest_tier_first(self, admin_client, price_list, product):
         """
-        ⚠️  نفس ترتيب المطابقة في `price_for` — فما يراه الأدمن هو
-            ما يقرؤه المحرك، لا ترتيبًا آخر يربكه.
+        ⚠️  The same matching order as in `price_for` — so what the admin sees
+            is what the engine reads, not another order that confuses them.
         """
         for quantity in (1, 50, 10):
             PriceRule.objects.create(
@@ -189,7 +194,7 @@ class TestPriceRules:
         assert tiers == [50, 10, 1]
 
     def test_a_duplicate_tier_is_refused(self, admin_client, price_list, product):
-        """شريحتان بنفس الكمية تعنيان سعرين لنفس الحالة."""
+        """Two tiers at the same quantity mean two prices for the same case."""
         body = {
             "price_list": str(price_list.pk),
             "product": str(product.pk),
@@ -203,8 +208,8 @@ class TestPriceRules:
 
     def test_a_price_change_records_the_old_value(self, admin_client, price_list, product):
         """
-        ⚠️  «متى صار هذا الصنف بهذا السعر؟» سؤال يُسأل بعد شهور،
-            ولا يُجاب إلا بقيمة محفوظة في السجل.
+        ⚠️  "When did this item become this price?" is a question asked months
+            later, answerable only from a value stored in the log.
         """
         rule = PriceRule.objects.create(
             price_list=price_list, product=product, unit_price=Decimal("20.00")
@@ -229,13 +234,13 @@ class TestPriceRules:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الخصومات الترويجية
+#  Promotional discounts
 # ═══════════════════════════════════════════════════════════
 
 
 class TestOverrides:
     def test_a_percentage_above_hundred_is_refused(self, admin_client, product):
-        """النسبة فوق ١٠٠٪ تعني سعرًا سالبًا — المتجر يدفع للعميل."""
+        """A rate above 100% means a negative price — the store pays the customer."""
         response = admin_client.post(
             reverse("v1:pricing:overrides"),
             {
@@ -251,7 +256,7 @@ class TestOverrides:
 
     def test_running_filter_uses_the_query_not_python(self, admin_client, product):
         """
-        ⚠️  التصفية بعد الترقيم تعطي صفحات ناقصة بلا أن يلاحظ أحد.
+        ⚠️  Filtering after pagination gives short pages with nobody noticing.
         """
         now = timezone.now()
 

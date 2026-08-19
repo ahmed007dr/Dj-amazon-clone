@@ -1,29 +1,29 @@
 """
-تشغيل المهام الدورية.
+Run the periodic tasks.
 
     python manage.py run_periodic
     python manage.py run_periodic --job inventory
     python manage.py run_periodic --dry-run
 
-⚠️  **هذا هو طابور المهام — لا Celery.**
+⚠️  **This is the task queue — not Celery.**
 
-    الأعمال الدورية هنا أربعة، أثقلها يمرّ على دفعات المخزون مرة
-    يوميًا. عامل Celery وبروكر Redis وطبقة مراقبة لأربع دوال تُنفَّذ
-    في ثوانٍ ليست بنيةً بل عبئًا تشغيليًا: خدمتان إضافيتان تُراقَبان
-    وتُعاد تشغيلهما وتُحدَّثان.
+    There are four periodic jobs here, the heaviest of which walks the stock
+    batches once a day. A Celery worker, a Redis broker and a monitoring layer
+    for four functions that execute in seconds is not infrastructure but
+    operational overhead: two more services to monitor, restart and upgrade.
 
-    الجدولة تقع خارج التطبيق — `cron` أو Task Scheduler. التفصيل
-    في `ops/README.md`.
+    The scheduling lives outside the application — `cron` or Task Scheduler. The
+    details are in `ops/README.md`.
 
-    وحين يظهر عمل **يستحق** طابورًا حقيقيًا (تقارير ثقيلة · آلاف
-    الرسائل · معالجة صور) يُضاف Celery حينها ولذلك العمل وحده.
-    البنية لا تمنعه: كل مهمة دالة مستقلة قابلة للاستدعاء من أي
-    مُشغِّل.
+    And when work appears that **deserves** a real queue (heavy reports ·
+    thousands of messages · image processing), Celery gets added then and for
+    that work alone. The structure does not prevent it: every job is an
+    independent function callable from any runner.
 
-⚠️  وفشل مهمة **لا يوقف البقية**.
+⚠️  And one job failing **does not stop the rest**.
 
-    دفعة تالفة تمنع الحجر يجب ألا تمنع إفراج الحجوزات — وإلا صار
-    خطأ واحد يعطّل الصيانة كلها إلى أن يلاحظه أحد.
+    A corrupt batch that blocks quarantining must not block the release of
+    reservations — or one error disables all maintenance until somebody notices.
 """
 
 from __future__ import annotations
@@ -46,17 +46,17 @@ logger = logging.getLogger(__name__)
 
 
 def _expire_points() -> int:
-    """⚠️  المهام تُرجع عددًا؛ خدمة الولاء تُرجع تفصيلًا."""
+    """⚠️  The jobs return a count; the loyalty service returns a breakdown."""
     return loyalty_services.expire_points()["batches"]
 
 
-#: المهمة → (المجموعة، الوصف، الدالة)
+#: job → (group, description, function)
 #
-# ⚠️  الترتيب مقصود: الإفراج عن الحجوزات **قبل** التنبيهات.
+# ⚠️  The order is deliberate: releasing reservations **before** the alerts.
 #
-#     الحجز المنتهي يخصم من المتاح؛ فحساب التنبيهات قبل الإفراج
-#     ينتج تنبيه «مخزون حرج» لمخزون سيعود بعد ثانية — ثم يُحسم
-#     التنبيه في اليوم التالي، فيبدو النظام مضطربًا.
+#     An expired reservation is deducted from available; so computing the alerts
+#     before the release produces a "critical stock" alert for stock that comes
+#     back a second later — and the alert is then resolved the next day, so the system looks erratic.
 JOBS: dict[str, tuple[str, str, Callable[[], int]]] = {
     "release_reservations": (
         "inventory",
@@ -78,64 +78,64 @@ JOBS: dict[str, tuple[str, str, Callable[[], int]]] = {
         "إهمال السلال الراكدة",
         cart_services.abandon_stale_carts,
     ),
-    # ⚠️  إسقاط النقاط المنتهية **مهمة دورية لا حساب لحظي**.
+    # ⚠️  Expiring due points is **a periodic job, not an on-the-fly calculation**.
     #
-    #     بدونها يبقى الالتزام في الدفتر منتفخًا بنقاط لا تُصرَف،
-    #     ويرى العميل رصيدًا يُرفض عند أول محاولة استبدال — وهو
-    #     أسوأ من رصيد أقل يراه صحيحًا.
+    #     Without it the liability stays inflated in the ledger with points that
+    #     will never be spent, and the customer sees a balance refused at the first
+    #     redemption attempt — which is worse than a smaller balance they see as correct.
     "expire_points": (
         "loyalty",
         "إسقاط نقاط الولاء المنتهية",
         _expire_points,
     ),
-    # ⚠️  **شبكة أمان لا مسار رئيسي.**
+    # ⚠️  **A safety net, not the main path.**
     #
-    #     التسليم يبدأ على `on_commit` فور وقوع الحدث — أي في ثوانٍ.
-    #     هذه المهمة تلتقط ما فشل (خادم متوقف · مهلة) وما عَلِق (عملية
-    #     سقطت بين الحجز والإرسال). وبدونها كان الفشل المؤقت يعني
-    #     رسالة ضائعة إلى الأبد.
+    #     Delivery starts on `on_commit` the moment the event occurs — within seconds.
+    #     This job picks up what failed (a server down · a timeout) and what got
+    #     stuck (a process that died between the claim and the send). And without it
+    #     a temporary failure meant a message lost forever.
     #
-    #     ولذلك تُجدوَل **كل بضع دقائق** لا يوميًا كبقية المهام:
-    #     أول إعادة محاولة بعد دقيقة، وتأخيرها يوميًا يجعل بريد
-    #     إعادة تعيين كلمة المرور يصل بعد أن ينساه صاحبه.
+    #     It is therefore scheduled **every few minutes** rather than daily like the rest:
+    #     the first retry comes after a minute, and delaying it to daily makes the
+    #     password reset email arrive after its owner has forgotten it.
     "send_outbound_mail": (
         "mail",
         "تسليم بريد الطابور",
         mail_services.deliver_pending,
     ),
-    # ⚠️  السحب **بعد** التسليم في الترتيب.
+    # ⚠️  The pull comes **after** delivery in the order.
     #
-    #     الصندوق الوارد يمتلئ بردود على ما أرسلناه؛ وسحبه قبل تسليم
-    #     ما ينتظر يجعل ردّ العميل يصل قبل الرسالة التي يردّ عليها —
-    #     فيقرأ الموظف جوابًا بلا سؤال.
+    #     The inbox fills with replies to what we sent; and pulling it before
+    #     delivering what is waiting makes the customer's reply arrive ahead of the
+    #     message it answers — so the employee reads an answer with no question.
     "fetch_inbound_mail": (
         "mail",
         "سحب البريد الوارد",
         mail_inbound.fetch_all,
     ),
-    # ⚠️  **تُجدوَل بالدقيقة لا باليوم** (ADR-17).
+    # ⚠️  **Scheduled by the minute, not by the day** (ADR-17).
     #
-    #     التواجد يُكتب في الكاش على كل طلب، والقاعدة تحفظ التاريخ.
-    #     بلا تفريغ يبقى «آخر ظهور» في جدول الحسابات عند لحظة الدخول
-    #     إلى الأبد، ويضيع سجل الجلسة كله إذا أُعيد تشغيل الكاش.
+    #     Presence is written to the cache on every request, and the database keeps the history.
+    #     Without the flush, "last seen" in the accounts table stays at the moment
+    #     of login forever, and the whole session record is lost if the cache restarts.
     #
-    #     والأمر خفيف عمدًا: استعلام واحد لكل دقيقة متميّزة، ولا
-    #     استعلام إطلاقًا حين لا يكون أحد متصلًا.
+    #     And the command is deliberately light: one query per distinct minute, and
+    #     no query at all when nobody is online.
     "flush_presence": (
         "presence",
         "تفريغ سجل التواجد إلى الجلسات",
         account_services.flush_presence,
     ),
-    # ⚠️  بالدقيقة أيضًا — العدّادات في الكاش، وإعادة تشغيله بين
-    #     تفريغين تُضيّع ما بينهما. والساعة السابقة تُفرَّغ مع
-    #     الحالية فلا تضيع دقائق عبور الساعة.
+    # ⚠️  By the minute as well — the counters live in the cache, and restarting it
+    #     between two flushes loses what lies between them. And the previous hour is
+    #     flushed with the current one, so the minutes crossing the hour are not lost.
     "flush_traffic": (
         "presence",
         "تفريغ عدّادات الحركة",
         analytics_services.flush_traffic,
     ),
-    # ⚠️  الاحتفاظ ٩٠ يومًا — حركة لا يقرأها أحد بعدها تبقى
-    #     مسؤولية بلا فائدة. تُجدوَل يوميًا لا بالدقيقة.
+    # ⚠️  Retention is 90 days — traffic nobody reads after that stays a
+    #     liability with no benefit. Scheduled daily, not by the minute.
     "purge_traffic": (
         "traffic",
         "حذف الحركة الأقدم من ٩٠ يومًا",
@@ -182,7 +182,7 @@ class Command(BaseCommand):
             try:
                 count = job()
             except Exception:
-                # ⚠️  الفشل يُسجَّل ولا يوقف البقية
+                # ⚠️  The failure is logged and does not stop the rest
                 failed += 1
                 logger.exception("فشلت المهمة الدورية %s", name)
                 self.stdout.write(self.style.ERROR(f"  ✕ {label} — فشلت (انظر السجل)"))
@@ -192,7 +192,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f"  ✓ {label}: {count} ({elapsed:.2f}s)"))
 
         if failed:
-            # ⚠️  رمز خروج غير صفري — الجدولة تكتشف الفشل بلا قراءة سجل
+            # ⚠️  A non-zero exit code — the scheduler detects the failure without reading a log
             self.stderr.write(self.style.ERROR(f"\n{failed} مهمة فشلت"))
             raise SystemExit(1)
 

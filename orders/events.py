@@ -1,28 +1,28 @@
 """
-أحداث نطاق الطلبات.
+Order domain events.
 
-⚠️  **`orders` لا يعرف من يستمع.**
+⚠️  **`orders` does not know who listens.**
 
-    المالية والولاء والعمولات وإحصاءات العملاء كلها تستهلك هذه
-    الإشارات. استدعاؤها مباشرةً يعني أن `orders` يستورد نطاقات
-    أعلى منه — استيراد صاعد يكسر الحدود.
+    Finance, loyalty, commissions and customer statistics all consume these
+    signals. Calling them directly would mean `orders` importing domains above
+    it — an upward import that breaks the boundaries.
 
-    الإشارة تقلب الاتجاه: الباعث لا يعرف المستمع.
+    The signal inverts the direction: the emitter does not know the listener.
 """
 
 import django.dispatch
 
-#: أُنشئ طلب — المخزون محجوز، الدفع لم يتم بعد
+#: An order was created — stock is reserved, payment has not happened yet
 order_created = django.dispatch.Signal()
 
-#: اكتمل الطلب — يستهلكه: finance · loyalty · commissions · customers
+#: The order completed — consumed by: finance · loyalty · commissions · customers
 order_completed = django.dispatch.Signal()
 
-#: أُلغي الطلب — المخزون أُفرج عنه والكوبون أُلغي
+#: The order was cancelled — stock was released and the coupon reversed
 order_cancelled = django.dispatch.Signal()
 
-#: تم الدفع
+#: Payment succeeded
 order_paid = django.dispatch.Signal()
 
-#: تم الشحن — المخزون خُصم فعليًا
+#: Shipped — stock was actually deducted
 order_shipped = django.dispatch.Signal()

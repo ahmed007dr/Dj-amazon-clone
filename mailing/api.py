@@ -1,11 +1,11 @@
 """
-واجهات البريد — الأدمن حصرًا.
+Mail endpoints — admin only.
 
-⚠️  **لا نقطة عامة هنا إطلاقًا.**
+⚠️  **There is no public endpoint here at all.**
 
-    بخلاف `branding` الذي يعرض الهوية للجمهور، إعداد البريد كله
-    داخلي: أسماء الخوادم والمستخدمين تكشف بنية تحتية، وتكفي مهاجمًا
-    ليعرف أين يجرّب كلمات المرور.
+    Unlike `branding`, which exposes the identity to the public, the entire mail
+    configuration is internal: server and user names reveal infrastructure, and
+    are enough for an attacker to know where to try passwords.
 """
 
 from django.http import Http404
@@ -52,8 +52,8 @@ class AccountDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_update(self, serializer):
         account = serializer.save()
-        # ⚠️  الحقول لا القيم: تسجيل الحمولة كان يكتب كلمة المرور في
-        #     سجل التدقيق — وهو أطول عمرًا من الصف الذي أخفيناها فيه.
+        # ⚠️  The field names, not the values: logging the payload wrote the password
+        #     into the audit log — which outlives the row we hid it in.
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditAction.SETTING_CHANGE,
@@ -65,9 +65,10 @@ class AccountDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
 class VerifyAccountAPI(APIView):
     """
-    مصافحة SMTP فعلية بلا إرسال.
+    A real SMTP handshake with no send.
 
-    ⚠️  الزرّ الذي يمنع اكتشاف الخطأ عند أول عميل فقد كلمة مروره.
+    ⚠️  The button that stops the fault being discovered by the first customer
+        who has lost their password.
     """
 
     permission_classes = [CanManageMailing]
@@ -128,11 +129,12 @@ class RouteDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
 class RoutingMapAPI(APIView):
     """
-    لكل قالب: من أي حساب يخرج فعلًا ومن أين جاء الجواب.
+    For each template: which account it actually goes out from, and where the answer came from.
 
-    ⚠️  عمود «المصدر» هو المهمّ: شاشة تعرض النتيجة وحدها تترك
-        المشغّل يظنّ أنه أسند ما هو ساقط إلى الافتراضي — فإذا غيّر
-        الافتراضي يومًا تحرّكت معه رسائل ظنّها مثبّتة.
+    ⚠️  The "source" column is the important one: a screen showing the result
+        alone leaves the operator believing they assigned what is in fact
+        falling back to the default — so if they change the default one day,
+        messages they thought were pinned move with it.
     """
 
     permission_classes = [CanManageMailing]
@@ -143,10 +145,10 @@ class RoutingMapAPI(APIView):
 
 class OutboxListAPI(generics.ListAPIView):
     """
-    الصادر — يجيب على «هل خرجت الرسالة؟» وهو أول سؤال في كل شكوى.
+    The outbox — it answers "did the message go out?", the first question in every complaint.
 
-    ⚠️  الترقيم بالإزاحة لا بالمؤشر: الأدمن يحتاج «صفحة ٥ من ٤٢» وهو
-        مصرَّح له برؤية العدد أصلًا (نفس قرار جدول الحسابات).
+    ⚠️  Offset pagination rather than cursor: the admin needs "page 5 of 42" and
+        is authorised to see the total anyway (the same decision as the accounts table).
     """
 
     permission_classes = [CanManageMailing]
@@ -169,10 +171,10 @@ class OutboxListAPI(generics.ListAPIView):
 
 class RetryMessageAPI(APIView):
     """
-    إعادة محاولة يدوية — بعد أن يصلح المشغّل سبب الفشل.
+    A manual retry — after the operator has fixed the cause of the failure.
 
-    ⚠️  الصفّ المُعلَن فشله يقبل الإعادة: الإعلان تشخيص لا حكم نهائي
-        على رسالة صالحة.
+    ⚠️  A row declared failed accepts a retry: the declaration is a diagnosis,
+        not a final verdict on a valid message.
     """
 
     permission_classes = [CanManageMailing]
@@ -188,7 +190,7 @@ class RetryMessageAPI(APIView):
         )
 
 
-#: قيم المعاينة — ليست بيانات حقيقية ولا تلمس قاعدة البيانات
+#: Preview values — not real data, and they never touch the database
 SAMPLE_CONTEXT = {
     "name": "أحمد محمود",
     "link": "https://example.com/…",
@@ -204,11 +206,11 @@ SAMPLE_CONTEXT = {
 
 def _template_row(key: str, template, override) -> dict:
     """
-    القالب كما تراه الشاشة: النص الفعّال ومصدره ومتغيّراته المتاحة.
+    The template as the screen sees it: the effective text, its source, and its available variables.
 
-    ⚠️  المتغيّرات تخرج مع كل صفّ: المحرّر الذي لا يرى ما يملك يكتب
-        `{price}` بدل `{total}` ويكتشف الخطأ حين يصل النص خامًا إلى
-        عميل.
+    ⚠️  The variables go out with every row: an editor who cannot see what they
+        have writes `{price}` instead of `{total}` and discovers the mistake
+        when the raw text reaches a customer.
     """
     active = override if (override and override.is_active) else template
 
@@ -233,10 +235,11 @@ def _template_row(key: str, template, override) -> dict:
 
 class TemplateListAPI(APIView):
     """
-    كل القوالب — نسخة الكود مدموجة مع التجاوزات.
+    Every template — the code version merged with the overrides.
 
-    ⚠️  الشاشة لا تسأل عن الجدول بل عن القوالب: جدول التجاوزات وحده
-        كان يعرض قائمة فارغة على نظام يرسل ثلاثة عشر قالبًا.
+    ⚠️  The screen does not ask about the table but about the templates: the
+        overrides table alone showed an empty list on a system that sends
+        thirteen templates.
     """
 
     permission_classes = [CanManageMailing]
@@ -253,11 +256,11 @@ class TemplateListAPI(APIView):
 
 class TemplateDetailAPI(APIView):
     """
-    قراءة قالب · حفظ تجاوز · **والحذف يعيد الأصل**.
+    Read a template · save an override · **and deleting restores the original**.
 
-    ⚠️  «الرجوع إلى الافتراضي» فعل أساسي لا ترف: تحرير فاسد وقت
-        الضغط يجب أن يُلغى بضغطة، لا بإعادة كتابة النص الأصلي من
-        الذاكرة.
+    ⚠️  "Revert to default" is a core action, not a luxury: a bad edit made under
+        pressure must be undone with one click, not by retyping the original
+        text from memory.
     """
 
     permission_classes = [CanManageMailing]
@@ -294,10 +297,10 @@ class TemplateDetailAPI(APIView):
 
     def delete(self, request, key):
         template = self._template(key)
-        # ⚠️  عدد لا صفّان: `SoftDeleteQuerySet.delete()` تكتب
-        #     `deleted_at` وتعيد العدد، بخلاف حذف Django الذي يعيد
-        #     `(count, details)`. تفكيكه كان يرفع TypeError على مسار
-        #     يبدو تافهًا — وأمسكه الاختبار قبل الشاشة.
+        # ⚠️  A count, not two values: `SoftDeleteQuerySet.delete()` writes
+        #     `deleted_at` and returns the count, unlike Django's delete, which returns
+        #     `(count, details)`. Unpacking it raised a TypeError on a path
+        #     that looks trivial — and the test caught it before the screen did.
         deleted = TemplateOverride.objects.filter(key=key).delete()
 
         if deleted:
@@ -314,10 +317,10 @@ class TemplateDetailAPI(APIView):
 
 class TemplatePreviewAPI(APIView):
     """
-    تصيير بقيم نموذجية — **قبل الحفظ**.
+    Render with sample values — **before saving**.
 
-    ⚠️  ولا يلمس قاعدة البيانات ولا يرسل شيئًا: المعاينة التي تحفظ
-        لتعرض تجعل التجربة التزامًا.
+    ⚠️  And it touches no database and sends nothing: a preview that saves in
+        order to display turns an experiment into a commitment.
     """
 
     permission_classes = [CanManageMailing]
@@ -339,8 +342,8 @@ class TemplatePreviewAPI(APIView):
             result[language] = {
                 "subject": render_text(subject, SAMPLE_CONTEXT),
                 "body": render_text(body, SAMPLE_CONTEXT),
-                # ⚠️  المتغيّر المجهول يُعرَض هنا صراحةً بدل أن يمرّ
-                #     في النص فيراه المحرّر «كلمة غريبة» ويتجاهلها.
+                # ⚠️  An unknown variable is shown explicitly here rather than passing
+                #     through in the text, where the editor sees it as "a strange word" and ignores it.
                 "unknown_variables": sorted(
                     (placeholders(subject) | placeholders(body)) - template.variables
                 ),
@@ -350,7 +353,7 @@ class TemplatePreviewAPI(APIView):
 
 
 class InboxListAPI(generics.ListAPIView):
-    """صندوق الوارد — ما وصل ولم يُجَب عليه بعد."""
+    """The inbox — what has arrived and not yet been answered."""
 
     permission_classes = [CanManageMailing]
     serializer_class = s.InboundMessageSerializer
@@ -372,10 +375,11 @@ class InboxListAPI(generics.ListAPIView):
 
 class InboxDetailAPI(generics.RetrieveUpdateAPIView):
     """
-    قراءة رسالة أو تغيير حالتها وإسنادها.
+    Read a message, or change its status and assignment.
 
-    ⚠️  المحتوى للقراءة فقط — تعديل نصّ رسالة وصلت تزوير للسجل.
-        القابل للتغيير: الحالة · المسؤول · الربط بمرجع.
+    ⚠️  The content is read-only — editing the text of a message that arrived
+        falsifies the record. What is changeable: the status · the owner · the
+        link to a reference.
     """
 
     permission_classes = [CanManageMailing]
@@ -385,10 +389,10 @@ class InboxDetailAPI(generics.RetrieveUpdateAPIView):
 
 class ReplyAPI(APIView):
     """
-    ردّ يكتبه موظف — يمرّ بالطابور كأي بريد.
+    A reply written by an employee — it goes through the queue like any mail.
 
-    ⚠️  ويُرفض على الرسائل الآلية: حلقة بريد تولّد آلاف الرسائل في
-        دقائق وتُدرِج الدومين في القوائم السوداء.
+    ⚠️  And it is refused on automated messages: a mail loop generates thousands
+        of messages in minutes and gets the domain blacklisted.
     """
 
     permission_classes = [CanManageMailing]

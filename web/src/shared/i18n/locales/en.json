@@ -355,7 +355,9 @@
     "offlineBody": "Check your internet connection and try again.",
     "notFoundTitle": "Page not found",
     "notFoundBody": "The link you opened is no longer available.",
-    "forbiddenTitle": "You do not have access to this page"
+    "forbiddenTitle": "You do not have access to this page",
+    "forbiddenBody": "Ask your system administrator to grant it.",
+    "forbiddenScreen": "The “{{screen}}” screen needs a permission — ask your system administrator."
   },
   "nav": {
     "home": "Home",
@@ -991,7 +993,13 @@
       "ENDED": "Ended",
       "TRANSFERRED": "Transferred"
     },
-    "allEmployees": "All employees"
+    "allEmployees": "All employees",
+    "permissions": "Permissions",
+    "permissionsSaved": "Permissions saved",
+    "permissionsHint": "What you pick here is what holders of this role see — nothing else appears to them at all.",
+    "selectAll": "All",
+    "grantsGranting": "Whoever holds this can grant themselves anything",
+    "noPermissionsWarning": "A role with no permissions opens no screen — its holder sees an empty panel."
   },
   "targets": {
     "title": "Targets & commissions",

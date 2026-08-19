@@ -1,13 +1,14 @@
 """
-نقطة استقبال أحداث البوابات.
+The gateway event endpoint.
 
-⚠️  **هذه النقطة هي الطرف الوحيد الذي يجعل الدفع الإلكتروني حقيقيًا.**
+⚠️  **This endpoint is the only thing that makes electronic payment real.**
 
-    `charge` تُصدر رابطًا أو رقمًا؛ ولا تعرف إن دفع العميل. الويب‌هوك
-    وحده يقول «قُبض المال». نقطة غائبة أو معطوبة تعني طلبات تبقى
-    «قيد المعالجة» بينما المبالغ في الحساب البنكي.
+    `charge` issues a link or a number; it does not know whether the customer
+    paid. The webhook alone says "the money was taken". A missing or broken
+    endpoint means orders left "processing" while the amounts are in the bank account.
 
-⚠️  وهي **بلا مصادقة** — فكل خاصية هنا حارس أمني لا تفصيل سلوكي.
+⚠️  And it is **unauthenticated** — so every property here is a security guard,
+    not a behavioural detail.
 """
 
 import hashlib
@@ -35,7 +36,7 @@ SECRET = "hmac-secret-for-tests"
 
 
 # ═══════════════════════════════════════════════════════════
-#  التركيب
+#  Setup
 # ═══════════════════════════════════════════════════════════
 
 
@@ -78,7 +79,7 @@ def webhook_url(code="paymob"):
 
 
 def paymob_payload(payment, *, event_id="55501", **overrides):
-    """حمولة Paymob كما تصل فعلًا — متداخلة وبقيم منطقية."""
+    """A Paymob payload exactly as it arrives — nested and with boolean values."""
     obj = {
         "id": event_id,
         "amount_cents": 15000,
@@ -109,7 +110,7 @@ def sign(payload):
 
 
 def deliver(client, payload, *, signature=None, code="paymob"):
-    """تسليم حدث كما تفعل البوابة: التوقيع في معامل الرابط."""
+    """Delivering an event the way the gateway does: the signature in the URL parameter."""
     signature = sign(payload) if signature is None else signature
     return client.post(
         f"{webhook_url(code)}?hmac={signature}",
@@ -119,7 +120,7 @@ def deliver(client, payload, *, signature=None, code="paymob"):
 
 
 # ═══════════════════════════════════════════════════════════
-#  المسار الصحيح
+#  The correct path
 # ═══════════════════════════════════════════════════════════
 
 
@@ -133,8 +134,8 @@ class TestSuccessfulDelivery:
         payment.refresh_from_db()
         assert payment.status == TransactionStatus.CAPTURED
         assert payment.captured_at is not None
-        # ⚠️  التحصيل يعني التصريح ضمنًا — تقرير يقيس المدة بينهما
-        #     ينكسر على معاملة محصَّلة بلا وقت تصريح.
+        # ⚠️  A capture implies an authorisation — a report measuring the interval
+        #     between them breaks on a captured transaction with no authorisation time.
         assert payment.authorized_at is not None
 
     def test_the_event_is_recorded_for_audit(self, client, payment, provider):
@@ -147,8 +148,8 @@ class TestSuccessfulDelivery:
 
     def test_higher_layers_are_told_without_being_imported(self, client, payment):
         """
-        ⚠️  `payments` **تحت** `orders` في مخطط الطبقات، فلا يجوز أن
-            يعلّم الطلب مدفوعًا بنفسه. الإشارة هي الطريق الوحيد.
+        ⚠️  `payments` sits **below** `orders` in the layer diagram, so it must
+            not mark the order paid itself. The signal is the only route.
         """
         received = []
 
@@ -165,22 +166,22 @@ class TestSuccessfulDelivery:
 
     def test_no_authentication_is_required(self, client, payment):
         """
-        ⚠️  البوابة لا تملك حسابًا ولا توكنًا. ترويسة مصادقة تالفة
-            يجب ألا تُسقط حدثًا صحيحًا.
+        ⚠️  The gateway has no account and no token. A malformed authentication
+            header must not drop a valid event.
         """
         client.credentials(HTTP_AUTHORIZATION="Bearer not-a-real-token")
         assert deliver(client, paymob_payload(payment)).status_code == 200
 
 
 # ═══════════════════════════════════════════════════════════
-#  التزوير
+#  Forgery
 # ═══════════════════════════════════════════════════════════
 
 
 class TestForgery:
     def test_a_bad_signature_changes_nothing(self, client, payment):
         """
-        ⚠️  **الهجوم الأول والأوضح**: نداء واحد يعلّم طلبًا كمدفوع.
+        ⚠️  **The first and most obvious attack**: one call marks an order paid.
         """
         response = deliver(client, paymob_payload(payment), signature="0" * 128)
 
@@ -189,7 +190,7 @@ class TestForgery:
         assert payment.status == TransactionStatus.PENDING
 
     def test_a_tampered_amount_is_rejected(self, client, payment):
-        """التوقيع محسوب على المبلغ الأصلي — تعديله يبطله."""
+        """The signature is computed over the original amount — altering it invalidates it."""
         payload = paymob_payload(payment)
         signature = sign(payload)
         payload["obj"]["amount_cents"] = 100
@@ -202,32 +203,34 @@ class TestForgery:
 
     def test_a_forged_event_cannot_block_the_genuine_one(self, client, payment, provider):
         """
-        ⚠️  **ثغرة تعطيل صامتة** — أخطر ما في هذا الملف.
+        ⚠️  **A silent denial hole** — the most dangerous thing in this file.
 
-            جدول المنع التكراري مفتاحه `(البوابة, معرّف الحدث)`.
-            لو سُجِّل الحدث المزوَّر قبل التحقق لَحجز الخانة: ثم يصل
-            الحقيقي بنفس المعرّف فيبدو تكرارًا ويُهمَل — ويبقى طلب
-            مدفوع بلا تعليم، بنداء واحد بلا أي مفتاح.
+            The deduplication table is keyed on `(gateway, event id)`. Were the
+            forged event recorded before verification, it would occupy the slot:
+            the real one then arrives with the same id, looks like a repeat and
+            is discarded — leaving a paid order unmarked, from one call with no
+            key at all.
 
-            ولذلك المزوَّر لا يدخل الجدول أصلًا.
+            The forged event therefore never enters the table.
         """
         payload = paymob_payload(payment, event_id="ATTACKER-GUESS")
 
         assert deliver(client, payload, signature="deadbeef").status_code == 403
         assert not WebhookEvent.objects.filter(event_id="ATTACKER-GUESS").exists()
 
-        # الحدث الحقيقي بنفس المعرّف يمرّ كأن شيئًا لم يكن
+        # The real event with the same id passes as though nothing had happened
         assert deliver(client, payload).status_code == 200
         payment.refresh_from_db()
         assert payment.status == TransactionStatus.CAPTURED
 
     def test_an_amount_that_does_not_match_is_never_marked_paid(self, client, payment):
         """
-        ⚠️  التوقيع الصحيح يثبت **المُرسِل** لا **المبلغ الصحيح**.
+        ⚠️  A valid signature proves **the sender**, not **the correct amount**.
 
-            بوابة حصّلت غير ما طلبناه تصل بتوقيع سليم تمامًا؛
-            وتعليمها مدفوعة يخلق طلبًا مكتملًا بمال ناقص لا يظهر
-            إلا في مطابقة شهرية.
+            A gateway that collected something other than what we asked for
+            arrives with a perfectly sound signature; and marking it paid
+            creates a completed order with money missing, visible only in a
+            monthly reconciliation.
         """
         response = deliver(client, paymob_payload(payment, amount_cents=9900))
 
@@ -239,16 +242,15 @@ class TestForgery:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التكرار
+#  Duplication
 # ═══════════════════════════════════════════════════════════
 
 
 class TestIdempotency:
     def test_the_same_event_is_applied_once(self, client, payment):
         """
-        ⚠️  البوابة تعيد الإرسال عند غياب الرد. بلا منع تكرار،
-            الطلب يُعلَّم مدفوعًا مرتين — ومع الاسترداد يصير المبلغ
-            مضاعفًا.
+        ⚠️  The gateway resends when no response arrives. Without deduplication
+            the order is marked paid twice — and with a refund the amount is doubled.
         """
         payload = paymob_payload(payment)
 
@@ -265,10 +267,11 @@ class TestIdempotency:
 
     def test_an_unprocessed_event_is_retried_not_swallowed(self, client, payment, provider):
         """
-        ⚠️  التكرار يُقاس بالمعالجة لا بالتسجيل.
+        ⚠️  Duplication is measured by processing, not by recording.
 
-            حدث سُجِّل ثم فشل تطبيقه يجب أن يُطبَّق حين تعيد البوابة
-            إرساله. قياسه بالتسجيل كان يجعل أول فشل نهائيًا.
+            An event that was recorded and then failed to apply must be applied
+            when the gateway resends it. Measuring by recording made the first
+            failure final.
         """
         payload = paymob_payload(payment, event_id="42042")
 
@@ -287,7 +290,7 @@ class TestIdempotency:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحالات
+#  States
 # ═══════════════════════════════════════════════════════════
 
 
@@ -301,8 +304,8 @@ class TestOutcomes:
 
     def test_authorisation_without_capture_is_not_payment(self, client, payment):
         """
-        ⚠️  الرصيد محجوز والمال لم ينتقل. تعليمه محصَّلًا ينتج
-            إيرادًا وهميًا في كل تقرير مالي.
+        ⚠️  The funds are held and the money has not moved. Marking it captured
+            produces phantom revenue in every financial report.
         """
         deliver(client, paymob_payload(payment, is_auth=True, is_capture=False))
 
@@ -312,8 +315,8 @@ class TestOutcomes:
 
     def test_a_refunded_transaction_is_never_pulled_back(self, client, payment):
         """
-        ⚠️  إعادة إرسال متأخرة لحدث نجاح قديم بعد ردّ المال كانت
-            تُظهر المبلغ إيرادًا مرة ثانية.
+        ⚠️  A late resend of an old success event after the money was returned
+            used to show the amount as revenue a second time.
         """
         payment.status = TransactionStatus.REFUNDED
         payment.save(update_fields=["status"])
@@ -335,17 +338,17 @@ class TestOutcomes:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحدود
+#  Boundaries
 # ═══════════════════════════════════════════════════════════
 
 
 class TestBoundaries:
     def test_a_disabled_provider_receives_nothing(self, client, payment, provider):
         """
-        ⚠️  إيقاف بوابة يجب أن يكون إيقافًا كاملًا.
+        ⚠️  Disabling a gateway must be a complete shutdown.
 
-            بقاء نقطتها مفتوحة يعني أنها ما زالت تعلّم طلبات
-            كمدفوعة بينما اختفت من خيارات العميل.
+            Leaving its endpoint open means it still marks orders as paid while
+            it has disappeared from the customer's options.
         """
         provider.is_active = False
         provider.save(update_fields=["is_active"])
@@ -356,7 +359,7 @@ class TestBoundaries:
         assert deliver(client, paymob_payload(payment), code="stripe").status_code == 404
 
     def test_an_unreadable_payload_is_refused(self, client, provider):
-        """حمولة لا يفهمها المحوّل لا تُسجَّل ولا تُطبَّق."""
+        """A payload the adapter does not understand is neither recorded nor applied."""
         response = client.post(f"{webhook_url()}?hmac=x", {"hello": "world"}, format="json")
 
         assert response.status_code == 400
@@ -365,9 +368,9 @@ class TestBoundaries:
 
     def test_an_event_without_a_matching_transaction_is_not_retried(self, client, provider):
         """
-        ⚠️  ٢٠٠ لا خطأ: البوابة تعيد الإرسال على أي رد غير ناجح،
-            وحدث بمرجع لا نعرفه سيصل كل بضع دقائق إلى الأبد.
-            يُسجَّل بوضوح ولا يُطلَب تكراره بلا فائدة.
+        ⚠️  200, not an error: the gateway resends on any unsuccessful response,
+            and an event with a reference we do not know would arrive every few
+            minutes forever. It is logged clearly and not asked to repeat for nothing.
         """
         orphan = PaymentTransaction(
             provider=provider,
@@ -390,10 +393,10 @@ class TestBoundaries:
 
 class TestFawryEnvelope:
     """
-    ⚠️  Fawry لا ترسل معرّف حدث — ترسل رقم المرجع وحالته، والرقم
-        ثابت عبر عمر الطلب. اتخاذه معرّفًا يجعل «دُفع» بعد «صدر
-        الرقم» يبدو تكرارًا فيُهمَل، ويبقى الطلب غير مدفوع بينما
-        المال قُبض في المنفذ.
+    ⚠️  Fawry sends no event id — it sends the reference number and its status,
+        and the number is constant over the order's lifetime. Taking it as the
+        id makes "paid" after "the number was issued" look like a repeat and be
+        discarded, leaving the order unpaid while the money was taken at the outlet.
     """
 
     def _adapter(self):
@@ -421,12 +424,12 @@ class TestFawryEnvelope:
         assert paid.outcome == "CAPTURED"
 
     def test_the_reference_number_alone_is_not_payment(self):
-        """`NEW` يعني «صدر الرقم» — والعميل أمامه مهلة ليدفع."""
+        """`NEW` means "the number was issued" — and the customer has time to pay."""
         envelope = self._adapter().parse_webhook(payload=self._payload("NEW"), params={})
         assert envelope.outcome == "PENDING"
 
     def test_the_signature_comes_from_the_body_not_the_url(self):
-        """بخلاف Paymob — قراءته من الرابط ترفض كل إشعار صحيح."""
+        """Unlike Paymob — reading it from the URL refuses every valid notification."""
         envelope = self._adapter().parse_webhook(payload=self._payload("PAID"), params={})
         assert envelope.signature == "sig"
         assert envelope.amount == Decimal("150.00")

@@ -1,11 +1,12 @@
 """
-اختبارات الوارد.
+Inbound mail tests.
 
-⚠️  **الاختبار على بايتات رسائل حقيقية لا على كائنات مُتخيَّلة.**
+⚠️  **Tested against real message bytes, not against imagined objects.**
 
-    الأخطاء كلها في التحليل لا في النقل: ترويسة عربية مرمَّزة · جسم
-    متعدد الأجزاء · مرفق يدّعي أنه PDF · ردّ آلي. وفصل
-    `import_message` عن `fetch` هو ما يجعل ذلك ممكنًا بلا خادم IMAP.
+    Every defect is in the parsing, not the transport: an encoded Arabic header ·
+    a multipart body · an attachment claiming to be a PDF · an auto-reply. And
+    separating `import_message` from `fetch` is what makes that possible with no
+    IMAP server.
 """
 
 from email.message import EmailMessage
@@ -20,7 +21,7 @@ from mailing.models import (
     MailTransport,
 )
 
-#: PNG صالح فعلًا — التوقيع وحده لا يكفي لأن الفحص يقرأ البايتات
+#: A genuinely valid PNG — the signature alone is not enough, because the check reads the bytes
 PNG_BYTES = bytes.fromhex(
     "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
     "890000000a49444154789c6360000002000100ffff03000006000557bfabd400"
@@ -65,8 +66,8 @@ def build(**overrides) -> bytes:
 class TestImport:
     def test_arabic_headers_are_decoded(self, mailbox):
         """
-        ⚠️  الموضوع العربي يصل مرمَّزًا (`=?UTF-8?B?…?=`). عرضه خامًا
-            يجعل الرسالة تبدو تالفة في شاشة الدعم فتُتجاهَل.
+        ⚠️  An Arabic subject arrives encoded (`=?UTF-8?B?…?=`). Displaying it
+            raw makes the message look corrupt on the support screen, so it gets ignored.
         """
         message = inbound.import_message(mailbox, build())
 
@@ -77,9 +78,9 @@ class TestImport:
 
     def test_the_same_message_is_never_imported_twice(self, mailbox):
         """
-        ⚠️  السحب يقع كل بضع دقائق، وأي انقطاع يعيد المرور على ما
-            سُحب. وبلا مفتاح ثابت يظهر البريد الواحد عشر مرات في
-            صندوق الدعم فيردّ عليه موظفان.
+        ⚠️  The pull happens every few minutes, and any interruption re-covers
+            what was already pulled. Without a stable key one email appears ten
+            times in the support inbox and two staff reply to it.
         """
         raw = build()
 
@@ -89,8 +90,8 @@ class TestImport:
 
     def test_a_message_without_an_id_gets_a_stable_one(self, mailbox):
         """
-        ⚠️  المعرّف المشتقّ من المحتوى لا العشوائي: العشوائي يجعل كل
-            سحب يستورد نفس الرسالة من جديد.
+        ⚠️  An id derived from the content, not a random one: a random one makes
+            every pull re-import the same message.
         """
         message = EmailMessage()
         message["From"] = "anon@client.example"
@@ -116,7 +117,7 @@ class TestImport:
 
         assert "النص الصريح" in stored.body_text
         assert "<script>" not in stored.body_text
-        assert "<script>" in stored.body_html  # محفوظ للأرشيف ولا يُعرَض
+        assert "<script>" in stored.body_html  # kept for the archive and never displayed
 
 
 @pytest.mark.django_db
@@ -132,12 +133,12 @@ class TestLoopProtection:
     )
     def test_automatic_messages_are_flagged(self, mailbox, headers):
         """
-        ⚠️  ردّان آليان متقابلان يولّدان آلاف الرسائل في دقائق:
-            «رسالتك وصلت» ← «أنا في إجازة» ← «رسالتك وصلت»… وينتهيان
-            بالدومين في القوائم السوداء، فيسقط معه بريد الطلبات
-            وإعادة تعيين كلمات المرور كلها.
+        ⚠️  Two auto-replies facing each other generate thousands of messages in
+            minutes: "your message was received" ← "I am on holiday" ← "your
+            message was received"… and they end with the domain blacklisted,
+            taking order mail and every password reset down with it.
 
-            والفحص على أربع ترويسات لا واحدة: كل مزوّد يستعمل غيرها.
+            And the check covers four headers, not one: every provider uses a different one.
         """
         message = inbound.import_message(mailbox, build(headers=headers))
 
@@ -174,11 +175,12 @@ class TestAttachments:
 
     def test_a_disguised_executable_is_refused(self, mailbox):
         """
-        ⚠️  **أخطر مسار رفع في النظام**: بلا مستخدم مسجَّل ولا حدّ —
-            يكفي أن يعرف المهاجم عنوان صندوقنا.
+        ⚠️  **The most dangerous upload path in the system**: no logged-in user
+            and no limit — an attacker need only know our mailbox address.
 
-            والاسم `فاتورة.pdf` لا يعني شيئًا: النوع الحقيقي يُقرأ من
-            أول بايتات الملف (ADR-45). وما لا يُعرف توقيعه لا يُخزَّن.
+            And the name `invoice.pdf` means nothing: the true type is read from
+            the file's first bytes (ADR-45). And anything whose signature is
+            unrecognised is not stored.
         """
         message = EmailMessage()
         message["Message-ID"] = "<evil-1@client.example>"
@@ -194,13 +196,14 @@ class TestAttachments:
 
         stored = inbound.import_message(mailbox, message.as_bytes())
 
-        assert stored is not None  # الرسالة تبقى
-        assert stored.attachments.count() == 0  # والمرفق لا
+        assert stored is not None  # the message stays
+        assert stored.attachments.count() == 0  # and the attachment does not
 
     def test_an_oversized_attachment_is_skipped_and_the_message_kept(self, mailbox, monkeypatch):
         """
-        ⚠️  إسقاط الرسالة بسبب مرفق مرفوض يخفي شكوى عميل حقيقية.
-            المرفق يُهمَل، والنص يصل إلى الدعم.
+        ⚠️  Dropping the message because of a rejected attachment hides a
+            genuine customer complaint. The attachment is discarded, and the
+            text reaches support.
         """
         monkeypatch.setattr(inbound, "MAX_ATTACHMENT_BYTES", 10)
 
@@ -221,8 +224,9 @@ class TestAttachments:
 class TestReply:
     def test_reply_threads_into_the_customer_conversation(self, mailbox):
         """
-        ⚠️  بلا `In-Reply-To` يظهر جوابنا عند العميل رسالةً منفصلة لا
-            جوابًا — فيقرأه بلا سؤاله أمامه ويعيد السؤال.
+        ⚠️  Without `In-Reply-To` our answer appears to the customer as a
+            separate message rather than a reply — so they read it without their
+            question in front of them and ask again.
         """
         from mailing import services
         from mailing.models import InboundState
@@ -236,7 +240,7 @@ class TestReply:
         assert outbound.to_email == "customer@client.example"
         assert outbound.subject.startswith("Re: ")
         assert outbound.in_reply_to == message.message_id
-        # ⚠️  الإضافة لا الاستبدال: الاستبدال يقطع الخيط عند العميل
+        # ⚠️  Appending, not replacing: replacing breaks the thread at the customer's end
         assert "<older@client.example>" in outbound.references
         assert message.message_id in outbound.references
 
@@ -244,7 +248,7 @@ class TestReply:
         assert message.status == InboundState.REPLIED
 
     def test_reply_goes_through_the_queue_like_any_mail(self, mailbox):
-        """أسوأ رسالة تُفقد هي التي كتبها إنسان مرة واحدة."""
+        """The worst message to lose is the one a human wrote once."""
         from mailing import services
         from mailing.models import DeliveryState
 
@@ -258,8 +262,9 @@ class TestReply:
 class TestFetchGuards:
     def test_an_outbound_only_account_is_never_polled(self, mailbox):
         """
-        صندوق بلا اتجاه استقبال لا يُسحب منه — والاتصال بخادم غير
-        مضبوط كان سيفشل ويُسجَّل عطلًا لا وجود له.
+        A mailbox with no inbound direction is never pulled from — and
+        connecting to an unconfigured server would have failed and been logged
+        as a fault that does not exist.
         """
         mailbox.direction = MailDirection.OUTBOUND
         mailbox.save()
@@ -274,8 +279,8 @@ class TestFetchGuards:
 
     def test_one_broken_mailbox_does_not_stop_the_others(self, mailbox, monkeypatch):
         """
-        ⚠️  نفس قاعدة `run_periodic`: فشل صندوق لا يوقف البقية، وإلا
-            عطّل خطأٌ في صندوق مهمل بريدَ الدعم كله.
+        ⚠️  The same rule as `run_periodic`: one mailbox failing does not stop
+            the rest, or a defect in a neglected mailbox disables all of support's mail.
         """
         broken = EmailAccount.objects.create(
             code="broken-box",
@@ -306,5 +311,5 @@ class TestFetchGuards:
 @pytest.mark.django_db
 class TestPeriodicRegistration:
     def test_the_sweep_reports_zero_when_no_mailbox_is_configured(self, db):
-        """لا صندوق مضبوط = صفر، لا استثناء: التركيب الجديد بلا بريد وارد."""
+        """No configured mailbox = zero, not an exception: a fresh install with no inbound mail."""
         assert inbound.fetch_all() == 0

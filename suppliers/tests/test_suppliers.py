@@ -1,13 +1,15 @@
 """
-اختبارات الموردين وأوامر الشراء.
+Supplier and purchase order tests.
 
-⚠️  بوابة الخروج للمرحلة ١٤:
+⚠️  The exit gate for phase 14:
 
-        الاستلام يدخل المخزون **بتكلفته** · لا استلام زائد ·
-        حساب المورّد يوازن · أمر استُلم منه شيء لا يُلغى.
+        receiving enters stock **at its cost** · no over-receiving ·
+        the supplier account balances · an order with anything received against
+        it is never cancelled.
 
-    وأخطر ما تحرسه: أن تدخل بضاعة بلا حركة مخزون · أن يُفوتَر أمر
-    مرتين · أن تُخلَط جهة الدَّين فيُقرأ ما علينا كأنه لنا.
+    And the greatest dangers it guards: goods entering with no stock movement ·
+    an order invoiced twice · the direction of the debt being confused, so what
+    we owe is read as what we are owed.
 """
 
 from datetime import timedelta
@@ -20,6 +22,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import AccountType, User
 from administration.models import AdminProfile
+from core.testing import grant_all_domains
 from catalog.models import Category, Product
 from core.errors import BusinessError
 from inventory.models import LocationKind, Stock, StockLocation, StockMovement
@@ -86,6 +89,7 @@ def manager(db):
     user.is_superuser = True
     user.save()
     AdminProfile.objects.create(user=user)
+    grant_all_domains(user)
     return user
 
 
@@ -96,7 +100,7 @@ def client_for(user):
 
 
 # ═══════════════════════════════════════════════════════════
-#  أوامر الشراء
+#  Purchase orders
 # ═══════════════════════════════════════════════════════════
 
 
@@ -104,8 +108,8 @@ def client_for(user):
 class TestPurchaseOrders:
     def test_price_comes_from_the_offer_not_the_caller(self, supplier, location, offer, product):
         """
-        ⚠️  قبول سعر مُرسَل يعني أن من يُنشئ الأمر يحدّد ما ندفعه —
-            وهو أول ما يُستغَل في الشراء.
+        ⚠️  Accepting a sent price means whoever creates the order sets what we
+            pay — the first thing exploited in purchasing.
         """
         order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
 
@@ -130,8 +134,8 @@ class TestPurchaseOrders:
 
     def test_sending_records_the_invoice_on_our_account(self, supplier, location, offer, product):
         """
-        ⚠️  قيدها عند الاستلام يُخفي التزامًا قائمًا: الأمر أُرسل
-            والمورّد سيطالب به.
+        ⚠️  Posting it on receipt hides an existing obligation: the order was
+            sent and the supplier will claim it.
         """
         order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
         services.send_order(order)
@@ -164,7 +168,7 @@ class TestPurchaseOrders:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الاستلام — بوابة الخروج
+#  Receiving — the exit gate
 # ═══════════════════════════════════════════════════════════
 
 
@@ -181,14 +185,15 @@ class TestReceiving:
         self, supplier, location, offer, product
     ):
         """
-        ⚠️  **بوابة الخروج:** الاستلام يدخل المخزون بتكلفته.
+        ⚠️  **The exit gate:** receiving enters stock at its cost.
 
-            وأخذ سعر العرض اليوم بدل سعر الأمر يجعل تكلفة الدفعة
-            تخالف الفاتورة — فينحرف كل ربح يُحسب عليها.
+            And taking today's offer price instead of the order's price makes
+            the batch's cost contradict the invoice — so every profit computed
+            on it drifts.
         """
         order = self._sent_order(supplier, location, product)
 
-        # العرض تغيّر بعد الإرسال — يجب ألا يؤثّر
+        # The offer changed after sending — it must have no effect
         offer.unit_cost = Decimal("95.00")
         offer.save()
 
@@ -200,8 +205,8 @@ class TestReceiving:
 
     def test_receiving_records_a_stock_movement(self, supplier, location, offer, product):
         """
-        ⚠️  بضاعة تدخل بلا حركة تعني رصيدًا بلا مصدر — وتكلفة
-            بضاعة مباعة لا يمكن إثباتها لاحقًا.
+        ⚠️  Goods entering with no movement mean a balance with no source — and
+            a cost of goods sold that cannot be proved later.
         """
         order = self._sent_order(supplier, location, product)
         services.receive_line(order.lines.first(), 10)
@@ -210,8 +215,8 @@ class TestReceiving:
 
     def test_partial_receipt_marks_the_order_partial(self, supplier, location, offer, product):
         """
-        ⚠️  المورّد يرسل ما توفّر ويُكمل لاحقًا — وبلا حالة جزئية
-            يُقفَل الأمر بكامله أو يبقى كأن شيئًا لم يصل.
+        ⚠️  The supplier sends what they have and completes later — and with no
+            partial state the order is closed in full or stays as though nothing had arrived.
         """
         order = self._sent_order(supplier, location, product)
         services.receive_line(order.lines.first(), 4)
@@ -234,8 +239,8 @@ class TestReceiving:
 
     def test_over_receiving_is_refused(self, supplier, location, offer, product):
         """
-        ⚠️  قبوله يعني إدخال بضاعة لم تُطلَب ولم تُفوتَر — فيختل
-            مطابقة الفاتورة مع المستلَم.
+        ⚠️  Accepting it means entering goods that were never ordered and never
+            invoiced — so the reconciliation of the invoice against what was received breaks.
         """
         order = self._sent_order(supplier, location, product)
 
@@ -243,7 +248,7 @@ class TestReceiving:
             services.receive_line(order.lines.first(), 11)
 
     def test_expiry_is_carried_into_the_batch(self, supplier, location, offer, product):
-        """الصلاحية أساس FEFO — ضياعها يجعل الأقدم لا يخرج أولًا."""
+        """The expiry is the basis of FEFO — losing it stops the oldest going out first."""
         order = self._sent_order(supplier, location, product)
         expiry = timezone.localdate() + timedelta(days=200)
 
@@ -253,7 +258,7 @@ class TestReceiving:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الإلغاء وحساب المورّد
+#  Cancellation and the supplier account
 # ═══════════════════════════════════════════════════════════
 
 
@@ -261,8 +266,8 @@ class TestReceiving:
 class TestCancellationAndLedger:
     def test_an_order_with_receipts_cannot_be_cancelled(self, supplier, location, offer, product):
         """
-        ⚠️  البضاعة دخلت المخزن؛ وإلغاء أمرها يترك دفعات بلا مصدر
-            ويُلغي فاتورة على بضاعة نملكها فعلًا.
+        ⚠️  The goods entered the warehouse; cancelling their order leaves
+            batches with no source and reverses an invoice for goods we genuinely own.
         """
         order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
         services.send_order(order)
@@ -272,7 +277,7 @@ class TestCancellationAndLedger:
             services.cancel_order(order, reason="تراجعنا")
 
     def test_cancelling_a_sent_order_reverses_the_invoice(self, supplier, location, offer, product):
-        """⚠️  إشعار دائن لا حذف: الفاتورة أُرسلت وقد سجّلها المورّد."""
+        """⚠️  A credit note, not a deletion: the invoice was sent and the supplier has recorded it."""
         order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
         services.send_order(order)
         services.cancel_order(order, reason="نفد لديه")
@@ -287,9 +292,9 @@ class TestCancellationAndLedger:
 
     def test_payment_reduces_what_we_owe(self, supplier, location, offer, product):
         """
-        ⚠️  الاتجاه **معكوس** عن دفتر العميل: هنا نحن المدينون.
+        ⚠️  The direction is **inverted** relative to the customer ledger: here we are the debtor.
 
-            خلط الاتجاهين بين الدفترين أسهل خطأ ممكن.
+            Confusing the two directions between the two ledgers is the easiest possible mistake.
         """
         order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
         services.send_order(order)
@@ -324,7 +329,7 @@ class TestCancellationAndLedger:
 
 
 # ═══════════════════════════════════════════════════════════
-#  السعر المتفاوَض عليه
+#  The negotiated price
 # ═══════════════════════════════════════════════════════════
 
 
@@ -342,8 +347,8 @@ class TestNegotiatedPrice:
         self, supplier, location, offer, product
     ):
         """
-        ⚠️  الشراء يُتفاوَض فيه؛ ورفض التعديل كان يجبر المشتري على
-            تعديل العرض نفسه — فيتغيّر السعر الافتراضي لكل أمر قادم.
+        ⚠️  Purchasing is negotiated; and refusing the edit forced the buyer to
+            change the offer itself — so the default price changed for every future order.
         """
         order = services.create_order(
             supplier,
@@ -357,7 +362,7 @@ class TestNegotiatedPrice:
         assert line.cost_variance == Decimal("-6.00")
         assert order.subtotal == Decimal("540.00")
 
-        # ⚠️  العرض نفسه لم يتغيّر — الأمر القادم يبدأ من ٦٠ ثانيةً
+        # ⚠️  The offer itself did not change — the next order starts from 60 again
         offer.refresh_from_db()
         assert offer.unit_cost == Decimal("60.00")
 
@@ -375,7 +380,7 @@ class TestNegotiatedPrice:
         assert rows[0]["list_cost"] == "60.00"
 
     def test_matching_prices_produce_no_variance_noise(self, supplier, location, offer, product):
-        """سطر بسعر العرض لا يُسجَّل — السجل للاستثناء لا للروتين."""
+        """A line at the offer price is not logged — the log is for the exception, not the routine."""
         order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
 
         assert services.price_variances(order) == []
@@ -390,10 +395,10 @@ class TestNegotiatedPrice:
 
     def test_the_negotiated_price_flows_into_the_batch(self, supplier, location, offer, product):
         """
-        ⚠️  تكلفة الدفعة هي ما دفعناه فعلًا — لا سعر العرض.
+        ⚠️  The batch's cost is what we actually paid — not the offer price.
 
-            أخذ سعر العرض يجعل كل ربح يُحسب على هذه البضاعة
-            خاطئًا بمقدار الفارق المتفاوَض عليه.
+            Taking the offer price makes every profit computed on these goods
+            wrong by the negotiated difference.
         """
         order = services.create_order(
             supplier,
@@ -408,7 +413,7 @@ class TestNegotiatedPrice:
 
 
 # ═══════════════════════════════════════════════════════════
-#  المرتجعات إلى المورّد
+#  Returns to the supplier
 # ═══════════════════════════════════════════════════════════
 
 
@@ -428,8 +433,8 @@ class TestSupplierReturns:
         self, supplier, location, offer, product
     ):
         """
-        ⚠️  **بوابة البند الناقص:** بدون هذا المسار يبقى «المرتجعات»
-            في كشف الحساب صفرًا دائمًا.
+        ⚠️  **The gate for the missing line item:** without this path, "returns"
+            on the statement stays permanently zero.
         """
         order, line = self._received(supplier, location, product)
         assert Stock.objects.get(product=product, location=location).quantity_physical == 10
@@ -446,9 +451,9 @@ class TestSupplierReturns:
         self, supplier, location, offer, product
     ):
         """
-        ⚠️  التسوية تعني «الرصيد كان خاطئًا»؛ والمرتجع يعني «خرجت
-            إلى جهة معلومة بمقابل». خلطهما يجعل تقرير الفروق يعُدّ
-            كل مرتجع خطأ جرد.
+        ⚠️  An adjustment means "the balance was wrong"; a return means "it went
+            out to a known party against payment". Conflating them makes the
+            discrepancy report count every return as a counting error.
         """
         from inventory.models import MovementType
 
@@ -474,8 +479,8 @@ class TestSupplierReturns:
         self, supplier, location, offer, product
     ):
         """
-        ⚠️  الإرجاع مرتين لنفس الكمية يُنشئ إشعارَي دائن على بضاعة
-            واحدة — فيصير المورّد مدينًا لنا بما لم نُعده.
+        ⚠️  Returning the same quantity twice creates two credit notes for one
+            lot of goods — so the supplier ends up owing us for what we never returned.
         """
         order, line = self._received(supplier, location, product)
 
@@ -491,14 +496,14 @@ class TestSupplierReturns:
         assert line.quantity_on_hand == 0
 
     def test_a_reason_is_required(self, supplier, location, offer, product):
-        """بلا سبب يصير تقييم المورّد مستحيلًا: تالفة؟ خاطئة؟ زائدة؟"""
+        """With no reason, assessing the supplier becomes impossible: damaged? wrong? surplus?"""
         order, line = self._received(supplier, location, product)
 
         with pytest.raises(BusinessError):
             services.return_to_supplier(line, 1, reason="   ")
 
     def test_the_original_invoice_is_never_deleted(self, supplier, location, offer, product):
-        """⚠️  الفاتورة صدرت وسجّلها المورّد — التصحيح بإشعار لا بممحاة."""
+        """⚠️  The invoice was issued and the supplier recorded it — the correction is a note, not an eraser."""
         order, line = self._received(supplier, location, product)
         services.return_to_supplier(line, 10, reason="الشحنة كلها خاطئة")
 
@@ -522,7 +527,7 @@ class TestSupplierReturns:
 
 
 # ═══════════════════════════════════════════════════════════
-#  القائمة — الرصيد والمشتريات والفلاتر
+#  The list — balance, purchases and filters
 # ═══════════════════════════════════════════════════════════
 
 
@@ -532,10 +537,10 @@ class TestSupplierList:
         self, supplier, location, offer, product, django_assert_num_queries
     ):
         """
-        ⚠️  **الفرق بين شاشة تعمل وشاشة تتعطّل.**
+        ⚠️  **The difference between a screen that works and one that stalls.**
 
-            استدعاء `payable_balance()` لكل صف يعني استعلامًا لكل
-            مورّد في أكثر شاشة تُفتح.
+            Calling `payable_balance()` per row means one query per supplier on
+            the most frequently opened screen.
         """
         order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
         services.send_order(order)
@@ -546,7 +551,7 @@ class TestSupplierList:
         )
         services.send_order(second)
 
-        # استعلام واحد مهما بلغ عدد الموردين
+        # One query however many suppliers there are
         with django_assert_num_queries(1):
             rows = list(services.annotated_suppliers().order_by("name_ar"))
 
@@ -557,9 +562,9 @@ class TestSupplierList:
 
     def test_totals_are_not_inflated_by_joining(self, supplier, location, offer, product):
         """
-        ⚠️  ضمّ جدولين في استعلام واحد يضاعف الصفوف: كل حركة حساب
-            تتكرّر بعدد أوامر الشراء والعكس — فيخرج رصيد ومشتريات
-            منفوخان بلا أن يبدو شيء خاطئًا.
+        ⚠️  Joining two tables in one query multiplies the rows: every account
+            movement repeats once per purchase order and vice versa — so an
+            inflated balance and purchase total come out with nothing looking wrong.
         """
         for _ in range(3):
             order = services.create_order(
@@ -575,7 +580,7 @@ class TestSupplierList:
         assert row.payable == Decimal("1700.00")
 
     def test_draft_orders_are_not_counted_as_purchases(self, supplier, location, offer, product):
-        """المسوّدة لم تُرسَل — لا التزام ولا شراء."""
+        """A draft was never sent — no obligation and no purchase."""
         services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
 
         row = services.annotated_suppliers().get(pk=supplier.pk)
@@ -583,8 +588,8 @@ class TestSupplierList:
 
     def test_the_inactive_filter_actually_filters(self, manager, supplier):
         """
-        ⚠️  الشرط القديم كان `== "true"` فقط، فكان `status=inactive`
-            **لا يفعل شيئًا**: يطلب الأدمن الموقوفين فيرى الجميع.
+        ⚠️  The old condition was `== "true"` only, so `status=inactive`
+            **did nothing**: the admin asked for the disabled ones and saw everyone.
         """
         Supplier.objects.create(code="off", name_ar="موقوف", name_en="Off", is_active=False)
 
@@ -623,8 +628,9 @@ class TestSupplierList:
         self, manager, supplier, location, offer, product
     ):
         """
-        ⚠️  الحقل المُصرَّح في الـserializer لا يخرج ما لم يُدرَج في
-            `fields` — يسقط بصمت بلا خطأ، فتبني الشاشة على `undefined`.
+        ⚠️  A field declared on the serializer does not go out unless it is
+            listed in `fields` — it drops silently with no error, so the screen
+            builds on `undefined`.
         """
         order = services.create_order(
             supplier,
@@ -657,7 +663,7 @@ class TestSupplierList:
 
 
 # ═══════════════════════════════════════════════════════════
-#  عروض الموردين — أساس Marketplace
+#  Supplier offers — the basis of the marketplace
 # ═══════════════════════════════════════════════════════════
 
 
@@ -665,10 +671,10 @@ class TestSupplierList:
 class TestMarketplaceFoundation:
     def test_a_product_can_have_many_suppliers(self, product, supplier):
         """
-        ⚠️  هذا الجدول هو ما يجعل «منتج من عدة موردين» ممكنًا.
+        ⚠️  This table is what makes "one product from several suppliers" possible.
 
-            بلا وسيط يكون لكل منتج مورّد واحد مثبَّت، وتغييره يفقد
-            تاريخ الشراء من السابق.
+            With no intermediary, every product has one fixed supplier, and
+            changing it loses the purchase history from the previous one.
         """
         cheaper = Supplier.objects.create(code="beta", name_ar="بيتا", name_en="Beta")
 
@@ -687,8 +693,8 @@ class TestMarketplaceFoundation:
 
     def test_only_one_preferred_supplier_per_product(self, product, supplier):
         """
-        ⚠️  اثنان مفضَّلان يجعلان أمر الشراء التلقائي لا يعرف من
-            يختار — فيصير الاختيار تابعًا لترتيب الاستعلام.
+        ⚠️  Two preferred ones make the automatic purchase order unable to
+            choose — so the choice becomes a matter of query ordering.
         """
         from django.db import IntegrityError, transaction
 
@@ -716,8 +722,9 @@ class TestMarketplaceFoundation:
 
     def test_reorder_flags_products_without_a_supplier(self, product, location):
         """
-        ⚠️  استبعاد الصنف بلا مورّد يجعل أهم نقص يختفي من شاشة
-            الشراء — والسبب أنه بلا مورّد، وهو ما يجب أن يُعالَج.
+        ⚠️  Excluding an item with no supplier makes the most important shortage
+            vanish from the purchasing screen — and the reason is that it has no
+            supplier, which is what needs dealing with.
         """
         from inventory import services as inventory_services
 
@@ -743,7 +750,7 @@ class TestMarketplaceFoundation:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الصلاحيات
+#  Permissions
 # ═══════════════════════════════════════════════════════════
 
 
@@ -751,8 +758,8 @@ class TestMarketplaceFoundation:
 class TestPermissions:
     def test_a_customer_cannot_read_purchase_prices(self, db):
         """
-        ⚠️  أسعار الشراء هي هامش المتجر مكشوفًا — تسريبها يجعل أي
-            عميل يعرف بكم اشترينا ما نبيعه له.
+        ⚠️  Purchase prices are the store's margin laid bare — leaking them lets
+            any customer learn what we paid for what we sell them.
         """
         customer = User.objects.create_user(email="shopper@test.local", password=PASSWORD)
         customer.is_active = True
@@ -767,6 +774,7 @@ class TestPermissions:
         staff.is_active = True
         staff.save()
         AdminProfile.objects.create(user=staff)
+        grant_all_domains(staff)
 
         assert client_for(staff).get(reverse("v1:suppliers:list")).status_code == 403
 
@@ -776,7 +784,7 @@ class TestPermissions:
     def test_receiving_a_line_of_another_order_is_refused(
         self, manager, supplier, location, offer, product
     ):
-        """⚠️  مُصفّى بالأمر: معرّف سطر أمر آخر كان يُستلَم من هنا."""
+        """⚠️  Filtered by the order: another order's line id used to be receivable here."""
         first = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
         second = services.create_order(
             supplier, location, [{"product": product.pk, "quantity": 10}]

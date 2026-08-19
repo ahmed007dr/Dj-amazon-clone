@@ -143,6 +143,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clearSession]);
 
+  const refreshUser = useCallback(async () => {
+    // ⚠️  الصمت عند الفشل مقصود: هذه إعادة قراءة تحسينية، وفشلها
+    //     لا يجوز أن يُخرج المستخدم من جلسة عاملة.
+    try {
+      setUser(await api.getMe());
+    } catch {
+      /* تبقى النسخة الحالية */
+    }
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -150,8 +160,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: user !== null,
       signIn,
       signOut,
+      refreshUser,
     }),
-    [user, isRestoring, signIn, signOut],
+    [user, isRestoring, signIn, signOut, refreshUser],
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

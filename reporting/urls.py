@@ -1,4 +1,4 @@
-"""مسارات التقارير — /api/v1/reports/"""
+"""Reporting routes — /api/v1/reports/"""
 
 from django.urls import path
 

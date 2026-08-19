@@ -1,5 +1,5 @@
 """
-واجهات التقييمات.
+Review endpoints.
 """
 
 from rest_framework import generics
@@ -17,9 +17,9 @@ from reviews.models import ProductRating, Review, ReviewStatus
 
 class ProductReviewListAPI(generics.ListAPIView):
     """
-    تقييمات منتج — **المنشورة فقط**.
+    A product's reviews — **the published ones only**.
 
-    ⚠️  المعلّقة والمرفوضة لا تظهر لأحد غير صاحبها والأدمن.
+    ⚠️  Pending and rejected reviews are shown to nobody but their author and the admin.
     """
 
     permission_classes = [AllowAny]
@@ -34,7 +34,7 @@ class ProductReviewListAPI(generics.ListAPIView):
 
 
 class ProductRatingAPI(APIView):
-    """التجميع — من الجدول المُخزَّن لا من حساب لحظي."""
+    """The aggregate — from the stored table, not from an on-the-fly calculation."""
 
     permission_classes = [AllowAny]
 
@@ -62,12 +62,12 @@ class MyReviewListCreateAPI(generics.ListCreateAPIView):
         return s.ReviewSerializer
 
     def get_queryset(self):
-        # ⚠️  الفلترة بالمالك — لا تقييمات الغير
+        # ⚠️  Filtered by owner — not other people's reviews
         return Review.objects.filter(user=self.request.user).select_related("product", "user")
 
     def perform_create(self, serializer):
         review = serializer.save(user=self.request.user, status=ReviewStatus.PENDING)
-        # لا إعادة حساب — التقييم المعلّق لا يدخل المتوسط
+        # No recalculation — a pending review does not enter the average
         return review
 
 
@@ -80,10 +80,10 @@ class MyReviewDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_update(self, serializer):
         """
-        ⚠️  تعديل تقييم منشور يعيده إلى المراجعة.
+        ⚠️  Editing a published review returns it to moderation.
 
-        بدونها يكتب المستخدم نصًا لائقًا، يُعتمد، ثم يستبدله بما
-        شاء — والمراجعة تصير بلا معنى.
+        Without that the user writes something acceptable, gets it approved, and
+        then replaces it with whatever they like — and the moderation becomes meaningless.
         """
         review = serializer.save(status=ReviewStatus.PENDING)
         services.recalculate_rating(review.product_id)
@@ -114,7 +114,7 @@ class ReviewHelpfulAPI(APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن
+#  Admin
 # ═══════════════════════════════════════════════════════════
 
 

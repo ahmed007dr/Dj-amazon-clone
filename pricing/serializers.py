@@ -1,9 +1,9 @@
 """
-عقود التسعير.
+Pricing contracts.
 
-⚠️  **قوائم منفصلة لا نسب خصم** (قاعدة العمل ٩). لا يوجد هنا حقل
-    «نسبة خصم الطلاب»: سعر الطالب سعرٌ قائم بذاته في قائمته، لا
-    مشتقٌّ من سعر التجزئة.
+⚠️  **Separate lists, not discount percentages** (business rule 9). There is no
+    "student discount percentage" field here: a student's price is a price in
+    its own right in its own list, not derived from the retail price.
 """
 
 from rest_framework import serializers
@@ -13,10 +13,11 @@ from pricing.models import PriceList, PriceOverride, PriceRule
 
 class PriceListSerializer(serializers.ModelSerializer):
     """
-    ⚠️  `rule_count` يجعل «قائمة فارغة» ظاهرة قبل تفعيلها.
+    ⚠️  `rule_count` makes an "empty list" visible before it is enabled.
 
-        قائمة مفعّلة بلا قواعد تعني عملاءها يرون سعر التجزئة وهم
-        يظنون أنهم على سعر الجملة — ولا شيء يشير إلى الخطأ.
+        An enabled list with no rules means its customers see the retail price
+        while believing they are on the wholesale price — with nothing to
+        indicate the mistake.
     """
 
     rule_count = serializers.SerializerMethodField()
@@ -46,10 +47,10 @@ class PriceListSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        ⚠️  نهاية قبل بداية تعني قائمة **لا تسري أبدًا**.
+        ⚠️  An end before a start means a list that **never applies**.
 
-            وهي تمرّ صامتة: الحقلان صالحان كلٌّ على حدة، والخطأ لا
-            يظهر إلا حين يشكو عميل أنه لا يرى سعره.
+            And it passes silently: each field is valid on its own, and the
+            error only surfaces when a customer complains they cannot see their price.
         """
         instance = self.instance
         start = attrs.get("valid_from", getattr(instance, "valid_from", None))
@@ -89,19 +90,19 @@ class PriceRuleSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        ⚠️  **قيد قاعدة البيانات لا يمسك هذه الحالة.**
+        ⚠️  **The database constraint does not catch this case.**
 
-            القيد على `(القائمة, المنتج, النسخة, الكمية)` و`النسخة`
-            تقبل `NULL`. وPostgreSQL يعتبر كل `NULL` متمايزًا عن
-            غيره، فصفّان بـ `variant = NULL` ونفس الكمية **يمرّان**
-            بلا اعتراض.
+            The constraint is on `(list, product, variant, quantity)` and
+            `variant` accepts `NULL`. And PostgreSQL treats every `NULL` as
+            distinct from every other, so two rows with `variant = NULL` and the
+            same quantity **both pass** unchallenged.
 
-            والأثر ليس شكليًا: `price_for` تأخذ أول تطابق، فسعر
-            الصنف يصير رهنًا بترتيب الصفوف — ويتغيّر بلا أن يعدّل
-            أحد شيئًا.
+            And the effect is not cosmetic: `price_for` takes the first match,
+            so the item's price becomes a matter of row ordering — and it
+            changes with nobody having edited anything.
 
-            الفحص هنا يسدّ المسار الذي تفتحه هذه الواجهة؛ ويبقى
-            القيد نفسه محتاجًا إلى شرط `variant__isnull=True`.
+            The check here closes the path this endpoint opens; the constraint
+            itself still needs a `variant__isnull=True` condition.
         """
         instance = self.instance
 
@@ -130,9 +131,9 @@ class PriceRuleSerializer(serializers.ModelSerializer):
 
 class PriceOverrideSerializer(serializers.ModelSerializer):
     """
-    ⚠️  الخصم الترويجي **منفصل عن الكوبون**: هذا يظهر في الكتالوج
-        بلا كود، والكوبون يُدخله العميل. خلطهما يعني عرضًا يُطبَّق
-        مرتين على نفس السطر.
+    ⚠️  A promotional discount is **separate from a coupon**: this appears in the
+        catalogue with no code, and a coupon is entered by the customer. Merging
+        them means an offer applied twice to the same line.
     """
 
     product_sku = serializers.CharField(source="product.sku", read_only=True)
@@ -164,7 +165,7 @@ class PriceOverrideSerializer(serializers.ModelSerializer):
         start = attrs.get("starts_at", getattr(instance, "starts_at", None))
         end = attrs.get("ends_at", getattr(instance, "ends_at", None))
 
-        # ⚠️  نسبة فوق ١٠٠٪ تعني سعرًا سالبًا — والمتجر يدفع للعميل.
+        # ⚠️  A rate above 100% means a negative price — and the store pays the customer.
         if kind == "PERCENTAGE" and value is not None and value > 100:
             raise serializers.ValidationError(
                 {"discount_value": "النسبة لا تتجاوز ١٠٠٪ — الخصم الأكبر يعني سعرًا سالبًا"}

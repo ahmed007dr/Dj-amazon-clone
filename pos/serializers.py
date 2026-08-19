@@ -1,11 +1,12 @@
 """
-عقود نقطة البيع.
+Point-of-sale contracts.
 
-⚠️  **لا مبالغ تدخل من الواجهة إطلاقًا.**
+⚠️  **No amounts come in from the frontend at all.**
 
-    الكاشير يرسل المنتج والكمية؛ السعر يحسبه `pricing` والإجمالي
-    يحسبه الخادم. قبول سعر من الجهاز يعني بيعة يحدّد سعرها من
-    يملك الجهاز — وهو أول ما يُستغَل في متجر فعلي.
+    The cashier sends the product and the quantity; `pricing` computes the price
+    and the server computes the total. Accepting a price from the terminal means
+    a sale whose price is set by whoever holds the terminal — the first thing
+    exploited in a physical shop.
 """
 
 from decimal import Decimal
@@ -65,10 +66,11 @@ class CashMovementSerializer(serializers.ModelSerializer):
 
 class SessionSerializer(serializers.ModelSerializer):
     """
-    ⚠️  `expected_cash` و`variance` **لا يُعرضان قبل الإغلاق**.
+    ⚠️  `expected_cash` and `variance` are **not shown before closing**.
 
-        عرض المتوقَّع للكاشير قبل أن يعدّ يجعله يعدّ حتى يطابقه —
-        فتصير التسوية شكلية والفرق صفرًا دائمًا.
+        Showing the expected figure to the cashier before they count makes them
+        count until it matches — so the reconciliation becomes a formality and
+        the discrepancy is always zero.
     """
 
     register_code = serializers.CharField(source="register.code", read_only=True)
@@ -109,7 +111,7 @@ class SessionSerializer(serializers.ModelSerializer):
 
 
 # ═══════════════════════════════════════════════════════════
-#  المدخلات
+#  Inputs
 # ═══════════════════════════════════════════════════════════
 
 
@@ -122,10 +124,10 @@ class OpenSessionSerializer(serializers.Serializer):
 
 class CloseSessionSerializer(serializers.Serializer):
     """
-    ⚠️  `counted_cash` إلزامي بلا قيمة افتراضية.
+    ⚠️  `counted_cash` is mandatory with no default.
 
-        الافتراضي (صفر أو المتوقَّع) يسمح بإغلاق بلا عدّ — وهو
-        بالضبط ما تمنعه التسوية.
+        A default (zero or the expected figure) allows closing without counting
+        — which is exactly what the reconciliation exists to prevent.
     """
 
     counted_cash = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0"))
@@ -145,7 +147,7 @@ class SplitPaymentSerializer(serializers.Serializer):
 
 class CheckoutSerializer(serializers.Serializer):
     """
-    ⚠️  **بلا حقل إجمالي.** يحسبه الخادم ويقارنه بمجموع الدفعات.
+    ⚠️  **No total field.** The server computes it and compares it against the sum of the payments.
     """
 
     lines = SaleLineSerializer(many=True)
@@ -169,19 +171,21 @@ class CheckoutSerializer(serializers.Serializer):
 
 class POSProductSerializer(serializers.ModelSerializer):
     """
-    الصنف كما تحتاجه شاشة الكاونتر.
+    The item as the counter screen needs it.
 
-    ⚠️  **حمولة أخف من `ProductDetailSerializer` عمدًا.**
+    ⚠️  **A deliberately lighter payload than `ProductDetailSerializer`.**
 
-        شاشة الكاشير تعرض عشرين نتيجة عند كل حرف يُكتب. جرّ الوصف
-        والصور والتصنيف الكامل في كل منها يجعل البحث يتلعثم على
-        جهاز لوحي — والكاشير يكتب أسرع مما يستجيب.
+        The cashier's screen shows twenty results with every character typed.
+        Dragging the description, the images and the full classification into
+        each of them makes the search stutter on a tablet — and the cashier
+        types faster than it responds.
 
-    ⚠️  و`base_price` **استرشادي لا نهائي.**
+    ⚠️  And `base_price` is **indicative, not final.**
 
-        السعر الفعلي يحسبه `pricing` عند التسعير (شرائح · خصومات ·
-        ضريبة قد تكون غائبة). عرضه هنا يساعد على التعرّف على الصنف
-        لا على جمع الفاتورة — ونقطة `/quote/` هي مصدر الإجمالي.
+        The actual price is computed by `pricing` at quote time (tiers ·
+        discounts · a tax that may be absent). Showing it here helps identify
+        the item, not add up the invoice — and the `/quote/` endpoint is the
+        source of the total.
     """
 
     base_price = MoneyField(read_only=True)
@@ -194,7 +198,7 @@ class POSProductSerializer(serializers.ModelSerializer):
 
 class QuoteSerializer(serializers.Serializer):
     """
-    ⚠️  بلا `payments` — التسعير لا يحتاج معرفة كيف سيُدفع.
+    ⚠️  No `payments` — pricing does not need to know how it will be paid.
     """
 
     lines = SaleLineSerializer(many=True)
@@ -212,8 +216,8 @@ class QuoteSerializer(serializers.Serializer):
 class CashMovementInputSerializer(serializers.Serializer):
     kind = serializers.ChoiceField(choices=["PAY_IN", "PAY_OUT"])
     amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
-    #: ⚠️  السبب إلزامي: نقد يخرج من الدرج بلا سبب هو بالضبط ما
-    #:     يجعل فرق الإغلاق غير قابل للتفسير.
+    #: ⚠️  The reason is mandatory: cash leaving the drawer with no reason is exactly what
+    #:     makes a closing discrepancy impossible to explain.
     reason = serializers.CharField(min_length=3, max_length=300)
 
 

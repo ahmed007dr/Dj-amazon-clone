@@ -1,11 +1,11 @@
 """
-محرك الكوبونات — **تنفيذ واحد**.
+The coupon engine — **one implementation**.
 
-⚠️  هذا الملف يستبدل نسختين متعارضتين كانتا في `orders/views.py`
-    و`orders/api.py`.
+⚠️  This file replaces two conflicting copies that lived in `orders/views.py`
+    and `orders/api.py`.
 
-    `orders` **يستهلك نتيجة** التحقق ولا ينفّذ المحرك — وإلا عاد
-    الازدواج من الباب الخلفي.
+    `orders` **consumes the result** of the validation and does not run the
+    engine — or the duplication returns by the back door.
 """
 
 from __future__ import annotations
@@ -39,12 +39,12 @@ class RejectionReason(str, Enum):
 @dataclass(frozen=True)
 class CouponResult:
     """
-    نتيجة التحقق.
+    The validation result.
 
-    ⚠️  **لا استثناء عند الرفض في مسار العرض.**
+    ⚠️  **No exception on refusal in the display path.**
 
-        العميل يجرّب أكوادًا؛ الرفض حالة متوقعة لا خطأ. الاستثناء
-        يُرفع في مسار الالتزام فقط (`redeem`).
+        The customer is trying codes; refusal is an expected state, not an
+        error. The exception is raised in the commitment path only (`redeem`).
     """
 
     is_valid: bool
@@ -63,22 +63,22 @@ def _reject(reason: RejectionReason, message: str = "") -> CouponResult:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التحقق
+#  Validation
 # ═══════════════════════════════════════════════════════════
 
 
 def _eligible_subtotal(coupon: Coupon, items) -> Decimal:
     """
-    مجموع الأسطر التي ينطبق عليها الكوبون.
+    The total of the lines the coupon applies to.
 
-    ⚠️  كوبون مقيّد بفئة يُطبَّق على أسطر تلك الفئة **فقط**، لا
-        على إجمالي السلة. تطبيقه على الإجمالي يعطي خصمًا أكبر
-        بكثير مما قُصد.
+    ⚠️  A coupon restricted to a category applies to that category's lines
+        **only**, not to the cart total. Applying it to the total gives a
+        discount far larger than intended.
     """
     product_ids = set(coupon.products.values_list("id", flat=True))
     category_ids = set(coupon.categories.values_list("id", flat=True))
 
-    # بلا تقييد ⟵ كل الأسطر
+    # With no restriction ⟵ every line
     if not product_ids and not category_ids:
         return quantize(sum((line.net for _product, line in items), ZERO))
 
@@ -94,12 +94,12 @@ def _eligible_subtotal(coupon: Coupon, items) -> Decimal:
 
 def validate(code: str, user, items, *, subtotal: Decimal | None = None) -> CouponResult:
     """
-    تحقق كامل من كوبون.
+    Full validation of a coupon.
 
-    `items` = تكرار من `(product, PricedLine)`.
+    `items` = an iterable of `(product, PricedLine)`.
 
-    الترتيب من الأرخص إلى الأغلى: وجود الكود ← الصلاحية ← الحدود
-    ← الأهلية ← الحساب.
+    Ordered from cheapest to most expensive: the code exists ← validity ← limits
+    ← eligibility ← the calculation.
     """
     normalised = (code or "").strip().upper()
     if not normalised:
@@ -120,12 +120,12 @@ def validate(code: str, user, items, *, subtotal: Decimal | None = None) -> Coup
     if coupon.is_exhausted:
         return _reject(RejectionReason.EXHAUSTED, "تم استنفاد هذا الكوبون")
 
-    # ── الأهلية ────────────────────────────────────────────
-    # ⚠️  الكوبون المملوك يُرفض بـ«غير موجود» لا بـ«ليس لك».
+    # ── Eligibility ────────────────────────────────────────
+    # ⚠️  An owned coupon is refused with "not found", not "not yours".
     #
-    #     التمييز بين الردّين يحوّل الحقل إلى أداة استكشاف: من
-    #     يجرّب أكوادًا يعرف أيّها حقيقي. والمالك الحقيقي لا يرى
-    #     هذا الردّ أصلًا.
+    #     Distinguishing the two responses turns the field into a discovery tool:
+    #     whoever is trying codes learns which are real. And the genuine owner
+    #     never sees this response at all.
     if coupon.owner_id is not None and coupon.owner_id != getattr(user, "pk", None):
         return _reject(RejectionReason.NOT_FOUND, "الكوبون غير موجود")
 
@@ -153,7 +153,7 @@ def validate(code: str, user, items, *, subtotal: Decimal | None = None) -> Coup
                     "هذا الكوبون للطلب الأول فقط",
                 )
 
-    # ── الحساب ─────────────────────────────────────────────
+    # ── The calculation ────────────────────────────────────
     items = list(items)
     cart_subtotal = (
         subtotal
@@ -184,14 +184,14 @@ def validate(code: str, user, items, *, subtotal: Decimal | None = None) -> Coup
     else:
         discount = min(coupon.value, eligible)
 
-    # ⚠️  الخصم لا يتجاوز الأصناف المؤهلة — وإلا صار إجمالي سالب
+    # ⚠️  The discount does not exceed the eligible items — or the total goes negative
     discount = quantize(min(discount, eligible))
 
     return CouponResult(is_valid=True, coupon=coupon, discount_amount=discount)
 
 
 # ═══════════════════════════════════════════════════════════
-#  الالتزام
+#  Commitment
 # ═══════════════════════════════════════════════════════════
 
 
@@ -206,12 +206,12 @@ def redeem(
     reference_id: str = "",
 ) -> CouponRedemption:
     """
-    تسجيل استخدام.
+    Record a use.
 
-    ⚠️  إعادة التحقق من الحدود **تحت القفل**.
+    ⚠️  The limits are re-validated **under the lock**.
 
-        التحقق وقت العرض لا يكفي: عشرة عملاء يرون آخر استخدام
-        متاحًا في نفس اللحظة، وبلا قفل هنا يستخدمونه عشرًا.
+        Validating at display time is not enough: ten customers see the last
+        available use at the same moment, and with no lock here they use it ten times.
     """
     locked = Coupon.objects.select_for_update().get(pk=coupon.pk)
 
@@ -240,10 +240,11 @@ def redeem(
 @transaction.atomic
 def cancel_redemption(redemption: CouponRedemption) -> CouponRedemption:
     """
-    إلغاء استخدام — عند إلغاء الطلب.
+    Reverse a use — on order cancellation.
 
-    ⚠️  السجل **يبقى** والعدّاد ينقص. الحذف يمحو أثر التدقيق:
-        لا يبقى ما يثبت أن هذا العميل استخدم الكوبون ثم ألغى.
+    ⚠️  The record **remains** and the counter decrements. Deleting erases the
+        audit trail: nothing is left to prove this customer used the coupon and
+        then cancelled.
     """
     if redemption.is_cancelled:
         return redemption
@@ -267,7 +268,7 @@ def redemption_for(reference_type: str, reference_id) -> CouponRedemption | None
 
 
 def active_coupons_for(user):
-    """الكوبونات السارية المنطبقة على هذا المستخدم — للعرض."""
+    """The valid coupons applying to this user — for display."""
     now = timezone.now()
     queryset = (
         Coupon.objects.filter(is_active=True, starts_at__lte=now)
@@ -275,7 +276,7 @@ def active_coupons_for(user):
         .filter(Q(usage_limit__isnull=True) | Q(usage_count__lt=F("usage_limit")))
     )
 
-    # ⚠️  الكوبونات المملوكة لغير هذا المستخدم لا تُعرَض له إطلاقًا
+    # ⚠️  Coupons owned by anyone other than this user are never shown to them
     if user is not None and getattr(user, "is_authenticated", False):
         queryset = queryset.filter(Q(owner__isnull=True) | Q(owner=user))
     else:

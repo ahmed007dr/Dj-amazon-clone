@@ -1,12 +1,12 @@
 """
-لوحة البريد.
+Mail admin panel.
 
-⚠️  **الأسرار للكتابة فقط** — نفس قاعدة `payments` (ADR-15).
+⚠️  **Secrets are write-only** — the same rule as `payments` (ADR-15).
 
-    الحقل يُقدَّم فارغًا دائمًا: تركه فارغًا يُبقي القيمة الحالية،
-    وملؤه يستبدلها. صورة شاشة واحدة لكلمة مرور صندوق بريد الشركة
-    تكفي لقراءة كل ما يصلها — بما فيه روابط إعادة تعيين كلمات المرور
-    التي تصل إليه.
+    The field is always presented empty: leaving it empty keeps the current
+    value, and filling it replaces it. One screenshot of the company mailbox
+    password is enough to read everything that arrives in it — including the
+    password reset links that land there.
 """
 
 from django import forms
@@ -90,8 +90,9 @@ class EmailCredentialAdmin(DomainModelAdmin):
 @admin.register(MailRoute)
 class MailRouteAdmin(DomainModelAdmin):
     """
-    ⚠️  الحفظ يمرّ بـ`clean()` — وهو ما يمنع إسناد رسائل الأمان إلى
-        حساب تسويقي، ويصحّح الغرض من القالب حين يُحدَّد قالب بعينه.
+    ⚠️  Saving passes through `clean()` — which is what prevents assigning
+        security messages to a marketing account, and corrects the template's
+        purpose when a specific template is chosen.
     """
 
     list_display = ("purpose", "template_key", "account", "is_active")
@@ -104,9 +105,10 @@ class MailRouteAdmin(DomainModelAdmin):
 @admin.register(OutboundMessage)
 class OutboundMessageAdmin(ReadOnlyDomainAdmin):
     """
-    ⚠️  **للقراءة فقط.** تغيير حالة صفّ يدويًا لا يُرسل شيئًا ولا
-        يمنعه — يخلق فقط تناقضًا بين ما تقوله اللوحة وما وقع.
-        الإعادة عبر `POST /mailing/admin/outbox/<id>/retry/`.
+    ⚠️  **Read-only.** Changing a row's status by hand sends nothing and
+        prevents nothing — it only creates a contradiction between what the
+        panel says and what happened.
+        Retrying goes through `POST /mailing/admin/outbox/<id>/retry/`.
     """
 
     list_display = ("to_email", "subject", "status", "attempts", "next_attempt_at", "sent_at")
@@ -119,8 +121,9 @@ class OutboundMessageAdmin(ReadOnlyDomainAdmin):
 @admin.register(TemplateOverride)
 class TemplateOverrideAdmin(DomainModelAdmin):
     """
-    ⚠️  الحفظ يمرّ بـ`clean()`: المتغيّرات المسموحة تأتي من نسخة الكود
-        وحدها — الكود يعرف ما يضعه في السياق، والمحرّر لا.
+    ⚠️  Saving passes through `clean()`: the permitted variables come from the
+        code version alone — the code knows what it puts in the context, and the
+        editor does not.
     """
 
     list_display = ("key", "subject_ar", "is_active", "updated_at")
@@ -138,11 +141,11 @@ class InboundAttachmentInline(admin.TabularInline):
 @admin.register(InboundMessage)
 class InboundMessageAdmin(DomainModelAdmin):
     """
-    ⚠️  المحتوى للقراءة فقط — تعديل نصّ رسالة وصلت تزوير للسجل.
-        والقابل للتغيير هو الحالة والإسناد وحدهما.
+    ⚠️  The content is read-only — editing the text of a message that arrived
+        falsifies the record. Only the status and the assignment are changeable.
 
-    ⚠️  و`body_html` **غير معروض**: رسالة من مجهول تحمل `<script>`
-        تُعرَض في صفحة أدمن مسجَّل الدخول هي XSS على أعلى صلاحية.
+    ⚠️  And `body_html` is **not displayed**: a message from a stranger carrying
+        `<script>` rendered on a logged-in admin page is XSS at the highest privilege.
     """
 
     list_display = ("received_at", "from_email", "subject", "status", "is_auto", "assigned_to")

@@ -1,16 +1,16 @@
 """
-تشفير بيانات اعتماد البوابات المخزَّنة.
+Encrypting the stored gateway credentials.
 
-⚠️  خطوتان بالترتيب — والترتيب ليس تفصيلًا:
+⚠️  Two steps in order — and the order is not a detail:
 
-        ١. تبديل نوع الحقل  ← يفعّل التشفير على الكتابة والفكّ على القراءة
-        ٢. إعادة حفظ الصفوف ← يحوّل ما كُتب قبل ذلك نصًّا صريحًا
+        1. change the field type   ← enables encryption on write and decryption on read
+        2. re-save the rows        ← converts what was written as plaintext before that
 
-    عكسهما يجعل الخطوة الثانية تقرأ وتكتب نصًّا صريحًا فلا تفعل شيئًا،
-    وتبقى المفاتيح القديمة مكشوفة بينما يبدو الترحيل ناجحًا.
+    Reversing them makes the second step read and write plaintext, so it does
+    nothing, and the old keys stay exposed while the migration appears to have succeeded.
 
-⚠️  والتحويل يمرّ عبر بايثون لا بـ `UPDATE` واحد — التشفير ليس دالة
-    في قاعدة البيانات، والمفتاح لا يجوز أن يصلها أصلًا.
+⚠️  And the conversion goes through Python rather than a single `UPDATE` —
+    encryption is not a database function, and the key must never reach it at all.
 """
 
 import core.encryption
@@ -19,30 +19,32 @@ from django.db import migrations
 
 def encrypt_existing(apps, schema_editor):
     """
-    ⚠️  قابل لإعادة التشغيل: `encrypt` تعيد القيمة كما هي إن كانت
-        تحمل علامة التشفير — فلا تشفير مزدوج لو أُعيد الترحيل.
+    ⚠️  Re-runnable: `encrypt` returns the value unchanged if it already carries
+        the encryption marker — so there is no double encryption if the
+        migration is re-run.
     """
     Credential = apps.get_model("payments", "ProviderCredential")
 
     for credential in Credential.objects.all().iterator():
-        # القراءة فكّت ما كان مشفّرًا وأبقت الصريح كما هو،
-        # والحفظ يشفّر الاثنين.
+        # The read decrypted whatever was encrypted and left the plaintext as it was,
+        # and the save encrypts both.
         credential.save(update_fields=["value"])
 
 
 def decrypt_existing(apps, schema_editor):
     """
-    ⚠️  **التراجع يعيد المفاتيح نصًّا صريحًا إلى قاعدة البيانات.**
+    ⚠️  **The reversal writes the keys back into the database as plaintext.**
 
-        موجود لأن ترحيلًا بلا عكس يحبس النشر، لا لأنه تصرّف عادي.
-        من يشغّله يعيد الثغرة التي أُغلقت هنا — فليكن ذلك قرارًا
-        صريحًا لا أثرًا جانبيًا لتراجع روتيني.
+        It exists because a migration with no reverse blocks a deployment, not
+        because it is an ordinary thing to do. Whoever runs it reopens the hole
+        closed here — so let that be an explicit decision rather than a side
+        effect of a routine rollback.
 
-    ⚠️  والكتابة بـ SQL خام لا بـ ORM.
+    ⚠️  And the write uses raw SQL, not the ORM.
 
-        حقل النموذج ما زال مشفَّرًا في هذه اللحظة (عكس العمليات
-        يبدأ من الأسفل)، فأي `save` أو `update` يمرّ به يعيد
-        التشفير — فينتهي «فكّ التشفير» بصفوف مشفّرة كما بدأت.
+        The model field is still encrypted at this moment (reversing operations
+        starts from the bottom), so any `save` or `update` passing through it
+        re-encrypts — and "decryption" ends with rows as encrypted as they started.
     """
     Credential = apps.get_model("payments", "ProviderCredential")
     table = Credential._meta.db_table

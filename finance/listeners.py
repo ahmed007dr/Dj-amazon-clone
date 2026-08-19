@@ -1,15 +1,17 @@
 """
-مستمعو المالية.
+Finance listeners.
 
-⚠️  **`orders` و`pos` لا يعرفان بوجود المالية.**
+⚠️  **`orders` and `pos` know nothing about finance.**
 
-    كلاهما يبعث إشارة ولا يعرف من يستمع؛ والمالية تستورد نطاق
-    الطلبات (استيراد نازل) لا العكس. الربط هنا يقلب الاتجاه.
+    Both emit a signal without knowing who listens; and finance imports the
+    orders domain (a downward import), not the reverse. Wiring it the other way
+    would invert the direction.
 
-⚠️  وفشل التقييد **لا يُفشل البيعة**.
+⚠️  And a failed posting **does not fail the sale**.
 
-    قيد محاسبي لم يُكتب يجب ألا يلغي طلبًا اكتمل أو بيعةً سُلِّمت
-    بضاعتها. الفشل يُسجَّل ويُبتلع — ويُصلَح بإعادة الالتقاط.
+    An accounting entry that was not written must not cancel a completed order
+    or a sale whose goods have been handed over. The failure is logged and
+    swallowed — and fixed by re-running the capture.
 """
 
 from __future__ import annotations
@@ -26,10 +28,10 @@ logger = logging.getLogger(__name__)
 
 def _safe(handler):
     """
-    ⚠️  المستمع يعمل داخل معاملة العملية الأصلية.
+    ⚠️  The listener runs inside the original operation's transaction.
 
-        استثناء غير ملتقط يتراجع بالبيعة كلها لأجل قيد لم يُكتب —
-        والبضاعة قد سُلِّمت فعلًا على الكاونتر.
+        An uncaught exception rolls the whole sale back for the sake of an entry
+        that was not written — and the goods have already been handed over at the counter.
     """
 
     def wrapper(*args, **kwargs):
@@ -52,17 +54,17 @@ def _register():
     @_safe
     def on_pos_sale_completed(sender, session, order, **kwargs):
         """
-        ⚠️  **إعادة حساب التكلفة بعد ربط حركات المخزون بالطلب.**
+        ⚠️  **Recomputing the cost after linking the stock movements to the order.**
 
-            نقطة البيع تخصم المخزون **قبل** إنشاء الطلب (لئلا يبقى
-            طلب يتيم لو نفد صنف)، فتُربط الحركات بالوردية ثم
-            يُعاد توجيهها إلى الطلب بعد إنشائه.
+            Point of sale deducts stock **before** creating the order (so no
+            orphan order remains should an item run out), so the movements are
+            attached to the shift and then redirected to the order once it exists.
 
-            لكن `post_save` على الطلب يسبق ذلك التوجيه، فيقع أول
-            حساب للتكلفة على **صفر حركات**. بلا هذا المستمع تبقى
-            كل بيعة كاونتر مقيَّدة بتكلفة صفر — أي بربح يساوي ثمن
-            البيع كاملًا، وهو أسوأ اتجاه ممكن للخطأ لأن التقرير
-            يبدو ممتازًا.
+            But `post_save` on the order fires before that redirection, so the
+            first cost calculation happens on **zero movements**. Without this
+            listener every counter sale stays posted at zero cost — that is, at
+            a profit equal to the full selling price, the worst possible
+            direction for an error because the report looks excellent.
         """
         entry = services.RevenueEntry.objects.filter(
             source=services.RevenueSource.ORDER, order=order
@@ -79,23 +81,23 @@ def _register():
     @_safe
     def on_order_saved(sender, instance, created, **kwargs):
         """
-        ⚠️  **بيعة الكاونتر لا تمرّ بـ `order_completed`.**
+        ⚠️  **A counter sale does not pass through `order_completed`.**
 
-            نقطة البيع تُنشئ الطلب في حالته النهائية مباشرةً
-            (`DELIVERED`/`PAID`) بلا مرور بآلة الحالة — فلا إشارة
-            اكتمال تُبعَث. الاكتفاء بالإشارة كان يعني أن **كل
-            مبيعات الفرع تغيب عن قائمة الأرباح** بينما التقرير
-            يبدو سليمًا.
+            Point of sale creates the order directly in its final state
+            (`DELIVERED`/`PAID`) without passing through the state machine — so
+            no completion signal is emitted. Relying on the signal alone meant
+            **all branch sales were absent from the profit statement** while the
+            report looked sound.
 
-        ⚠️  والمرتجع يُلتقط من هنا أيضًا: `REFUNDED` حالة تُكتب
-            على الطلب لا حدثًا مستقلًا.
+        ⚠️  And returns are captured here too: `REFUNDED` is a state written on
+            the order, not an independent event.
         """
         if instance.status == OrderStatus.REFUNDED:
             services.record_refund(instance)
             return
 
-        # الطلب المكتمل أو المسلَّم — والالتقاط لا يزدوج بفضل
-        # القيد الفريد على (المصدر، الطلب).
+        # A completed or delivered order — and the capture does not double up thanks
+        # to the unique constraint on (source, order).
         if instance.status in (OrderStatus.COMPLETED, OrderStatus.DELIVERED):
             services.record_order_revenue(instance)
 

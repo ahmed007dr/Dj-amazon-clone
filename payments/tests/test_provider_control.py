@@ -1,10 +1,10 @@
 """
-اختبارات التحكم ببوابات الدفع.
+Payment gateway control tests.
 
-⚠️  المتطلب: **أكثر من بوابة مع تشغيلها وإيقافها من لوحة الأدمن**
-    بلا تعديل كود ولا إعادة نشر. (ADR-15)
+⚠️  The requirement: **more than one gateway, with enabling and disabling from
+    the admin panel**, with no code change and no redeployment. (ADR-15)
 
-    هذه الاختبارات تحرس الخصائص التي تجعل ذلك حقيقيًا لا زخرفيًا.
+    These tests guard the properties that make that real rather than decorative.
 """
 
 from decimal import Decimal
@@ -16,6 +16,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import AccountType, User
 from administration.models import AdminProfile
+from core.testing import grant_all_domains
 from payments.models import (
     PaymentMethodKind,
     PaymentProvider,
@@ -40,6 +41,7 @@ def admin_client(db):
     admin.is_active = True
     admin.save()
     AdminProfile.objects.create(user=admin)
+    grant_all_domains(admin)
 
     client = APIClient()
     client.force_authenticate(user=admin)
@@ -47,7 +49,7 @@ def admin_client(db):
 
 
 # ═══════════════════════════════════════════════════════════
-#  تعدد البوابات
+#  Multiple gateways
 # ═══════════════════════════════════════════════════════════
 
 
@@ -55,32 +57,32 @@ def admin_client(db):
 class TestMultipleProviders:
     def test_seed_activates_only_what_can_actually_work(self, providers):
         """
-        ⚠️  البوابات الخارجية تُبذر **موقوفة**.
+        ⚠️  The external gateways are seeded **disabled**.
 
-            تفعيل Paymob أو Fawry بلا مفاتيح يجعل العميل يختارها
-            ثم يفشل دفعه بعد أن أدخل بياناته. الجاهز فورًا هو ما
-            لا يحتاج حسابًا خارجيًا.
+            Enabling Paymob or Fawry with no keys makes a customer choose one
+            and then have their payment fail after entering their details. What
+            is ready immediately is what needs no external account.
         """
         working = {code for code, p in providers.items() if p.is_active}
         awaiting = {code for code, p in providers.items() if not p.is_active}
 
-        # ⚠️  `pos-card` من الجاهزين: ماكينة الكاونتر تُشغَّل يدويًا
-        #     ولا تحتاج مفاتيح مزوّد، فتفعيلها لا يَعِد بما لا يعمل.
+        # ⚠️  `pos-card` is among the ready ones: the counter terminal is operated by hand
+        #     and needs no provider keys, so enabling it promises nothing that does not work.
         assert working == {"cod", "cash", "bank", "pos-card"}
         assert awaiting == {"paymob", "fawry"}
 
     def test_external_gateways_start_in_sandbox(self, providers):
-        """وضع الإنتاج بلا اختبار يحصّل مالًا حقيقيًا في أول تجربة."""
+        """Production mode with no testing collects real money on the first attempt."""
         assert providers["paymob"].is_sandbox
         assert providers["fawry"].is_sandbox
 
     def test_reseeding_does_not_disable_a_gateway_the_admin_enabled(self, providers, db):
         """
-        ⚠️  **الفخّ الذي أُصلح.**
+        ⚠️  **The trap that was fixed.**
 
-            كانت البذرة تفرض `is_active` في كل تشغيل — أي أن إعادة
-            بذر بعد أن يضيف الأدمن مفاتيح Paymob ويفعّلها تُوقفها
-            ثانيةً بصمت، فيتوقّف الدفع بالبطاقة بلا سبب ظاهر.
+            The seed used to force `is_active` on every run — meaning a re-seed
+            after the admin had added the Paymob keys and enabled it disabled it
+            again silently, so card payment stopped for no evident reason.
         """
         from django.core.management import call_command
 
@@ -97,7 +99,7 @@ class TestMultipleProviders:
 
     def test_customer_sees_only_channel_appropriate_methods(self, providers):
         """
-        ⚠️  «نقدي» في متجر إلكتروني بلا معنى — القناة تحسم.
+        ⚠️  "Cash" in an online store is meaningless — the channel settles it.
         """
         client = APIClient()
 
@@ -112,7 +114,7 @@ class TestMultipleProviders:
         assert PaymentMethodKind.CASH in pos_methods
 
     def test_amount_limits_filter_providers(self, providers):
-        """التحويل البنكي بحد أدنى ٥٠٠ — لا يظهر لطلب أصغر."""
+        """Bank transfer with a minimum of 500 — it does not appear for a smaller order."""
         client = APIClient()
 
         small = client.get(reverse("v1:payments:methods"), {"channel": "ONLINE", "amount": "100"})
@@ -123,7 +125,7 @@ class TestMultipleProviders:
 
     def test_highest_priority_provider_wins(self, providers, db):
         """
-        ⚠️  عند صلاحية أكثر من بوابة، الأعلى أولوية يُجرَّب أولًا.
+        ⚠️  When more than one gateway is suitable, the highest priority is tried first.
         """
         from payments import services
 
@@ -147,7 +149,7 @@ class TestMultipleProviders:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التشغيل والإيقاف — جوهر المتطلب
+#  Enabling and disabling — the heart of the requirement
 # ═══════════════════════════════════════════════════════════
 
 
@@ -155,10 +157,10 @@ class TestMultipleProviders:
 class TestToggleControl:
     def test_disabling_removes_it_from_customer_options_immediately(self, admin_client, providers):
         """
-        ⚠️  **جوهر ADR-15.**
+        ⚠️  **The heart of ADR-15.**
 
-            الأدمن يوقف بوابة فتختفي من خيارات العميل في الطلب
-            التالي — بلا إعادة نشر ولا تعديل كود.
+            The admin disables a gateway and it disappears from the customer's
+            options on the next request — with no redeployment and no code change.
         """
         client = APIClient()
         params = {"channel": "ONLINE", "amount": "1000"}
@@ -192,10 +194,10 @@ class TestToggleControl:
 
     def test_cannot_disable_the_last_active_provider(self, admin_client, providers):
         """
-        ⚠️  متجر بلا بوابة واحدة لا يستقبل طلبات — والاكتشاف يكون
-            بشكوى عميل لا بتنبيه.
+        ⚠️  A store with not one gateway accepts no orders — and the discovery
+            comes through a customer complaint rather than an alert.
         """
-        # ⚠️  تُوقَف كل النشطة عدا واحدة، فيقع الرفض على الأخيرة.
+        # ⚠️  Every active one is disabled but one, so the refusal falls on the last.
         for code in ("bank", "cash", "pos-card"):
             admin_client.post(
                 reverse("v1:payments:provider-toggle", args=[providers[code].pk]),
@@ -244,7 +246,7 @@ class TestToggleControl:
 
 
 # ═══════════════════════════════════════════════════════════
-#  بيانات الاعتماد
+#  Credentials
 # ═══════════════════════════════════════════════════════════
 
 
@@ -252,10 +254,10 @@ class TestToggleControl:
 class TestCredentialSecrecy:
     def test_secret_value_is_never_returned(self, admin_client, providers):
         """
-        ⚠️  **ADR-15** — القيمة تُكتب ولا تُقرأ، حتى للأدمن.
+        ⚠️  **ADR-15** — the value is written and never read, not even by the admin.
 
-            إرجاع المفتاح «للتأكد منه» يعني أن تسريب جلسة أدمن
-            واحدة يسرّب حساب البوابة كله.
+            Returning the key "to check it" means one leaked admin session leaks
+            the entire gateway account.
         """
         url = reverse("v1:payments:provider-credentials", args=[providers["bank"].pk])
         secret = "sk_live_abcdefghij0123456789"
@@ -301,7 +303,7 @@ class TestCredentialSecrecy:
 
 
 # ═══════════════════════════════════════════════════════════
-#  إضافة بوابة جديدة من اللوحة
+#  Adding a new gateway from the panel
 # ═══════════════════════════════════════════════════════════
 
 
@@ -315,8 +317,8 @@ class TestAddingProviders:
 
     def test_unknown_adapter_is_rejected(self, admin_client):
         """
-        ⚠️  بوابة بمحوّل غير موجود تفشل عند أول محاولة دفع — والرفض
-            هنا يجعل الخطأ ظاهرًا وقت الضبط.
+        ⚠️  A gateway with a nonexistent adapter fails on the first payment
+            attempt — and refusing here makes the error visible at configuration time.
         """
         response = admin_client.post(
             reverse("v1:payments:providers"),
@@ -349,7 +351,7 @@ class TestAddingProviders:
 
     def test_provider_with_transactions_cannot_be_deleted(self, admin_client, providers, db):
         """
-        ⚠️  حذفها يترك معاملات تاريخية بلا مرجع فينكسر كل تقرير مالي.
+        ⚠️  Deleting it leaves historical transactions with no reference, so every financial report breaks.
         """
         from payments.models import PaymentTransaction
 

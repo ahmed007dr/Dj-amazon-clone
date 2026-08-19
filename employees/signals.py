@@ -1,12 +1,13 @@
 """
-مزامنة صلاحيات الموظف مع حالته.
+Synchronising an employee's permissions with their status.
 
-⚠️  **إشارة لا استدعاء يدوي.**
+⚠️  **A signal, not a manual call.**
 
-    إيقاف الموظف يقع من أكثر من مكان: شاشة الأدمن · أمر إداري ·
-    تصحيح مباشر. ربط سحب الصلاحيات باستدعاء في نقطة واحدة يعني
-    أن كل مسار آخر يترك موظفًا انتهت خدمته ومجموعته باقية —
-    و`has_perm` في بقية النظام يقول «نعم».
+    Deactivating an employee happens from more than one place: the admin screen ·
+    a management command · a direct correction. Tying the withdrawal of
+    permissions to a call at one point means every other path leaves a departed
+    employee with their group intact — and `has_perm` in the rest of the system
+    says "yes".
 """
 
 from __future__ import annotations
@@ -24,18 +25,19 @@ logger = logging.getLogger(__name__)
 @receiver(post_save, sender=EmployeeProfile, weak=False)
 def sync_permissions_with_status(sender, instance, created, **kwargs):
     """
-    ⚠️  **`apply_role_permissions` لا `set_role`.**
+    ⚠️  **`apply_role_permissions`, not `set_role`.**
 
-        الثانية تحفظ الملف، فتُعيد إطلاق هذه الإشارة إلى ما لا
-        نهاية. وقع ذلك فعلًا، و`except` أدناه كان يبتلع
-        `RecursionError` — فيبدو الحفظ ناجحًا بينما كل عملية تحرق
-        ألف إطار مكدس وتسجّل استثناءً لا يقرأه أحد.
+        The latter saves the profile, re-firing this signal endlessly. That
+        genuinely happened, and the `except` below swallowed the
+        `RecursionError` — so the save looked successful while every operation
+        burned a thousand stack frames and logged an exception nobody read.
 
-    ⚠️  والفشل يُسجَّل ولا يُفشل الحفظ.
+    ⚠️  And a failure is logged without failing the save.
 
-        تعطّل المزامنة يجب ألا يمنع إيقاف موظف — والإيقاف هو
-        الإجراء العاجل. لكنه **يُسجَّل بمستوى خطأ**: موظف موقوف
-        بصلاحيات باقية حالة تُراجَع لا تُبتلع.
+        A broken synchronisation must not prevent deactivating an employee — and
+        deactivation is the urgent action. But it **is logged at error level**: a
+        deactivated employee with permissions still attached is a state to be
+        reviewed, not swallowed.
     """
     from employees import services
 
@@ -45,8 +47,8 @@ def sync_permissions_with_status(sender, instance, created, **kwargs):
         else:
             services.revoke_permissions(instance)
     except RecursionError:
-        # ⚠️  لا يُبتلع أبدًا: هو عَرَض خلل بنيوي لا فشل عابر،
-        #     وابتلاعه هو ما أخفاه أول مرة.
+        # ⚠️  Never swallowed: this is a symptom of a structural defect rather than a
+        #     passing failure, and swallowing it is what hid it the first time.
         raise
     except Exception:
         logger.exception("فشلت مزامنة صلاحيات الموظف %s", instance.employee_number)

@@ -1,15 +1,17 @@
 """
-اختبارات بوابة الموظفين.
+Staff portal tests.
 
-⚠️  بوابة الخروج للمرحلة ١٠:
+⚠️  The exit gate for phase 10:
 
-        المندوب يرى **عملاءه وحدهم** · لا يبيع على عميل ليس له ·
-        الطلب يُنسَب لصاحبه · الأدوار لا تحمل صلاحيات الأدمن.
+        the rep sees **their own customers alone** · does not sell to a customer
+        who is not theirs · the order is attributed to its owner · the roles do
+        not carry admin permissions.
 
-    وأخطر ما تحرسه ليس الشاشة بل ما تحتها: أن يقرأ مندوب هاتف
-    عميل زميله وحجم مشترياته بتغيير معرّف · أن يبقى موظف انتهت
-    خدمته يبيع بتوكن صالح · أن يضيع سجل «من كان مسؤولًا وقت
-    البيع» فتُحسب العمولة للشخص الخطأ.
+    And the greatest dangers it guards are not on the screen but beneath it: a
+    rep reading a colleague's customer's phone number and purchase volume by
+    changing an id · a departed employee still selling on a valid token · the
+    record of "who was responsible at the time of sale" being lost so the
+    commission goes to the wrong person.
 """
 
 from datetime import timedelta
@@ -23,6 +25,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import AccountType, User
 from core.errors import BusinessError
+from core.testing import grant_all_domains
 from customers.models import CustomerProfile
 from employees import services
 from employees.models import (
@@ -38,7 +41,7 @@ PASSWORD = "Str0ng-Test-Pass!23"
 
 
 # ═══════════════════════════════════════════════════════════
-#  التجهيز
+#  Setup
 # ═══════════════════════════════════════════════════════════
 
 
@@ -117,7 +120,7 @@ def make_order(customer, employee=None, *, total="1000.00", status=OrderStatus.D
 
 
 # ═══════════════════════════════════════════════════════════
-#  الإسناد — بوابة الخروج
+#  Assignment — the exit gate
 # ═══════════════════════════════════════════════════════════
 
 
@@ -125,9 +128,8 @@ def make_order(customer, employee=None, *, total="1000.00", status=OrderStatus.D
 class TestAssignment:
     def test_a_customer_has_one_active_owner(self, rep, other_rep):
         """
-        ⚠️  مندوبان يتقاسمان عميلًا يعني عمولةً مزدوجة على نفس
-            البيعة، وتضاربًا في المتابعة: يتصل به الاثنان أو لا
-            يتصل أحد.
+        ⚠️  Two reps sharing a customer means a double commission on the same
+            sale, and conflicting follow-up: either both call them or neither does.
         """
         customer = make_customer("shared@test.local")
         services.assign_customer(customer, rep)
@@ -140,7 +142,7 @@ class TestAssignment:
         assert active.first().employee == other_rep
 
     def test_the_database_refuses_two_active_assignments(self, rep, other_rep):
-        """الفحص في الخدمة يخسر السباق؛ القيد الفريد يحسمه."""
+        """A check in the service loses the race; the unique constraint settles it."""
         from django.db import IntegrityError, transaction
 
         customer = make_customer("race@test.local")
@@ -151,10 +153,10 @@ class TestAssignment:
 
     def test_transfer_keeps_the_old_record(self, rep, other_rep):
         """
-        ⚠️  **العمولة تُحسب على من كان مسؤولًا وقت البيع.**
+        ⚠️  **Commission is calculated on whoever was responsible at the time of sale.**
 
-            حذف الإسناد المنتهي يجعل كل طلب قديم بلا نسبة — ولا
-            سبيل لإعادة بنائها.
+            Deleting the ended assignment leaves every old order unattributed —
+            with no way to reconstruct it.
         """
         customer = make_customer("moved@test.local")
         services.assign_customer(customer, rep)
@@ -171,7 +173,7 @@ class TestAssignment:
         assert CustomerAssignment.objects.filter(customer=mine).count() == 1
 
     def test_an_inactive_employee_cannot_receive_customers(self, role):
-        """موظف انتهت خدمته لا يُسنَد له عملاء جدد."""
+        """A departed employee is assigned no new customers."""
         gone = make_employee("gone@test.local", role, active=False)
         customer = make_customer("orphan@test.local")
 
@@ -186,7 +188,7 @@ class TestAssignment:
 
 
 # ═══════════════════════════════════════════════════════════
-#  العزل بين المندوبين
+#  Isolation between reps
 # ═══════════════════════════════════════════════════════════
 
 
@@ -202,9 +204,9 @@ class TestIsolation:
 
     def test_search_cannot_escape_the_assignment_filter(self, rep, mine, theirs):
         """
-        ⚠️  بحث يتجاوز التصفية يجعل المندوب يعثر على أي عميل باسمه
-            فيقرأ هاتفه وحجم مشترياته — بيانات المنافسة الداخلية
-            بين المندوبين.
+        ⚠️  A search that bypasses the filter lets a rep find any customer by
+            name and read their phone number and purchase volume — the data reps
+            compete over internally.
         """
         response = client_for(rep.user).get(
             reverse("v1:employees:customers"), {"search": "عميل الزميل"}
@@ -214,7 +216,7 @@ class TestIsolation:
         assert response.data["results"] == []
 
     def test_a_rep_cannot_read_another_reps_customer_orders(self, rep, theirs):
-        """⚠️  ٤٠٤ لا ٤٠٣: الفارق يكشف وجود العميل لمن يجرّب معرّفات."""
+        """⚠️  404, not 403: the difference reveals the customer's existence to anyone trying ids."""
         response = client_for(rep.user).get(
             reverse("v1:employees:customer-orders", args=[theirs.pk])
         )
@@ -223,21 +225,22 @@ class TestIsolation:
 
     def test_a_rep_cannot_sell_to_another_reps_customer(self, rep, theirs):
         """
-        ⚠️  **الحارس الذي يمنع نسب المبيعة لغير صاحبها.**
+        ⚠️  **The guard that stops a sale being attributed to the wrong person.**
 
-            بلا الفحص يُنشئ أي مندوب طلبًا لأي عميل بتمرير معرّف،
-            فتُحسب العمولة للشخص الخطأ ويكتشفه صاحب الحق في نهاية
-            الشهر لا قبلها.
+            Without the check any rep creates an order for any customer by
+            passing an id, so the commission goes to the wrong person and
+            whoever it belonged to discovers it at the end of the month rather
+            than before.
         """
         with pytest.raises(BusinessError):
             services.assert_may_act_for(rep, theirs)
 
     def test_a_suspended_employee_loses_access_immediately(self, rep, mine):
         """
-        ⚠️  توكن صالح في يد موظف انتهت خدمته أوضح ثغرة ممكنة.
+        ⚠️  A valid token in a departed employee's hand is the most obvious hole possible.
 
-            تعطيل الحساب وحده يترك فجوة حتى انتهاء التوكن؛ وفحص
-            `is_active` على الملف يُغلقها في أول طلب.
+            Disabling the account alone leaves a gap until the token expires;
+            checking `is_active` on the profile closes it on the first request.
         """
         rep.is_active = False
         rep.save()
@@ -266,7 +269,7 @@ class TestIsolation:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأداء
+#  Performance
 # ═══════════════════════════════════════════════════════════
 
 
@@ -274,11 +277,11 @@ class TestIsolation:
 class TestPerformance:
     def test_sales_are_attributed_by_owner_not_creator(self, rep, mine):
         """
-        ⚠️  المندوب مسؤول عن **كل** طلبات عملائه — بما فيها ما
-            طلبوه بأنفسهم من الموقع.
+        ⚠️  The rep is responsible for **all** their customers' orders —
+            including those the customers placed themselves on the website.
 
-            الحصر بما أنشأه بيده يجعل نجاحه في تحويل العميل إلى
-            الطلب الذاتي **يخفض** رقمه.
+            Restricting it to what they typed by hand makes their success in
+            converting a customer to self-service **lower** their number.
         """
         online = make_order(mine, rep, total="2000.00")
         online.channel = OrderChannel.ONLINE
@@ -293,7 +296,7 @@ class TestPerformance:
         assert result.gross_sales == Decimal("2000.00")
 
     def test_cancelled_orders_are_excluded_entirely(self, rep, mine):
-        """الملغى لم يُبَع شيء فيه — لا يُجمع ولا يُطرح."""
+        """Nothing was sold in a cancelled order — it is neither added nor subtracted."""
         make_order(mine, rep, total="500.00")
         make_order(mine, rep, total="900.00", status=OrderStatus.CANCELLED)
 
@@ -305,7 +308,7 @@ class TestPerformance:
         assert result.gross_sales == Decimal("500.00")
 
     def test_refunds_are_subtracted_not_ignored(self, rep, mine):
-        """المرتجع بيع ثم عاد — يُطرح من الصافي."""
+        """A return was sold and then came back — it is subtracted from the net."""
         make_order(mine, rep, total="1000.00")
         make_order(mine, rep, total="400.00", status=OrderStatus.REFUNDED)
 
@@ -342,10 +345,11 @@ class TestPerformance:
 
     def test_monthly_history_covers_the_requested_months(self, rep, mine):
         """
-        ⚠️  الطرح بالأشهر لا بـ«٣١ يومًا».
+        ⚠️  Subtracting by months, not by "31 days".
 
-            الطرح بعدد أيام ثابت ينزلق فيدخل شهر سابع ناقص، ويبدو
-            كأن أداء المندوب انهار في أقدم صف.
+            Subtracting a fixed day count drifts, so an incomplete seventh month
+            creeps in and it looks as though the rep's performance collapsed in
+            the oldest row.
         """
         make_order(mine, rep, total="700.00")
 
@@ -356,7 +360,7 @@ class TestPerformance:
 
 
 # ═══════════════════════════════════════════════════════════
-#  اللوحة والبيع نيابةً
+#  The dashboard and selling on behalf
 # ═══════════════════════════════════════════════════════════
 
 
@@ -364,11 +368,11 @@ class TestPerformance:
 class TestDashboardAndSelling:
     def test_the_dashboard_carries_performance_only(self, rep, mine):
         """
-        ⚠️  **بلا حقول هدف أو عمولة — والغياب مقصود.**
+        ⚠️  **No target or commission fields — and the absence is deliberate.**
 
-            `targets` و`commissions` فوق هذا النطاق في الطبقات.
-            حقل `target` هنا يعود `null` دائمًا ويُقرأ «لا هدف»
-            بدل «اسأل `/targets/me/`» — وهو كذب أسوأ من الغياب.
+            `targets` and `commissions` sit above this domain in the layers.
+            A `target` field here would always return `null` and read as "no
+            target" rather than "ask `/targets/me/`" — a lie worse than absence.
         """
         response = client_for(rep.user).get(reverse("v1:employees:dashboard"))
 
@@ -379,8 +383,9 @@ class TestDashboardAndSelling:
 
     def test_creating_an_order_attributes_it_to_the_rep(self, rep, mine, db):
         """
-        ⚠️  `owner_employee` أساس العمولة لاحقًا — تركه فارغًا
-            يُسقط الطلب من أداء المندوب ومن حساب عمولته.
+        ⚠️  `owner_employee` is the basis of the commission later — leaving it
+            empty drops the order from the rep's performance and from their
+            commission calculation.
         """
         from catalog.models import Category, Product
         from inventory import services as inventory_services
@@ -449,7 +454,7 @@ class TestDashboardAndSelling:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدوار والصلاحيات
+#  Roles and permissions
 # ═══════════════════════════════════════════════════════════
 
 
@@ -457,10 +462,10 @@ class TestDashboardAndSelling:
 class TestRoles:
     def test_the_seed_gives_no_role_admin_powers(self):
         """
-        ⚠️  **الموظف لا يُمنَح صلاحيات الأدمن ولو «مؤقتًا».**
+        ⚠️  **An employee is never granted admin permissions, not even "temporarily".**
 
-            الفحص يشمل ما يُنسى عادةً: تعديل الأسعار وإيقاف
-            الحسابات ورؤية الأرباح لغير المالي.
+            The check covers what is usually forgotten: editing prices,
+            suspending accounts, and seeing profits for anyone outside finance.
         """
         from django.core.management import call_command
 
@@ -483,16 +488,16 @@ class TestRoles:
 
     def test_saving_a_profile_does_not_recurse(self, role, db, monkeypatch):
         """
-        ⚠️  **خطأ وقع فعلًا وأخفاه ابتلاع الاستثناءات.**
+        ⚠️  **A defect that genuinely occurred and was hidden by swallowed exceptions.**
 
-            إشارة `post_save` كانت تستدعي `set_role` التي تحفظ
-            الملف، فتُعيد إطلاق الإشارة بلا نهاية. و`except
-            Exception` في الإشارة كان يبتلع `RecursionError` —
-            فيبدو الحفظ ناجحًا بينما كل عملية تحرق ألف إطار مكدس
-            وتسجّل استثناءً لا يقرأه أحد.
+            The `post_save` signal called `set_role`, which saves the profile,
+            re-firing the signal endlessly. And the signal's `except Exception`
+            swallowed the `RecursionError` — so the save looked successful while
+            every operation burned a thousand stack frames and logged an
+            exception nobody read.
 
-            الفصل: الإشارة تستدعي `apply_role_permissions` التي لا
-            تحفظ شيئًا.
+            The separation: the signal calls `apply_role_permissions`, which
+            saves nothing.
         """
         from employees import services as svc
 
@@ -514,12 +519,12 @@ class TestRoles:
 
     def test_role_permissions_actually_resolve_through_has_perm(self, role, db):
         """
-        ⚠️  **الاختبار الذي يفصل الصلاحية الحقيقية عن الزينة.**
+        ⚠️  **The test that separates a real permission from decoration.**
 
-            `has_perm` يقرأ صلاحيات المستخدم ومجموعاته فقط، ولا
-            يعرف بوجود `EmployeeRole.permissions`. بلا المزامنة
-            إلى مجموعة Django يكون الدور مضبوطًا في اللوحة وكل
-            فحص صلاحية يقول «لا».
+            `has_perm` reads the user's own permissions and their groups only,
+            and knows nothing about `EmployeeRole.permissions`. Without
+            synchronising to the Django group, the role is configured in the
+            panel and every permission check says "no".
         """
         employee = make_employee("perm@test.local", role)
         role.permissions.add(Permission.objects.get(codename="view_order"))
@@ -531,10 +536,11 @@ class TestRoles:
 
     def test_changing_role_drops_the_previous_permissions(self, role, db):
         """
-        ⚠️  تراكم المجموعات يجعل الموظف يجمع صلاحيات كل دور مرّ به.
+        ⚠️  Accumulating groups makes the employee collect the permissions of
+            every role they have passed through.
 
-            مندوب نُقل إلى خدمة العملاء يبقى قادرًا على إنشاء
-            الطلبات — ولا يظهر ذلك في أي شاشة.
+            A rep moved to customer service remains able to create orders —
+            and it shows on no screen.
         """
         selling = EmployeeRole.objects.create(
             code="seller", kind=EmployeeRoleKind.SALES_REP, name_ar="بائع", name_en="Seller"
@@ -561,10 +567,10 @@ class TestRoles:
 
     def test_a_suspended_employee_loses_permissions_system_wide(self, role, db):
         """
-        ⚠️  `is_active` وحده يحمي نقاط هذا النطاق فقط.
+        ⚠️  `is_active` alone protects this domain's endpoints only.
 
-            بقية النظام يسأل `has_perm` — وسيقول «نعم» لموظف
-            انتهت خدمته ما دام في المجموعة.
+            The rest of the system asks `has_perm` — and it will say "yes" to a
+            departed employee for as long as they remain in the group.
         """
         employee = make_employee("suspended-perm@test.local", role)
         role.permissions.add(Permission.objects.get(codename="view_order"))
@@ -580,7 +586,7 @@ class TestRoles:
 
 
 # ═══════════════════════════════════════════════════════════
-#  شاشات الأدمن
+#  Admin screens
 # ═══════════════════════════════════════════════════════════
 
 
@@ -597,12 +603,13 @@ class TestAdminScreens:
         user.is_superuser = True
         user.save()
         AdminProfile.objects.create(user=user)
+        grant_all_domains(user)
         return user
 
     def test_unassigned_customers_are_listed(self, manager, rep, mine):
         """
-        ⚠️  عميل بلا مسؤول لا يتابعه أحد ولا يظهر في لوحة أي
-            مندوب — ولا شيء ينبّه إليه إلا هذه القائمة.
+        ⚠️  A customer with no owner is followed up by nobody and appears on no
+            rep's dashboard — and nothing draws attention to them but this list.
         """
         stray = make_customer("nobody@test.local", "بلا مسؤول")
 

@@ -1,22 +1,23 @@
 """
-محوّل Fawry.
+The Fawry adapter.
 
-⚠️  التوقيع **SHA-256 على سلسلة مرتَّبة** — والترتيب جزء من العقد.
+⚠️  The signature is **SHA-256 over an ordered string** — and the order is part of the contract.
 
         merchantCode + merchantRefNum + customerProfileId +
         paymentMethod + amount + secureKey
 
-    المبلغ في السلسلة برقمين عشريين دائمًا (`150.00` لا `150`)
-    وإلا فشل التحقق بلا رسالة مفيدة.
+    The amount in the string always has two decimal places (`150.00`, not
+    `150`), or verification fails with no useful message.
 
-⚠️  Fawry ليست بطاقة فقط: `PAYATFAWRY` يولّد **رقم مرجعي** يدفع به
-    العميل في أي منفذ فوري خلال مهلة.
+⚠️  Fawry is not cards only: `PAYATFAWRY` generates a **reference number** the
+    customer pays with at any outlet within a time limit.
 
-    وهذا يعني أن `charge` الناجح **لا يعني أن المال قُبض** — يعني
-    أن رقم الدفع صدر. التحصيل يتأكد بالويب‌هوك وحده، وتعليمه
-    مدفوعًا هنا ينتج إيرادًا وهميًا عن كل من طلب رقمًا ولم يدفع.
+    Which means a successful `charge` **does not mean the money was taken** — it
+    means the payment number was issued. The capture is confirmed by the webhook
+    alone, and marking it paid here produces phantom revenue for everyone who
+    requested a number and never paid.
 
-⚠️  لم يُختبر مقابل حساب حقيقي — انظر `payments/gateways/__init__.py`.
+⚠️  Not tested against a real account — see `payments/gateways/__init__.py`.
 """
 
 from __future__ import annotations
@@ -51,10 +52,11 @@ REFUND_PATH = "/ECommerceWeb/Fawry/payments/refund"
 
 def _money(amount: Decimal) -> str:
     """
-    ⚠️  رقمان عشريان **دائمًا** — في التوقيع وفي الحمولة معًا.
+    ⚠️  Two decimal places **always** — in the signature and in the payload alike.
 
-        `Decimal("150")` تُسلسَل `150` فيُحسب التوقيع على سلسلة
-        مختلفة عمّا يحسبه الخادم، ويفشل بلا سبب مفهوم.
+        `Decimal("150")` serialises as `150`, so the signature is computed over
+        a different string from the one the server computes, and it fails for no
+        comprehensible reason.
     """
     return str(amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
@@ -76,7 +78,7 @@ class FawryAdapter(PaymentAdapter):
     def _signature(self, *parts: str) -> str:
         return hashlib.sha256("".join(parts).encode()).hexdigest()
 
-    # ── الواجهة ────────────────────────────────────────────
+    # ── The interface ──────────────────────────────────────
 
     def charge(self, *, amount: Decimal, currency: str, reference: str, metadata: dict):
         try:
@@ -119,10 +121,10 @@ class FawryAdapter(PaymentAdapter):
                 raw_response=response.data,
             )
 
-        # ⚠️  `200 OK` **ليس نجاحًا**: Fawry تعيد رمز الحالة في الجسم.
+        # ⚠️  `200 OK` is **not success**: Fawry returns the status code in the body.
         #
-        #     الاستنتاج من رمز HTTP وحده يعلّم طلبًا كمدفوع بينما
-        #     الجسم يقول «بيانات غير صالحة».
+        #     Inferring from the HTTP code alone marks an order paid while the
+        #     body says "invalid data".
         status_code = str(response.data.get("statusCode", ""))
         if status_code != "200":
             return ChargeResult(
@@ -140,8 +142,8 @@ class FawryAdapter(PaymentAdapter):
         return ChargeResult(
             success=True,
             provider_reference=str(response.data.get("referenceNumber", "")),
-            # ⚠️  البطاقة تحتاج تحويلًا؛ الدفع في المنفذ لا يحتاجه
-            #     لأن العميل يحمل الرقم إلى الفرع.
+            # ⚠️  A card needs a redirect; paying at an outlet does not,
+            #     because the customer carries the number to the branch.
             requires_redirect=bool(redirect),
             redirect_url=redirect,
             raw_response=response.data,
@@ -184,14 +186,15 @@ class FawryAdapter(PaymentAdapter):
             raw_response=response.data,
         )
 
-    # ── الويب‌هوك ──────────────────────────────────────────
+    # ── The webhook ────────────────────────────────────────
 
     def verify_webhook(self, payload: dict, signature: str) -> bool:
         """
-        ⚠️  توقيع الإشعار يُحسب على حقول **مختلفة** عن توقيع الطلب.
+        ⚠️  The notification's signature is computed over **different** fields
+            from the request's signature.
 
-            استخدام صيغة الطلب هنا يرفض كل إشعار صحيح — فيبقى كل
-            طلب «قيد المعالجة» بينما المال محصَّل فعلًا.
+            Using the request's formula here refuses every valid notification —
+            so every order stays "processing" while the money has actually been collected.
         """
         try:
             secure_key = self._credential("secure_key")
@@ -209,24 +212,25 @@ class FawryAdapter(PaymentAdapter):
             secure_key,
         )
 
-        # مقارنة ثابتة الزمن — انظر نظيرتها في محوّل Paymob
+        # A constant-time comparison — see its counterpart in the Paymob adapter
         return hmac.compare_digest(expected, (signature or "").lower())
 
     def parse_webhook(self, *, payload: dict, params: dict):
         """
-        ⚠️  **Fawry لا ترسل معرّف حدث.**
+        ⚠️  **Fawry does not send an event id.**
 
-            ترسل رقم المرجع وحالته فقط، والرقم ثابت عبر عمر الطلب:
-            «صدر الرقم» ثم «دُفع» ثم «استُرد» تصل كلها بنفس
-            `fawryRefNumber`. اتخاذه معرّفًا يجعل كل حدث بعد الأول
-            يبدو تكرارًا فيُهمَل — ويبقى الطلب غير مدفوع بينما
-            المال قُبض في المنفذ.
+            It sends the reference number and its status only, and the number is
+            constant over the order's lifetime: "the number was issued", then
+            "paid", then "refunded" all arrive with the same `fawryRefNumber`.
+            Taking it as the id makes every event after the first look like a
+            repeat, so it is discarded — and the order stays unpaid while the
+            money was taken at the outlet.
 
-            ولذلك المعرّف هو **الرقم مع الحالة**: كل انتقال يُسجَّل
-            مرة، وإعادة إرسال نفس الانتقال تُهمَل. وهذا بالضبط ما
-            نريده من جدول المنع التكراري.
+            The id is therefore **the number together with the status**: every
+            transition is recorded once, and a resend of the same transition is
+            discarded. Which is exactly what we want from a deduplication table.
 
-        ⚠️  والتوقيع في الجسم لا في الرابط — بخلاف Paymob.
+        ⚠️  And the signature is in the body, not the URL — unlike Paymob.
         """
         reference = str(payload.get("fawryRefNumber") or "")
         status = str(payload.get("orderStatus") or "")
@@ -245,11 +249,11 @@ class FawryAdapter(PaymentAdapter):
         )
 
 
-#: حالات Fawry ← نتائجنا.
+#: Fawry statuses ← our outcomes.
 #:
-#: ⚠️  `NEW` ليس فشلًا: الرقم صدر والعميل أمامه مهلة ليدفع في المنفذ.
-#:     معاملته يجب أن تبقى معلّقة لا أن تُغلق — إغلاقها يرفض دفعة
-#:     ستصل بعد ساعة.
+#: ⚠️  `NEW` is not a failure: the number was issued and the customer has time to pay at an outlet.
+#:     Their transaction must stay pending rather than be closed — closing it
+#:     refuses a payment that will arrive an hour later.
 _STATUS_OUTCOMES = {
     "PAID": CAPTURED,
     "DELIVERED": CAPTURED,

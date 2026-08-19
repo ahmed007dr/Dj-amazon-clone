@@ -1,27 +1,28 @@
 """
-محوّل Paymob.
+The Paymob adapter.
 
-⚠️  التحصيل **ثلاث خطوات** لا واحدة:
+⚠️  Charging is **three steps**, not one:
 
-        ١. مصادقة   ⟵ api_key            →  auth_token
-        ٢. تسجيل طلب ⟵ auth_token         →  order_id
-        ٣. مفتاح دفع ⟵ order_id + بيانات  →  payment_token
-                                             →  رابط الـ iframe
+        1. authenticate  ⟵ api_key             →  auth_token
+        2. register order ⟵ auth_token          →  order_id
+        3. payment key   ⟵ order_id + details  →  payment_token
+                                                  →  the iframe URL
 
-    الثلاثة نداءات متتابعة، وفشل أيٍّ منها فشل للعملية كلها. تجاهل
-    ذلك ينتج رابط دفع بمفتاح منتهٍ يفشل عند العميل لا عندنا.
+    All three are consecutive calls, and a failure in any of them fails the
+    whole operation. Ignoring that produces a payment link with an expired key
+    that fails at the customer's end rather than at ours.
 
-⚠️  **المبالغ بالقروش** (`amount_cents`).
+⚠️  **Amounts are in piastres** (`amount_cents`).
 
-    إرسال ١٥٠.٠٠ بدل ١٥٠٠٠ يحصّل جنيهًا ونصفًا بدل مئة وخمسين.
-    التحويل يقع هنا مرة واحدة وبـ `Decimal`.
+    Sending 150.00 instead of 15000 collects one and a half pounds instead of a
+    hundred and fifty. The conversion happens here once, and with `Decimal`.
 
-⚠️  التحقق من الويب‌هوك **HMAC-SHA512 على حقول بترتيب محدَّد**.
+⚠️  Webhook verification is **HMAC-SHA512 over fields in a specific order**.
 
-    الترتيب جزء من العقد لا تفصيل تنفيذي: تغييره يجعل كل توقيع
-    صحيح يبدو مزوَّرًا، والعكس أخطر.
+    The order is part of the contract, not an implementation detail: changing it
+    makes every valid signature look forged, and the reverse is more dangerous.
 
-⚠️  لم يُختبر مقابل حساب حقيقي — انظر `payments/gateways/__init__.py`.
+⚠️  Not tested against a real account — see `payments/gateways/__init__.py`.
 """
 
 from __future__ import annotations
@@ -51,8 +52,8 @@ logger = logging.getLogger(__name__)
 LIVE_BASE = "https://accept.paymob.com/api"
 IFRAME_URL = "https://accept.paymob.com/api/acceptance/iframes/{iframe_id}"
 
-#: ⚠️  ترتيب حقول توقيع الويب‌هوك — **جزء من العقد**.
-#:     أبجدي كما توثّقه Paymob؛ أي إعادة ترتيب تكسر كل تحقّق.
+#: ⚠️  The field order for the webhook signature — **part of the contract**.
+#:     Alphabetical as Paymob documents it; any reordering breaks every verification.
 HMAC_FIELDS = (
     "amount_cents",
     "created_at",
@@ -76,8 +77,8 @@ HMAC_FIELDS = (
     "success",
 )
 
-#: بيانات فوترة إلزامية عند Paymob — الفراغ يُرفَض، و`NA` هو البديل
-#: المتفق عليه للحقل غير المتوفر.
+#: Billing details Paymob requires — an empty value is refused, and `NA` is the
+#: agreed substitute for a field we do not have.
 BILLING_PLACEHOLDER = "NA"
 
 
@@ -85,19 +86,19 @@ BILLING_PLACEHOLDER = "NA"
 class PaymobAdapter(PaymentAdapter):
     key = "paymob"
 
-    # ── بيانات الاعتماد ────────────────────────────────────
+    # ── Credentials ────────────────────────────────────────
 
     def _credential(self, name: str) -> str:
         value = self.credentials.get(name, "")
         if not value:
-            # ⚠️  الفشل صريح باسم المفتاح الناقص.
+            # ⚠️  The failure names the missing key explicitly.
             #
-            #     «فشل الدفع» وحدها تجعل الأدمن يبحث في البوابة
-            #     بينما المشكلة حقل لم يُملأ في لوحته.
+            #     "Payment failed" alone makes the admin hunt through the gateway
+            #     while the problem is a field left blank in their own panel.
             raise KeyError(name)
         return value
 
-    # ── الخطوات الثلاث ─────────────────────────────────────
+    # ── The three steps ────────────────────────────────────
 
     def _authenticate(self) -> str | None:
         response = post_json(f"{LIVE_BASE}/auth/tokens", {"api_key": self._credential("api_key")})
@@ -110,8 +111,8 @@ class PaymobAdapter(PaymentAdapter):
             f"{LIVE_BASE}/ecommerce/orders",
             {
                 "auth_token": auth_token,
-                # ⚠️  الطلب يُنشأ مرة واحدة لكل مرجع؛ التكرار يُرفض
-                #     من Paymob وهو السلوك المطلوب لا خطأ.
+                # ⚠️  The order is created once per reference; a repeat is refused
+                #     by Paymob, and that is the desired behaviour rather than an error.
                 "delivery_needed": False,
                 "amount_cents": amount_cents,
                 "currency": "EGP",
@@ -144,10 +145,11 @@ class PaymobAdapter(PaymentAdapter):
 
     def _billing(self, metadata: dict) -> dict:
         """
-        ⚠️  كل الحقول إلزامية عند Paymob.
+        ⚠️  Every field is mandatory at Paymob.
 
-            الحقل الفارغ يُرفَض الطلب كله برسالة غامضة، ولذلك
-            `NA` لما لا نملكه فعلًا بدل تركه فارغًا.
+            An empty field gets the whole request refused with an obscure
+            message, hence `NA` for what we genuinely do not have rather than
+            leaving it blank.
         """
         return {
             "first_name": metadata.get("first_name") or BILLING_PLACEHOLDER,
@@ -165,7 +167,7 @@ class PaymobAdapter(PaymentAdapter):
             "shipping_method": BILLING_PLACEHOLDER,
         }
 
-    # ── الواجهة ────────────────────────────────────────────
+    # ── The interface ──────────────────────────────────────
 
     def charge(self, *, amount: Decimal, currency: str, reference: str, metadata: dict):
         try:
@@ -177,7 +179,7 @@ class PaymobAdapter(PaymentAdapter):
                 failure_message=f"بيانات اعتماد ناقصة: {exc.args[0]}",
             )
 
-        # ⚠️  القروش عدد صحيح — التقريب قبل التحويل لا بعده.
+        # ⚠️  Piastres are an integer — round before the conversion, not after.
         amount_cents = int((amount * 100).to_integral_value())
 
         try:
@@ -202,9 +204,9 @@ class PaymobAdapter(PaymentAdapter):
         return ChargeResult(
             success=True,
             provider_reference=str(order_id),
-            # ⚠️  **لم يُدفع بعد.** العميل يُحوَّل إلى صفحة البوابة،
-            #     والتحصيل يتأكد بالويب‌هوك وحده. تعليمه مدفوعًا هنا
-            #     يعني إيرادًا وهميًا عن كل من فتح الصفحة وأغلقها.
+            # ⚠️  **Not paid yet.** The customer is redirected to the gateway's page,
+            #     and the capture is confirmed by the webhook alone. Marking it paid here
+            #     means phantom revenue for everyone who opened the page and closed it.
             requires_redirect=True,
             redirect_url=(
                 f"{IFRAME_URL.format(iframe_id=iframe_id)}?payment_token={payment_token}"
@@ -249,14 +251,15 @@ class PaymobAdapter(PaymentAdapter):
             raw_response=response.data,
         )
 
-    # ── الويب‌هوك ──────────────────────────────────────────
+    # ── The webhook ────────────────────────────────────────
 
     def verify_webhook(self, payload: dict, signature: str) -> bool:
         """
-        ⚠️  `compare_digest` لا `==`.
+        ⚠️  `compare_digest`, not `==`.
 
-            المقارنة العادية تنتهي عند أول محرف مختلف، فيسرّب زمنُها
-            التوقيعَ الصحيح محرفًا محرفًا لمن يقيسه.
+            An ordinary comparison stops at the first differing character, so
+            its timing leaks the correct signature character by character to
+            anyone measuring it.
         """
         try:
             secret = self._credential("hmac_secret")
@@ -273,14 +276,14 @@ class PaymobAdapter(PaymentAdapter):
 
     def parse_webhook(self, *, payload: dict, params: dict):
         """
-        ⚠️  التوقيع في **معامل الرابط** `hmac` لا في الجسم.
+        ⚠️  The signature is in the **URL parameter** `hmac`, not in the body.
 
-            قراءته من الجسم ترفض كل حدث صحيح، فيبقى كل طلب بطاقة
-            «قيد المعالجة» بينما المال محصَّل.
+            Reading it from the body refuses every valid event, so every card
+            order stays "processing" while the money is collected.
 
-        ⚠️  و`merchant_order_id` هو مرجعنا نحن — أُرسل في `charge`
-            وتُعيده البوابة كما هو. المطابقة به أوثق من المطابقة
-            بمعرّف الطلب لدى Paymob.
+        ⚠️  And `merchant_order_id` is our own reference — sent in `charge` and
+            returned by the gateway unchanged. Matching on it is more reliable
+            than matching on Paymob's own order id.
         """
         obj = payload.get("obj")
         if not isinstance(obj, dict) or not obj.get("id"):
@@ -289,9 +292,9 @@ class PaymobAdapter(PaymentAdapter):
         order = obj.get("order") if isinstance(obj.get("order"), dict) else {}
 
         return WebhookEnvelope(
-            # ⚠️  معرّف المعاملة لا معرّف الطلب: محاولة الدفع الفاشلة
-            #     ثم الناجحة على نفس الطلب حدثان مختلفان، ودمجهما
-            #     تحت معرّف واحد يجعل الثاني يبدو تكرارًا فيُهمَل.
+            # ⚠️  The transaction id, not the order id: a failed payment attempt
+            #     and then a successful one on the same order are two different
+            #     events, and merging them under one id makes the second look like a repeat and be discarded.
             event_id=str(obj["id"]),
             event_type=str(payload.get("type") or "TRANSACTION"),
             outcome=self._outcome(obj),
@@ -304,10 +307,10 @@ class PaymobAdapter(PaymentAdapter):
     @staticmethod
     def _outcome(obj: dict) -> str:
         """
-        ⚠️  الترتيب مقصود: الاسترداد والإلغاء يسبقان `success`.
+        ⚠️  The order is deliberate: refund and cancellation come before `success`.
 
-            المعاملة المستردة تصل بـ `success=true` أيضًا — فقراءة
-            `success` أولًا تعيد تعليمها مدفوعة بعد ردّ المال.
+            A refunded transaction arrives with `success=true` as well — so
+            reading `success` first marks it paid again after the money was returned.
         """
         if obj.get("is_refunded"):
             return REFUNDED
@@ -315,15 +318,15 @@ class PaymobAdapter(PaymentAdapter):
             return FAILED
         if obj.get("pending"):
             return PENDING
-        # ⚠️  التصريح بلا تحصيل ليس قبضًا: الرصيد محجوز والمال لم
-        #     ينتقل بعد. تعليمه محصَّلًا ينتج إيرادًا وهميًا.
+        # ⚠️  An authorisation with no capture is not a receipt: the funds are held and
+        #     the money has not moved yet. Marking it captured produces phantom revenue.
         if obj.get("is_auth") and not obj.get("is_capture"):
             return AUTHORIZED
         return CAPTURED
 
 
 def _piastres_to_pounds(amount_cents) -> Decimal | None:
-    """⚠️  قسمة `Decimal` لا `float` — نفس قاعدة `core.money`."""
+    """⚠️  `Decimal` division, not `float` — the same rule as `core.money`."""
     if amount_cents in (None, ""):
         return None
     try:
@@ -334,10 +337,10 @@ def _piastres_to_pounds(amount_cents) -> Decimal | None:
 
 def _lookup(payload: dict, path: str) -> str:
     """
-    قراءة `source_data.pan` من حمولة متداخلة.
+    Reading `source_data.pan` from a nested payload.
 
-    ⚠️  القيم المنطقية تُرسَل نصًّا بأحرف صغيرة (`true`/`false`).
-        استخدام `str(True)` ينتج `True` فيكسر التوقيع بصمت.
+    ⚠️  Booleans are sent as lower-case strings (`true`/`false`).
+        Using `str(True)` produces `True` and breaks the signature silently.
     """
     value: object = payload
     for part in path.split("."):

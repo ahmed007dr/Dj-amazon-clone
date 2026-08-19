@@ -252,12 +252,6 @@ export function useUpdateRole() {
       http.patch<EmployeeRole>(`/employees/admin/roles/${id}/`, body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admin', 'employee-roles'] });
-      // ⚠️  **وصلاحيات المستخدم الحالي معها.**
-      //
-      //     من يعدّل دوره هو يجب أن ترتّب شاشته فورًا؛ وبقاء
-      //     الكاش يجعله يرى روابط سحبها عن نفسه للتوّ ثم تُرفض
-      //     عند الضغط — وهي أسوأ حالة: يظنّ العطل في النظام.
-      void queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
     },
   });
 }

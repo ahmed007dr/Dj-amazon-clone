@@ -8,12 +8,13 @@ import type {
 } from './types';
 
 /**
- * حزم الطالب الحالي.
+ * The current student's bundles.
  *
- * ⚠️  الخادم يختارها من **كليته وسنته** — لا الواجهة.
+ * ⚠️  The server selects them from **their faculty and year** — not the frontend.
  *
- *     فلترة محلية تعني تحميل كل الحزم لكل الجامعات ثم عرض حزمة
- *     واحدة، وتعني أيضًا طالبًا يرى حزم كلية ليست كليته.
+ *     Filtering locally means downloading every bundle for every university and
+ *     then displaying one, and it also means a student seeing bundles from a
+ *     faculty that is not theirs.
  */
 export const getMyBundles = () => http.get<StudyBundle[]>('/academic/me/bundles/');
 

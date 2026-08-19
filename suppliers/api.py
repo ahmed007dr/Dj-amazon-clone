@@ -1,10 +1,10 @@
 """
-واجهات الموردين — للأدمن حصرًا.
+Supplier endpoints — admin only.
 
-⚠️  **لا نقطة واحدة للعميل.**
+⚠️  **Not one customer-facing endpoint.**
 
-    أسعار الشراء هي هامش المتجر مكشوفًا. تسريبها يجعل أي عميل
-    يعرف بكم اشترينا ما نبيعه له.
+    Purchase prices are the store's margin laid bare. Leaking them lets any
+    customer learn what we paid for what we sell them.
 """
 
 from __future__ import annotations
@@ -39,11 +39,11 @@ class SupplierListCreateAPI(generics.ListCreateAPIView):
     pagination_class = AdminPageNumberPagination
 
     def get_queryset(self):
-        # ⚠️  `order_by` صريح بعد `annotate`.
+        # ⚠️  An explicit `order_by` after `annotate`.
         #
-        #     التجميع يُسقط ترتيب `Meta`، فيصير الترقيم غير مستقر:
-        #     نفس الصف يظهر في صفحتين أو يسقط بينهما — وقاعدة
-        #     البيانات لا تَعِد بترتيب ثابت بلا `ORDER BY`.
+        #     Aggregation drops the `Meta` ordering, so pagination becomes unstable:
+        #     the same row appears on two pages or falls between them — and the
+        #     database promises no stable order without an `ORDER BY`.
         queryset = (
             services.annotated_suppliers()
             .annotate(offer_count=Count("offers", filter=Q(offers__is_active=True)))
@@ -51,11 +51,11 @@ class SupplierListCreateAPI(generics.ListCreateAPIView):
         )
         params = self.request.query_params
 
-        # ⚠️  `status` صريحة لا `active=true` وحدها.
+        # ⚠️  An explicit `status` rather than `active=true` alone.
         #
-        #     الشرط القديم كان `== "true"` فقط، فكان `active=false`
-        #     **لا يفعل شيئًا**: يطلب الأدمن الموقوفين فيرى الجميع
-        #     ولا خطأ يظهر.
+        #     The old condition was `== "true"` only, so `active=false`
+        #     **did nothing**: the admin asked for the disabled ones, saw everyone,
+        #     and no error appeared.
         status_filter = params.get("status")
         if status_filter == "active":
             queryset = queryset.filter(is_active=True)
@@ -79,14 +79,14 @@ class SupplierDetailAPI(generics.RetrieveUpdateAPIView):
     serializer_class = s.SupplierSerializer
 
     def get_queryset(self):
-        # ⚠️  نفس التجميع: شاشة التفاصيل تعرض الرصيد وإجمالي
-        #     المشتريات، وحسابها بدالة منفصلة يجعل الرقمين يختلفان
-        #     بين القائمة والتفاصيل عند أول تعديل في أحدهما.
+        # ⚠️  The same aggregation: the detail screen shows the balance and the
+        #     total purchases, and computing them with a separate function makes the two
+        #     figures differ between the list and the detail at the first edit to either.
         return services.annotated_suppliers()
 
 
 class SupplierOfferListCreateAPI(generics.ListCreateAPIView):
-    """عروض الموردين — **أساس الـ Marketplace**."""
+    """Supplier offers — **the basis of the marketplace**."""
 
     permission_classes = [CanManagePurchasing]
     serializer_class = s.SupplierProductSerializer
@@ -111,10 +111,11 @@ class SupplierOfferDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
 class ProductOffersAPI(APIView):
     """
-    كل من يعرض منتجًا — مرتّبين بالسعر.
+    Everyone offering a product — ordered by price.
 
-    ⚠️  هذه هي نقطة الـ Marketplace: اليوم تخدم قرار الشراء،
-        وغدًا تخدم اختيار العميل بين بائعين بنفس البيانات.
+    ⚠️  This is the marketplace endpoint: today it serves the purchasing
+        decision, and tomorrow it serves the customer's choice between sellers
+        on the same data.
     """
 
     permission_classes = [CanManagePurchasing]
@@ -127,7 +128,7 @@ class ProductOffersAPI(APIView):
 
 
 class ReorderSuggestionsAPI(APIView):
-    """ما يجب شراؤه — أصناف تحت نقطة إعادة الطلب."""
+    """What needs buying — items below their reorder point."""
 
     permission_classes = [CanManagePurchasing]
 
@@ -142,7 +143,7 @@ class ReorderSuggestionsAPI(APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  أوامر الشراء
+#  Purchase orders
 # ═══════════════════════════════════════════════════════════
 
 
@@ -213,10 +214,10 @@ class SendPurchaseOrderAPI(APIView):
         order = get_object_or_404(PurchaseOrder, pk=pk)
         services.send_order(order, actor=request.user)
 
-        # ⚠️  فوارق الأسعار تُسجَّل عند الإرسال.
+        # ⚠️  Price differences are recorded on sending.
         #
-        #     تعديل سعر بلا أثر يجعل «من خفّض/رفع وكم؟» سؤالًا بلا
-        #     جواب بعد أول تحديث للعرض.
+        #     An unrecorded price edit makes "who lowered/raised it, and by how much?"
+        #     a question with no answer after the first offer update.
         variances = services.price_variances(order)
 
         AuditLog.objects.create(
@@ -232,10 +233,10 @@ class SendPurchaseOrderAPI(APIView):
 
 class ReceivePurchaseOrderAPI(APIView):
     """
-    استلام كمية على سطر.
+    Receive a quantity against a line.
 
-    ⚠️  الدفعة تدخل عبر `inventory` — بتكلفة **سطر الأمر** لا
-        بسعر عرض المورّد اليوم.
+    ⚠️  The batch enters through `inventory` — at the **order line's** cost, not
+        at the supplier's offer price today.
     """
 
     permission_classes = [CanManagePurchasing]
@@ -249,7 +250,7 @@ class ReceivePurchaseOrderAPI(APIView):
         order = get_object_or_404(PurchaseOrder, pk=pk)
         line = PurchaseOrderLine.objects.filter(pk=data["line"], order=order).first()
         if line is None:
-            # ⚠️  مُصفّى بالأمر: معرّف سطر أمر آخر كان يُستلَم من هنا
+            # ⚠️  Filtered by the order: another order's line id used to be receivable here
             raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
 
         batch = services.receive_line(
@@ -274,10 +275,10 @@ class ReceivePurchaseOrderAPI(APIView):
 
 class ReturnToSupplierAPI(APIView):
     """
-    إرجاع بضاعة **استُلمت فعلًا** إلى المورّد.
+    Return goods **that were actually received** to the supplier.
 
-    ⚠️  يخصم من المخزون بحركة `RETURN_OUT` ويُنشئ إشعارًا دائنًا —
-        فيظهر تحت «المرتجعات» في كشف الحساب.
+    ⚠️  It deducts from stock with a `RETURN_OUT` movement and creates a credit
+        note — so it appears under "returns" on the statement.
     """
 
     permission_classes = [CanManagePurchasing]
@@ -291,7 +292,7 @@ class ReturnToSupplierAPI(APIView):
         order = get_object_or_404(PurchaseOrder, pk=pk)
         line = PurchaseOrderLine.objects.filter(pk=data["line"], order=order).first()
         if line is None:
-            # ⚠️  مُصفّى بالأمر — كما في الاستلام
+            # ⚠️  Filtered by the order — as in receiving
             raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
 
         entry = services.return_to_supplier(
@@ -328,7 +329,7 @@ class CancelPurchaseOrderAPI(APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  حساب المورّد
+#  The supplier account
 # ═══════════════════════════════════════════════════════════
 
 
@@ -355,8 +356,8 @@ class SupplierStatementAPI(APIView):
                 "end": str(result.end),
                 "opening_balance": str(result.opening_balance),
                 "closing_balance": str(result.closing_balance),
-                # ⚠️  التجميعات بنود مستقلة: الكشف بالحركات وحدها
-                #     يجبر المحاسب على فرزها وجمعها ليعرف الأربعة.
+                # ⚠️  The aggregates are separate line items: a statement of movements alone
+                #     forces the accountant to sort and add them up to learn the four figures.
                 "invoiced": str(result.invoiced),
                 "paid": str(result.paid),
                 "returned": str(result.returned),

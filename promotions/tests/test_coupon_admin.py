@@ -1,17 +1,19 @@
 """
-إدارة الكوبونات من اللوحة.
+Coupon management from the panel.
 
-⚠️  نطاق `promotions` كان **بلا ملف `urls.py` إطلاقًا**: المتجر يقبل
-    كوبونًا ولا يستطيع أحد إنشاء واحد إلا من لوحة Django.
+⚠️  The `promotions` domain had **no `urls.py` at all**: the store accepts a
+    coupon and nobody could create one except from the Django panel.
 
-⚠️  والمحروس: لا قائمة عامة · الكود موحَّد بحروف كبيرة · المستخدَم
-    يُوقَف ولا يُحذف.
+⚠️  And what is guarded: no public list · the code is normalised to upper case ·
+    a used one is disabled and never deleted.
 """
 
 from datetime import timedelta
 from decimal import Decimal
 
 import pytest
+
+from core.testing import grant_all_domains
 from django.apps import apps
 from django.urls import reverse
 from django.utils import timezone
@@ -33,6 +35,7 @@ def admin_client(db):
     admin.is_active = True
     admin.save()
     apps.get_model("administration", "AdminProfile").objects.create(user=admin)
+    grant_all_domains(admin)
 
     client = APIClient()
     client.force_authenticate(user=admin)
@@ -52,7 +55,7 @@ def draft(**overrides) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الإنشاء والتحقق
+#  Creation and validation
 # ═══════════════════════════════════════════════════════════
 
 
@@ -65,8 +68,8 @@ class TestCreate:
 
     def test_the_code_is_normalised_to_upper_case(self, admin_client):
         """
-        ⚠️  بلا توحيد يصير `summer10` و`SUMMER10` كوبونين — والعميل
-            الذي يكتبه بحروف صغيرة يُرفض بلا سبب مفهوم.
+        ⚠️  Without normalisation, `summer10` and `SUMMER10` become two coupons
+            — and a customer who types it in lower case is refused for no comprehensible reason.
         """
         response = admin_client.post(
             reverse("v1:promotions:coupons"), draft(code=" summer20 "), format="json"
@@ -77,9 +80,9 @@ class TestCreate:
 
     def test_a_duplicate_code_is_caught_after_normalising(self, admin_client):
         """
-        ⚠️  التحقق على الصيغة **الموحّدة**: بدونه يمرّ `summer10`
-            بجوار `SUMMER10` ثم يصطدمان عند الحفظ بخطأ قاعدة بيانات
-            لا رسالة حقل.
+        ⚠️  Validation on the **normalised** form: without it `summer10` passes
+            alongside `SUMMER10` and they then collide on save with a database
+            error rather than a field message.
         """
         admin_client.post(reverse("v1:promotions:coupons"), draft(), format="json")
 
@@ -91,7 +94,7 @@ class TestCreate:
         assert "code" in response.data["fields"]
 
     def test_a_percentage_above_hundred_is_refused(self, admin_client):
-        """النسبة فوق ١٠٠٪ تجعل الطلب سالبًا — المتجر يدفع للعميل."""
+        """A rate above 100% makes the order negative — the store pays the customer."""
         response = admin_client.post(
             reverse("v1:promotions:coupons"), draft(value="120.00"), format="json"
         )
@@ -99,8 +102,9 @@ class TestCreate:
 
     def test_a_zero_discount_is_refused(self, admin_client):
         """
-        ⚠️  ليس خطأً تقنيًا لكنه كوبون بلا أثر: العميل يُدخله ويرى
-            «طُبّق» ولا يتغيّر شيء — فيشكو من عطل غير موجود.
+        ⚠️  Not a technical error but a coupon with no effect: the customer
+            enters it, sees "applied", and nothing changes — so they report a
+            fault that does not exist.
         """
         response = admin_client.post(
             reverse("v1:promotions:coupons"), draft(value="0.00"), format="json"
@@ -121,8 +125,8 @@ class TestCreate:
 
     def test_usage_count_cannot_be_written(self, admin_client):
         """
-        ⚠️  كتابته تعني أن تعديلًا في اللوحة يعيد فتح كوبون استُنفد
-            بلا أثر في أي سجل صرف.
+        ⚠️  Writing it means an edit in the panel reopens an exhausted coupon
+            with no trace in any redemption record.
         """
         response = admin_client.post(
             reverse("v1:promotions:coupons"), draft(usage_count=999), format="json"
@@ -133,15 +137,15 @@ class TestCreate:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحذف والحالة
+#  Deletion and status
 # ═══════════════════════════════════════════════════════════
 
 
 class TestLifecycle:
     def test_a_used_coupon_is_not_deleted(self, admin_client):
         """
-        ⚠️  سجلات الصرف تشير إليه، وحذفه يجعل «بكم بيع هذا الطلب
-            ولماذا؟» سؤالًا بلا جواب.
+        ⚠️  The redemption records point at it, and deleting it makes "how much
+            was this order sold for, and why?" a question with no answer.
         """
         coupon = Coupon.objects.create(
             code="USED",
@@ -168,8 +172,7 @@ class TestLifecycle:
 
     def test_status_filter_runs_in_the_query(self, admin_client):
         """
-        ⚠️  التصفية في بايثون بعد الترقيم تعطي صفحات ناقصة بلا أن
-            يلاحظ أحد.
+        ⚠️  Filtering in Python after pagination gives short pages with nobody noticing.
         """
         now = timezone.now()
 
@@ -197,7 +200,7 @@ class TestLifecycle:
         assert [row["code"] for row in scheduled.data["results"]] == ["SOON"]
 
     def test_the_running_flags_are_exposed(self, admin_client):
-        """الأدمن يحتاج «لماذا لا يعمل؟» لا «مفعّل: نعم» وحدها."""
+        """The admin needs "why does it not work?", not "enabled: yes" alone."""
         Coupon.objects.create(
             code="DONE",
             name_ar="منتهٍ",
@@ -216,14 +219,15 @@ class TestLifecycle:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الخصوصية
+#  Privacy
 # ═══════════════════════════════════════════════════════════
 
 
 def test_the_coupon_list_is_never_public():
     """
-    ⚠️  كشفها يجعل كل زائر يجرّب أعلى خصم متاح بدل الكود الذي وصله
-        في حملته — فتنهار كل حملة موجّهة.
+    ⚠️  Exposing them makes every visitor try the highest available discount
+        instead of the code they were sent in their campaign — so every targeted
+        campaign collapses.
     """
     assert APIClient().get(reverse("v1:promotions:coupons")).status_code in (401, 403)
 

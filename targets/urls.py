@@ -1,4 +1,4 @@
-"""مسارات الأهداف — /api/v1/targets/"""
+"""Target routes — /api/v1/targets/"""
 
 from django.urls import path
 

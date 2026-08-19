@@ -1,16 +1,16 @@
 """
-طلبات وتقييمات — عبر **المسار الحقيقي** لا بالكتابة المباشرة.
+Orders and reviews — through **the real path**, not by direct writes.
 
-⚠️  الطلب يُنشأ بـ `orders.services.create_from_cart` بعد ملء سلة
-    حقيقية.
+⚠️  The order is created with `orders.services.create_from_cart` after filling a
+    real cart.
 
-    كتابة صفوف `Order` مباشرةً أسرع وأقصر، لكنها تنتج طلبًا بلا
-    حجز مخزون وبلا لقطات أسعار وبلا سجل حالة — أي بيانات تبدو
-    سليمة في الجدول وتنهار عند أول عملية إلغاء أو استرداد. البذرة
-    التي تكذب أسوأ من غياب البذرة.
+    Writing `Order` rows directly is faster and shorter, but it produces an order
+    with no stock reservation, no price snapshots and no status history — data
+    that looks sound in the table and collapses at the first cancellation or
+    refund. A seed that lies is worse than no seed.
 
-⚠️  الطلبات موزّعة على الحالات عمدًا: قيد الانتظار · مؤكد · قيد
-    التجهيز · مُسلَّم · ملغى. شاشة الطلبات بحالة واحدة لا تُختبر.
+⚠️  The orders are spread deliberately across the states: pending · confirmed ·
+    processing · delivered · cancelled. An orders screen with a single state is untested.
 """
 
 from cart import services as cart_services
@@ -19,7 +19,7 @@ from orders.models import Order, OrderStatus
 from reviews import services as review_services
 from reviews.models import Review, ReviewStatus
 
-#: (بريد العميل، [(SKU، كمية)]، كوبون، طريقة الشحن، الحالة النهائية)
+#: (customer email, [(SKU, quantity)], coupon, shipping method, final status)
 ORDERS = [
     (
         "customer@dev.local",
@@ -57,7 +57,7 @@ ORDERS = [
         OrderStatus.DELIVERED,
     ),
     (
-        # ⚠️  طلب ملغى — يُفرج عن الحجز ويترك أثره في السجل
+        # ⚠️  A cancelled order — the reservation is released and its trace stays in the log
         "vip@dev.local",
         [("GLU-MTR", 1)],
         "",
@@ -66,7 +66,7 @@ ORDERS = [
     ),
 ]
 
-#: المسار من `PENDING` إلى الحالة المطلوبة — الانتقالات محكومة
+#: The path from `PENDING` to the requested status — the transitions are governed
 PATHS = {
     OrderStatus.PENDING: [],
     OrderStatus.CONFIRMED: [OrderStatus.CONFIRMED],
@@ -79,7 +79,7 @@ PATHS = {
     ],
 }
 
-#: (SKU، بريد المُقيِّم، النجوم، العنوان، النص، معتمد؟)
+#: (SKU, reviewer email, stars, title, body, approved?)
 REVIEWS = [
     (
         "MSK-SRG",
@@ -122,8 +122,8 @@ REVIEWS = [
         True,
     ),
     (
-        # ⚠️  تقييم ينتظر المراجعة — طابور الإشراف يجب أن يكون
-        #     غير فارغ ليُختبر
+        # ⚠️  A review awaiting moderation — the moderation queue has to be
+        #     non-empty to be exercised
         "GLV-LTX",
         "student@dev.local",
         2,
@@ -166,8 +166,8 @@ def _place_order(user, customer, line_specs, coupon_code, method_code, products)
 
 
 def seed(users: dict, customers: dict, products: dict):
-    # ⚠️  الحارس الوحيد للتكرار: وجود أي طلب يعني أن البذرة عملت.
-    #     طلبٌ ثانٍ في كل تشغيل يستهلك المخزون ويشوّه كل تقرير.
+    # ⚠️  The only guard against duplication: the existence of any order means the seed ran.
+    #     A second order on every run consumes stock and distorts every report.
     if Order.objects.exists():
         orders_created = 0
     else:

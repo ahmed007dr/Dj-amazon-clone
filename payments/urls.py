@@ -1,4 +1,4 @@
-"""مسارات الدفع — /api/v1/payments/"""
+"""Payment routes — /api/v1/payments/"""
 
 from django.urls import path
 
@@ -7,25 +7,25 @@ from payments import api
 app_name = "payments"
 
 urlpatterns = [
-    # ── العميل ─────────────────────────────────────────────
-    # الطرق المتاحة تُحسب من البوابات المفعّلة الآن
+    # ── Customer ───────────────────────────────────────────
+    # The available methods are computed from the gateways enabled right now
     path("methods/", api.AvailableMethodsAPI.as_view(), name="methods"),
-    # ── البوابات ───────────────────────────────────────────
-    # ⚠️  عنوان لكل بوابة لا عنوان واحد.
+    # ── Gateways ───────────────────────────────────────────
+    # ⚠️  One URL per gateway, not a single shared URL.
     #
-    #     العنوان الموحّد كان يحتاج استنتاج البوابة من شكل الحمولة —
-    #     تخمينٌ يفشل بصمت حين تتشابه بوابتان أو تغيّر إحداهما حقلًا.
-    #     والرمز في المسار يجعل الاختيار صريحًا، ويسمح بتسليم عنوان
-    #     مختلف لكل بوابة كما تطلب لوحاتها.
+    #     A shared URL would have needed the gateway inferred from the payload
+    #     shape — a guess that fails silently when two gateways look alike or one changes a field.
+    #     The code in the path makes the choice explicit, and allows handing a
+    #     different URL to each gateway, as their panels require.
     #
-    # ⚠️  ويُسجَّل في لوحة البوابة نفسها — نقطة لا تصلها البوابة
-    #     تعني طلبات تبقى «قيد المعالجة» بينما المال محصَّل.
+    # ⚠️  And it is registered in the gateway's own panel — an endpoint the gateway
+    #     cannot reach means orders left "processing" while the money is collected.
     path(
         "webhooks/<slug:provider_code>/",
         api.ProviderWebhookAPI.as_view(),
         name="webhook",
     ),
-    # ── الأدمن: البوابات ───────────────────────────────────
+    # ── Admin: gateways ────────────────────────────────────
     path("admin/adapters/", api.AdapterListAPI.as_view(), name="adapters"),
     path("admin/providers/", api.ProviderListCreateAPI.as_view(), name="providers"),
     path(
@@ -43,7 +43,7 @@ urlpatterns = [
         api.ReorderProvidersAPI.as_view(),
         name="providers-reorder",
     ),
-    # بيانات الاعتماد — للكتابة فقط، لا تُقرأ (ADR-15)
+    # Credentials — write-only, never read (ADR-15)
     path(
         "admin/providers/<uuid:pk>/credentials/",
         api.ProviderCredentialsAPI.as_view(),
@@ -54,7 +54,7 @@ urlpatterns = [
         api.ProviderCredentialDetailAPI.as_view(),
         name="provider-credential-detail",
     ),
-    # ── الأدمن: المعاملات ──────────────────────────────────
+    # ── Admin: transactions ────────────────────────────────
     path("admin/transactions/", api.TransactionListAPI.as_view(), name="transactions"),
     path(
         "admin/transactions/<uuid:pk>/",

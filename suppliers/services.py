@@ -1,11 +1,12 @@
 """
-خدمات الموردين.
+Supplier services.
 
-⚠️  **الاستلام يمرّ بـ`inventory` دائمًا.**
+⚠️  **Receiving always goes through `inventory`.**
 
-    الدفعة تُنشأ بـ`inventory.services.receive` لا بكتابة مباشرة.
-    المسار الثاني للمخزون لا يمرّ بفحوصه ولا يُسجَّل في حركاته —
-    فيظهر رصيد لا حركة له، وتُحسب تكلفة بضاعة بلا مصدر.
+    The batch is created with `inventory.services.receive`, never by a direct
+    write. A second path into stock passes none of its checks and is recorded in
+    none of its movements — so a balance appears with no movement behind it, and
+    the cost of goods gets computed with no source.
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════
-#  أوامر الشراء
+#  Purchase orders
 # ═══════════════════════════════════════════════════════════
 
 
@@ -52,11 +53,11 @@ def create_order(
     actor=None,
 ) -> PurchaseOrder:
     """
-    ⚠️  السعر يُؤخذ من **عرض المورّد** لا من الواجهة.
+    ⚠️  The price is taken from **the supplier's offer**, not from the frontend.
 
-        قبول سعر مُرسَل يعني أن من يُنشئ الأمر يحدّد ما ندفعه —
-        وهو أول ما يُستغَل في الشراء. والعرض غير الموجود يُرفض
-        صراحةً بدل أن يُشترى بسعر مخترع.
+        Accepting a sent price means whoever creates the order sets what we pay
+        — the first thing exploited in purchasing. And a nonexistent offer is
+        refused explicitly rather than bought at an invented price.
     """
     if not supplier.is_active:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="المورّد موقوف")
@@ -99,15 +100,15 @@ def create_order(
                 ),
             )
 
-        # ⚠️  السعر من العرض، **ويقبل تعديلًا مقصودًا**.
+        # ⚠️  The price comes from the offer, **and accepts a deliberate edit**.
         #
-        #     الشراء يُتفاوَض فيه: مورّد يمنح سعرًا لطلبية بعينها
-        #     دون تغيير عرضه الدائم. رفض التعديل كان يجبر المشتري
-        #     على تعديل العرض نفسه — فيتغيّر السعر الافتراضي لكل
-        #     أمر قادم بلا أن يقصد ذلك.
+        #     Purchasing is negotiated: a supplier grants a price for one particular
+        #     order without changing their standing offer. Refusing the edit forced the
+        #     buyer to change the offer itself — so the default price changed for every
+        #     future order with nobody intending it.
         #
-        #     والأصل يُحفَظ في `list_cost` ليبقى الفارق مقروءًا:
-        #     «بكم كان معروضًا وكم دفعنا؟» سؤال يُقيَّم به المشتري.
+        #     And the original is kept in `list_cost` so the difference stays readable:
+        #     "what was it offered at and what did we pay?" is the question the buyer is judged on.
         unit_cost = quantize(Decimal(str(line["unit_cost"]))) if line.get("unit_cost") else None
 
         if unit_cost is not None and unit_cost < ZERO:
@@ -129,12 +130,12 @@ def create_order(
 
 def price_variances(order: PurchaseOrder) -> list[dict]:
     """
-    أسطر خالف سعرها العرض — **للتدقيق**.
+    The lines whose price differed from the offer — **for auditing**.
 
-    ⚠️  تُقرأ عند الإرسال وتُكتب في سجل التدقيق.
+    ⚠️  Read on sending and written into the audit log.
 
-        تعديل سعر بلا أثر يجعل «من خفّض/رفع وكم؟» سؤالًا بلا جواب
-        بعد أول تحديث للعرض.
+        An unrecorded price edit makes "who lowered/raised it, and by how much?"
+        a question with no answer after the first offer update.
     """
     rows = []
     for line in order.lines.select_related("product"):
@@ -155,10 +156,10 @@ def price_variances(order: PurchaseOrder) -> list[dict]:
 @transaction.atomic
 def send_order(order: PurchaseOrder, *, actor=None) -> PurchaseOrder:
     """
-    ⚠️  الإرسال يُثبّت الأسعار ويقيّد الفاتورة على حسابنا.
+    ⚠️  Sending fixes the prices and posts the invoice to our account.
 
-        قيدها عند الاستلام بدلًا من الإرسال يُخفي التزامًا قائمًا:
-        الأمر أُرسل والمورّد سيطالب به.
+        Posting it on receipt rather than on sending hides an existing
+        obligation: the order was sent and the supplier will claim it.
     """
     if order.status != PurchaseOrderStatus.DRAFT:
         raise BusinessError(ErrorCode.CONFLICT, detail="لا يُرسَل إلا أمر مسوّدة", status_code=409)
@@ -180,7 +181,7 @@ def send_order(order: PurchaseOrder, *, actor=None) -> PurchaseOrder:
 
 
 def _due_date(supplier: Supplier) -> date:
-    """⚠️  مهلة السداد **لنا** — كم يومًا نتأخر في الدفع له."""
+    """⚠️  The payment terms are **ours** — how many days we take to pay them."""
     return timezone.localdate() + timedelta(days=supplier.payment_terms_days)
 
 
@@ -194,18 +195,19 @@ def receive_line(
     actor=None,
 ):
     """
-    استلام كمية على سطر — **وإدخالها المخزون عبر `inventory`**.
+    Receive a quantity against a line — **and enter it into stock through `inventory`**.
 
-    ⚠️  الاستلام الزائد يُرفض.
+    ⚠️  Over-receiving is refused.
 
-        قبوله يعني إدخال بضاعة لم تُطلَب ولم تُفوتَر، فيختل مطابقة
-        الفاتورة مع المستلَم — وهي أول ما يُراجَع مع المورّد.
+        Accepting it means entering goods that were never ordered and never
+        invoiced, so the reconciliation of the invoice against what was received
+        breaks — and that is the first thing reviewed with the supplier.
 
-    ⚠️  والتكلفة **من سطر الأمر لا من عرض المورّد اليوم**.
+    ⚠️  And the cost comes **from the order line, not from the supplier's offer today**.
 
-        العرض يتغيّر بين الإرسال والاستلام؛ وأخذ سعر اليوم يجعل
-        تكلفة الدفعة تخالف الفاتورة المتفق عليها — فينحرف كل ربح
-        يُحسب عليها لاحقًا.
+        The offer changes between sending and receiving; and taking today's
+        price makes the batch's cost contradict the agreed invoice — so every
+        profit computed on it afterwards drifts.
     """
     from inventory import services as inventory_services
 
@@ -245,10 +247,10 @@ def receive_line(
 
 def _refresh_order_status(order: PurchaseOrder) -> None:
     """
-    ⚠️  الحالة تُشتق من الأسطر لا تُكتب يدويًا.
+    ⚠️  The status is derived from the lines rather than written by hand.
 
-        كتابتها في كل مسار استلام تعني أن مسارًا واحدًا منسيًّا
-        يترك أمرًا مستلَمًا بالكامل ظاهرًا كجزئي إلى الأبد.
+        Writing it on every receiving path means one forgotten path leaves a
+        fully received order showing as partial forever.
     """
     lines = list(order.lines.all())
     received_any = any(line.quantity_received > 0 for line in lines)
@@ -266,10 +268,10 @@ def _refresh_order_status(order: PurchaseOrder) -> None:
 @transaction.atomic
 def cancel_order(order: PurchaseOrder, *, reason: str, actor=None) -> PurchaseOrder:
     """
-    ⚠️  **لا يُلغى أمر استُلم منه شيء.**
+    ⚠️  **An order with anything received against it is never cancelled.**
 
-        البضاعة دخلت المخزن؛ وإلغاء أمرها يترك دفعات بلا مصدر
-        ويُلغي فاتورة على بضاعة نملكها فعلًا.
+        The goods entered the warehouse; cancelling their order leaves batches
+        with no source and reverses an invoice for goods we genuinely own.
     """
     if order.status == PurchaseOrderStatus.RECEIVED:
         raise BusinessError(
@@ -284,8 +286,8 @@ def cancel_order(order: PurchaseOrder, *, reason: str, actor=None) -> PurchaseOr
         )
 
     if order.status == PurchaseOrderStatus.SENT:
-        # ⚠️  إشعار دائن يعكس الفاتورة — لا حذف لها.
-        #     الفاتورة أُرسلت للمورّد وقد سجّلها عنده.
+        # ⚠️  A credit note reversing the invoice — not a deletion of it.
+        #     The invoice was sent to the supplier and they have recorded it.
         SupplierLedgerEntry.objects.create(
             supplier=order.supplier,
             purchase_order=order,
@@ -303,7 +305,7 @@ def cancel_order(order: PurchaseOrder, *, reason: str, actor=None) -> PurchaseOr
 
 
 # ═══════════════════════════════════════════════════════════
-#  المرتجعات إلى المورّد
+#  Returns to the supplier
 # ═══════════════════════════════════════════════════════════
 
 
@@ -316,24 +318,24 @@ def return_to_supplier(
     actor=None,
 ) -> SupplierLedgerEntry:
     """
-    إرجاع بضاعة **استُلمت فعلًا** إلى المورّد.
+    Return goods **that were actually received** to the supplier.
 
-    ⚠️  الترتيب مقصود: **المخزون أولًا ثم القيد**.
+    ⚠️  The order is deliberate: **stock first, then the entry**.
 
-        القيد قبل الخصم يجعل المورّد دائنًا لنا ببضاعة ما زالت
-        عندنا لو فشل الخصم. والعكس — خصم بلا قيد — يفقد البضاعة
-        بلا مقابل مالي.
+        The entry before the deduction makes the supplier credit us for goods
+        still in our possession should the deduction fail. And the reverse — a
+        deduction with no entry — loses the goods with no financial counterpart.
 
-    ⚠️  والسقف هو **المستلَم ناقص المرتجع سلفًا**.
+    ⚠️  And the ceiling is **received minus already returned**.
 
-        الإرجاع مرتين لنفس الكمية يُنشئ إشعارَي دائن على بضاعة
-        واحدة، فيصير المورّد مدينًا لنا بما لم نُعده — وهو خطأ
-        يظهر في كشف حسابه لا في مخزوننا.
+        Returning the same quantity twice creates two credit notes for one lot
+        of goods, so the supplier ends up owing us for what we never returned —
+        an error that shows on their statement rather than in our stock.
 
-    ⚠️  ولا يُحذف قيد الفاتورة الأصلي.
+    ⚠️  And the original invoice entry is never deleted.
 
-        الفاتورة صدرت وسجّلها المورّد عنده؛ التصحيح بإشعار دائن
-        لا بممحاة.
+        The invoice was issued and the supplier recorded it; the correction is a
+        credit note, not an eraser.
     """
     from inventory import services as inventory_services
 
@@ -352,7 +354,7 @@ def return_to_supplier(
 
     order = line.order
 
-    # ── ١. المخزون ─────────────────────────────────────────
+    # ── 1. Stock ───────────────────────────────────────────
     inventory_services.return_to_supplier(
         line.product,
         quantity,
@@ -367,10 +369,10 @@ def return_to_supplier(
     line.save(update_fields=["quantity_returned", "updated_at"])
     line.refresh_from_db()
 
-    # ── ٢. القيد ───────────────────────────────────────────
-    # ⚠️  بلا `purchase_order` في القيد: القيد الفريد يسمح بإشعار
-    #     دائن واحد لكل أمر، وأوامر الشراء تُرجَع منها دفعات
-    #     متعددة على فترات. المرجع نصي في `reference`.
+    # ── 2. The entry ───────────────────────────────────────
+    # ⚠️  No `purchase_order` on the entry: the unique constraint allows one credit
+    #     note per order, and purchase orders have several batches returned from
+    #     them over time. The reference is a string in `reference`.
     amount = quantize(line.unit_cost * quantity)
 
     return SupplierLedgerEntry.objects.create(
@@ -384,7 +386,7 @@ def return_to_supplier(
 
 
 # ═══════════════════════════════════════════════════════════
-#  حساب المورّد
+#  The supplier account
 # ═══════════════════════════════════════════════════════════
 
 
@@ -406,7 +408,7 @@ def _signed_sum(queryset) -> Decimal:
 
 
 def payable_balance(supplier: Supplier) -> Decimal:
-    """ما علينا للمورّد — **مشتق من الدفتر** لا حقلًا مخزَّنًا."""
+    """What we owe the supplier — **derived from the ledger**, not a stored field."""
     return _signed_sum(SupplierLedgerEntry.objects.filter(supplier=supplier))
 
 
@@ -435,13 +437,14 @@ def record_payment(
 @dataclass(frozen=True)
 class SupplierStatement:
     """
-    كشف حساب مورّد.
+    A supplier account statement.
 
-    ⚠️  **التجميعات بنود مستقلة لا يستنتجها القارئ.**
+    ⚠️  **The aggregates are their own line items, not something the reader infers.**
 
-        كشف بالحركات وحدها يجبر المحاسب على فرزها وجمعها ليعرف
-        «كم فوترنا وكم دفعنا وكم أرجعنا» — وهي الأرقام الأربعة
-        التي يُبنى عليها أي نقاش مع المورّد.
+        A statement of movements alone forces the accountant to sort and add
+        them up to learn "how much we were invoiced, how much we paid and how
+        much we returned" — the four figures any discussion with the supplier is
+        built on.
     """
 
     supplier: Supplier
@@ -497,26 +500,26 @@ def statement(supplier: Supplier, start: date, end: date) -> SupplierStatement:
 
 def annotated_suppliers():
     """
-    قائمة الموردين بالرصيد وإجمالي المشتريات — **استعلام واحد**.
+    The supplier list with balance and total purchases — **a single query**.
 
-    ⚠️  **هذا هو الفرق بين شاشة تعمل وشاشة تتعطّل.**
+    ⚠️  **This is the difference between a screen that works and one that stalls.**
 
-        استدعاء `payable_balance()` لكل صف يعني استعلامًا لكل
-        مورّد (N+1) في أكثر شاشة تُفتح. والتجميع هنا يجعلها
-        استعلامًا واحدًا مهما بلغ العدد.
+        Calling `payable_balance()` per row means one query per supplier (N+1)
+        on the most frequently opened screen. And the aggregation here makes it
+        one query however many there are.
 
-    ⚠️  والتجميعان **منفصلان بـ`distinct=True`**.
+    ⚠️  And the two aggregates are **separated with `distinct=True`**.
 
-        ضمّ جدولين في استعلام واحد يضاعف الصفوف: كل حركة حساب
-        تتكرّر بعدد أوامر الشراء والعكس — فيخرج رصيد ومشتريات
-        منفوخان بلا أن يبدو شيء خاطئًا.
+        Joining two tables in one query multiplies the rows: every account
+        movement repeats once per purchase order and vice versa — so an inflated
+        balance and purchase total come out with nothing looking wrong.
     """
     from django.db.models import Exists, OuterRef
 
     money = DecimalField(max_digits=16, decimal_places=2)
 
-    # ⚠️  استعلامات فرعية لا `annotate` مباشرة: الضمّ المتعدد
-    #     يضاعف الصفوف كما في التعليق أعلاه.
+    # ⚠️  Subqueries rather than a direct `annotate`: the multiple join
+    #     multiplies the rows, as in the comment above.
     ledger = (
         SupplierLedgerEntry.objects.filter(supplier=OuterRef("pk")).order_by().values("supplier")
     )
@@ -551,27 +554,27 @@ def annotated_suppliers():
         total_purchases=Coalesce(
             Subquery(purchases, output_field=money), Value(ZERO), output_field=money
         ),
-        # ⚠️  «له فواتير متأخرة» **تقريبية عمدًا**: تحسب الفواتير
-        #     المستحقة لا المسدَّدة منها، لأن الدفتر لا يخصّص
-        #     السداد لفاتورة بعينها. تكفي للتنبيه لا للمطالبة.
+        # ⚠️  "Has overdue invoices" is **deliberately approximate**: it counts the
+        #     invoices due rather than what has been paid against them, because the
+        #     ledger does not allocate payment to a specific invoice. Enough to flag, not to claim.
         has_overdue=Exists(overdue),
     )
 
 
 # ═══════════════════════════════════════════════════════════
-#  اقتراح الشراء — أساس Marketplace
+#  Purchase suggestions — the basis of the marketplace
 # ═══════════════════════════════════════════════════════════
 
 
 def offers_for(product) -> list[dict]:
     """
-    كل من يعرض هذا المنتج — **مرتّبين بالسعر**.
+    Everyone offering this product — **ordered by price**.
 
-    ⚠️  هذه هي الدالة التي يقوم عليها الـ Marketplace لاحقًا.
+    ⚠️  This is the function the marketplace will later rest on.
 
-        اليوم تخدم قرار الشراء: «من أرخص، ومن أسرع توريدًا؟».
-        وغدًا تخدم اختيار العميل بين بائعين — بنفس البيانات وبلا
-        تغيير في البنية.
+        Today it serves the purchasing decision: "who is cheapest, and who
+        delivers fastest?". And tomorrow it serves the customer's choice between
+        sellers — on the same data and with no change to the structure.
     """
     rows = (
         SupplierProduct.objects.filter(product=product, is_active=True, supplier__is_active=True)
@@ -595,12 +598,13 @@ def offers_for(product) -> list[dict]:
 
 def reorder_suggestions(location=None, limit: int = 50) -> list[dict]:
     """
-    ما يجب شراؤه: أصناف تحت نقطة إعادة الطلب ولها مورّد.
+    What needs buying: items below their reorder point that have a supplier.
 
-    ⚠️  **الصنف بلا مورّد يُدرَج ويُعلَّم لا يُحذف.**
+    ⚠️  **An item with no supplier is listed and flagged, not dropped.**
 
-        استبعاده يجعل أهم نقص في المخزن يختفي من شاشة الشراء —
-        والسبب أنه بلا مورّد، وهو بالضبط ما يجب أن يُعالَج.
+        Excluding it makes the most important shortage in the warehouse vanish
+        from the purchasing screen — and the reason is that it has no supplier,
+        which is exactly what needs dealing with.
     """
     from inventory.models import Stock
 
@@ -632,7 +636,7 @@ def reorder_suggestions(location=None, limit: int = 50) -> list[dict]:
                 "supplier": str(preferred.supplier_id) if preferred else None,
                 "supplier_name": preferred.supplier.name_ar if preferred else None,
                 "unit_cost": str(preferred.unit_cost) if preferred else None,
-                # ⚠️  العلامة الصريحة: الشاشة تُبرزه بدل أن تُسقطه
+                # ⚠️  An explicit flag: the screen highlights it rather than dropping it
                 "has_supplier": preferred is not None,
             }
         )

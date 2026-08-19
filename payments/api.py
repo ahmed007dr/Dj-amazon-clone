@@ -1,12 +1,12 @@
 """
-واجهات الدفع.
+Payment endpoints.
 
-⚠️  **التحكم الكامل بالبوابات من لوحة الأدمن.** (ADR-15)
+⚠️  **Full control of the gateways from the admin panel.** (ADR-15)
 
-    إضافة بوابة · تفعيلها · إيقافها · ترتيب أولويتها · ضبط حدودها
-    وقنواتها — كلها بلا تعديل كود ولا إعادة نشر.
+    Adding a gateway · enabling it · disabling it · ordering its priority ·
+    setting its limits and channels — all with no code change and no redeployment.
 
-    البوابة الموقوفة تختفي فورًا من خيارات العميل.
+    A disabled gateway disappears from the customer's options immediately.
 """
 
 from django.db import transaction
@@ -30,7 +30,7 @@ from payments.models import (
     ProviderCredential,
 )
 
-#: تسميات طرق الدفع للعرض
+#: Display labels for the payment methods
 METHOD_LABELS = {
     PaymentMethodKind.CASH_ON_DELIVERY: ("الدفع عند الاستلام", "Cash on delivery"),
     PaymentMethodKind.CASH: ("نقدي", "Cash"),
@@ -40,26 +40,27 @@ METHOD_LABELS = {
     PaymentMethodKind.INSTALLMENT: ("تقسيط", "Instalments"),
 }
 
-#: طرق تتطلب تحويل العميل إلى صفحة البوابة
+#: Methods that require redirecting the customer to the gateway's page
 REDIRECT_METHODS = {PaymentMethodKind.CARD, PaymentMethodKind.INSTALLMENT}
 
 
 # ═══════════════════════════════════════════════════════════
-#  العميل
+#  Customer
 # ═══════════════════════════════════════════════════════════
 
 
 class AvailableMethodsAPI(APIView):
     """
-    طرق الدفع المتاحة لهذه العملية.
+    The payment methods available for this operation.
 
-    ⚠️  تُحسب من البوابات **المفعّلة الآن**.
+    ⚠️  Computed from the gateways **enabled right now**.
 
-        الأدمن يوقف بوابة فتختفي من هذه القائمة في الطلب التالي —
-        بلا إعادة نشر ولا تعديل كود. وهذا جوهر المتطلب.
+        The admin disables a gateway and it disappears from this list on the
+        next request — with no redeployment and no code change. That is the
+        heart of the requirement.
 
-    ⚠️  ولا تُكشف بيانات البوابة ولا حدودها الداخلية — الاسم
-        والطريقة فقط.
+    ⚠️  And no gateway credentials and no internal limits are exposed — the name
+        and the method only.
     """
 
     permission_classes = [AllowAny]
@@ -84,7 +85,7 @@ class AvailableMethodsAPI(APIView):
             if not providers:
                 continue
 
-            provider = providers[0]  # الأعلى أولوية
+            provider = providers[0]  # highest priority
             if method in seen:
                 continue
             seen.add(method)
@@ -106,18 +107,18 @@ class AvailableMethodsAPI(APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن — إدارة البوابات
+#  Admin — gateway management
 # ═══════════════════════════════════════════════════════════
 
 
 class AdapterListAPI(APIView):
     """
-    المحوّلات المتاحة في الكود.
+    The adapters available in the code.
 
-    ⚠️  الأدمن يضيف بوابة باختيار محوّل من هذه القائمة.
+    ⚠️  The admin adds a gateway by choosing an adapter from this list.
 
-        محوّل جديد يعني كودًا جديدًا؛ أما **البوابة** فبيانات
-        يضبطها الأدمن بلا مطوّر.
+        A new adapter means new code; a **gateway**, by contrast, is data the
+        admin configures with no developer.
     """
 
     permission_classes = [CanManagePayments]
@@ -169,10 +170,10 @@ class ProviderDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_destroy(self, instance):
         """
-        ⚠️  البوابة ذات المعاملات **لا تُحذف**.
+        ⚠️  A gateway with transactions is **never deleted**.
 
-            حذفها يترك معاملات تاريخية بلا مرجع، فينكسر كل تقرير
-            مالي سابق. الإيقاف هو البديل.
+            Deleting it leaves historical transactions with no reference, so
+            every past financial report breaks. Disabling is the alternative.
         """
         if instance.transactions.exists():
             raise BusinessError(
@@ -193,13 +194,14 @@ class ProviderDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
 class ToggleProviderAPI(APIView):
     """
-    تشغيل أو إيقاف بوابة.
+    Enable or disable a gateway.
 
-    ⚠️  الأثر **فوري**: البوابة الموقوفة تختفي من خيارات العميل في
-        الطلب التالي.
+    ⚠️  The effect is **immediate**: a disabled gateway disappears from the
+        customer's options on the next request.
 
-    ⚠️  ولا يُترك النظام بلا بوابة مفعّلة واحدة — إيقاف الأخيرة
-        يعني متجرًا لا يستقبل طلبات، والاكتشاف يكون بشكوى عميل.
+    ⚠️  And the system is never left with no enabled gateway — disabling the
+        last one means a store that accepts no orders, discovered through a
+        customer complaint.
     """
 
     permission_classes = [CanManagePayments]
@@ -244,9 +246,9 @@ class ToggleProviderAPI(APIView):
 
 class ReorderProvidersAPI(APIView):
     """
-    إعادة ترتيب أولوية البوابات.
+    Reorder the gateways' priority.
 
-    الأعلى يُجرَّب أولًا حين تصلح أكثر من بوابة لنفس العملية.
+    The highest is tried first when more than one gateway suits the same operation.
     """
 
     permission_classes = [CanManagePayments]
@@ -275,13 +277,12 @@ class ReorderProvidersAPI(APIView):
 
 class ProviderCredentialsAPI(generics.ListCreateAPIView):
     """
-    بيانات اعتماد بوابة.
+    A gateway's credentials.
 
-    ⚠️  القيمة **تُكتب ولا تُقرأ أبدًا** — حتى للأدمن. (ADR-15)
+    ⚠️  The value is **written and never read** — not even by the admin. (ADR-15)
 
-        الاستجابة تحمل `masked_value` فقط. إرجاع المفتاح السري
-        «للتأكد منه» يعني أن تسريب جلسة أدمن واحدة يسرّب حساب
-        البوابة كله.
+        The response carries `masked_value` only. Returning the secret key "to
+        check it" means one leaked admin session leaks the entire gateway account.
     """
 
     permission_classes = [CanManagePayments]
@@ -302,7 +303,7 @@ class ProviderCredentialsAPI(generics.ListCreateAPIView):
             actor=self.request.user,
             action=AuditAction.SETTING_CHANGE,
             object_repr=f"بيانات اعتماد {provider.code}",
-            # ⚠️  اسم المفتاح فقط — لا قيمته حتى في سجل التدقيق
+            # ⚠️  The key's name only — not its value, not even in the audit log
             changes={"key": credential.key, "is_sandbox": credential.is_sandbox},
         )
 
@@ -312,27 +313,27 @@ class ProviderCredentialDetailAPI(generics.DestroyAPIView):
     lookup_url_kwarg = "credential_pk"
 
     def get_queryset(self):
-        # ⚠️  مُصفّى بالبوابة — لا يُحذف مفتاح بوابة أخرى بتخمين معرّفه
+        # ⚠️  Filtered by gateway — no deleting another gateway's key by guessing its id
         return ProviderCredential.objects.filter(provider_id=self.kwargs["pk"])
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأحداث الواردة من البوابات
+#  Inbound gateway events
 # ═══════════════════════════════════════════════════════════
 
 
 class WebhookThrottle(AnonRateThrottle):
     """
-    ⚠️  حدّ **مرتفع عمدًا**.
+    ⚠️  A **deliberately high** limit.
 
-        الحارس الحقيقي هنا هو التوقيع لا العدّاد: حدث بلا توقيع
-        صحيح يُرفض مهما تكرر. أما الحدّ المنخفض فيُسقط ذروة حقيقية
-        من البوابة — وكل حدث مفقود هو طلب مدفوع لا يعرف أحد أنه
-        دُفع.
+        The real guard here is the signature, not the counter: an event without
+        a valid signature is refused however often it repeats. A low limit, by
+        contrast, drops a genuine spike from the gateway — and every lost event
+        is a paid order nobody knows was paid.
 
-        وهي تشترك في عدّاد الزوّار الافتراضي لولا نطاقها الخاص:
-        بوابة واحدة تتحدث من عناوين قليلة، فكانت تستهلك حصة
-        الزوّار كلها وتُسقط تصفّح المتجر.
+        And it would share the default visitor counter were it not for its own
+        scope: one gateway talks from a handful of addresses, so it consumed the
+        entire visitor quota and took store browsing down with it.
     """
 
     scope = "webhook"
@@ -340,34 +341,33 @@ class WebhookThrottle(AnonRateThrottle):
 
 class ProviderWebhookAPI(APIView):
     """
-    نقطة استقبال أحداث بوابة.
+    The endpoint receiving a gateway's events.
 
-        POST /api/v1/payments/webhooks/<رمز البوابة>/
+        POST /api/v1/payments/webhooks/<gateway code>/
 
-    ⚠️  **بلا مصادقة — والتوقيع هو الهوية.**
+    ⚠️  **No authentication — the signature is the identity.**
 
-        البوابة لا تملك حسابًا ولا توكنًا. `authentication_classes`
-        فارغة عمدًا: تركها على الافتراضي يجعل DRF يحاول قراءة
-        ترويسة `Authorization` غير الموجودة، ويردّ ٤٠١ على أحداث
-        صحيحة تمامًا.
+        The gateway has no account and no token. `authentication_classes` is
+        deliberately empty: leaving it on the default makes DRF try to read a
+        nonexistent `Authorization` header and answer 401 to perfectly valid events.
 
-    ⚠️  **و`is_active` شرط**: بوابة أوقفها الأدمن لا تُعلّم طلبات
-        كمدفوعة. إيقافها يجب أن يكون إيقافًا كاملًا لا لواجهة
-        العميل وحدها.
+    ⚠️  **And `is_active` is a precondition**: a gateway the admin disabled does
+        not mark orders as paid. Disabling it must be a complete shutdown, not
+        one for the customer interface alone.
 
-    ⚠️  والرد **٢٠٠ على كل ما لا تصلحه إعادة المحاولة.**
+    ⚠️  And it answers **200 to everything a retry cannot fix.**
 
-        البوابة تعيد الإرسال على أي رد غير ناجح. حدث بمرجع لا
-        نعرفه سيبقى يصل كل بضع دقائق إلى الأبد إن رددنا بخطأ —
-        وهو ضجيج يغطّي على الفشل الحقيقي. الفشل المؤقت وحده يستحق
-        ٥٠٠ ليُعاد.
+        The gateway resends on any unsuccessful response. An event with a
+        reference we do not know would keep arriving every few minutes forever
+        if we answered with an error — noise that buries the real failures. Only
+        a temporary failure deserves a 500, so it gets retried.
     """
 
     permission_classes = [AllowAny]
     authentication_classes = []
     throttle_classes = [WebhookThrottle]
 
-    #: نتيجة الخدمة ← رمز HTTP
+    #: The service's outcome ← the HTTP code
     STATUS_CODES = {
         services.WEBHOOK_REJECTED: status.HTTP_403_FORBIDDEN,
         services.WEBHOOK_UNREADABLE: status.HTTP_400_BAD_REQUEST,
@@ -387,15 +387,15 @@ class ProviderWebhookAPI(APIView):
         )
 
         return Response(
-            # ⚠️  لا تفاصيل في الرد: المرسل قد يكون مهاجمًا يستكشف.
-            #     التفصيل كامل في `WebhookEvent` وفي السجل.
+            # ⚠️  No details in the response: the sender may be an attacker probing.
+            #     The full detail is in `WebhookEvent` and in the log.
             {"status": result.status},
             status=self.STATUS_CODES.get(result.status, status.HTTP_200_OK),
         )
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن — المعاملات والاستردادات
+#  Admin — transactions and refunds
 # ═══════════════════════════════════════════════════════════
 
 
@@ -426,12 +426,12 @@ class TransactionDetailAPI(generics.RetrieveAPIView):
 
 class CaptureTransactionAPI(APIView):
     """
-    تحصيل معاملة مُصرَّح بها.
+    Capture an authorised transaction.
 
-    ⚠️  للدفع عند الاستلام: يُستدعى عند تسليم الطلب **فعلًا**.
+    ⚠️  For cash on delivery: called when the order is **actually** delivered.
 
-        تعليمها محصَّلة قبل ذلك يعني إيرادًا وهميًا في كل تقرير
-        مالي — وهو ما يجعل المرحلة ٨ تبني على رقم خاطئ.
+        Marking it captured before that means phantom revenue in every financial
+        report — which makes phase 8 build on a wrong figure.
     """
 
     permission_classes = [CanManagePayments]

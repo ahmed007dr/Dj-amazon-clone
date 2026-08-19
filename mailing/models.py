@@ -1,22 +1,22 @@
 """
-حسابات البريد — أكثر من حساب، ولكلٍّ مسؤوليته.
+Mail accounts — more than one account, each with its own responsibility.
 
-⚠️  **الحدود مع النطاقات المجاورة:**
+⚠️  **The boundaries with the neighbouring domains:**
 
-        mailing/       →  كيف يُرسَل البريد ومن أي حساب (نقل وهوية)
-        notifications/ →  متى يُرسَل ولمن (تصنيف وتفضيل وسجل)
-        core/settings  →  إعدادات تشغيلية عامة
+        mailing/       →  how mail is sent and from which account (transport and identity)
+        notifications/ →  when it is sent and to whom (classification, preference and history)
+        core/settings  →  general operational settings
 
-⚠️  وهذا النطاق **لا يعرف بوجود أي نطاق عمل** — كـ`branding` تمامًا.
-    لا مستخدمين ولا طلبات: `send_to_user` يقبل أي كائن له `email`
-    و`preferred_language`. يفرضه `import-linter`.
+⚠️  And this domain **knows of no business domain** — exactly like `branding`.
+    No users and no orders: `send_to_user` accepts any object with an `email`
+    and a `preferred_language`. Enforced by `import-linter`.
 
-⚠️  **لماذا أكثر من حساب أصلًا؟**
+⚠️  **Why more than one account at all?**
 
-    ليس تنظيمًا بل سياجًا. حساب التسويق يُدرَج في القوائم السوداء
-    بحكم طبيعته — رسائل جماعية وشكاوى وإلغاء اشتراك. وحين يكون هو
-    نفسه حساب «إعادة تعيين كلمة المرور»، يُحجَب المستخدمون عن
-    حساباتهم عقابًا على حملة تسويقية.
+    Not for tidiness but as a firewall. The marketing account gets blacklisted
+    by its very nature — bulk messages, complaints and unsubscribes. And when it
+    is also the "password reset" account, users are locked out of their accounts
+    as punishment for a marketing campaign.
 """
 
 from __future__ import annotations
@@ -46,11 +46,12 @@ class MailDirection(models.TextChoices):
 
 class MailTransport(models.TextChoices):
     """
-    ⚠️  `CONSOLE` ليس محوّلًا للتطوير وحده — إنه **مفتاح إيقاف**.
+    ⚠️  `CONSOLE` is not a development-only backend — it is **an off switch**.
 
-        حساب موقوف بحذفه يفقد إعداده كاملًا، وإيقافه بـ `is_active`
-        يجعل المسار يسقط إلى حساب آخر بلا أن يلاحظ أحد. وتحويله إلى
-        الطرفية يُبقي الإعداد ويجعل الأثر ظاهرًا في السجل.
+        An account disabled by deletion loses its entire configuration, and
+        disabling it with `is_active` makes the path fall back to another
+        account with nobody noticing. Switching it to the console keeps the
+        configuration and makes the effect visible in the log.
     """
 
     SMTP = "SMTP", _("SMTP")
@@ -65,9 +66,9 @@ class MailSecurity(models.TextChoices):
 
 class EmailAccount(TranslatedFieldMixin, BaseModel):
     """
-    حساب بريد واحد — نقلًا وهويةً وصحّة.
+    A single mail account — transport, identity and health.
 
-    ⚠️  **كلمة المرور ليست هنا.** انظر `EmailCredential`.
+    ⚠️  **The password is not here.** See `EmailCredential`.
     """
 
     TRANSLATED_FIELDS = ["label", "from_name"]
@@ -84,7 +85,7 @@ class EmailAccount(TranslatedFieldMixin, BaseModel):
         db_index=True,
     )
 
-    # ── الصادر ─────────────────────────────────────────────
+    # ── Outbound ───────────────────────────────────────────
     transport = models.CharField(
         _("المحوّل"), max_length=16, choices=MailTransport.choices, default=MailTransport.SMTP
     )
@@ -97,23 +98,23 @@ class EmailAccount(TranslatedFieldMixin, BaseModel):
     )
     username = models.CharField(_("اسم المستخدم"), max_length=255, blank=True)
 
-    #: ⚠️  المهلة **إلزامية بقيمة صغيرة**. خادم SMTP لا يردّ بلا مهلة
-    #:     يعلّق خيط الويب حتى مهلة النظام — فيتحوّل عطل بريد إلى
-    #:     توقّف موقع.
+    #: ⚠️  The timeout is **mandatory and small**. An SMTP server that does not
+    #:     respond, with no timeout, pins a web thread until the system timeout —
+    #:     turning a mail fault into a site outage.
     timeout = models.PositiveSmallIntegerField(
         _("المهلة (ثانية)"), default=10, validators=[MinValueValidator(1), MaxValueValidator(120)]
     )
 
-    # ── الهوية الظاهرة للمستلم ─────────────────────────────
+    # ── The identity the recipient sees ────────────────────
     from_email = models.EmailField(_("المرسل"), max_length=254)
     from_name_ar = models.CharField(_("اسم المرسل بالعربية"), max_length=120, blank=True)
     from_name_en = models.CharField(_("اسم المرسل بالإنجليزية"), max_length=120, blank=True)
 
-    #: ⚠️  عنوان يقرأه إنسان. المرسل غالبًا `noreply@`، وردّ العميل
-    #:     عليه يذهب إلى العدم — وهو يظنّ أنه راسل خدمة العملاء.
+    #: ⚠️  An address a human reads. The sender is usually `noreply@`, and a
+    #:     customer's reply to it goes nowhere — while they believe they wrote to support.
     reply_to = models.EmailField(_("الردّ إلى"), max_length=254, blank=True)
 
-    # ── الوارد (IMAP) ──────────────────────────────────────
+    # ── Inbound (IMAP) ─────────────────────────────────────
     imap_host = models.CharField(_("خادم IMAP"), max_length=255, blank=True)
     imap_port = models.PositiveIntegerField(
         _("منفذ IMAP"), default=993, validators=[MinValueValidator(1), MaxValueValidator(65535)]
@@ -124,11 +125,11 @@ class EmailAccount(TranslatedFieldMixin, BaseModel):
     imap_username = models.CharField(_("مستخدم IMAP"), max_length=255, blank=True)
     imap_folder = models.CharField(_("المجلد"), max_length=100, default="INBOX")
 
-    #: ⚠️  آخر معرّف مسحوب — بدونه تعيد كل دورة استيراد الصندوق كله.
+    #: ⚠️  The last UID pulled — without it every cycle re-imports the whole mailbox.
     imap_last_uid = models.BigIntegerField(_("آخر معرّف مسحوب"), default=0)
 
-    # ── التشغيل ────────────────────────────────────────────
-    #: ⚠️  الوسم الذي يمنع إسناد رسائل الأمان إليه.
+    # ── Operation ──────────────────────────────────────────
+    #: ⚠️  The flag that prevents security messages being assigned to it.
     is_marketing = models.BooleanField(
         _("حساب تسويقي"),
         default=False,
@@ -138,10 +139,10 @@ class EmailAccount(TranslatedFieldMixin, BaseModel):
     is_active = models.BooleanField(_("مفعّل"), default=True, db_index=True)
     priority = models.IntegerField(_("الأولوية"), default=0, help_text=_("الأعلى يُجرَّب أولًا"))
 
-    #: صفر = بلا سقف
+    #: Zero = no cap
     max_per_hour = models.PositiveIntegerField(_("سقف الرسائل بالساعة"), default=0)
 
-    # ── الصحّة ─────────────────────────────────────────────
+    # ── Health ─────────────────────────────────────────────
     last_success_at = models.DateTimeField(_("آخر نجاح"), null=True, blank=True)
     last_error_at = models.DateTimeField(_("آخر فشل"), null=True, blank=True)
     last_error = models.TextField(_("آخر خطأ"), blank=True)
@@ -164,7 +165,7 @@ class EmailAccount(TranslatedFieldMixin, BaseModel):
         mode = " [طرفية]" if self.transport == MailTransport.CONSOLE else ""
         return f"{self.label_ar}{mode}"
 
-    # ── الحساب ─────────────────────────────────────────────
+    # ── The account ────────────────────────────────────────
 
     @property
     def sends(self) -> bool:
@@ -176,24 +177,25 @@ class EmailAccount(TranslatedFieldMixin, BaseModel):
 
     @property
     def sender(self) -> str:
-        """`المتجر الطبي <noreply@example.com>` — أو العنوان وحده."""
+        """`Medical Store <noreply@example.com>` — or the address alone."""
         name = self.from_name_ar or self.from_name_en
         return formataddr((name, self.from_email)) if name else self.from_email
 
     @property
     def is_failing(self) -> bool:
         """
-        ⚠️  **مؤشّر لا مفتاح.**
+        ⚠️  **An indicator, not a switch.**
 
-            الإيقاف التلقائي عند تكرار الفشل يبدو حمايةً، وهو في
-            حساب وحيد يحوّل عطلًا مؤقتًا في SMTP إلى انقطاع كامل
-            يحتاج تدخلًا يدويًا لرفعه — أي يضاعف العطل بدل أن
-            يحتويه. الحالة تُعرض، والقرار للمشغّل.
+            Automatic disabling on repeated failure looks like protection, and
+            on a single account it turns a temporary SMTP fault into a complete
+            outage needing manual intervention to lift — that is, it multiplies
+            the fault instead of containing it. The status is displayed, and the
+            decision belongs to the operator.
         """
         return self.consecutive_failures >= 3
 
     def secret(self, key: str) -> str:
-        """كلمة مرور أو مفتاح — من الجدول المنفصل."""
+        """A password or a key — from the separate table."""
         credential = self.credentials.filter(key=key).first()
         return credential.value if credential else ""
 
@@ -211,9 +213,9 @@ class EmailAccount(TranslatedFieldMixin, BaseModel):
             errors["imap_host"] = _("خادم IMAP مطلوب للاستقبال")
 
         if self.is_marketing and self.is_default:
-            # ⚠️  الافتراضي نهاية كل مسار لم يُسنَد صراحةً — ورسائل
-            #     الأمان تقع فيه. حساب تسويقي افتراضي يلتفّ على سياج
-            #     `SECURITY_PURPOSES` كله من الباب الخلفي.
+            # ⚠️  The default is the end of every path not explicitly assigned — and
+            #     security messages land in it. A marketing default routes around the
+            #     entire `SECURITY_PURPOSES` firewall through the back door.
             errors["is_marketing"] = _("الحساب الافتراضي لا يكون تسويقيًا — رسائل الأمان تمرّ به")
 
         if errors:
@@ -228,21 +230,22 @@ class CredentialKey(models.TextChoices):
 
 class EmailCredential(BaseModel):
     """
-    سرّ حساب بريد.
+    A mail account secret.
 
-    ⚠️  **مفصول عن `EmailAccount` عمدًا** — نفس حجّة `ProviderCredential`
-        في `payments` (ADR-15): من يدير حسابات البريد ليس بالضرورة
-        من يملك كلماتها. جدول منفصل يسمح بصلاحية قراءة مختلفة.
+    ⚠️  **Deliberately separated from `EmailAccount`** — the same argument as
+        `ProviderCredential` in `payments` (ADR-15): whoever manages mail
+        accounts is not necessarily whoever holds their passwords. A separate
+        table allows a different read permission.
 
-    ⚠️  **القيمة لا تُرجَع في أي API إطلاقًا — حتى للأدمن.**
-        الحقل للكتابة فقط، والعرض `masked_value` وحده.
+    ⚠️  **The value is never returned in any API — not even to the admin.**
+        The field is write-only, and only `masked_value` is displayed.
 
-    ⚠️  **ومشفّرة في قاعدة البيانات** بـ `FIELD_ENCRYPTION_KEY`.
+    ⚠️  **And it is encrypted in the database** with `FIELD_ENCRYPTION_KEY`.
 
-        حجب القيمة عن الـ API وحده يحمي مسارًا ويترك الآخر مفتوحًا:
-        نسخة احتياطية أو تسريب SQL يعطي كلمات مرور صناديق البريد
-        كاملة — وصندوق البريد هو مفتاح إعادة تعيين كل كلمة مرور
-        أخرى تملكها الشركة.
+        Withholding the value from the API alone protects one path and leaves
+        the other open: a backup or a SQL leak hands over the mailbox passwords
+        in full — and the mailbox is the key to resetting every other password
+        the company owns.
     """
 
     account = models.ForeignKey(
@@ -270,7 +273,7 @@ class EmailCredential(BaseModel):
 
     @property
     def masked_value(self) -> str:
-        """التمثيل الوحيد المسموح بعرضه."""
+        """The only representation permitted to be displayed."""
         if len(self.value) <= 4:
             return "••••"
         return f"••••••••{self.value[-4:]}"
@@ -278,30 +281,31 @@ class EmailCredential(BaseModel):
 
 class MailRoute(BaseModel):
     """
-    المسؤولية: هذا الغرض (أو هذا القالب بعينه) يخرج من هذا الحساب.
+    The responsibility: this purpose (or this specific template) goes out from this account.
 
-    ⚠️  **الحلّ من الأخصّ إلى الأعمّ، وينتهي دائمًا إلى نهاية.**
+    ⚠️  **Resolution runs from the most specific to the most general, and always ends in a terminus.**
 
-            قالب بعينه   (password_reset ← حساب الأمان)
-                  ↓ إن لم يوجد
-            الغرض        (ORDERS · MARKETING · …)
-                  ↓ إن لم يوجد
-            الحساب الافتراضي  ← نهاية إلزامية
+            a specific template   (password_reset ← the security account)
+                  ↓ if absent
+            the purpose           (ORDERS · MARKETING · …)
+                  ↓ if absent
+            the default account   ← a mandatory terminus
 
-        بلا النهاية، قالب يُضاف غدًا لا يُرسَل — لا بخطأ بل بصمت،
-        وهو أسوأ سلوك ممكن: الشاشة تقول إن الإشعار أُرسل، والعميل
-        لم يصله شيء، ولا سطر في أي سجل يفسّر لماذا.
+        Without the terminus, a template added tomorrow is not sent — not with
+        an error but silently, which is the worst possible behaviour: the screen
+        says the notification was sent, the customer received nothing, and no
+        line in any log explains why.
 
-    ⚠️  و`PROTECT` على الحساب: حذف حساب مسنَد إليه بريد الأمان كان
-        يُسقط مسؤوليته صامتًا فتعود رسائل التفعيل إلى الافتراضي —
-        وقد يكون التسويقي.
+    ⚠️  And `PROTECT` on the account: deleting an account that security mail was
+        assigned to used to drop its responsibility silently, so activation
+        messages fell back to the default — which might be the marketing one.
     """
 
     purpose = models.CharField(
         _("الغرض"), max_length=16, choices=MailPurpose.choices, db_index=True
     )
 
-    #: فارغ = كل قوالب هذا الغرض
+    #: Empty = every template of this purpose
     template_key = models.CharField(
         _("قالب بعينه"),
         max_length=100,
@@ -341,23 +345,23 @@ class MailRoute(BaseModel):
             if template is None:
                 errors["template_key"] = _("قالب غير معروف")
             else:
-                # ⚠️  الغرض يُؤخذ من القالب لا من اختيار المستخدم.
+                # ⚠️  The purpose is taken from the template, not from the user's choice.
                 #
-                #     صفّ بغرض يخالف غرض قالبه لا يخطئ ولا يعمل: لا
-                #     يطابق شيئًا أبدًا. والحالة غير الصالحة التي لا
-                #     تُرفَض تصير إعدادًا يراه المشغّل مضبوطًا وهو
-                #     ميت — وأثره الوحيد رسالة تخرج من الحساب الخطأ.
+                #     A row whose purpose contradicts its template's neither errors nor
+                #     works: it simply never matches anything. And an invalid state that
+                #     is not rejected becomes a configuration the operator sees as set
+                #     up while it is dead — its only effect a message from the wrong account.
                 self.purpose = template.purpose
 
         if self.account_id and not self.account.sends:
-            # حساب استقبال ليس حساب إرسال — والخلط يُخرج البريد من صندوق الدعم
+            # A receiving account is not a sending account — conflating them sends mail out of the support inbox
             errors["account"] = _("هذا الحساب لا يرسل — اتجاهه استقبال فقط")
 
         if self.account_id and self.purpose in SECURITY_PURPOSES and self.account.is_marketing:
-            # ⚠️  السياج الذي وُجد النطاق كله لأجله (ADR-76): حساب
-            #     التسويق يُدرَج في القوائم السوداء بحكم طبيعته، وإسناد
-            #     «إعادة تعيين كلمة المرور» إليه يحجب المستخدمين عن
-            #     حساباتهم عقابًا على حملة تسويقية.
+            # ⚠️  The firewall the whole domain exists for (ADR-76): the marketing
+            #     account gets blacklisted by its very nature, and assigning
+            #     "password reset" to it locks users out of their accounts
+            #     as punishment for a marketing campaign.
             errors["account"] = _("رسائل الحساب والأمان لا تُسنَد إلى حساب تسويقي")
 
         if errors:
@@ -372,37 +376,40 @@ class DeliveryState(models.TextChoices):
     CANCELLED = "CANCELLED", _("ألغي")
 
 
-#: بعدها يُعلَن الفشل نهائيًا ويظهر في الشاشة
+#: After this the failure is declared final and appears on the screen
 MAX_ATTEMPTS = 5
 
-#: ⚠️  تراجع تدريجي بالدقائق — لا إعادة فورية.
+#: ⚠️  A gradual backoff in minutes — not an immediate retry.
 #:
-#:     خادم SMTP يرفض بسبب حدّ معدّل يرفض الإعادة الفورية أيضًا،
-#:     وإلحاحُنا عليه يطيل المنع بدل أن يقصره.
+#:     An SMTP server refusing because of a rate limit refuses the immediate
+#:     retry too, and our insistence lengthens the block rather than shortening it.
 BACKOFF_MINUTES = (1, 5, 15, 60, 240)
 
-#: ⚠️  صفّ عالق في `SENDING` يُستردّ بعد هذه المدة.
+#: ⚠️  A row stuck in `SENDING` is recovered after this interval.
 #:
-#:     العملية التي تسقط بين «الحجز» و«الإرسال» تترك الصف محجوزًا
-#:     إلى الأبد، فتضيع الرسالة بلا فشل ظاهر — أسوأ من فشل معلن.
+#:     A process that dies between "claim" and "send" leaves the row claimed
+#:     forever, so the message is lost with no visible failure — worse than a declared one.
 STUCK_MINUTES = 15
 
 
 class OutboundMessage(BaseModel):
     """
-    رسالة في طابور الصادر.
+    A message in the outbound queue.
 
-    ⚠️  **النص لقطة لا مرجع** — يُصيَّر عند التقييد لا عند التسليم.
+    ⚠️  **The text is a snapshot, not a reference** — it is rendered on
+        enqueueing, not on delivery.
 
-        التصيير المؤجَّل يقرأ قالبًا قد يكون الأدمن حرّره في الأثناء،
-        وسياقًا قد تغيّر: «إجمالي طلبك ٤٥٠» تصير رقمًا آخر بعد
-        مرتجع. الرسالة تصف لحظة وقوع الحدث، فتُجمَّد عندها.
+        Deferred rendering reads a template the admin may have edited in the
+        meantime, and a context that may have changed: "your order total is 450"
+        becomes another figure after a return. The message describes the moment
+        the event happened, so it is frozen there.
 
-    ⚠️  **والحساب يُحلّ عند التسليم لا عند التقييد.**
+    ⚠️  **And the account is resolved at delivery, not at enqueueing.**
 
-        الطابور يعيش دقائق، والمسؤوليات قد تتغيّر فيها. وتجميد
-        الحساب كان يعني أن تصحيح إسناد خاطئ لا يطال ما في الطابور —
-        وهو بالضبط ما يُصحَّح على عجل حين يُكتشف الخطأ.
+        The queue lives for minutes, and responsibilities may change within
+        them. Freezing the account meant that correcting a wrong assignment did
+        not reach what was already queued — which is exactly what gets corrected
+        in a hurry when the mistake is found.
     """
 
     to_email = models.EmailField(_("المستلم"), max_length=254)
@@ -427,15 +434,15 @@ class OutboundMessage(BaseModel):
     last_error = models.TextField(_("آخر خطأ"), blank=True)
     sent_at = models.DateTimeField(_("وقت التسليم"), null=True, blank=True)
 
-    #: ⚠️  ترويسات المحادثة — تجعل الردّ يظهر **داخل** سلسلة العميل.
+    #: ⚠️  Threading headers — they make the reply appear **inside** the customer's thread.
     #:
-    #:     بدونها يصل جوابنا رسالةً منفصلة في صندوقه، فيقرأه بلا
-    #:     سؤاله الأصلي أمامه — ويعيد السؤال.
+    #:     Without them our answer arrives as a separate message in their inbox, so
+    #:     they read it without their original question in front of them — and ask again.
     in_reply_to = models.CharField(_("ردّ على"), max_length=998, blank=True)
     references = models.TextField(_("سلسلة المراجع"), blank=True)
 
-    #: ⚠️  `SET_NULL` لا `PROTECT`: حساب يُحذف بعد تسليم رسائله يجب
-    #:     ألا يبقى محجوزًا بسجل تاريخي. الرسالة تبقى، ونسبتها تسقط.
+    #: ⚠️  `SET_NULL`, not `PROTECT`: an account deleted after its messages were delivered
+    #:     must not stay pinned by a historical record. The message remains, and its attribution drops.
     account = models.ForeignKey(
         EmailAccount,
         on_delete=models.SET_NULL,
@@ -450,7 +457,7 @@ class OutboundMessage(BaseModel):
         verbose_name_plural = _("الصادر")
         ordering = ["-created_at"]
         indexes = [
-            # يخدم استعلام السحب في المهمة الدورية
+            # Serves the claim query in the periodic task
             models.Index(fields=["status", "next_attempt_at"]),
         ]
 
@@ -465,28 +472,28 @@ class OutboundMessage(BaseModel):
 
 class TemplateOverride(BaseModel):
     """
-    نسخة محرَّرة من قالب — تعلو نسخة الكود ولا تحلّ محلّها.
+    An edited version of a template — it outranks the code version rather than replacing it.
 
-    ⚠️  **نسخة الكود تبقى دائمًا** كقيمة احتياطية.
+    ⚠️  **The code version always remains** as a fallback.
 
-        تحرير فاسد لا يجوز أن يعطّل «إعادة تعيين كلمة المرور»:
-        إيقاف التجاوز (أو حذفه) يعيد النص الأصلي فورًا بلا نشر ولا
-        استعادة نسخة احتياطية. ولذلك الجدول **تجاوزات** لا قوالب:
-        الغياب حالة صالحة تعني «الافتراضي».
+        A bad edit must not be able to disable "password reset": disabling the
+        override (or deleting it) restores the original text immediately with no
+        deployment and no backup restore. That is why the table holds
+        **overrides**, not templates: absence is a valid state meaning "the default".
 
-    ⚠️  **واللغتان إلزامiتان.**
+    ⚠️  **And both languages are mandatory.**
 
-        قالب بلغة واحدة يعني مستخدمًا يتلقّى رسالة لا يفهمها. ومن
-        يحرّر العربية وينسى الإنجليزية لا يكتشف ذلك أبدًا — لأنه لا
-        يقرأ بريده بالإنجليزية.
+        A template in one language means a user receiving a message they cannot
+        read. And whoever edits the Arabic and forgets the English never
+        discovers it — because they do not read their mail in English.
     """
 
-    #: ⚠️  التفرّد **مشروط بعدم الحذف** لا `unique=True`.
+    #: ⚠️  Uniqueness is **conditioned on not being deleted**, not `unique=True`.
     #:
-    #:     «الرجوع إلى الافتراضي» حذف ناعم، والصفّ المحذوف يبقى في
-    #:     الجدول. ومع تفرّد صارم كان يحتلّ المفتاح إلى الأبد: أول
-    #:     تحرير بعد أي رجوع يفشل بـ IntegrityError على مفتاح لا يراه
-    #:     المشغّل أصلًا.
+    #:     "Revert to default" is a soft delete, and the deleted row stays in the
+    #:     table. Under strict uniqueness it occupied the key forever: the first
+    #:     edit after any revert failed with an IntegrityError on a key the
+    #:     operator cannot even see.
     key = models.SlugField(_("مفتاح القالب"), max_length=100, db_index=True)
 
     subject_ar = models.CharField(_("الموضوع بالعربية"), max_length=300)
@@ -494,7 +501,7 @@ class TemplateOverride(BaseModel):
     body_ar = models.TextField(_("النص بالعربية"))
     body_en = models.TextField(_("النص بالإنجليزية"))
 
-    #: إيقافه يعيد نص الكود بلا حذف العمل
+    #: Disabling it restores the code text without deleting the work
     is_active = models.BooleanField(_("مفعّل"), default=True, db_index=True)
 
     class Meta:
@@ -529,8 +536,8 @@ class TemplateOverride(BaseModel):
         default = self.default
 
         if default is None:
-            # ⚠️  تجاوز لقالب لا وجود له لا يخطئ ولا يعمل: صفّ ميت
-            #     يراه المشغّل إعدادًا مضبوطًا.
+            # ⚠️  An override for a template that does not exist neither errors nor works: a dead row
+            #     the operator sees as a configured setting.
             raise ValidationError({"key": _("قالب غير معروف")})
 
         allowed = default.variables
@@ -538,8 +545,8 @@ class TemplateOverride(BaseModel):
         for field in ("subject_ar", "subject_en", "body_ar", "body_en"):
             unknown = placeholders(getattr(self, field) or "") - allowed
             if unknown:
-                # ⚠️  الكود وحده يعرف ما يضعه في السياق؛ ومتغيّر خارج
-                #     قائمته يصل إلى المستلم نصًّا خامًا `{whatever}`.
+                # ⚠️  Only the code knows what it puts in the context; and a variable outside
+                #     its list reaches the recipient as raw text, `{whatever}`.
                 errors[field] = _("متغيّرات غير معروفة: %(names)s — المتاح: %(allowed)s") % {
                     "names": " · ".join(sorted(unknown)),
                     "allowed": " · ".join(sorted(allowed)) or "—",
@@ -563,20 +570,22 @@ def inbound_attachment_path(instance, filename: str) -> str:
 
 class InboundMessage(BaseModel):
     """
-    رسالة واردة إلى أحد صناديقنا.
+    A message arriving at one of our mailboxes.
 
-    ⚠️  **`message_id` هو مفتاح عدم التكرار** — لا رقم الرسالة في
-        الخادم ولا وقت الوصول.
+    ⚠️  **`message_id` is the deduplication key** — not the message number on
+        the server, and not the arrival time.
 
-        السحب يقع كل بضع دقائق، وأي انقطاع في منتصفه يعيد المرور على
-        ما سُحب. وبلا مفتاح ثابت من الرسالة نفسها يظهر البريد الواحد
-        عشر مرات في صندوق الدعم، فيردّ عليه موظفان.
+        The pull happens every few minutes, and any interruption mid-way
+        re-covers what was already pulled. Without a stable key from the message
+        itself, one email appears ten times in the support inbox and two staff
+        reply to it.
 
-    ⚠️  **و`body_html` يُخزَّن ولا يُعرَض.**
+    ⚠️  **And `body_html` is stored and never displayed.**
 
-        رسالة واردة من مجهول تحمل `<script>` تُعرَض في شاشة أدمن
-        مسجَّل الدخول هي XSS مباشر على أعلى صلاحية في النظام. النص
-        الصريح يكفي للقراءة والردّ، والـ HTML يبقى للأرشيف.
+        An inbound message from a stranger carrying `<script>` rendered on a
+        logged-in admin screen is direct XSS at the highest privilege in the
+        system. Plain text is enough to read and reply, and the HTML stays for
+        the archive.
     """
 
     account = models.ForeignKey(
@@ -586,11 +595,11 @@ class InboundMessage(BaseModel):
         verbose_name=_("الصندوق"),
     )
 
-    #: معرّف الرسالة من ترويسة `Message-ID`
+    #: The message id from the `Message-ID` header
     message_id = models.CharField(_("معرّف الرسالة"), max_length=998, db_index=True)
 
-    #: ⚠️  لبناء `In-Reply-To` عند الردّ — بدونه يظهر ردّنا عند العميل
-    #:     رسالةً منفصلة لا جوابًا، فيفقد السياق ويعيد السؤال.
+    #: ⚠️  For building `In-Reply-To` on reply — without it our answer appears to
+    #:     the customer as a separate message rather than an answer, so they lose the context and ask again.
     in_reply_to = models.CharField(_("ردّ على"), max_length=998, blank=True)
     references = models.TextField(_("سلسلة المراجع"), blank=True)
 
@@ -605,7 +614,7 @@ class InboundMessage(BaseModel):
     received_at = models.DateTimeField(_("وقت الوصول"), db_index=True)
     size_bytes = models.PositiveIntegerField(_("الحجم"), default=0)
 
-    #: ⚠️  ردّ آلي: لا يُردّ عليه أبدًا. انظر `services.reply`.
+    #: ⚠️  An auto-reply: never replied to. See `services.reply`.
     is_auto = models.BooleanField(_("رسالة آلية"), default=False)
 
     status = models.CharField(
@@ -624,7 +633,7 @@ class InboundMessage(BaseModel):
         verbose_name=_("المسؤول"),
     )
 
-    #: مرجع نصي — لا مفتاح صاعد إلى أي نطاق (نمط `Notification`)
+    #: A string reference — no upward key to any domain (the `Notification` pattern)
     reference_type = models.CharField(_("نوع المرجع"), max_length=32, blank=True)
     reference_id = models.CharField(_("معرّف المرجع"), max_length=64, blank=True)
 
@@ -650,15 +659,16 @@ class InboundMessage(BaseModel):
 
 class InboundAttachment(BaseModel):
     """
-    مرفق رسالة واردة.
+    An inbound message attachment.
 
-    ⚠️  **أخطر مسار رفع في النظام كله**: بلا مستخدم مسجَّل ولا حدّ ولا
-        نيّة معلومة — يكفي أن يعرف المهاجم عنوان صندوقنا.
+    ⚠️  **The most dangerous upload path in the entire system**: no logged-in
+        user, no limit and no known intent — an attacker need only know our
+        mailbox address.
 
-        ولذلك يخضع لفحص التوقيع نفسه الذي يخضع له رفع المنتجات
-        (ADR-45): `content_type` تكتبه الرسالة ويمكن تزويره، والنوع
-        الحقيقي يُقرأ من أول بايتات الملف. وما لا يُعرف توقيعه
-        **لا يُخزَّن**.
+        It is therefore subject to the same signature check as product uploads
+        (ADR-45): `content_type` is written by the message and can be forged,
+        and the true type is read from the file's first bytes. And anything
+        whose signature is unrecognised **is not stored**.
     """
 
     message = models.ForeignKey(

@@ -1,15 +1,17 @@
 """
-اختبارات واجهات البريد.
+Mail endpoint tests.
 
-⚠️  **الخاصية المحروسة هنا واحدة قبل كل شيء: السرّ لا يخرج.**
+⚠️  **One property is guarded here before all others: the secret does not get out.**
 
-    إعداد البريد يُدار من شاشة، والشاشة تقرأ من الـ API. وأي حقل
-    يعيد كلمة المرور — ولو «مقنّعة جزئيًا» — يضعها في سجل المتصفح
-    وفي كاش الوكيل وفي أي أداة تصحيح مفتوحة. القناع الحقيقي أن تكون
-    القيمة غير موجودة في الحمولة أصلًا.
+    Mail configuration is managed from a screen, and the screen reads from the
+    API. And any field returning the password — even "partially masked" — puts
+    it in the browser history, in the proxy cache, and in any open debugging
+    tool. The real mask is for the value to be absent from the payload entirely.
 """
 
 import pytest
+
+from core.testing import grant_all_domains
 from django.apps import apps
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -21,7 +23,7 @@ SMTP_SECRET = "sup3r-secret-smtp-key"
 
 
 def _model(label: str, name: str):
-    """⚠️  `apps.get_model` لا `import` — `mailing` ممنوع من استيراد نطاق عمل."""
+    """⚠️  `apps.get_model`, not `import` — `mailing` is forbidden from importing a business domain."""
     return apps.get_model(label, name)
 
 
@@ -34,6 +36,7 @@ def admin_client(db):
     admin.is_active = True
     admin.save()
     _model("administration", "AdminProfile").objects.create(user=admin)
+    grant_all_domains(admin)
 
     client = APIClient()
     client.force_authenticate(user=admin)
@@ -72,7 +75,7 @@ class TestSecretsNeverLeave:
         assert SMTP_SECRET not in response.content.decode()
 
     def test_write_then_read_back_never_returns_it(self, admin_client, account):
-        """الكتابة تنجح، والقراءة بعدها لا تعيد ما كُتب."""
+        """The write succeeds, and the read afterwards does not return what was written."""
         url = reverse("v1:mailing:account-detail", args=[account.pk])
 
         response = admin_client.patch(url, {"password": "brand-new-password"}, format="json")
@@ -83,8 +86,8 @@ class TestSecretsNeverLeave:
 
     def test_audit_log_records_field_names_not_values(self, admin_client, account):
         """
-        ⚠️  سجل التدقيق أطول عمرًا من الصف الذي أخفينا السرّ فيه —
-            وكتابة الحمولة فيه تُبقي كلمة المرور صريحة إلى الأبد.
+        ⚠️  The audit log outlives the row we hid the secret in — and writing
+            the payload into it keeps the password in the clear forever.
         """
         url = reverse("v1:mailing:account-detail", args=[account.pk])
         admin_client.patch(url, {"password": "another-secret"}, format="json")
@@ -101,9 +104,10 @@ class TestSecretsNeverLeave:
 class TestSecretPreservation:
     def test_blank_password_keeps_the_current_one(self, admin_client, account):
         """
-        ⚠️  الشاشة تُقدَّم بحقل فارغ دائمًا لأن القيمة لا تُقرأ. فحفظ
-            تعديل على المنفذ وحده كان سيمسح كلمة المرور بلا أن يقصد
-            أحد — ويوقف البريد كله بتعديل يبدو بريئًا.
+        ⚠️  The screen is always presented with an empty field because the value
+            is never read. So saving an edit to the port alone would have erased
+            the password with nobody intending it — stopping all mail through an
+            edit that looks innocent.
         """
         url = reverse("v1:mailing:account-detail", args=[account.pk])
 
@@ -122,8 +126,8 @@ class TestAccess:
 
     def test_customer_is_rejected(self, db, account):
         """
-        ⚠️  إعداد البريد داخلي بالكامل: أسماء الخوادم والمستخدمين
-            تكشف بنية تحتية وتدلّ مهاجمًا على أين يجرّب كلمات المرور.
+        ⚠️  Mail configuration is entirely internal: server and user names
+            reveal infrastructure and tell an attacker where to try passwords.
         """
         user_model = _model("accounts", "User")
         customer = user_model.objects.create_user(
@@ -142,11 +146,11 @@ class TestAccess:
 class TestVerification:
     def test_verify_reports_failure_without_raising(self, admin_client, db):
         """
-        ⚠️  خادم لا يستجيب يجب أن يعطي «فشل ورسالته» لا 500.
+        ⚠️  A server that does not respond must give "a failure and its message", not a 500.
 
-            الشاشة التي تعرض خطأ خادم عام تترك المشغّل بلا سبب، وهو
-            بالضبط ما جاء ليعرفه: أهي كلمة المرور أم المنفذ أم جدار
-            الحماية؟
+            A screen showing a generic server error leaves the operator with no
+            cause, which is exactly what they came to learn: is it the password,
+            the port, or the firewall?
         """
         account = EmailAccount.objects.create(
             code="broken",
@@ -170,9 +174,10 @@ class TestVerification:
 
     def test_test_send_uses_the_account_it_was_asked_about(self, admin_client, db, monkeypatch):
         """
-        ⚠️  الرسالة التجريبية تتجاوز الحلّال عمدًا: السؤال «هل يعمل
-            **هذا** الحساب؟» لا «من المسؤول عن هذا الغرض؟». تمريرها
-            بالحلّال كان يفحص حسابًا غير الذي يجلس المشغّل أمامه.
+        ⚠️  The test message deliberately bypasses the resolver: the question is
+            "does **this** account work?", not "who is responsible for this
+            purpose?". Passing it through the resolver tested an account other
+            than the one the operator is sitting in front of.
         """
         from django.core import mail as django_mail
 
@@ -232,7 +237,7 @@ class TestRoutingAPI:
         assert rows["password_reset"]["source"] == "default"
 
     def test_security_route_to_marketing_is_refused_by_the_api(self, admin_client, db):
-        """السياج يُفرَض في الـ API كما في لوحة الإدارة — لا نسختين للقاعدة."""
+        """The firewall is enforced in the API as in the admin panel — not two copies of the rule."""
         from mailing.purposes import MailPurpose
 
         promo = EmailAccount.objects.create(
@@ -254,8 +259,9 @@ class TestRoutingAPI:
 
     def test_purpose_is_corrected_from_the_template(self, admin_client, account):
         """
-        ⚠️  صفٌّ بغرض يخالف غرض قالبه لا يخطئ ولا يعمل: لا يطابق شيئًا
-            أبدًا. والتصحيح يمنع إعدادًا يراه المشغّل مضبوطًا وهو ميت.
+        ⚠️  A row whose purpose contradicts its template's neither errors nor
+            works: it simply never matches. And the correction prevents a
+            configuration the operator sees as set up while it is dead.
         """
         from mailing.purposes import MailPurpose
 
@@ -293,10 +299,10 @@ class TestOutboxAPI:
 
     def test_body_is_not_exposed_in_the_list(self, admin_client, account):
         """
-        ⚠️  نص الرسالة يحمل روابط تفعيل وإعادة تعيين صالحة للاستعمال.
+        ⚠️  The message text carries activation and reset links that still work.
 
-            عرضه في جدول يقرؤه كل من يفتح شاشة البريد يحوّل شاشة
-            تشخيص إلى مفتاح لكل حساب في النظام.
+            Displaying it in a table read by everyone who opens the mail screen
+            turns a diagnostic screen into a key to every account in the system.
         """
         from mailing import services
 
@@ -338,8 +344,9 @@ class TestOutboxAPI:
 class TestTemplateAPI:
     def test_list_shows_all_templates_not_just_edited_ones(self, admin_client):
         """
-        ⚠️  الشاشة تسأل عن القوالب لا عن الجدول: عرض التجاوزات وحدها
-            كان يُظهر قائمة فارغة على نظام يرسل ثلاثة عشر قالبًا.
+        ⚠️  The screen asks about the templates, not about the table: showing
+            the overrides alone displayed an empty list on a system that sends
+            thirteen templates.
         """
         from mailing.templates import TEMPLATES
 
@@ -350,7 +357,7 @@ class TestTemplateAPI:
         assert all(row["is_overridden"] is False for row in response.data)
 
     def test_row_carries_the_available_variables(self, admin_client):
-        """المحرّر الذي لا يرى ما يملك يكتب `{price}` بدل `{total}`."""
+        """An editor who cannot see what they have writes `{price}` instead of `{total}`."""
         response = admin_client.get(reverse("v1:mailing:template-detail", args=["order_placed"]))
 
         assert set(response.data["variables"]) == {"name", "number", "total", "link"}
@@ -373,7 +380,7 @@ class TestTemplateAPI:
         assert saved.data["subject_ar"] == "تنبيه أمني"
         assert saved.data["is_overridden"] is True
 
-        # ⚠️  «الرجوع إلى الافتراضي» ضغطة لا إعادة كتابة من الذاكرة
+        # ⚠️  "Revert to default" is a click, not a retype from memory
         reset = admin_client.delete(url)
 
         assert reset.status_code == 200
@@ -393,13 +400,14 @@ class TestTemplateAPI:
         )
 
         assert response.status_code == 400
-        # المعالج الموحّد يضع أخطاء الحقول تحت `fields` (اصطلاح الـ API)
+        # The unified handler puts field errors under `fields` (the API convention)
         assert "body_ar" in response.data["fields"]
 
     def test_preview_renders_the_draft_without_saving(self, admin_client):
         """
-        ⚠️  المعاينة تعمل على ما في الشاشة الآن: معاينة لا تسبق الحفظ
-            لا تمنع شيئًا. ولا تلمس قاعدة البيانات — التجربة ليست التزامًا.
+        ⚠️  The preview works on what is on the screen now: a preview that does
+            not precede the save prevents nothing. And it touches no database —
+            an experiment is not a commitment.
         """
         from mailing.models import TemplateOverride
 
@@ -415,8 +423,8 @@ class TestTemplateAPI:
 
     def test_preview_names_the_unknown_variables(self, admin_client):
         """
-        ⚠️  المتغيّر المجهول يُعرَض صراحةً بدل أن يمرّ في النص فيراه
-            المحرّر «كلمة غريبة» ويتجاهلها.
+        ⚠️  An unknown variable is shown explicitly rather than passing through
+            in the text, where the editor sees it as "a strange word" and ignores it.
         """
         response = admin_client.post(
             reverse("v1:mailing:template-preview", args=["password_changed"]),
@@ -444,11 +452,12 @@ class TestTemplateAPI:
 class TestTemplateResetCycle:
     def test_edit_reset_edit_again_works(self, admin_client):
         """
-        ⚠️  الدورة الكاملة: تحرير ← رجوع ← تحرير من جديد.
+        ⚠️  The full cycle: edit ← revert ← edit again.
 
-            بتفرّد صارم كان الصفّ المحذوف ناعمًا يحتلّ المفتاح إلى
-            الأبد، فيفشل التحرير الثاني بـ IntegrityError على مفتاح لا
-            يراه المشغّل — وهو عطل لا يظهر إلا لمن رجع عن تحرير مرة.
+            Under strict uniqueness the soft-deleted row occupied the key
+            forever, so the second edit failed with an IntegrityError on a key
+            the operator cannot even see — a fault visible only to someone who
+            has reverted an edit once.
         """
         url = reverse("v1:mailing:template-detail", args=["password_changed"])
         payload = {

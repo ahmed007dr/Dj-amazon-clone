@@ -1,18 +1,21 @@
 """
-نقاط حركات المخزون عبر HTTP.
+Stock movement endpoints over HTTP.
 
-⚠️  الخدمات مختبَرة في `test_inventory.py`. المختبَر هنا هو **العقد
-    الذي تعتمد عليه شاشة الأدمن**: شكل الحمولة، والصلاحية، والرفض
-    الذي يجب أن يصل إلى الواجهة رسالةً على حقل لا انهيارًا.
+⚠️  The services are covered in `test_inventory.py`. What is covered here is
+    **the contract the admin screen depends on**: the payload shape, the
+    permission, and the rejection that must reach the frontend as a message on a
+    field rather than a crash.
 
-⚠️  و`administration` يُوصَل إليه بـ `apps.get_model` — هو و`inventory`
-    لا يستورد أحدهما الآخر.
+⚠️  And `administration` is reached through `apps.get_model` — it and `inventory`
+    do not import each other.
 """
 
 from datetime import timedelta
 from decimal import Decimal
 
 import pytest
+
+from core.testing import grant_all_domains
 from django.apps import apps
 from django.urls import reverse
 from django.utils import timezone
@@ -58,6 +61,7 @@ def admin_client(db):
     admin.is_active = True
     admin.save()
     apps.get_model("administration", "AdminProfile").objects.create(user=admin)
+    grant_all_domains(admin)
 
     client = APIClient()
     client.force_authenticate(user=admin)
@@ -76,7 +80,7 @@ def customer_client(db):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الاستلام
+#  Receiving
 # ═══════════════════════════════════════════════════════════
 
 
@@ -102,8 +106,8 @@ class TestReceive:
 
     def test_unit_cost_is_required(self, admin_client, product, location):
         """
-        ⚠️  بلا تكلفة الوحدة يستحيل حساب الربح لاحقًا — والرفض هنا
-            أرخص من قيد تكلفة صفري يمرّ إلى قائمة الأرباح.
+        ⚠️  Without the unit cost, calculating profit later is impossible — and
+            rejecting here is cheaper than a zero-cost entry passing into the profit statement.
         """
         response = admin_client.post(
             reverse("v1:inventory:receive"),
@@ -115,7 +119,7 @@ class TestReceive:
         assert "unit_cost" in response.data["fields"]
 
     def test_location_may_be_omitted(self, admin_client, product, location):
-        """أغلب المنشآت لها مخزن واحد — وإجبار اختياره خطوة بلا قرار."""
+        """Most businesses have one warehouse — forcing them to choose it is a step with no decision."""
         response = admin_client.post(
             reverse("v1:inventory:receive"),
             {"product": str(product.pk), "quantity": 5, "unit_cost": "3.00"},
@@ -127,7 +131,7 @@ class TestReceive:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التسوية
+#  Adjustment
 # ═══════════════════════════════════════════════════════════
 
 
@@ -150,7 +154,7 @@ class TestAdjust:
         assert services.available_quantity(product, location) == 97
 
     def test_reason_is_required(self, admin_client, product, location):
-        """تسوية بلا سبب ثغرة في الجرد: الفرق يظهر بعد شهر بلا تفسير."""
+        """An adjustment with no reason is a hole in the stock count: the discrepancy appears a month later unexplained."""
         services.receive(product, 10, Decimal("1.00"), location=location)
 
         response = admin_client.post(
@@ -174,8 +178,9 @@ class TestAdjust:
 
     def test_the_old_figure_survives_in_the_log(self, admin_client, product, location):
         """
-        ⚠️  التسوية **لا تكتب فوق** الرصيد: تُسجَّل حركةً بسببها،
-            ويبقى «كم كان قبلها» مقروءًا في `balance_after`.
+        ⚠️  An adjustment **does not overwrite** the balance: it is recorded as
+            a movement with its reason, and "what it was before" stays readable
+            in `balance_after`.
         """
         services.receive(product, 50, Decimal("2.00"), location=location)
 
@@ -195,7 +200,7 @@ class TestAdjust:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التحويل والتلف
+#  Transfer and damage
 # ═══════════════════════════════════════════════════════════
 
 
@@ -255,13 +260,13 @@ class TestTransferAndDamage:
 
 
 # ═══════════════════════════════════════════════════════════
-#  السجل والصلاحية
+#  The log and permissions
 # ═══════════════════════════════════════════════════════════
 
 
 class TestLogAndPermissions:
     def test_every_command_leaves_a_movement(self, admin_client, product, location, branch):
-        """**كل تغيير في المخزون يترك حركة. بلا استثناء.**"""
+        """**Every change in stock leaves a movement. Without exception.**"""
         admin_client.post(
             reverse("v1:inventory:receive"),
             {"product": str(product.pk), "quantity": 10, "unit_cost": "1.00"},
@@ -284,7 +289,7 @@ class TestLogAndPermissions:
         assert {"RECEIPT", "ADJUSTMENT_DOWN", "DAMAGE"} <= kinds
 
     def test_the_log_records_who_did_it(self, admin_client, product, location):
-        """«من غيّر الرصيد» هو نصف الجواب عن «أين ذهبت الخمسون علبة؟»."""
+        """"Who changed the balance" is half the answer to "where did the fifty boxes go?"."""
         admin_client.post(
             reverse("v1:inventory:receive"),
             {"product": str(product.pk), "quantity": 3, "unit_cost": "1.00"},
@@ -313,8 +318,8 @@ class TestLogAndPermissions:
     )
     def test_customers_cannot_move_stock(self, customer_client, product, endpoint, body):
         """
-        ⚠️  حركة المخزون بيد الأدمن وحده — وعميل يستطيع تسجيل
-            «استلام» يخلق بضاعة من العدم في كل تقرير.
+        ⚠️  Stock movement is in the admin's hands alone — and a customer able
+            to record a "receipt" creates goods from nothing in every report.
         """
         response = customer_client.post(
             reverse(endpoint), {"product": str(product.pk), **body}, format="json"
@@ -324,5 +329,5 @@ class TestLogAndPermissions:
         assert not StockMovement.objects.filter(product=product).exists()
 
     def test_customers_cannot_read_the_log(self, customer_client):
-        """السجل يكشف حجم النشاط ومعدّل الدوران — رقم تجاري لا يُعطى."""
+        """The log reveals the volume of business and the turnover rate — a commercial figure that is not given away."""
         assert customer_client.get(reverse("v1:inventory:movements")).status_code == 403

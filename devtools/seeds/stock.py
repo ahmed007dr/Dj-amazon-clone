@@ -51,13 +51,13 @@ BATCHES = [
     # Two batches of the same item: the one expiring sooner is consumed first (FEFO)
     ("PAR-500", 150, "12.50", 25, "main"),
     ("PAR-500", 600, "12.00", 500, "main"),
-    # توشك على الانتهاء — داخل نافذة التنبيه (٩٠ يومًا)
+    # About to expire — inside the alert window (90 days)
     ("VAC-STR", 60, "310.00", 45, "main"),
-    # منتهية بالفعل — للأمر `quarantine_expired_batches`
+    # Already expired — for the `quarantine_expired_batches` command
     ("GZE-STR", 50, "7.20", -10, "main"),
 ]
 
-#: (SKU، حد إعادة الطلب، الحد الحرج) — لكل موقع بائع
+#: (SKU, reorder point, critical threshold) — per selling location
 REORDER_POINTS = {
     "GLV-NIT": (60, 20),
     "GLV-LTX": (60, 20),
@@ -73,12 +73,12 @@ REORDER_POINTS = {
     "VAC-STR": (30, 12),
 }
 
-#: نسخ تُستلَم بكمياتها الخاصة — المخزون على النسخة لا المنتج
+#: Variants received with their own quantities — stock is on the variant, not the product
 VARIANT_BATCHES = [
     ("GLV-NIT-S", 120, "96.00", 540, "main"),
     ("GLV-NIT-M", 340, "96.00", 540, "main"),
-    # ⚠️  مقاس L نافد عمدًا — المنتج «متوفر» ونسخة منه ليست كذلك،
-    #     وهو الفرق الذي يجعل تتبّع المخزون على النسخة ضروريًا
+    # ⚠️  Size L is deliberately out of stock — the product is "available" while one
+    #     of its variants is not, and that difference is why stock is tracked on the variant
     ("GLV-NIT-L", 0, "96.00", 540, "main"),
     ("LAB-COAT-S", 40, "210.00", None, "main"),
     ("LAB-COAT-M", 85, "210.00", None, "main"),
@@ -92,10 +92,10 @@ VARIANT_BATCHES = [
 
 def _marker(sku: str, location_code: str, index: int) -> str:
     """
-    علامة الدفعة المبذورة.
+    A marker for a seeded batch.
 
-    ⚠️  `receive` تُنشئ دفعة جديدة في كل استدعاء — بلا هذه العلامة
-        يضاعف التشغيل الثاني المخزون بصمت.
+    ⚠️  `receive` creates a new batch on every call — without this marker the
+        second run silently doubles the stock.
     """
     return f"SEED-{sku}-{location_code}-{index}"
 
@@ -105,7 +105,7 @@ def _receive_once(product, quantity, unit_cost, days, location, *, variant=None,
         return False
 
     if quantity <= 0:
-        # صفر كمية = صنف نافد مقصود: يُنشأ سجل الرصيد بلا دفعة
+        # Zero quantity = a deliberately out-of-stock item: the balance record is created with no batch
         get_or_create_stock(product, location=location, variant=variant)
         return False
 
@@ -154,7 +154,7 @@ def seed(products: dict, variants: dict, locations: dict):
             marker=_marker(variant_sku, location_code, index),
         )
 
-    # ── حدود التنبيه ───────────────────────────────────────
+    # ── Alert thresholds ───────────────────────────────────
     thresholds = 0
     for sku, (reorder_point, critical_point) in REORDER_POINTS.items():
         product = products.get(sku)

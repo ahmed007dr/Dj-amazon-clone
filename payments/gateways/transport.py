@@ -1,17 +1,17 @@
 """
-نقل HTTP للبوابات.
+HTTP transport for the gateways.
 
-⚠️  **مهلة إلزامية على كل نداء.**
+⚠️  **A mandatory timeout on every call.**
 
-    نداء بلا مهلة يعلّق عامل الويب إلى الأبد حين تتوقف البوابة عن
-    الرد — وطلب واحد معلّق يستهلك عاملًا، فعشرة تُسقط الموقع كله
-    بينما البوابة وحدها هي المتعطّلة.
+    A call with no timeout pins a web worker forever once the gateway stops
+    responding — and one hung request consumes a worker, so ten take the whole
+    site down while the gateway alone is the one at fault.
 
-⚠️  ولا إعادة محاولة تلقائية على `POST`.
+⚠️  And no automatic retry on `POST`.
 
-    إعادة نداء تحصيل لم تصل استجابته قد تُحصّل المبلغ مرتين. الأمان
-    من التكرار مسؤولية البوابة عبر مفتاح `idempotency`، وليس شيئًا
-    نفترضه.
+    Retrying a charge whose response never arrived may collect the amount twice.
+    Idempotency is the gateway's responsibility through an `idempotency` key,
+    not something we assume.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-#: ثوانٍ — (وصل، قراءة)
+#: Seconds — (connect, read)
 TIMEOUT = (5, 30)
 
 
@@ -38,10 +38,11 @@ class GatewayResponse:
 
 def post_json(url: str, payload: dict, *, headers: dict | None = None) -> GatewayResponse:
     """
-    نداء JSON واحد.
+    A single JSON call.
 
-    ⚠️  لا يرفع استثناءً أبدًا — فشل البوابة حالة عمل لا خطأ برمجي،
-        ورفعه يترك الطلب معلّقًا بين «دُفع» و«لم يُدفع».
+    ⚠️  It never raises — a gateway failure is a business state, not a
+        programming error, and raising leaves the order suspended between "paid"
+        and "not paid".
     """
     try:
         response = requests.post(url, json=payload, headers=headers or {}, timeout=TIMEOUT)
@@ -55,8 +56,8 @@ def post_json(url: str, payload: dict, *, headers: dict | None = None) -> Gatewa
     try:
         data = response.json()
     except ValueError:
-        # ⚠️  البوابة أعادت HTML (صفحة خطأ · صيانة) — نحفظ مقتطفًا
-        #     للتشخيص ولا نعرضه للعميل.
+        # ⚠️  The gateway returned HTML (an error page · maintenance) — we keep an excerpt
+        #     for diagnosis and never show it to the customer.
         snippet = response.text[:500]
         logger.warning("استجابة غير JSON من %s: %s", url, snippet)
         return GatewayResponse(False, response.status_code, {"raw": snippet}, "استجابة غير متوقعة")

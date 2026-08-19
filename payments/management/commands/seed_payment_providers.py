@@ -1,14 +1,14 @@
 """
-بذر بوابات الدفع القياسية.
+Seed the standard payment gateways.
 
-قابل للتشغيل مرارًا — يُحدّث ولا يكرّر.
+Re-runnable — it updates and does not duplicate.
 
     python manage.py seed_payment_providers
 
-⚠️  **البوابات التي لا تحتاج بيانات اعتماد تُفعَّل؛ وما عداها لا.**
+⚠️  **Gateways needing no credentials are enabled; the rest are not.**
 
-    تفعيل بوابة بلا مفاتيح يعني عميلًا يختارها ثم يفشل دفعه.
-    الأدمن يضيف المفاتيح ثم يفعّلها من اللوحة.
+    Enabling a gateway with no keys means a customer choosing it and then having
+    their payment fail. The admin adds the keys and then enables it from the panel.
 """
 
 from django.core.management.base import BaseCommand
@@ -16,7 +16,7 @@ from django.db import transaction
 
 from payments.models import PaymentMethodKind, PaymentProvider
 
-#: القنوات
+#: Channels
 ONLINE = "ONLINE"
 POS = "POS"
 EMPLOYEE = "EMPLOYEE"
@@ -31,7 +31,7 @@ PROVIDERS = [
         "supported_channels": [ONLINE, EMPLOYEE],
         "priority": 100,
         "is_sandbox": False,
-        # ⚠️  لا مال يُقبض الآن — التحصيل يدوي عند التسليم
+        # ⚠️  No money is taken now — the capture is manual on delivery
         "is_active": True,
     },
     {
@@ -40,23 +40,23 @@ PROVIDERS = [
         "name_ar": "نقدي",
         "name_en": "Cash",
         "supported_methods": [PaymentMethodKind.CASH],
-        # ⚠️  نقطة البيع فقط — «نقدي» في متجر إلكتروني بلا معنى
+        # ⚠️  Point of sale only — "cash" in an online store is meaningless
         "supported_channels": [POS],
         "priority": 90,
         "is_sandbox": False,
         "is_active": True,
     },
     {
-        # ⚠️  ماكينة البطاقة على الكاونتر — **بوابة قائمة بذاتها.**
+        # ⚠️  The card terminal at the counter — **a gateway in its own right.**
         #
-        #     الدفع المقسّم (نصفه نقدًا ونصفه بالبطاقة) حالة يومية
-        #     على الكاونتر. بلا بوابة تقبل `CARD` على قناة `POS`
-        #     كان نصف البيعة يُرفض بـ«طريقة الدفع غير متاحة» —
-        #     والكاشير يسجّلها بيعتين فينكسر الإيصال والمرتجع معًا.
+        #     Split payment (half cash and half by card) is a daily occurrence
+        #     at the counter. Without a gateway accepting `CARD` on the `POS`
+        #     channel, half the sale was refused with "payment method unavailable" —
+        #     and the cashier recorded it as two sales, breaking the receipt and the return together.
         #
-        # ⚠️  و`adapter_key="cash"` مقصود: الماكينة تُشغَّل يدويًا
-        #     وتطبع إيصالها الخاص. النظام يسجّل أن المبلغ حُصّل ولا
-        #     يتصل بشبكة الدفع — ولذلك **لا يدخل الدرج** أيضًا.
+        # ⚠️  And `adapter_key="cash"` is deliberate: the terminal is operated by hand
+        #     and prints its own receipt. The system records that the amount was
+        #     collected and contacts no payment network — and therefore **it does not enter the drawer** either.
         "code": "pos-card",
         "adapter_key": "cash",
         "name_ar": "بطاقة على الطرفية",
@@ -74,19 +74,19 @@ PROVIDERS = [
         "name_en": "Bank transfer",
         "supported_methods": [PaymentMethodKind.BANK_TRANSFER],
         "supported_channels": [ONLINE, EMPLOYEE],
-        # ⚠️  التحويل يُراجَع يدويًا — لا يصلح لمبالغ صغيرة
+        # ⚠️  A transfer is reviewed by hand — unsuitable for small amounts
         "min_amount": 500,
         "priority": 50,
         "is_sandbox": False,
         "is_active": True,
     },
-    # ── البوابات الخارجية — **موقوفة حتى تُضاف المفاتيح** ──
+    # ── External gateways — **disabled until the keys are added** ──
     #
-    # ⚠️  تُبذر موقوفة وفي وضع التجريب عمدًا.
+    # ⚠️  Seeded disabled and in test mode deliberately.
     #
-    #     تفعيلها بلا مفاتيح يجعل العميل يختارها ثم يفشل دفعه؛
-    #     ووضع الإنتاج بلا اختبار يحصّل مالًا حقيقيًا في أول تجربة.
-    #     الأدمن يضيف المفاتيح من اللوحة ثم يفعّلها.
+    #     Enabling them with no keys makes a customer choose one and then have
+    #     their payment fail; and production mode with no testing collects real money on the first attempt.
+    #     The admin adds the keys from the panel and then enables them.
     {
         "code": "paymob",
         "adapter_key": "paymob",
@@ -115,7 +115,7 @@ PROVIDERS = [
     },
 ]
 
-#: المفاتيح المطلوبة لكل بوابة خارجية — تُعرض في تعليمات التشغيل
+#: The keys each external gateway requires — shown in the setup instructions
 REQUIRED_CREDENTIALS = {
     "paymob": ["api_key", "integration_id", "iframe_id", "hmac_secret"],
     "fawry": ["merchant_code", "secure_key"],
@@ -135,14 +135,14 @@ class Command(BaseCommand):
 
             existing = PaymentProvider.objects.filter(code=code).first()
 
-            # ⚠️  **التشغيل والإيقاف قرار الأدمن لا قرار البذرة.**
+            # ⚠️  **Enabling and disabling are the admin's decision, not the seed's.**
             #
-            #     الشكل السابق كان يفرض `is_active` من هذا الملف في
-            #     كل تشغيل — أي أن إعادة بذر بعد أن يضيف الأدمن
-            #     مفاتيح Paymob ويفعّلها تُوقفها ثانيةً بصمت،
-            #     فيتوقّف الدفع بالبطاقة بلا سبب ظاهر.
+            #     The previous form forced `is_active` from this file on every
+            #     run — meaning a re-seed after the admin had added the Paymob
+            #     keys and enabled it disabled it again silently,
+            #     so card payment stopped for no evident reason.
             #
-            #     القيمة المبذورة تسري على **الإنشاء الأول** فقط.
+            #     The seeded value applies to the **first creation** only.
             if existing is not None:
                 payload.pop("is_active", None)
                 payload.pop("is_sandbox", None)

@@ -1,10 +1,10 @@
 """
-اختبار تكامل: دورة الشراء الكاملة عبر HTTP.
+An integration test: the complete purchase cycle over HTTP.
 
-⚠️  الاختبارات الأخرى تفحص الخدمات مباشرةً. هذا يفحص **ما يراه
-    الفرونت إند فعلًا**: الترويسات والأكواد وأشكال الاستجابات.
+⚠️  The other tests exercise the services directly. This one exercises **what
+    the frontend actually sees**: the headers, the status codes and the response shapes.
 
-    خدمة صحيحة خلف واجهة مكسورة لا تنفع أحدًا.
+    A correct service behind a broken interface helps nobody.
 """
 
 from decimal import Decimal
@@ -109,7 +109,7 @@ def client(buyer):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الدورة الكاملة
+#  The complete cycle
 # ═══════════════════════════════════════════════════════════
 
 
@@ -117,17 +117,17 @@ def client(buyer):
 class TestFullPurchaseFlow:
     def test_browse_add_checkout_and_view(self, client, product, payment_provider, location):
         """
-        ⚠️  الرحلة كاملة: تصفّح ← سلة ← إتمام ← عرض الطلب.
+        ⚠️  The whole journey: browse ← cart ← checkout ← view the order.
 
-        كل خطوة تعتمد على سابقتها — كسر أي حلقة يظهر هنا لا في
-        الإنتاج.
+        Every step depends on the one before it — a break in any link shows up
+        here rather than in production.
         """
-        # ١ — تصفّح
+        # 1 — browse
         listing = client.get(reverse("v1:catalog:products"))
         assert listing.status_code == 200
         assert listing.data["results"][0]["sku"] == "P-001"
 
-        # ٢ — إضافة للسلة
+        # 2 — add to the cart
         added = client.post(
             reverse("v1:cart:lines"),
             {"product": str(product.pk), "quantity": 2},
@@ -138,7 +138,7 @@ class TestFullPurchaseFlow:
         assert added.data["totals"]["tax_total"] == "28.00"
         assert added.data["is_checkoutable"]
 
-        # ٣ — إتمام الشراء
+        # 3 — checkout
         checkout = client.post(
             reverse("v1:orders:checkout"),
             {"address": ADDRESS, "payment_method": "COD"},
@@ -151,20 +151,20 @@ class TestFullPurchaseFlow:
         assert order["status"] == "PENDING"
         assert order["number"].startswith("ORD-")
 
-        # ٤ — عرض الطلب
+        # 4 — view the order
         detail = client.get(reverse("v1:orders:detail", args=[order["id"]]))
         assert detail.status_code == 200
         assert detail.data["lines"][0]["product_sku"] == "P-001"
         assert detail.data["lines"][0]["tax_rate"] == "14.00"
 
-        # ٥ — السلة تحوّلت
+        # 5 — the cart has converted
         assert client.get(reverse("v1:cart:detail")).data["totals"]["item_count"] == 0
 
     def test_money_is_serialised_as_string(self, client, product):
         """
-        ⚠️  ADR-31 — `JSON.parse` يحوّل الأرقام إلى `double`.
+        ⚠️  ADR-31 — `JSON.parse` converts numbers to `double`.
 
-            `450.00` تصير `450`، و`0.1+0.2` تصير `0.30000000000000004`.
+            `450.00` becomes `450`, and `0.1+0.2` becomes `0.30000000000000004`.
         """
         client.post(
             reverse("v1:cart:lines"),
@@ -178,7 +178,7 @@ class TestFullPurchaseFlow:
 
 
 # ═══════════════════════════════════════════════════════════
-#  سلة الزائر
+#  The guest cart
 # ═══════════════════════════════════════════════════════════
 
 
@@ -186,7 +186,7 @@ class TestFullPurchaseFlow:
 class TestGuestCart:
     def test_guest_shops_before_signing_up(self, product):
         """
-        ⚠️  إجبار الزائر على التسجيل قبل الإضافة يفقد المبيعة.
+        ⚠️  Forcing a visitor to register before adding loses the sale.
         """
         guest = APIClient()
         response = guest.post(
@@ -230,7 +230,7 @@ class TestGuestCart:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الكوبونات
+#  Coupons
 # ═══════════════════════════════════════════════════════════
 
 
@@ -238,9 +238,10 @@ class TestGuestCart:
 class TestCouponEndpoint:
     def test_invalid_coupon_returns_200_with_reason(self, client, product):
         """
-        ⚠️  الكوبون المرفوض ليس خطأ — العميل يجرّب أكوادًا.
+        ⚠️  A rejected coupon is not an error — the customer is trying codes.
 
-            الرد `400` يجعل الفرونت يعرض «حدث خطأ» بدل السبب.
+            Answering `400` makes the frontend show "an error occurred" instead
+            of the reason.
         """
         client.post(
             reverse("v1:cart:lines"),
@@ -275,7 +276,7 @@ class TestCouponEndpoint:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الملكية
+#  Ownership
 # ═══════════════════════════════════════════════════════════
 
 
@@ -283,8 +284,8 @@ class TestCouponEndpoint:
 class TestOrderOwnership:
     def test_cannot_view_another_customers_order(self, client, buyer, product, payment_provider):
         """
-        ⚠️  الثغرة الأشهر في الكود القديم: الهوية من الرابط لا من
-            التوكن.
+        ⚠️  The best-known hole in the legacy code: the identity taken from the
+            URL rather than from the token.
         """
         client.post(
             reverse("v1:cart:lines"),
@@ -305,7 +306,7 @@ class TestOrderOwnership:
         other = APIClient()
         other.force_authenticate(user=intruder)
 
-        # ⚠️  404 لا 403 — الفرق بينهما أداة تعداد
+        # ⚠️  404, not 403 — the difference between them is an enumeration tool
         assert other.get(reverse("v1:orders:detail", args=[order_id])).status_code == 404
         assert (
             other.post(
@@ -321,7 +322,7 @@ class TestOrderOwnership:
 
 
 # ═══════════════════════════════════════════════════════════
-#  إعادة التحقق عند الإتمام
+#  Re-validation at checkout
 # ═══════════════════════════════════════════════════════════
 
 
@@ -336,7 +337,7 @@ class TestCheckoutRevalidation:
             format="json",
         )
 
-        # مشترٍ آخر يستهلك المخزون
+        # Another buyer consumes the stock
         inventory_services.sell_immediately(product, 50, location=location)
 
         response = client.post(

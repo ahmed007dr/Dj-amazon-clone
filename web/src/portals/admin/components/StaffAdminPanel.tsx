@@ -5,9 +5,10 @@ import {
   useCreateRole,
   useEmployeeRoles,
   useUpdateEmployee,
+  type EmployeeRole,
 } from '@/features/employees/api';
 import { isApiError } from '@/shared/http/errors';
-import { Alert } from '@/shared/ui/Alert';
+import { RolePermissionsDrawer } from '@/portals/admin/components/RolePermissionsDrawer';
 import { Button } from '@/shared/ui/Button';
 import { Field } from '@/shared/ui/Field';
 import { Spinner } from '@/shared/ui/Spinner';
@@ -33,9 +34,11 @@ const ROLE_KINDS = [
  *     منحها فردًا يجعل كل موظف جديد يحتاج ضبطًا يدويًا، وأول منسيّ
  *     يبقى بلا صلاحية أو بأكثر مما يجب. والدور حزمة تُسنَد مرة.
  *
- * ⚠️  و**الصلاحيات نفسها تُسنَد من لوحة Django** — هذه الشاشة تُنشئ
- *     الدور وتسمّيه، ويبقى ربط الصلاحيات به هناك. يُقال صراحةً بدل
- *     أن يظنّ الأدمن أن الدور جاهز.
+ * ⚠️  و**الصلاحيات تُمنَح من هنا** لا من لوحة Django.
+ *
+ *     كانت تحتاج لوحة Django، أي أن ضبط الأدوار يحتاج من يعرف
+ *     أسماء الصلاحيات التقنية. ومع إخفاء ما لا يملكه المستخدم صار
+ *     ذلك مستحيلًا: لا سبيل لإعادة فتح ما أُخفي إلا من سطر الأوامر.
  */
 export function RolesPanel() {
   const { t } = useTranslation();
@@ -43,6 +46,7 @@ export function RolesPanel() {
 
   const roles = useEmployeeRoles();
   const create = useCreateRole();
+  const [granting, setGranting] = useState<EmployeeRole | null>(null);
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ code: '', name_ar: '', kind: 'SALES_REP' });
@@ -119,8 +123,6 @@ export function RolesPanel() {
             </select>
           </label>
 
-          <Alert tone="info">{t('staff.rolePermissionsNote')}</Alert>
-
           <div className="pricing-form__actions">
             <Button
               onClick={submit}
@@ -151,9 +153,15 @@ export function RolesPanel() {
                 ? t('staff.noPermissions')
                 : t('staff.permissionCount', { count: role.permission_count })}
             </span>
+
+            <Button size="sm" variant="ghost" onClick={() => setGranting(role)}>
+              {t('staff.permissions')}
+            </Button>
           </li>
         ))}
       </ul>
+
+      <RolePermissionsDrawer role={granting} onClose={() => setGranting(null)} />
     </div>
   );
 }

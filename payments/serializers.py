@@ -1,11 +1,11 @@
 """
-عقود الدفع.
+Payment contracts.
 
-⚠️  **بيانات الاعتماد لا تُقرأ عبر أي API — حتى للأدمن.** (ADR-15)
+⚠️  **Credentials are never read through any API — not even by the admin.** (ADR-15)
 
-    الحقل للكتابة فقط، والعرض يظهر آخر أربعة محارف مقنّعة. إرجاع
-    المفتاح السري «للتأكد منه» يعني أن تسريب جلسة أدمن واحدة يسرّب
-    حساب البوابة كله.
+    The field is write-only, and the display shows the last four characters
+    masked. Returning the secret key "to check it" means one leaked admin
+    session leaks the entire gateway account.
 """
 
 from rest_framework import serializers
@@ -30,7 +30,7 @@ class MoneyField(serializers.DecimalField):
 
 class ProviderCredentialSerializer(serializers.ModelSerializer):
     """
-    ⚠️  `value` للكتابة فقط. `masked_value` هو التمثيل الوحيد المسموح.
+    ⚠️  `value` is write-only. `masked_value` is the only permitted representation.
     """
 
     value = serializers.CharField(write_only=True)
@@ -43,10 +43,10 @@ class ProviderCredentialSerializer(serializers.ModelSerializer):
 
 class PaymentProviderSerializer(serializers.ModelSerializer):
     """
-    بوابة دفع كما يراها الأدمن.
+    A payment gateway as the admin sees it.
 
-    ⚠️  `is_active` هو مفتاح التشغيل والإيقاف — تغييره يسري فورًا
-        بلا إعادة نشر، وهو جوهر المتطلب.
+    ⚠️  `is_active` is the on/off switch — changing it takes effect immediately
+        with no redeployment, and that is the heart of the requirement.
     """
 
     credential_keys = serializers.SerializerMethodField()
@@ -76,7 +76,7 @@ class PaymentProviderSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
     def get_credential_keys(self, obj) -> list:
-        """أسماء المفاتيح المضبوطة — لا قيمها."""
+        """The names of the configured keys — not their values."""
         return list(obj.credentials.filter(is_sandbox=obj.is_sandbox).values_list("key", flat=True))
 
     def get_is_configured(self, obj) -> bool:
@@ -84,10 +84,10 @@ class PaymentProviderSerializer(serializers.ModelSerializer):
 
     def get_adapter_exists(self, obj) -> bool:
         """
-        ⚠️  بوابة بمحوّل غير موجود تفشل عند أول محاولة دفع.
+        ⚠️  A gateway with a nonexistent adapter fails on the first payment attempt.
 
-            كشفها في الاستجابة يجعل الأدمن يرى الخطأ في الشاشة لا
-            في شكوى عميل.
+            Surfacing it in the response makes the admin see the error on the
+            screen rather than in a customer complaint.
         """
         return obj.adapter_key in available_adapters()
 
@@ -109,9 +109,10 @@ class PaymentProviderSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        ⚠️  بوابة مفعّلة بلا بيانات اعتماد تفشل عند أول عملية.
+        ⚠️  A gateway enabled with no credentials fails on the first operation.
 
-            المنع هنا يجعل الفشل ظاهرًا وقت الضبط لا وقت الشراء.
+            Blocking it here makes the failure visible at configuration time
+            rather than at purchase time.
         """
         instance = self.instance
         is_active = attrs.get("is_active", getattr(instance, "is_active", False))
@@ -137,7 +138,7 @@ class PaymentProviderSerializer(serializers.ModelSerializer):
         return attrs
 
 
-#: محوّلات لا تحتاج بيانات اعتماد — الدفع يتم خارج أي بوابة
+#: Adapters needing no credentials — the payment happens outside any gateway
 _CREDENTIAL_FREE_ADAPTERS = {"cash_on_delivery", "cash", "bank_transfer"}
 
 
@@ -153,17 +154,17 @@ class ToggleProviderSerializer(serializers.Serializer):
 
 class ReorderProvidersSerializer(serializers.Serializer):
     """
-    إعادة ترتيب الأولوية.
+    Reordering the priority.
 
-    ⚠️  الترتيب يحدد **أي بوابة تُجرَّب أولًا** حين تصلح أكثر من
-        واحدة لنفس العملية.
+    ⚠️  The order determines **which gateway is tried first** when more than one
+        suits the same operation.
     """
 
     order = serializers.ListField(child=serializers.UUIDField(), allow_empty=False, max_length=50)
 
 
 class PaymentMethodOptionSerializer(serializers.Serializer):
-    """طريقة دفع متاحة — كما يراها العميل عند إتمام الشراء."""
+    """An available payment method — as the customer sees it at checkout."""
 
     method = serializers.CharField(read_only=True)
     label_ar = serializers.CharField(read_only=True)
@@ -176,10 +177,10 @@ class PaymentMethodOptionSerializer(serializers.Serializer):
 
 class PaymentTransactionSerializer(serializers.ModelSerializer):
     """
-    ⚠️  `provider_response` **مستبعد**.
+    ⚠️  `provider_response` is **excluded**.
 
-        قد يحمل بيانات بطاقة جزئية أو رموز داخلية من البوابة —
-        إرجاعه يسرّب ما لا لزوم له.
+        It may carry partial card data or internal gateway codes — returning it
+        leaks what serves no purpose.
     """
 
     provider_code = serializers.CharField(source="provider.code", read_only=True)

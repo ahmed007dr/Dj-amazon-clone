@@ -1,14 +1,15 @@
 """
-اختبارات طابور الصادر.
+Outbox queue tests.
 
-⚠️  **العطلان اللذان وُجد الطابور لأجلهما، وكلاهما كان صامتًا:**
+⚠️  **The two faults the queue exists for, and both were silent:**
 
-    ١. الإرسال داخل المعاملة قبل إيداعها — معاملة تُلغى بعد الإرسال
-       تعني عميلًا يتلقّى «استلمنا طلبك» لطلب غير موجود.
+    1. Sending inside the transaction before it commits — a transaction rolled
+       back after the send means a customer receiving "we have received your
+       order" for an order that does not exist.
 
-    ٢. `fail_silently=True` بلا إعادة محاولة — خادم متوقف ثانيتين
-       يعني طلب إعادة تعيين كلمة مرور يُفقد نهائيًا، ويرى المستخدم
-       شاشة تقول «أرسلنا لك رسالة».
+    2. `fail_silently=True` with no retry — a server down for two seconds means
+       a password reset request lost permanently, while the user sees a screen
+       saying "we have sent you a message".
 """
 
 from datetime import timedelta
@@ -34,15 +35,15 @@ LOCMEM = "django.core.mail.backends.locmem.EmailBackend"
 @pytest.fixture(autouse=True)
 def clean_outbox(db):
     """
-    ⚠️  الطابور جدول **مشترك**، والعدّ عليه يقيس ما تركه غيرك.
+    ⚠️  The queue is a **shared** table, and counting on it measures what others left behind.
 
-        اختبارات التزامن في نطاقات أخرى تعمل بمعاملات حقيقية: تُودِع
-        صفوفًا فعلًا، وتُنظّفها بـ`TRUNCATE` عند تفكيكها. وحين يفشل
-        ذلك التفكيك (وهو يفشل أحيانًا على اتصالات خيوط معلّقة) تبقى
-        صفوفها في قاعدة الاختبار المُعاد استخدامها — فيقرأ اختبارٌ
-        هنا «صفّان» بينما لم يُنشئ واحدًا.
+        Concurrency tests in other domains run with real transactions: they
+        genuinely commit rows, and clean them with `TRUNCATE` on teardown. And
+        when that teardown fails (as it sometimes does on hung thread
+        connections) their rows stay in the reused test database — so a test
+        here reads "two rows" while it created none.
 
-        التنظيف قبل كل اختبار يجعل التأكيد يقيس ما فعله هو.
+        Cleaning before every test makes the assertion measure what it did itself.
     """
     OutboundMessage.objects.all().delete()
 
@@ -62,7 +63,7 @@ def console_account(db, monkeypatch):
 
 @pytest.fixture
 def dead_account(db):
-    """خادم لا يستجيب — منفذ مغلق ومهلة ثانية واحدة."""
+    """A server that does not respond — a closed port and a one-second timeout."""
     return EmailAccount.objects.create(
         code="dead",
         label_ar="معطّل",
@@ -89,9 +90,10 @@ def queue(template_key="password_changed", **overrides):
 class TestSnapshot:
     def test_body_is_rendered_at_enqueue_not_at_delivery(self, console_account):
         """
-        ⚠️  النص لقطة لا مرجع: التصيير المؤجَّل يقرأ قالبًا قد يكون
-            الأدمن حرّره في الأثناء، وسياقًا قد تغيّر — «إجمالي طلبك
-            ٤٥٠» تصير رقمًا آخر بعد مرتجع.
+        ⚠️  The text is a snapshot, not a reference: deferred rendering reads a
+            template the admin may have edited in the meantime, and a context
+            that may have changed — "your order total is 450" becomes another
+            figure after a return.
         """
         message = queue(
             "order_placed",
@@ -106,25 +108,27 @@ class TestSnapshot:
 @pytest.mark.django_db
 class TestCommitBoundary:
     """
-    ⚠️  بلا `transaction=True`.
+    ⚠️  Without `transaction=True`.
 
-        الاختبار التبادلي يقطع الجداول عند تفكيكه، وهو مع اتصالات
-        الخيوط المعلّقة في اختبارات التزامن الأخرى يجعل الحزمة تفشل
-        فشلًا متنقّلًا لا علاقة له بما تختبره. ونقطة الإيداع تُقاس
-        بلا ذلك: المُستدعَيات المسجَّلة داخل كتلة مُلغاة **تُسقَط**،
-        وهو بالضبط ما يعني «لم يُرسَل شيء».
+        The transactional test truncates the tables on teardown, and combined
+        with the hung thread connections in other domains' concurrency tests it
+        makes the suite fail intermittently for reasons unrelated to what it
+        tests. And the commit point is measured without it: callbacks registered
+        inside a rolled-back block **are dropped**, which is exactly what
+        "nothing was sent" means.
     """
 
     def test_rollback_leaves_no_message_and_schedules_no_delivery(
         self, console_account, django_capture_on_commit_callbacks
     ):
         """
-        ⚠️  العطل الأول حرفيًا: الصفّ يُكتب داخل المعاملة فيُلغى معها،
-            والتسليم مجدوَل على `on_commit` فلا يقع أصلًا.
+        ⚠️  The first fault, literally: the row is written inside the
+            transaction and rolled back with it, and the delivery is scheduled
+            on `on_commit`, so it never happens at all.
 
-            قبل ذلك كان البريد يخرج **قبل** الإيداع: معاملة تُلغى
-            بعده تعني عميلًا يتلقّى «استلمنا طلبك ORD-…» لطلب غير
-            موجود في قاعدة البيانات.
+            Before that, mail went out **before** the commit: a transaction
+            rolled back afterwards meant a customer receiving "we have received
+            your order ORD-…" for an order that does not exist in the database.
         """
         django_mail.outbox.clear()
 
@@ -145,7 +149,7 @@ class TestCommitBoundary:
         with django_capture_on_commit_callbacks(execute=True):
             with transaction.atomic():
                 message = queue()
-            assert django_mail.outbox == []  # قُيِّد ولم يُسلَّم بعد
+            assert django_mail.outbox == []  # enqueued and not yet delivered
 
         message.refresh_from_db()
         assert message.status == DeliveryState.SENT
@@ -157,9 +161,10 @@ class TestCommitBoundary:
 class TestRetry:
     def test_failure_keeps_the_message_and_backs_off(self, dead_account):
         """
-        ⚠️  العطل الثاني: الفشل المؤقت كان يعني رسالة ضائعة إلى الأبد.
-            الصفّ يبقى، ويُعاد بتراجع تدريجي لا فورًا — الخادم الذي
-            رفض لحدّ معدّل يرفض الإلحاح أيضًا.
+        ⚠️  The second fault: a temporary failure used to mean a message lost
+            forever. The row remains and is retried with a gradual backoff
+            rather than immediately — a server that refused on a rate limit
+            refuses insistence too.
         """
         message = queue()
         before = timezone.now()
@@ -188,9 +193,10 @@ class TestRetry:
 
     def test_exhausted_attempts_become_a_declared_failure(self, dead_account):
         """
-        ⚠️  الصفّ الذي يُعاد بلا حدّ يخفي عطلًا دائمًا (عنوان خاطئ ·
-            صندوق ممتلئ) وسط ضجيج المحاولات، فلا يعرف أحد أن الرسالة
-            لن تصل أبدًا. `FAILED` تجعلها سطرًا يُقرأ ويُعالَج.
+        ⚠️  A row retried without limit hides a permanent fault (a wrong address ·
+            a full mailbox) in the noise of the attempts, so nobody knows the
+            message will never arrive. `FAILED` turns it into a line that gets
+            read and dealt with.
         """
         message = queue()
 
@@ -212,8 +218,8 @@ class TestRetry:
 
     def test_manual_retry_keeps_the_attempt_history(self, dead_account):
         """
-        ⚠️  الإعادة اليدوية تصفّر التراجع لا العدّاد: تصفيره يجعل
-            رسالة فشلت عشرين مرة تبدو كأنها في محاولتها الأولى.
+        ⚠️  A manual retry resets the backoff, not the counter: resetting it
+            makes a message that failed twenty times look like it is on its first attempt.
         """
         message = queue()
         OutboundMessage.objects.filter(pk=message.pk).update(
@@ -228,9 +234,10 @@ class TestRetry:
 
     def test_manual_retry_delivers_once_the_fault_is_fixed(self, console_account):
         """
-        ⚠️  الحالة الفعلية بعد العطل: المشغّل يصلح الإعداد ثم يعيد
-            المحاولة من الشاشة. الصفّ الذي أُعلن فشله يجب أن يقبل
-            الإعادة — وإلا صار الإعلان حكمًا نهائيًا على رسالة صالحة.
+        ⚠️  The real situation after a fault: the operator fixes the
+            configuration and then retries from the screen. A row declared
+            failed must accept the retry — otherwise the declaration becomes a
+            final verdict on a valid message.
         """
         django_mail.outbox.clear()
         message = queue()
@@ -250,22 +257,24 @@ class TestRetry:
 class TestClaiming:
     def test_a_message_is_never_delivered_twice(self, console_account):
         """
-        ⚠️  عاملان يقرآن نفس الصفّ فيرسلانه مرتين: العميل يتلقّى
-            رسالتين متطابقتين. الحجز شرطٌ ذرّي — من يعيد `1` يملكه.
+        ⚠️  Two workers reading the same row send it twice: the customer
+            receives two identical messages. The claim is an atomic condition —
+            whoever gets `1` back owns it.
         """
         django_mail.outbox.clear()
         message = queue()
 
         assert services.deliver(message.pk) is True
-        assert services.deliver(message.pk) is False  # لا مالك ثانٍ
+        assert services.deliver(message.pk) is False  # no second owner
 
         assert len(django_mail.outbox) == 1
 
     def test_a_claim_expires_so_a_crash_does_not_swallow_the_message(self, console_account):
         """
-        ⚠️  العملية التي تسقط بين الحجز والإرسال كانت تترك الصفّ
-            محجوزًا إلى الأبد — رسالة تضيع بلا فشل ظاهر، وهو أسوأ من
-            فشل معلن. الحجز يمتدّ ثم يسقط فتلتقطها المهمة الدورية.
+        ⚠️  A process that died between the claim and the send used to leave the
+            row claimed forever — a message lost with no visible failure, which
+            is worse than a declared one. The claim lasts and then lapses, so
+            the periodic task picks it up.
         """
         django_mail.outbox.clear()
         message = queue()
@@ -278,7 +287,7 @@ class TestClaiming:
         assert len(django_mail.outbox) == 1
 
     def test_a_live_claim_is_left_alone(self, console_account):
-        """حجز حيّ لعامل آخر لا يُنتزع — وإلا عاد الازدواج من الباب الآخر."""
+        """A live claim held by another worker is not seized — or the duplication returns by the other door."""
         message = queue()
         OutboundMessage.objects.filter(pk=message.pk).update(
             status=DeliveryState.SENDING,
@@ -300,13 +309,13 @@ class TestClaiming:
 class TestPeriodicSweep:
     def test_the_sweep_delivers_what_is_due(self, console_account):
         """
-        ⚠️  شبكة أمان لا مسار رئيسي: التسليم يبدأ على `on_commit`،
-            وهذا المسح يلتقط ما فشل وما عَلِق.
+        ⚠️  A safety net, not the main path: delivery starts on `on_commit`,
+            and this sweep picks up what failed and what got stuck.
 
-        ⚠️  وجدولته في `ops` تُختبَر **هناك** لا هنا: استيراد أمر
-            التشغيل من اختبار `mailing` كان يجرّ معه كل نطاقات العمل
-            (`accounts` · `cart` · `inventory` · `loyalty`) ويكسر
-            عقد استقلال النطاق — أمسكه `import-linter` فعلًا.
+        ⚠️  And its scheduling in `ops` is tested **there**, not here: importing
+            the management command from a `mailing` test dragged every business
+            domain in with it (`accounts` · `cart` · `inventory` · `loyalty`)
+            and broke the domain isolation contract — `import-linter` genuinely caught it.
         """
         django_mail.outbox.clear()
         queue()

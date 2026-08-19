@@ -1,7 +1,7 @@
 """
-واجهات الإشعارات.
+Notification endpoints.
 
-⚠️  كل queryset مُصفّى بالمستخدم — إشعارات الغير لا تُقرأ ولا تُعلَّم.
+⚠️  Every queryset is filtered by user — nobody else's notifications are read or marked.
 """
 
 from rest_framework import generics, serializers, status
@@ -67,7 +67,7 @@ class NotificationListAPI(generics.ListAPIView):
 
 
 class UnreadCountAPI(APIView):
-    """عدّاد الجرس — يُستدعى كثيرًا فيبقى خفيفًا."""
+    """The bell counter — called often, so it stays light."""
 
     permission_classes = [IsAuthenticated]
 
@@ -79,7 +79,7 @@ class MarkReadAPI(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
-        # ⚠️  الفلترة بالمستخدم — لا إشعار لغيره يُعلَّم
+        # ⚠️  Filtered by user — no one else's notification is marked
         notification = Notification.objects.filter(pk=pk, user=request.user).first()
         if notification is None:
             raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
@@ -97,12 +97,12 @@ class MarkAllReadAPI(APIView):
 
 class PreferenceListAPI(APIView):
     """
-    تفضيلات الإشعارات.
+    Notification preferences.
 
-    ⚠️  الاستجابة تحمل **كل** تركيبة تصنيف × قناة — لا المخزَّنة فقط.
+    ⚠️  The response carries **every** category × channel combination — not only the stored ones.
 
-        غياب الصف يعني «مفعّل افتراضيًا»، وعرض المخزَّن وحده يجعل
-        الشاشة فارغة لمستخدم لم يغيّر شيئًا.
+        A missing row means "enabled by default", and showing only what is
+        stored leaves the screen empty for a user who has changed nothing.
     """
 
     permission_classes = [IsAuthenticated]

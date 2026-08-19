@@ -1,16 +1,16 @@
 """
-المالية — الإيرادات والمصروفات وتكلفة البضاعة المباعة.
+Finance — revenue, expenses and the cost of goods sold.
 
-⚠️  **كل رقم قابل للتتبع إلى مصدره. لا حساب صندوق أسود.**
+⚠️  **Every number is traceable to its source. No black-box calculation.**
 
-    قيد الإيراد يحمل مفتاحًا أجنبيًا للطلب، وقيد التكلفة يحمل
-    مرجع الدفعة التي خرجت منها البضاعة فعلًا. سؤال «من أين جاء
-    هذا الرقم؟» يجب أن يُجاب بصفٍّ لا بحساب.
+    The revenue entry carries a foreign key to the order, and the cost entry
+    carries a reference to the batch the goods actually left from. The question
+    "where did this number come from?" must be answered with a row, not a calculation.
 
-⚠️  و`Decimal` حصرًا — لا `float` في أي حساب مالي.
+⚠️  And `Decimal` exclusively — no `float` in any financial calculation.
 
-    مع مرتجعات وخصومات وضرائب تتراكم فروق الفاصلة العائمة حتى
-    تكسر أي مطابقة محاسبية.
+    With returns, discounts and taxes, floating-point discrepancies accumulate
+    until they break any accounting reconciliation.
 """
 
 from __future__ import annotations
@@ -28,28 +28,28 @@ from core.money import ZERO, MoneyField
 
 def expense_attachment_path(instance, filename):
     """
-    ⚠️  مسار **خاص** باسم عشوائي.
+    ⚠️  A **private** path under a random name.
 
-        فاتورة إيجار تحمل اسم المؤجّر ومبلغه. تركها تحت اسمها
-        الأصلي في مسار عام يجعلها تُقرأ بمن يعرف الرابط، ومسارًا
-        تسلسليًا يُخمَّن بحلقة.
+        A rent invoice carries the landlord's name and their amount. Leaving it
+        under its original name on a public path makes it readable by anyone who
+        knows the URL, and a sequential path is guessed with a loop.
     """
     return f"private/expense-attachments/{random_filename(filename)}"
 
 
 # ═══════════════════════════════════════════════════════════
-#  المصروفات
+#  Expenses
 # ═══════════════════════════════════════════════════════════
 
 
 class ExpenseCategory(BaseModel):
     """
-    بند مصروف — شجري.
+    An expense category — a tree.
 
-    ⚠️  الشجرة لأن «مرافق» تنقسم إلى كهرباء وماء وإنترنت.
+    ⚠️  A tree because "utilities" splits into electricity, water and internet.
 
-        قائمة مسطّحة تجبر صاحب النشاط على الاختيار بين بندٍ عام
-        لا يفيد التحليل وعشرين بندًا لا يُقرأ أيّها.
+        A flat list forces the business owner to choose between one general
+        category that helps no analysis and twenty categories where none is legible.
     """
 
     code = models.SlugField(_("الرمز"), max_length=64, unique=True)
@@ -79,11 +79,11 @@ class ExpenseCategory(BaseModel):
 
 class ExpenseStatus(models.TextChoices):
     """
-    ⚠️  المصروف يبدأ **مسوَّدة** لا معتمدًا.
+    ⚠️  An expense starts as a **draft**, not approved.
 
-        الاعتماد التلقائي يجعل كل خطأ إدخال يدخل قائمة الأرباح
-        فورًا — ورقم خاطئ في تقرير مالي أسوأ من رقم ناقص، لأنه
-        يُتخذ عليه قرار.
+        Automatic approval makes every entry error enter the profit statement
+        immediately — and a wrong number in a financial report is worse than a
+        missing one, because a decision gets taken on it.
     """
 
     DRAFT = "DRAFT", _("مسوّدة")
@@ -92,7 +92,7 @@ class ExpenseStatus(models.TextChoices):
 
 
 class PaymentMean(models.TextChoices):
-    """كيف خرج المال — للتدفق النقدي."""
+    """How the money went out — for the cash flow."""
 
     CASH = "CASH", _("نقدًا")
     BANK = "BANK", _("تحويل بنكي")
@@ -102,13 +102,13 @@ class PaymentMean(models.TextChoices):
 
 class Expense(BaseModel):
     """
-    مصروف تشغيلي — **يُدخَل يدويًا**.
+    An operating expense — **entered by hand**.
 
-    ⚠️  `incurred_on` تاريخ **الاستحقاق لا الإدخال**.
+    ⚠️  `incurred_on` is the date it **was incurred, not the date it was entered**.
 
-        إيجار مارس يُدخَل في أبريل ويجب أن يظهر في أرباح مارس.
-        الخلط بينهما ينقل المصروف إلى الشهر التالي فيُظهر شهرًا
-        رابحًا وآخر خاسرًا بلا سبب حقيقي.
+        March's rent is entered in April and must appear in March's profit.
+        Conflating them moves the expense into the following month, showing one
+        profitable month and one loss-making one for no real reason.
     """
 
     category = models.ForeignKey(
@@ -152,8 +152,8 @@ class Expense(BaseModel):
         related_name="entered_expenses",
         verbose_name=_("المُدخِل"),
     )
-    # ⚠️  `SET_NULL` لا `PROTECT`: حذف حساب معتمِد قديم يجب ألا
-    #     يحمي مصروفًا من الحذف ولا يفشل بخطأ تكامل غامض.
+    # ⚠️  `SET_NULL`, not `PROTECT`: deleting an old approver's account must not
+    #     protect an expense from deletion, nor fail with an obscure integrity error.
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -172,7 +172,7 @@ class Expense(BaseModel):
         verbose_name_plural = _("المصروفات")
         ordering = ["-incurred_on", "-created_at"]
         indexes = [
-            # الاستعلام السائد: مصروفات فترة بحالة معيّنة
+            # The dominant query: a period's expenses in a given state
             models.Index(fields=["status", "incurred_on"]),
         ]
 
@@ -182,16 +182,16 @@ class Expense(BaseModel):
     @property
     def counts_toward_profit(self) -> bool:
         """
-        ⚠️  المعتمد وحده يدخل الأرباح.
+        ⚠️  Only approved expenses enter the profit statement.
 
-            إدخال المسوّدات يجعل رقم الربح يتحرّك كلما كتب موظف
-            مصروفًا لم يُراجَع بعد.
+            Including drafts makes the profit figure move every time an employee
+            writes down an expense that has not been reviewed.
         """
         return self.status == ExpenseStatus.APPROVED
 
 
 # ═══════════════════════════════════════════════════════════
-#  الإيرادات والتكلفة
+#  Revenue and cost
 # ═══════════════════════════════════════════════════════════
 
 
@@ -202,27 +202,28 @@ class RevenueSource(models.TextChoices):
 
 class RevenueEntry(BaseModel):
     """
-    قيد إيراد — **يُلتقط تلقائيًا من الأحداث**.
+    A revenue entry — **captured automatically from the events**.
 
-    ⚠️  **قيد واحد لكل مصدر — يفرضه قيد فريد في قاعدة البيانات.**
+    ⚠️  **One entry per source — enforced by a unique database constraint.**
 
-        `order_completed` قد تُبعَث مرتين: إعادة محاولة · تصحيح
-        يدوي · مستمع سُجّل مرتين بعد إعادة تحميل. وبلا القيد
-        الفريد يُحتسب إيراد الطلب مرتين، فيقول التقرير ضعف ما
-        بيع — وهو خطأ **لا يُكتشف** إلا بمطابقة يدوية.
+        `order_completed` may be emitted twice: a retry · a manual correction ·
+        a listener registered twice after a reload. And without the unique
+        constraint the order's revenue is counted twice, so the report says
+        double what was sold — an error that is **never discovered** except by a
+        manual reconciliation.
 
-    ⚠️  والمرتجع **قيد سالب لا حذف للأصلي**.
+    ⚠️  And a return is **a negative entry, not a deletion of the original**.
 
-        حذف قيد الإيراد يمحو أن البيعة وقعت أصلًا. السجل
-        المحاسبي يُصحَّح بقيد معاكس لا بممحاة.
+        Deleting the revenue entry erases that the sale ever happened. An
+        accounting record is corrected with an offsetting entry, not an eraser.
     """
 
     source = models.CharField(
         _("المصدر"), max_length=16, choices=RevenueSource.choices, db_index=True
     )
 
-    # ⚠️  مفتاح أجنبي حقيقي لا مرجع نصي — «من أين جاء هذا الرقم؟»
-    #     يجب أن يُجاب بصفٍّ يمكن فتحه، لا بسلسلة تُبحَث يدويًا.
+    # ⚠️  A real foreign key, not a string reference — "where did this number come
+    #     from?" must be answered with a row that can be opened, not a string to search by hand.
     order = models.ForeignKey(
         "orders.Order",
         on_delete=models.PROTECT,
@@ -233,8 +234,8 @@ class RevenueEntry(BaseModel):
     gross = MoneyField(_("الإجمالي قبل الخصم"))
     discounts = MoneyField(_("الخصومات"), default=ZERO)
     tax = MoneyField(_("الضريبة"), default=ZERO)
-    #: ⚠️  صافي المبيعات **بلا ضريبة**: الضريبة تُحصَّل للدولة ولا
-    #:     تُملَك، فاحتسابها إيرادًا يضخّم الربح بنسبتها كاملة.
+    #: ⚠️  Net sales **excluding tax**: tax is collected for the state and is not
+    #:     owned, so counting it as revenue inflates the profit by its full rate.
     net = MoneyField(_("صافي المبيعات"))
 
     channel = models.CharField(_("القناة"), max_length=16, blank=True, db_index=True)
@@ -245,8 +246,8 @@ class RevenueEntry(BaseModel):
         verbose_name_plural = _("قيود الإيراد")
         ordering = ["-occurred_on", "-created_at"]
         constraints = [
-            # ⚠️  هذا القيد هو الحارس الوحيد ضد ازدواج الإيراد.
-            #     الفحص في الكود وحده يخسر السباق بين طلبين متزامنين.
+            # ⚠️  This constraint is the only guard against duplicated revenue.
+            #     A check in code alone loses the race between two concurrent orders.
             models.UniqueConstraint(
                 fields=["source", "order"],
                 condition=models.Q(deleted_at__isnull=True),
@@ -260,19 +261,21 @@ class RevenueEntry(BaseModel):
 
 class COGSEntry(BaseModel):
     """
-    تكلفة البضاعة المباعة.
+    The cost of goods sold.
 
-    ⚠️  **من `Batch.unit_cost` وقت البيع لا من متوسط اليوم.**
+    ⚠️  **From `Batch.unit_cost` at the time of sale, not from today's average.**
 
-        النظام يستهلك الدفعات بـ FEFO، وكل حركة بيع تحمل تكلفة
-        دفعتها. حساب التكلفة بمتوسط حالي يعطي ربحًا لا يطابق أي
-        بيعة وقعت فعلًا — ويتغيّر بأثر رجعي كلما وصلت دفعة جديدة.
+        The system consumes batches by FEFO, and every sale movement carries its
+        batch's cost. Computing the cost from a current average gives a profit
+        matching no sale that actually happened — and it changes retroactively
+        every time a new batch arrives.
 
-    ⚠️  و`unknown_quantity` ليس تفصيلًا.
+    ⚠️  And `unknown_quantity` is not a detail.
 
-        مخزون أُدخل بلا دفعة يُباع بتكلفة مجهولة. معاملتها كصفر
-        يجعل الربح يظهر أعلى من حقيقته بثمن البضاعة كاملًا —
-        وهو أسوأ اتجاه ممكن للخطأ. تُعَدّ وتُعرَض بدل أن تُبتلع.
+        Stock entered with no batch is sold at an unknown cost. Treating it as
+        zero makes the profit appear higher than reality by the full price of
+        the goods — the worst possible direction for an error. It is counted and
+        displayed rather than swallowed.
     """
 
     revenue_entry = models.OneToOneField(
@@ -300,29 +303,30 @@ class COGSEntry(BaseModel):
 
     @property
     def is_complete(self) -> bool:
-        """التكلفة معروفة بالكامل — لا كمية مجهولة."""
+        """The cost is fully known — no unknown quantity."""
         return self.unknown_quantity == 0
 
 
 # ═══════════════════════════════════════════════════════════
-#  إقفال الفترات
+#  Closing periods
 # ═══════════════════════════════════════════════════════════
 
 
 class FiscalPeriod(TimeStampedModel):
     """
-    شهر مالي — يُقفَل فلا يُعدَّل.
+    A fiscal month — closed, and then never edited.
 
-    ⚠️  **الفترة المقفلة لا تقبل مصروفًا جديدًا ولا تعديلًا.**
+    ⚠️  **A closed period accepts no new expense and no edit.**
 
-        تقرير أرباح صدر واتُّخذ عليه قرار ثم تغيّر بأثر رجعي هو
-        أسوأ ما يقع في نظام مالي: لا أحد يعرف أي نسخة كانت
-        صحيحة. التصحيح يُقيَّد في الفترة المفتوحة.
+        A profit report that was issued, acted upon, and then changed
+        retroactively is the worst thing that can happen in a financial system:
+        nobody knows which version was correct. Corrections are posted in the
+        open period.
 
-    ⚠️  ومفتاحه `(year, month)` لا UUID.
+    ⚠️  And its key is `(year, month)`, not a UUID.
 
-        المفتاح **هو** المعنى: «٢٠٢٦-٠٣» يُقرأ ويُستعلَم به،
-        ولا يظهر في رابط عام.
+        The key **is** the meaning: "2026-03" is read and queried directly,
+        and it appears in no public URL.
     """
 
     year = models.PositiveIntegerField(_("السنة"))
@@ -354,10 +358,10 @@ class FiscalPeriod(TimeStampedModel):
     @classmethod
     def is_locked(cls, on_date) -> bool:
         """
-        ⚠️  الفترة **غير الموجودة مفتوحة**.
+        ⚠️  A period that **does not exist is open**.
 
-            اعتبار الغياب إقفالًا كان يمنع أول مصروف يُدخَل في
-            النظام — ولا شيء يشرح للمستخدم السبب.
+            Treating absence as closed blocked the very first expense entered
+            into the system — with nothing to explain why to the user.
         """
         return cls.objects.filter(year=on_date.year, month=on_date.month, is_closed=True).exists()
 

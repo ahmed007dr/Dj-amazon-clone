@@ -1,11 +1,12 @@
 """
-خدمات الموظفين.
+Employee services.
 
-⚠️  **الأداء يُحسب من الطلبات لا يُخزَّن.**
+⚠️  **Performance is computed from the orders, never stored.**
 
-    رقم مبيعات مخزَّن على ملف الموظف ينحرف عند أول إلغاء أو مرتجع
-    لا يمرّ بمسار التحديث. والمندوب يقرأ رقمه يوميًا ويبني عليه
-    توقّع عمولته — فانحرافه شكوى مباشرة.
+    A sales figure stored on the employee profile drifts at the first
+    cancellation or return that does not pass through the update path. And the
+    rep reads their number daily and builds a commission expectation on it — so
+    drift is a complaint waiting to happen.
 """
 
 from __future__ import annotations
@@ -43,21 +44,22 @@ def _money(queryset, field: str) -> Decimal:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدوار والصلاحيات
+#  Roles and permissions
 # ═══════════════════════════════════════════════════════════
 
 
 @transaction.atomic
 def sync_role_permissions(role) -> None:
     """
-    يزامن صلاحيات الدور إلى مجموعة Django التي تسندها فعلًا.
+    Synchronises the role's permissions into the Django group that actually confers them.
 
-    ⚠️  **بدون هذا الاستدعاء تكون الصلاحيات زينة.**
+    ⚠️  **Without this call the permissions are decoration.**
 
-        `user.has_perm()` يقرأ صلاحيات المستخدم ومجموعاته، ولا
-        يعرف بوجود جدول `EmployeeRole.permissions` إطلاقًا. تركه
-        بلا مزامنة يعني دورًا يبدو مضبوطًا في اللوحة بينما كل فحص
-        صلاحية يفشل — ثم يُكتب فاحص خاص يتجاوز نظام Django.
+        `user.has_perm()` reads the user's own permissions and their groups, and
+        knows nothing at all about the `EmployeeRole.permissions` table. Leaving
+        it unsynchronised means a role that looks configured in the panel while
+        every permission check fails — and then a custom checker gets written
+        that bypasses Django's system.
     """
     from django.contrib.auth.models import Group
 
@@ -72,21 +74,21 @@ def sync_role_permissions(role) -> None:
 @transaction.atomic
 def apply_role_permissions(employee: EmployeeProfile) -> None:
     """
-    يضع الموظف في مجموعة دوره — **بلا حفظ للملف**.
+    Puts the employee into their role's group — **without saving the profile**.
 
-    ⚠️  **الفصل عن `set_role` ليس تنظيمًا بل ضرورة.**
+    ⚠️  **The separation from `set_role` is a necessity, not tidiness.**
 
-        الإشارة على `post_save` تستدعي هذه؛ ولو حفظت الملف لأعادت
-        إطلاق الإشارة إلى ما لا نهاية. وقع ذلك فعلًا: التكرار كان
-        يبتلعه `except Exception` في الإشارة، فيبدو الحفظ ناجحًا
-        بينما كل عملية تحرق ألف إطار مكدس وتسجّل استثناءً لا يقرأه
-        أحد.
+        The `post_save` signal calls this one; and were it to save the profile,
+        it would re-fire the signal endlessly. That genuinely happened: the
+        recursion was swallowed by the signal's `except Exception`, so the save
+        looked successful while every operation burned a thousand stack frames
+        and logged an exception nobody read.
 
-    ⚠️  و**ينزع مجموعات الأدوار الأخرى**.
+    ⚠️  And it **removes the other roles' groups**.
 
-        تركها يجعل الموظف يجمع صلاحيات كل دور مرّ به — فمندوب
-        نُقل إلى خدمة العملاء يبقى قادرًا على إنشاء الطلبات، ولا
-        يظهر ذلك في أي شاشة.
+        Leaving them makes the employee accumulate the permissions of every role
+        they have passed through — so a rep moved to customer service remains
+        able to create orders, and it shows on no screen.
     """
     from django.contrib.auth.models import Group
 
@@ -101,7 +103,7 @@ def apply_role_permissions(employee: EmployeeProfile) -> None:
 @transaction.atomic
 def set_role(employee: EmployeeProfile, role) -> EmployeeProfile:
     """
-    يغيّر دور الموظف — والإشارة تتولّى المجموعات بعد الحفظ.
+    Changes the employee's role — and the signal handles the groups after the save.
     """
     employee.role = role
     employee.save(update_fields=["role", "updated_at"])
@@ -110,11 +112,11 @@ def set_role(employee: EmployeeProfile, role) -> EmployeeProfile:
 
 def revoke_permissions(employee: EmployeeProfile) -> None:
     """
-    ⚠️  إيقاف الموظف **يسحب مجموعته فورًا**.
+    ⚠️  Deactivating an employee **withdraws their group immediately**.
 
-        الاكتفاء بـ`is_active` يحمي نقاط هذا النطاق وحدها؛ أما
-        `has_perm` في بقية النظام فيبقى يقول «نعم» لموظف انتهت
-        خدمته ما دام في المجموعة.
+        Relying on `is_active` alone protects this domain's endpoints only; in
+        the rest of the system `has_perm` keeps saying "yes" to a departed
+        employee for as long as they remain in the group.
     """
     from django.contrib.auth.models import Group
 
@@ -122,18 +124,18 @@ def revoke_permissions(employee: EmployeeProfile) -> None:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الإسناد
+#  Assignment
 # ═══════════════════════════════════════════════════════════
 
 
 def assigned_customers(employee: EmployeeProfile):
     """
-    عملاء هذا الموظف **القائمون**.
+    This employee's **current** customers.
 
-    ⚠️  الأساس الوحيد لكل ما يراه المندوب.
+    ⚠️  The sole basis for everything the rep sees.
 
-        كل استعلام في بوابته يمرّ من هنا؛ ونسيان التصفية في نقطة
-        واحدة يكشف قائمة العملاء كاملة لمن أُسند له ثلاثة.
+        Every query in their portal goes through here; and forgetting the filter
+        on one endpoint exposes the entire customer list to someone assigned three.
     """
     from customers.models import CustomerProfile
 
@@ -152,13 +154,14 @@ def is_assigned(employee: EmployeeProfile, customer) -> bool:
 @transaction.atomic
 def assign_customer(customer, employee: EmployeeProfile, *, actor=None, note: str = ""):
     """
-    ينقل عميلًا إلى موظف — **وينهي إسناده السابق**.
+    Transfers a customer to an employee — **and ends their previous assignment**.
 
-    ⚠️  الإنهاء قبل الإنشاء وفي نفس المعاملة.
+    ⚠️  Ending before creating, and in the same transaction.
 
-        القيد الفريد يمنع إسنادين قائمين؛ والإنشاء قبل الإنهاء
-        يرفضه بخطأ تكامل خام لا يفهمه الأدمن. والعكس — إنهاء بلا
-        إنشاء بعده — يترك عميلًا بلا مسؤول لو فشل ما بعده.
+        The unique constraint forbids two current assignments; creating before
+        ending is rejected with a raw integrity error the admin cannot read. And
+        the reverse — ending with no creation after it — leaves a customer with
+        no owner should what follows fail.
     """
     if not employee.is_active:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="الموظف ليس على رأس العمل")
@@ -186,10 +189,10 @@ def assign_customer(customer, employee: EmployeeProfile, *, actor=None, note: st
 @transaction.atomic
 def end_assignment(customer, *, actor=None) -> int:
     """
-    ⚠️  الإنهاء **لا يحذف السجل**.
+    ⚠️  Ending **does not delete the record**.
 
-        العمولة تُحسب على من كان مسؤولًا وقت البيع؛ وحذف الإسناد
-        المنتهي يجعل كل طلب قديم بلا نسبة.
+        Commission is calculated on whoever was responsible at the time of sale;
+        deleting the ended assignment leaves every old order unattributed.
     """
     return CustomerAssignment.objects.filter(
         customer=customer, status=AssignmentStatus.ACTIVE
@@ -197,20 +200,21 @@ def end_assignment(customer, *, actor=None) -> int:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأداء
+#  Performance
 # ═══════════════════════════════════════════════════════════
 
 
 @dataclass(frozen=True)
 class Performance:
     """
-    أداء موظف في فترة.
+    An employee's performance over a period.
 
-    ⚠️  **بلا هدف ولا عمولة — المرحلة ١١.**
+    ⚠️  **No target and no commission — phase 11.**
 
-        وضع صفر مكانهما كان يجعل المندوب يقرأ «تحقيقك ٠٪» ويظنه
-        أداءً سيئًا لا نظامًا لم يُضبَط بعد. الغياب يُعلَن صراحةً
-        بدل أن يُملأ برقم كاذب.
+        Putting zero in their place made the rep read "your achievement is 0%"
+        and take it for poor performance rather than a system not yet
+        configured. The absence is declared explicitly rather than filled with a
+        false number.
     """
 
     employee: EmployeeProfile
@@ -234,11 +238,12 @@ class Performance:
 
 def performance(employee: EmployeeProfile, start: date, end: date) -> Performance:
     """
-    ⚠️  المنسوب للموظف هو `owner_employee` لا `created_by`.
+    ⚠️  What is attributed to the employee is `owner_employee`, not `created_by`.
 
-        المندوب مسؤول عن كل طلبات عملائه — بما فيها ما طلبوه
-        بأنفسهم من الموقع. الحصر بما أنشأه بيده يجعل نجاحه في
-        تحويل العميل إلى الطلب الذاتي **يخفض** رقمه.
+        The rep is responsible for all their customers' orders — including those
+        the customers placed themselves on the website. Restricting it to what
+        they typed by hand makes their success in converting a customer to
+        self-service **lower** their number.
     """
     from orders.models import Order, OrderStatus
 
@@ -251,8 +256,8 @@ def performance(employee: EmployeeProfile, start: date, end: date) -> Performanc
         created_at__date__lte=end,
     )
 
-    # ⚠️  الملغى خارج الحساب تمامًا: لم يُبَع شيء.
-    #     أما المرتجع فقد بيع ثم عاد — يُطرح ولا يُتجاهَل.
+    # ⚠️  Cancelled orders are excluded from the calculation entirely: nothing was sold.
+    #     A return, however, was sold and then came back — it is subtracted, not ignored.
     sold = period.exclude(status__in=[OrderStatus.CANCELLED, OrderStatus.REFUNDED])
     returned = period.filter(status=OrderStatus.REFUNDED)
 
@@ -280,22 +285,22 @@ def performance(employee: EmployeeProfile, start: date, end: date) -> Performanc
 
 def monthly_history(employee: EmployeeProfile, months: int = 6) -> list[dict]:
     """
-    أداء الأشهر السابقة.
+    The previous months' performance.
 
-    ⚠️  **استعلام واحد بالتجميع لا استعلام لكل شهر.**
+    ⚠️  **One aggregated query, not one query per month.**
 
-        حلقة على اثني عشر شهرًا تعني اثني عشر استعلامًا في كل فتح
-        للوحة — وهي أول شاشة يفتحها كل مندوب كل صباح.
+        A loop over twelve months means twelve queries on every dashboard open —
+        and it is the first screen every rep opens each morning.
     """
     from django.db.models.functions import TruncMonth
 
     from orders.models import Order, OrderStatus
 
-    # ⚠️  الطرح بالأشهر لا بـ«٣١ يومًا».
+    # ⚠️  Subtracting by months, not by "31 days".
     #
-    #     الطرح بعدد أيام ثابت ينزلق: ستة أشهر × ٣١ يومًا تتجاوز
-    #     نصف السنة بأيام، فيدخل شهر سابع ناقص ويبدو كأن أداء
-    #     المندوب انهار في أقدم صف.
+    #     Subtracting a fixed day count drifts: six months × 31 days overshoots
+    #     half a year by several days, so an incomplete seventh month creeps in
+    #     and it looks as though the rep's performance collapsed in the oldest row.
     today = timezone.localdate()
     month_index = today.year * 12 + (today.month - 1) - (months - 1)
     first_month = date(month_index // 12, month_index % 12 + 1, 1)
@@ -329,17 +334,18 @@ def monthly_history(employee: EmployeeProfile, months: int = 6) -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════
-#  البيع نيابةً عن العميل
+#  Selling on the customer's behalf
 # ═══════════════════════════════════════════════════════════
 
 
 def assert_may_act_for(employee: EmployeeProfile, customer) -> None:
     """
-    ⚠️  **الحارس الذي يمنع بيع مندوب على عميل ليس له.**
+    ⚠️  **The guard that stops a rep selling to a customer who is not theirs.**
 
-        بلا هذا الفحص يُنشئ أي مندوب طلبًا لأي عميل بتمرير معرّف
-        — فتُنسب المبيعة لغير صاحبها وتُحسب عمولتها للشخص الخطأ،
-        ويكتشفه صاحب الحق في نهاية الشهر لا قبلها.
+        Without this check any rep creates an order for any customer by passing
+        an id — so the sale is attributed to the wrong person and its commission
+        goes to the wrong person, and whoever it belonged to discovers it at the
+        end of the month rather than before.
     """
     if not employee.is_active:
         raise BusinessError(
@@ -347,6 +353,6 @@ def assert_may_act_for(employee: EmployeeProfile, customer) -> None:
         )
 
     if not is_assigned(employee, customer):
-        # ⚠️  404 لا 403: الفارق بينهما يكشف وجود العميل ونشاطه
-        #     لمن يجرّب معرّفات.
+        # ⚠️  404, not 403: the difference reveals the customer's existence and activity
+        #     to anyone trying ids.
         raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)

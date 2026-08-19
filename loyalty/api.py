@@ -1,16 +1,16 @@
 """
-واجهات الولاء والإحالة.
+Loyalty and referral endpoints.
 
-⚠️  **مسار العميل ومسار الأدمن منفصلان تمامًا.**
+⚠️  **The customer path and the admin path are entirely separate.**
 
-    العميل يرى دفتره هو، والأدمن يرى الضبط ودفاتر الجميع. خلط
-    الاثنين في نقطة واحدة تُرشَّح بالصلاحية هو كيف تتسرّب أرصدة
-    عملاء آخرين عند أول خطأ في شرط الترشيح.
+    The customer sees their own ledger, and the admin sees the configuration and
+    everyone's ledgers. Mixing the two into one endpoint filtered by permission
+    is how other customers' balances leak at the first mistake in the filter condition.
 
-⚠️  و**كل نقطة تفحص التشغيل والاستهداف** عبر `program_for`.
+⚠️  And **every endpoint checks enablement and targeting** through `program_for`.
 
-    نقطة واحدة تنسى الفحص تجعل مفتاح الإيقاف كذبة: الأدمن يوقف
-    البرنامج ويستمر الكسب من حيث لا يرى.
+    One endpoint that forgets the check makes the off switch a lie: the admin
+    disables the programme and earning continues where they cannot see it.
 """
 
 from __future__ import annotations
@@ -47,19 +47,20 @@ def _customer_of(request):
 
 
 # ═══════════════════════════════════════════════════════════
-#  العميل
+#  Customer
 # ═══════════════════════════════════════════════════════════
 
 
 class MyLoyaltyAPI(APIView):
     """
-    ملخّص ولاء العميل.
+    A customer's loyalty summary.
 
-    ⚠️  **`enabled: false` ردٌّ عادي لا خطأ.**
+    ⚠️  **`enabled: false` is a normal response, not an error.**
 
-        النظام قد يكون موقوفًا كليًا أو موجَّهًا لفئة لا تشمل هذا
-        الحساب. الردّ بـ ٤٠٤ كان يجعل الواجهة تُظهر رسالة عطل
-        لعميل لا عطل عنده — والصحيح أن تُخفي القسم بهدوء.
+        The system may be disabled entirely, or targeted at a segment that does
+        not include this account. Answering 404 made the frontend show a fault
+        message to a customer with no fault — the right behaviour is to hide the
+        section quietly.
     """
 
     permission_classes = [IsAuthenticated]
@@ -75,7 +76,7 @@ class MyLoyaltyAPI(APIView):
         tiers = list(program.tiers.order_by("threshold"))
         spent = customer.total_spent
 
-        # الفئة التالية وما تبقّى لبلوغها — الحافز الفعلي للعميل
+        # The next tier and what remains to reach it — the customer's actual incentive
         next_tier = next((row for row in tiers if row.threshold > spent), None)
 
         return Response(
@@ -116,7 +117,7 @@ class MyLoyaltyAPI(APIView):
 
 
 class MyPointsAPI(generics.ListAPIView):
-    """كشف نقاط العميل — دفتره هو وحده."""
+    """The customer's points statement — their own ledger alone."""
 
     permission_classes = [IsAuthenticated]
     serializer_class = s.PointsEntrySerializer
@@ -129,10 +130,11 @@ class MyPointsAPI(generics.ListAPIView):
 
 class RedemptionQuoteAPI(APIView):
     """
-    ⚠️  التسعير قبل الالتزام **بنفس الدالة**.
+    ⚠️  Pricing before commitment **through the same function**.
 
-        حسابه هنا بمنطق مستقل يجعل ما يراه العميل يخالف ما يُخصم
-        منه — وهي أسوأ مفاجأة ممكنة في نظام نقاط.
+        Computing it here with independent logic makes what the customer sees
+        differ from what is deducted from them — the worst possible surprise in
+        a points system.
     """
 
     permission_classes = [IsAuthenticated]
@@ -183,7 +185,7 @@ class RedeemAPI(APIView):
 
 
 class MyReferralAPI(APIView):
-    """كود الإحالة الشخصي وإحصاءاته."""
+    """The personal referral code and its statistics."""
 
     permission_classes = [IsAuthenticated]
 
@@ -212,10 +214,11 @@ class MyReferralAPI(APIView):
 
 class ApplyReferralAPI(APIView):
     """
-    يربط الحساب بمُحيل.
+    Links the account to a referrer.
 
-    ⚠️  الربط لا يُكافئ فورًا: المكافأة عند أول طلب مكتمل. الصرف
-        عند الربط يحوّل النظام إلى مزرعة حسابات وهمية.
+    ⚠️  Linking does not reward immediately: the reward comes on the first
+        completed order. Paying out at link time turns the system into a farm of
+        fake accounts.
     """
 
     permission_classes = [IsAuthenticated]
@@ -238,7 +241,7 @@ class ApplyReferralAPI(APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن — الضبط
+#  Admin — configuration
 # ═══════════════════════════════════════════════════════════
 
 
@@ -250,11 +253,12 @@ class LoyaltyProgramListCreateAPI(generics.ListCreateAPIView):
 
 def _refuse_delete_with_history(instance, entries) -> None:
     """
-    ⚠️  **البرنامج الذي مُنحت منه نقاط لا يُحذف — يُوقَف.**
+    ⚠️  **A programme that has awarded points is never deleted — it is disabled.**
 
-        الحذف يترك حركات في الدفتر تشير إلى برنامج غير موجود، فلا
-        يُقرأ كشف عميل قديم ولا تُعرَف قيمة نقطته. والإيقاف يفعل
-        كل ما يريده الأدمن فعلًا: يمنع الكسب الجديد ويُبقي التاريخ.
+        Deleting it leaves ledger movements pointing at a programme that does
+        not exist, so an old customer's statement cannot be read and the value
+        of their point cannot be known. And disabling does everything the admin
+        actually wants: it stops new earning and keeps the history.
     """
     if entries.exists():
         raise BusinessError(
@@ -266,10 +270,11 @@ def _refuse_delete_with_history(instance, entries) -> None:
 
 class LoyaltyProgramDetailAPI(generics.RetrieveUpdateDestroyAPIView):
     """
-    ⚠️  **التفعيل والإيقاف يُدوَّنان في سجل التدقيق.**
+    ⚠️  **Enabling and disabling are recorded in the audit log.**
 
-        إيقاف البرنامج يوقف كسب كل العملاء فورًا. سؤال «من أوقفه
-        ومتى؟» يأتي بعد يوم من الشكاوى — وبلا سجل لا إجابة.
+        Disabling the programme stops every customer earning immediately. The
+        question "who disabled it, and when?" arrives a day into the complaints
+        — and with no log there is no answer.
     """
 
     permission_classes = [CanManageLoyalty]
@@ -334,11 +339,11 @@ class ReferralProgramDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
 class TargetingOptionsAPI(APIView):
     """
-    خيارات الاستهداف المتاحة — **من المصدر لا من قائمة مكتوبة**.
+    The available targeting options — **from the source, not from a hand-written list**.
 
-    ⚠️  تكرار الخيارات في الواجهة يجعل إضافة نوع حساب جديد تحتاج
-        تعديلين؛ ونسيان أحدهما ينتج استهدافًا لا يطابق أحدًا بلا
-        رسالة خطأ.
+    ⚠️  Duplicating the options in the frontend makes adding a new account type
+        need two edits; and forgetting one produces targeting that matches
+        nobody with no error message.
     """
 
     permission_classes = [CanManageLoyalty]
@@ -361,7 +366,7 @@ class TargetingOptionsAPI(APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن — الدفاتر
+#  Admin — the ledgers
 # ═══════════════════════════════════════════════════════════
 
 
@@ -383,16 +388,16 @@ class AdminPointsListAPI(generics.ListAPIView):
 
 class CustomerLookupAPI(APIView):
     """
-    بحث عن عميل **برصيده**.
+    Search for a customer **with their balance**.
 
-    ⚠️  **الرصيد جزء من نتيجة البحث لا شاشة تالية.**
+    ⚠️  **The balance is part of the search result, not a following screen.**
 
-        من يسجّل تسوية يحتاج أن يرى ما لدى العميل قبل أن يكتب
-        الرقم: سحب ١٠٠ من رصيد ٣٠ يُقصّ صامتًا إلى ٣٠، فيظن
-        الأدمن أنه سحب ما نوى.
+        Whoever records an adjustment needs to see what the customer has before
+        writing the number: withdrawing 100 from a balance of 30 is silently
+        clamped to 30, so the admin believes they withdrew what they intended.
 
-    ⚠️  و**الحد عشرة**: البحث للاختيار لا للتصفّح، وقائمة طويلة
-        في لوح ضيّق تُبطئ ولا تفيد.
+    ⚠️  And **the limit is ten**: the search is for selection, not browsing, and
+        a long list in a narrow panel slows things down without helping.
     """
 
     permission_classes = [CanAdjustPoints]
@@ -422,9 +427,9 @@ class CustomerLookupAPI(APIView):
                     "segment": row.segment,
                     "balance": services.balance(row),
                     "usable_points": services.usable_points(row),
-                    # ⚠️  «خارج البرنامج» يظهر قبل الكتابة لا بعد
-                    #     الإرسال: التسوية على حساب لا يشمله برنامج
-                    #     تُرفض، وإخفاء ذلك يجعل الرفض يبدو عطلًا.
+                    # ⚠️  "Outside the programme" appears before typing rather than after
+                    #     submitting: an adjustment on an account no programme covers
+                    #     is rejected, and hiding that makes the rejection look like a fault.
                     "covered": services.program_for(row.user, row) is not None,
                 }
                 for row in rows
@@ -434,14 +439,14 @@ class CustomerLookupAPI(APIView):
 
 class ExpirePointsAPI(APIView):
     """
-    إسقاط النقاط المنتهية **الآن**.
+    Expire the due points **now**.
 
-    ⚠️  المهمة دورية أصلًا (`run_periodic --job loyalty`)؛ وهذا
-        الزر لمن لم تُجدوَل عنده بعد، أو أراد أن يرى أثرها قبل
-        إقفال الشهر بدل أن ينتظر منتصف الليل.
+    ⚠️  The task is periodic anyway (`run_periodic --job loyalty`); this button
+        is for whoever has not scheduled it yet, or wants to see its effect
+        before closing the month rather than waiting for midnight.
 
-    ⚠️  وهي **آمنة التكرار**: لا تمسّ إلا دفعات تجاوز تاريخها
-        اليوم، وتسجّل حركة انتهاء بدل الحذف.
+    ⚠️  And it is **safe to repeat**: it touches only batches whose date has
+        passed today, and records an expiry movement rather than deleting.
     """
 
     permission_classes = [CanManageLoyalty]
@@ -461,7 +466,7 @@ class ExpirePointsAPI(APIView):
 
 
 class AdjustPointsAPI(APIView):
-    """تسوية يدوية — إضافة أو سحب، بسبب إلزامي."""
+    """A manual adjustment — add or withdraw, with a mandatory reason."""
 
     permission_classes = [CanAdjustPoints]
     serializer_class = s.AdjustmentInputSerializer
@@ -514,10 +519,10 @@ class AdminReferralListAPI(generics.ListAPIView):
 
 class LoyaltyOverviewAPI(APIView):
     """
-    لوحة الولاء — **الالتزام أولًا**.
+    The loyalty dashboard — **the liability first**.
 
-    ⚠️  عدد النقاط وحده رقم تسويقي؛ قيمتها بالجنيه هي ما يظهر في
-        الميزانية حين تُصرَف.
+    ⚠️  The number of points alone is a marketing figure; their value in pounds
+        is what appears on the balance sheet when they are redeemed.
     """
 
     permission_classes = [CanManageLoyalty]
@@ -527,7 +532,7 @@ class LoyaltyOverviewAPI(APIView):
 
         return Response(
             {
-                # ⚠️  المبلغ نصًا (ADR-31) — والعدد رقمًا
+                # ⚠️  The amount as a string (ADR-31) — and the count as a number
                 "liability": {
                     "points": liability["points"],
                     "value": str(liability["value"]),

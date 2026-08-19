@@ -1,25 +1,25 @@
 """
-صلاحيات المالية.
+Finance permissions.
 
-⚠️  **رؤية الأرباح ليست صلاحية أدمن تلقائية.**
+⚠️  **Seeing profits is not an automatic admin permission.**
 
-    لوحة الأدمن يفتحها مدير كتالوج وموظف خدمة عملاء ومسؤول مخزن.
-    ولا واحد منهم يحتاج أن يعرف هامش الربح ولا رواتب الزملاء ولا
-    إيجار المحل. جعلها تابعة لـ`IsAdminAccount` كان يفتحها للجميع
-    بلا أن يقرّر أحد ذلك.
+    The admin panel is opened by a catalogue manager, a customer service
+    employee and a warehouse supervisor. None of them needs to know the profit
+    margin, nor colleagues' salaries, nor the shop's rent. Tying it to
+    `IsAdminAccount` opened it to everyone without anyone deciding so.
 
-⚠️  وقاعدة العمل ١٤ حسمت **الجهة**: الإيرادات والمصروفات تُرى من
-    بوابة الأدمن. وهي لم تحسم **مَن** داخلها — فالافتراضي هنا
-    الأشدّ: صلاحية Django صريحة تُمنَح بقرار.
+⚠️  And business rule 14 settled **the side**: revenue and expenses are viewed
+    from the admin portal. It did not settle **who** within it — so the default
+    here is the stricter one: an explicit Django permission granted by decision.
 """
 
 from rest_framework.permissions import BasePermission
 
-#: ⚠️  صلاحية واحدة تحكم القراءة كلها.
+#: ⚠️  A single permission governs all reading.
 #:
-#:     تفتيتها إلى «يرى الإيراد» و«يرى المصروفات» و«يرى الربح»
-#:     وهمٌ: من يرى الاثنين الأولين يطرح. الفصل الحقيقي الوحيد
-#:     هو بين من يقرأ التقرير ومن يُدخل مصروفًا.
+#:     Splitting it into "sees revenue", "sees expenses" and "sees profit"
+#:     is an illusion: whoever sees the first two subtracts. The only real
+#:     separation is between whoever reads the report and whoever enters an expense.
 VIEW_FINANCE = "finance.view_revenueentry"
 MANAGE_EXPENSES = "finance.add_expense"
 APPROVE_EXPENSES = "finance.change_expense"
@@ -27,10 +27,10 @@ APPROVE_EXPENSES = "finance.change_expense"
 
 class _PermissionRequired(BasePermission):
     """
-    ⚠️  المالك (`is_superuser`) يمرّ دائمًا.
+    ⚠️  The owner (`is_superuser`) always passes.
 
-        بدونه لا يستطيع أول مستخدم في نظام جديد فتح شاشة مالية
-        ليمنح الصلاحيات — وهي حلقة مفرغة تُحَلّ بـ`manage.py`.
+        Without it the first user of a new system cannot open a finance screen
+        to grant the permissions — a deadlock resolved through `manage.py`.
     """
 
     permission = ""
@@ -56,10 +56,10 @@ class CanManageExpenses(_PermissionRequired):
 
 class CanApproveExpenses(_PermissionRequired):
     """
-    ⚠️  الاعتماد **صلاحية منفصلة عن الإدخال**.
+    ⚠️  Approval is **a permission separate from entry**.
 
-        من يُدخل مصروفًا ويعتمده بنفسه يجعل الاعتماد توقيعًا على
-        بياض. الفصل هو كل قيمة الخطوة.
+        Someone who enters an expense and approves it themselves makes approval
+        a signature on a blank page. The separation is the entire value of the step.
     """
 
     message = "اعتماد المصروفات يحتاج صلاحية صريحة"

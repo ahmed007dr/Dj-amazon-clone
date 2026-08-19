@@ -50,7 +50,8 @@ class CanViewReports(BasePermission):
         if user.is_superuser:
             return True
         # ⚠️  The same permission as finance: whoever sees profits sees the reports.
-        #     A separate third permission would get forgotten, so it would be opened or closed by oversight.
+        # A separate third permission would get forgotten, so it would be opened or closed by
+        # oversight.
         return user.has_perm("finance.view_revenueentry")
 
 
@@ -190,7 +191,10 @@ class CanManageOrders(DomainPermission):
 
 
 class CanManageAccounts(DomainPermission):
-    """⚠️  The most dangerous permission after finance: whoever holds it suspends and reactivates accounts."""
+    """
+    ⚠️  The most dangerous permission after finance: whoever holds it
+        suspends and reactivates accounts.
+    """
 
     permission = "accounts.change_user"
     message = "إدارة الحسابات تحتاج صلاحية صريحة"
@@ -288,10 +292,12 @@ DOMAIN_PERMISSIONS = {
 #     makes granting `delete_user` by oversight a real possibility, one click away.
 #
 #     This catalogue shows only what the system actually guards, under names
-#     that say what they open — the rest stays for the Django panel, for those who know what they are doing.
+# that say what they open — the rest stays for the Django panel, for those who know what they are
+# doing.
 #
 # ⚠️  And **the ordering runs from least to most dangerous within each group**:
-#     whoever grants reads from the top, so the most dangerous is never granted by oversight alongside what precedes it.
+# whoever grants reads from the top, so the most dangerous is never granted by oversight alongside
+# what precedes it.
 
 PERMISSION_CATALOGUE = [
     {

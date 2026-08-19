@@ -15,6 +15,7 @@ import pytest
 
 from accounts.models import AccountStatus, User
 from administration.models import AdminProfile, AdminRole, AdminRoleAssignment
+from core.testing import grant_all_domains
 
 PASSWORD = "Str0ng-Test-Pass!23"
 
@@ -31,9 +32,11 @@ def admin_user(db):
 class TestAdminProfile:
     def test_admin_number_is_generated_and_unique(self, admin_user):
         first = AdminProfile.objects.create(user=admin_user)
+        grant_all_domains(admin_user)
 
         other = User.objects.create_user(email="admin2@test.local", password=PASSWORD)
         second = AdminProfile.objects.create(user=other)
+        grant_all_domains(other)
 
         assert first.admin_number.startswith("ADM-")
         assert first.admin_number != second.admin_number
@@ -44,9 +47,12 @@ class TestAdminProfile:
 
         AdminProfile.objects.create(user=admin_user, is_owner=True)
 
+        grant_all_domains(admin_user)
+
         other = User.objects.create_user(email="admin3@test.local", password=PASSWORD)
         with pytest.raises(IntegrityError):
             AdminProfile.objects.create(user=other, is_owner=True)
+            grant_all_domains(other)
 
 
 @pytest.mark.django_db
@@ -59,6 +65,8 @@ class TestOwnerProtection:
         from core.errors import BusinessError
 
         AdminProfile.objects.create(user=admin_user, is_owner=True)
+
+        grant_all_domains(admin_user)
 
         with pytest.raises(BusinessError) as exc:
             services.suspend_account(admin_user, reason="محاولة")
@@ -75,6 +83,8 @@ class TestOwnerProtection:
         from accounts import services
 
         AdminProfile.objects.create(user=admin_user, is_owner=False)
+
+        grant_all_domains(admin_user)
         services.suspend_account(admin_user, reason="مخالفة")
 
         admin_user.refresh_from_db()
@@ -93,6 +103,8 @@ class TestAdminRoles:
         from django.utils import timezone
 
         profile = AdminProfile.objects.create(user=admin_user)
+
+        grant_all_domains(admin_user)
         role = AdminRole.objects.create(
             name_ar="مدير مالي", name_en="Finance Manager", code="finance_manager"
         )
@@ -109,6 +121,8 @@ class TestAdminRoles:
         from django.db.models import ProtectedError
 
         profile = AdminProfile.objects.create(user=admin_user)
+
+        grant_all_domains(admin_user)
         role = AdminRole.objects.create(name_ar="مدقّق", name_en="Auditor", code="auditor")
         AdminRoleAssignment.objects.create(admin=profile, role=role)
 

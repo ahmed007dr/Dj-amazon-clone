@@ -1,12 +1,12 @@
 """
-الطلبات — «معاملة تجارية مؤكدة».
+Orders — "a confirmed commercial transaction".
 
-⚠️  كل رقم هنا **لقطة تاريخية**.
+⚠️  Every figure here is **a historical snapshot**.
 
-    السعر والنسبة الضريبية واسم المنتج — كلها منسوخة وقت الطلب.
-    الفاتورة الصادرة لا تتغيّر بتغيّر الكتالوج أو الضريبة أو
-    قوائم الأسعار. حسابها لاحقًا من القيم الحالية يزوّر السجل
-    ويكسر أي مراجعة ضريبية أو محاسبية.
+    The price, the tax rate and the product name — all copied at the time of the
+    order. An issued invoice does not change as the catalogue, the tax or the
+    price lists change. Computing it later from current values falsifies the
+    record and breaks any tax or accounting review.
 """
 
 from django.core.validators import MinValueValidator
@@ -24,13 +24,13 @@ def order_number() -> str:
 
 class OrderChannel(models.TextChoices):
     """
-    قناة البيع.
+    The sales channel.
 
-    ⚠️  **يُخلق في المرحلة ٥ ولو كانت القيمة الوحيدة `ONLINE`.** (ADR-09)
+    ⚠️  **Created in phase 5 even though `ONLINE` is the only value.** (ADR-09)
 
-        نقطة البيع في المرحلة ٧، لكن إضافة الحقل بعد تراكم الطلبات
-        تعني أن كل طلب سابق بلا قناة — فلا تقرير مبيعات يفصل
-        القنوات رجعيًا.
+        Point of sale arrives in phase 7, but adding the field after orders have
+        accumulated means every previous order has no channel — so no sales
+        report can separate the channels retrospectively.
     """
 
     ONLINE = "ONLINE", _("متجر إلكتروني")
@@ -52,11 +52,11 @@ class OrderStatus(models.TextChoices):
 
 class PaymentStatus(models.TextChoices):
     """
-    ⚠️  حالة الدفع **منفصلة** عن حالة الطلب.
+    ⚠️  The payment status is **separate** from the order status.
 
-        طلب مؤكد قد يكون غير مدفوع (دفع عند الاستلام)، وطلب ملغى
-        قد يكون مدفوعًا وينتظر الاسترداد. دمجهما في حقل واحد يجعل
-        نصف الحالات الحقيقية غير قابلة للتمثيل.
+        A confirmed order may be unpaid (cash on delivery), and a cancelled
+        order may be paid and awaiting a refund. Merging them into one field
+        makes half the real states impossible to represent.
     """
 
     UNPAID = "UNPAID", _("غير مدفوع")
@@ -81,19 +81,19 @@ class Order(BaseModel):
         "customers.CustomerProfile",
         on_delete=models.PROTECT,
         related_name="orders",
-        # ⚠️  **اختياري — لبيع الكاونتر وحده.** (المرحلة ٧)
+        # ⚠️  **Optional — for counter sales alone.** (phase 7)
         #
-        #     المشتري في متجر فعلي لا يملك حسابًا غالبًا، وإلزام
-        #     العميل هنا يعني أحد أمرين: إمّا كاشير يرفض البيع لمن
-        #     لا يسجّل، وإمّا كاشير يخترع حسابًا وهميًا لكل عابر —
-        #     فيمتلئ سجل العملاء بأشخاص لا وجود لهم وتصير كل إحصاءة
-        #     عنهم كذبًا.
+        #     A buyer in a physical shop usually has no account, and making the
+        #     customer mandatory here means one of two things: either a cashier
+        #     who refuses to sell to anyone not registering, or a cashier who
+        #     invents a dummy account for every passer-by — so the customer
+        #     record fills with people who do not exist and every statistic about them becomes a lie.
         #
-        #     `null` هنا يعني «بيعة كاونتر» صراحةً، وهو ما تقرؤه
-        #     التقارير بلا لبس.
+        #     `null` here means "a counter sale" explicitly, and that is what the
+        #     reports read with no ambiguity.
         #
-        #     ⚠️  وكل قارئ لهذا الحقل يجب أن يحتمل الغياب —
-        #         `notifications/listeners.py` يفعل.
+        #     ⚠️  And every reader of this field must tolerate its absence —
+        #         `notifications/listeners.py` does.
         null=True,
         blank=True,
         verbose_name=_("العميل"),
@@ -115,7 +115,7 @@ class Order(BaseModel):
         db_index=True,
     )
 
-    # ── القناة والموقع — حقول مبكرة (ADR-09) ───────────────
+    # ── Channel and location — early fields (ADR-09) ───────
     channel = models.CharField(
         _("القناة"),
         max_length=16,
@@ -133,7 +133,7 @@ class Order(BaseModel):
         help_text=_("فرع نقطة البيع أو المخزن المُصرِّف"),
     )
 
-    # ── الإسناد — تُخلق الآن وتبقى فارغة حتى المرحلة ١٠ ────
+    # ── Attribution — created now and left empty until phase 10 ──
     created_by = models.ForeignKey(
         "accounts.User",
         on_delete=models.SET_NULL,
@@ -162,7 +162,7 @@ class Order(BaseModel):
         help_text=_("للمرحلة ١١ — قد يختلف عن المسؤول"),
     )
 
-    # ── المبالغ — لقطات ────────────────────────────────────
+    # ── Amounts — snapshots ────────────────────────────────
     currency = CurrencyField()
     subtotal = MoneyField(_("الإجمالي قبل الخصم"), default=0)
     discount_total = MoneyField(_("إجمالي الخصم"), default=0)
@@ -173,7 +173,7 @@ class Order(BaseModel):
 
     coupon_code = models.CharField(_("كود الكوبون"), max_length=32, blank=True)
 
-    # ── لقطة العنوان ───────────────────────────────────────
+    # ── Address snapshot ───────────────────────────────────
     shipping_method_code = models.CharField(_("طريقة الشحن"), max_length=50, blank=True)
     recipient_name = models.CharField(_("اسم المستلم"), max_length=200, blank=True)
     recipient_phone = models.CharField(_("هاتف المستلم"), max_length=20, blank=True)
@@ -226,16 +226,16 @@ class Order(BaseModel):
 
 class OrderLine(BaseModel):
     """
-    سطر طلب — **كل حقل لقطة**.
+    An order line — **every field a snapshot**.
 
-    ⚠️  `tax_rate` و`tax_amount` يُخزَّنان ولا يُحسبان لاحقًا.
+    ⚠️  `tax_rate` and `tax_amount` are stored and never computed later.
 
-        لو تغيّرت الضريبة من ١٤٪ إلى ١٥٪ العام القادم، تبقى
-        الفواتير القديمة بـ ١٤٪. حسابها من النسبة الحالية يزوّر
-        السجل المحاسبي ويكسر أي مراجعة ضريبية. (ADR-30)
+        If the tax changes from 14% to 15% next year, old invoices stay at 14%.
+        Computing them from the current rate falsifies the accounting record and
+        breaks any tax review. (ADR-30)
 
-    ⚠️  واسم المنتج منسوخ أيضًا — المنتج قد يُعاد تسميته أو يُحذف
-        ناعمًا، والفاتورة يجب أن تبقى مقروءة.
+    ⚠️  And the product name is copied too — the product may be renamed or soft
+        deleted, and the invoice must stay readable.
     """
 
     order = models.ForeignKey(
@@ -255,26 +255,26 @@ class OrderLine(BaseModel):
         related_name="order_lines",
     )
 
-    # ── لقطة المنتج ────────────────────────────────────────
+    # ── Product snapshot ───────────────────────────────────
     product_sku = models.CharField(_("رمز المنتج"), max_length=64)
     product_name_ar = models.CharField(_("اسم المنتج بالعربية"), max_length=200)
     product_name_en = models.CharField(_("اسم المنتج بالإنجليزية"), max_length=200)
 
     quantity = models.PositiveIntegerField(_("الكمية"), validators=[MinValueValidator(1)])
 
-    # ── لقطة السعر ─────────────────────────────────────────
+    # ── Price snapshot ─────────────────────────────────────
     unit_price = MoneyField(_("سعر الوحدة"))
     list_price = MoneyField(_("السعر المرجعي"), default=0)
     discount_amount = MoneyField(_("الخصم"), default=0)
 
-    # ── لقطة الضريبة —  ADR-30 ─────────────────────────────
+    # ── Tax snapshot —  ADR-30 ─────────────────────────────
     tax_rate = RateField(_("نسبة الضريبة"), default=0)
     tax_amount = MoneyField(_("قيمة الضريبة"), default=0)
     tax_class_code = models.CharField(_("رمز الفئة الضريبية"), max_length=50, blank=True)
 
     price_list_code = models.CharField(_("قائمة الأسعار"), max_length=50, blank=True)
 
-    #: لقطة التكلفة — لحساب الربح في المرحلة ٨ بلا رجوع للمخزون
+    #: A cost snapshot — for the profit calculation in phase 8 with no trip back to inventory
     unit_cost = MoneyField(_("تكلفة الوحدة"), null=True, blank=True)
 
     class Meta:
@@ -288,7 +288,7 @@ class OrderLine(BaseModel):
 
     @property
     def net(self) -> "models.DecimalField":
-        """الوعاء الضريبي — بعد الخصم قبل الضريبة."""
+        """The taxable base — after the discount and before the tax."""
         return self.unit_price * self.quantity - self.discount_amount
 
     @property
@@ -298,12 +298,12 @@ class OrderLine(BaseModel):
 
 class OrderStatusHistory(models.Model):
     """
-    سجل تغيّر الحالة. **إضافة فقط.**
+    The status change log. **Append-only.**
 
-    ⚠️  يجيب على «متى تغيّرت الحالة ومن غيّرها ولماذا» — وهو ما
-        يُحسم به أي نزاع مع عميل.
+    ⚠️  It answers "when did the status change, who changed it, and why" — which
+        is what settles any dispute with a customer.
 
-    مفتاح BigInt — سجل داخلي لا يظهر في رابط.
+    A BigInt key — an internal log that appears in no URL.
     """
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="status_history")

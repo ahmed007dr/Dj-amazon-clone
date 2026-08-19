@@ -1,9 +1,10 @@
 """
-واجهات الأهداف.
+Target endpoints.
 
-⚠️  **المندوب يقرأ هدفه ولا يكتبه.**
+⚠️  **A rep reads their target and does not write it.**
 
-    هدف يحدّده صاحبه ليس هدفًا. الكتابة كلها خلف صلاحية إدارية.
+    A target set by the person it applies to is not a target. All writing sits
+    behind an administrative permission.
 """
 
 from __future__ import annotations
@@ -23,10 +24,10 @@ from targets.models import MonthlyTarget
 
 class MyTargetAPI(APIView):
     """
-    هدف الشهر الجاري — **أو `null`**.
+    The current month's target — **or `null`**.
 
-    ⚠️  `null` لا ٤٠٤: غياب الهدف حالة عادية في أول الشهر قبل أن
-        تضبطه الإدارة، وليست خطأً يُعرَض كشاشة عطل.
+    ⚠️  `null`, not 404: a missing target is a normal state at the start of the
+        month before management sets it, and not an error to be shown as a fault screen.
     """
 
     permission_classes = [HasEmployeeProfile]
@@ -83,7 +84,7 @@ class AdminTargetDetailAPI(generics.RetrieveUpdateAPIView):
     queryset = MonthlyTarget.objects.select_related("employee__user")
 
     def perform_update(self, serializer):
-        # ⚠️  المقفل لا يُعدَّل: لقطته أساس عمولة قد تكون صُرفت.
+        # ⚠️  A closed one is not edited: its snapshot is the basis of a commission that may have been paid.
         from core.errors import BusinessError, ErrorCode
 
         if serializer.instance.is_closed:
@@ -105,7 +106,7 @@ class AdminActivateTargetAPI(APIView):
 
 
 class AdminCloseTargetAPI(APIView):
-    """⚠️  الإقفال يُجمّد اللقطة — ولا يُعاد."""
+    """⚠️  Closing freezes the snapshot — and it is never repeated."""
 
     permission_classes = [CanManageEmployees]
 
@@ -128,7 +129,7 @@ class AdminCloseTargetAPI(APIView):
 
 
 class AdminBulkTargetsAPI(APIView):
-    """إنشاء أهداف شهر لفريق — الموجود يُتخطّى لا يُكتب فوقه."""
+    """Create a month's targets for a team — existing ones are skipped, not overwritten."""
 
     permission_classes = [CanManageEmployees]
     serializer_class = s.BulkTargetSerializer

@@ -1,17 +1,17 @@
 """
-خدمات الطلبات.
+Order services.
 
-⚠️  **هذا النطاق لا يلمس موديلات المخزون ولا ينفّذ محرك الكوبونات.**
+⚠️  **This domain does not touch the inventory models and does not implement the coupon engine.**
 
-    الكود القديم فعل الاثنين:
+    The legacy code did both:
 
-        product.quantity -= item.quantity      ← يعدّل موديل catalog
+        product.quantity -= item.quantity      ← editing a catalog model
         product.save()
 
-        # ونسخة كاملة من منطق الكوبون داخل الـ view
+        # plus a complete copy of the coupon logic inside the view
 
-    هنا: `inventory.services` و`promotions.services` — استدعاء لا
-    تكرار، والاتجاه نازل.
+    Here: `inventory.services` and `promotions.services` — a call, not a copy,
+    and the direction is downward.
 """
 
 from __future__ import annotations
@@ -43,13 +43,13 @@ logger = logging.getLogger(__name__)
 REFERENCE_TYPE = "order"
 
 # ═══════════════════════════════════════════════════════════
-#  آلة الحالة
+#  The state machine
 # ═══════════════════════════════════════════════════════════
 #
-#  ⚠️  الانتقالات المسموحة **معرّفة صراحةً**.
+#  ⚠️  The permitted transitions are **declared explicitly**.
 #
-#      بلا آلة حالة، طلب «مكتمل» يعود إلى «قيد الانتظار» بنداء
-#      واحد — فيفسد كل تقرير مبيعات وكل عمولة محسوبة.
+#      Without a state machine, a "completed" order returns to "pending" in one
+#      call — corrupting every sales report and every computed commission.
 
 ALLOWED_TRANSITIONS = {
     OrderStatus.PENDING: {OrderStatus.CONFIRMED, OrderStatus.CANCELLED},
@@ -58,11 +58,11 @@ ALLOWED_TRANSITIONS = {
     OrderStatus.SHIPPED: {OrderStatus.DELIVERED, OrderStatus.CANCELLED},
     OrderStatus.DELIVERED: {OrderStatus.COMPLETED, OrderStatus.REFUNDED},
     OrderStatus.COMPLETED: {OrderStatus.REFUNDED},
-    OrderStatus.CANCELLED: set(),  # نهائية
-    OrderStatus.REFUNDED: set(),  # نهائية
+    OrderStatus.CANCELLED: set(),  # terminal
+    OrderStatus.REFUNDED: set(),  # terminal
 }
 
-#: الحالات التي يبقى فيها المخزون محجوزًا
+#: The statuses in which stock stays reserved
 RESERVING_STATUSES = {
     OrderStatus.PENDING,
     OrderStatus.CONFIRMED,
@@ -79,24 +79,24 @@ def can_cancel(order: Order) -> bool:
 
 
 # ═══════════════════════════════════════════════════════════
-#  إنشاء الطلب
+#  Creating the order
 # ═══════════════════════════════════════════════════════════
 
 
 @transaction.atomic
 def resolve_address(profile, data: dict) -> dict:
     """
-    عنوان الشحن — محفوظًا أو مُرسَلًا صراحةً.
+    The shipping address — saved, or sent explicitly.
 
-    ⚠️  **مُصفّى بمالك العنوان.**
+    ⚠️  **Filtered by the address's owner.**
 
-        بلا `customer=profile` يشحن أي مستخدم إلى عنوان أي عميل
-        بتخمين معرّف — ويقرأ اسمه وهاتفه في استجابة الطلب.
+        Without `customer=profile`, any user ships to any customer's address by
+        guessing an id — and reads their name and phone number in the order response.
 
-    ⚠️  ومشتركة بين إتمام المتجر وإتمام الآجل عمدًا.
+    ⚠️  And it is deliberately shared between the store checkout and the credit checkout.
 
-        نسختان من نفس التصفية تعنيان أن إحداهما تُنسى عند أول
-        تعديل — والمنسيّة هي الثغرة.
+        Two copies of the same filtering mean one gets forgotten at the first
+        edit — and the forgotten one is the hole.
     """
     if data.get("address"):
         return dict(data["address"])
@@ -105,8 +105,8 @@ def resolve_address(profile, data: dict) -> dict:
 
     saved = CustomerAddress.objects.filter(pk=data["address_id"], customer=profile).first()
     if saved is None:
-        # ⚠️  404 لغير الموجود وغير المملوك معًا — الفارق بينهما
-        #     يكشف وجود العنوان لمن لا يملكه.
+        # ⚠️  404 for both nonexistent and not-owned — the difference between them
+        #     reveals the address's existence to someone who does not own it.
         raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
 
     return {
@@ -132,13 +132,14 @@ def create_from_cart(
     customer_note: str = "",
 ) -> Order:
     """
-    تحويل سلة إلى طلب.
+    Convert a cart into an order.
 
-    ⚠️  **إعادة تحقق كاملة أولًا — بلا استثناء.**
+    ⚠️  **A full re-validation first — without exception.**
 
-        ما ترسله الواجهة من أسعار وإجماليات يُتجاهَل تمامًا. السلة
-        تُعاد تسعيرها ويُعاد فحص كل سطر، فطلب بسعر قديم أو منتج
-        ممنوع أو مخزون ناقص يُرفض هنا لا بعد الشحن.
+        Any prices and totals the frontend sends are ignored entirely. The cart
+        is repriced and every line rechecked, so an order at a stale price, with
+        a forbidden product, or with missing stock is refused here rather than
+        after shipping.
     """
     user = cart.user
 
@@ -149,11 +150,11 @@ def create_from_cart(
         shipping_method_code=shipping_method_code,
     )
 
-    # ⚠️  المشاكل **قبل** فحص الفراغ.
+    # ⚠️  The problems come **before** the empty check.
     #
-    #     حين تفشل كل الأسطر (نفد المخزون · أُوقف المنتج) تصير
-    #     `snapshot.lines` فارغة — فتقديم فحص الفراغ يعطي العميل
-    #     «سلتك فارغة» بينما سلته ممتلئة وسببها الحقيقي مختلف تمامًا.
+    #     When every line fails (stock ran out · the product was discontinued),
+    #     `snapshot.lines` becomes empty — so putting the empty check first
+    #     tells the customer "your cart is empty" while it is full and the real cause is entirely different.
     if snapshot.has_issues:
         first = snapshot.issues[0]
         raise BusinessError(
@@ -167,7 +168,7 @@ def create_from_cart(
 
     priced = snapshot.priced
 
-    # ── إنشاء الطلب ────────────────────────────────────────
+    # ── Creating the order ─────────────────────────────────
     order = Order.objects.create(
         customer=customer,
         channel=channel,
@@ -191,7 +192,7 @@ def create_from_cart(
         customer_note=customer_note,
     )
 
-    # ── الأسطر بلقطاتها ────────────────────────────────────
+    # ── The lines with their snapshots ─────────────────────
     for (product, quantity, variant), line in snapshot.lines:
         OrderLine.objects.create(
             order=order,
@@ -204,13 +205,13 @@ def create_from_cart(
             unit_price=line.unit_price,
             list_price=line.list_price,
             discount_amount=line.discount_amount,
-            tax_rate=line.tax_rate,  # ⚠️ لقطة — ADR-30
+            tax_rate=line.tax_rate,  # ⚠️ a snapshot — ADR-30
             tax_amount=line.tax_amount,
             tax_class_code=line.tax_class_code,
             price_list_code=line.price_list_code,
         )
 
-        # ── حجز المخزون ────────────────────────────────────
+        # ── Reserving stock ────────────────────────────────
         inventory_services.reserve(
             product,
             quantity,
@@ -220,7 +221,7 @@ def create_from_cart(
             reference_id=order.pk,
         )
 
-    # ── تسجيل الكوبون ──────────────────────────────────────
+    # ── Recording the coupon ───────────────────────────────
     if snapshot.coupon_result and snapshot.coupon_result.is_valid:
         promotion_services.redeem(
             snapshot.coupon_result.coupon,
@@ -231,7 +232,7 @@ def create_from_cart(
             reference_id=order.pk,
         )
 
-    # ── الشحنة ─────────────────────────────────────────────
+    # ── The shipment ───────────────────────────────────────
     if shipping_method_code:
         method = ShippingMethod.objects.filter(code=shipping_method_code).first()
         if method is not None:
@@ -253,7 +254,7 @@ def create_from_cart(
 
 
 # ═══════════════════════════════════════════════════════════
-#  الانتقالات
+#  Transitions
 # ═══════════════════════════════════════════════════════════
 
 
@@ -270,9 +271,9 @@ def _record_status(order, from_status, to_status, *, note="", actor=None):
 @transaction.atomic
 def transition(order: Order, to_status: str, *, note: str = "", actor=None) -> Order:
     """
-    نقل الطلب إلى حالة جديدة.
+    Move the order to a new status.
 
-    ⚠️  الانتقال غير المسموح يُرفض بـ `409` لا يُنفَّذ بصمت.
+    ⚠️  A disallowed transition is refused with `409`, never carried out silently.
     """
     if not can_transition(order, to_status):
         raise BusinessError(
@@ -296,8 +297,8 @@ def transition(order: Order, to_status: str, *, note: str = "", actor=None) -> O
     order.save(update_fields=updates)
     _record_status(order, previous, to_status, note=note, actor=actor)
 
-    # ⚠️  المخزون يُنفَّذ عند الشحن لا عند التأكيد.
-    #     الطلب المؤكد قد يُلغى؛ المشحون لا يعود.
+    # ⚠️  Stock is fulfilled on shipping, not on confirmation.
+    #     A confirmed order may be cancelled; a shipped one does not come back.
     if to_status == OrderStatus.SHIPPED:
         _commit_reservations(order)
 
@@ -306,11 +307,11 @@ def transition(order: Order, to_status: str, *, note: str = "", actor=None) -> O
 
 def _commit_reservations(order: Order) -> int:
     """
-    تنفيذ حجوزات الطلب — الخصم الفعلي من المخزون.
+    Fulfil the order's reservations — the actual deduction from stock.
 
-    ⚠️  عبر الخدمة بالمرجع لا باستعلام موديلات المخزون هنا.
-        `orders` في L6 و`inventory` في L3؛ معرفة بنية جداوله
-        تجعل أي تغيير فيها كسرًا في مكانين.
+    ⚠️  Through the service by reference, not by querying the inventory models
+        here. `orders` is in L6 and `inventory` in L3; knowing its table
+        structure makes any change to it a break in two places.
     """
     return inventory_services.commit_for_reference(REFERENCE_TYPE, order.pk)
 
@@ -318,15 +319,15 @@ def _commit_reservations(order: Order) -> int:
 @transaction.atomic
 def cancel(order: Order, *, reason: str, actor=None) -> Order:
     """
-    إلغاء طلب.
+    Cancel an order.
 
-    ⚠️  ثلاثة إجراءات في معاملة واحدة:
-          ١. الإفراج عن المخزون المحجوز
-          ٢. إلغاء استخدام الكوبون
-          ٣. تسجيل الحالة والسبب
+    ⚠️  Three actions in one transaction:
+          1. release the reserved stock
+          2. reverse the coupon usage
+          3. record the status and the reason
 
-        الفصل بينها يترك مخزونًا محجوزًا لطلب ملغى، أو كوبونًا
-        مستهلكًا بلا مقابل.
+        Separating them leaves stock reserved for a cancelled order, or a coupon
+        consumed for nothing.
     """
     if not can_cancel(order):
         raise BusinessError(
@@ -362,9 +363,9 @@ def _release_reservations(order: Order) -> int:
 @transaction.atomic
 def mark_paid(order: Order, *, actor=None) -> Order:
     """
-    تعليم الطلب مدفوعًا.
+    Mark the order as paid.
 
-    ⚠️  يُستدعى من `payments` بعد تأكيد البوابة — لا من الواجهة.
+    ⚠️  Called from `payments` after the gateway confirms — not from the frontend.
     """
     if order.payment_status == PaymentStatus.PAID:
         raise BusinessError(ErrorCode.ORDER_ALREADY_PAID)
@@ -372,7 +373,7 @@ def mark_paid(order: Order, *, actor=None) -> Order:
     order.payment_status = PaymentStatus.PAID
     order.save(update_fields=["payment_status"])
 
-    # الدفع يؤكد الطلب تلقائيًا
+    # Payment confirms the order automatically
     if order.status == OrderStatus.PENDING:
         transition(order, OrderStatus.CONFIRMED, note="تأكيد بعد الدفع", actor=actor)
 
@@ -382,12 +383,13 @@ def mark_paid(order: Order, *, actor=None) -> Order:
 @transaction.atomic
 def complete(order: Order, *, actor=None) -> Order:
     """
-    إكمال الطلب.
+    Complete the order.
 
-    ⚠️  هنا تُبعث الأحداث التي تستهلكها النطاقات العليا:
-        المالية والولاء والعمولات وتحديث إحصاءات العميل.
+    ⚠️  This is where the events consumed by the upper domains are emitted:
+        finance, loyalty, commissions and updating the customer's statistics.
 
-        كلها **تستمع** ولا تُستدعى — `orders` لا يعرف بوجودها.
+        All of them **listen** and are never called — `orders` does not know
+        they exist.
     """
     order = transition(order, OrderStatus.COMPLETED, actor=actor)
 
@@ -398,7 +400,7 @@ def complete(order: Order, *, actor=None) -> Order:
 
 
 def orders_for(customer):
-    """طلبات عميل — مُصفّاة بالملكية."""
+    """A customer's orders — filtered by ownership."""
     return (
         Order.objects.filter(customer=customer)
         .select_related("customer", "location")
@@ -407,18 +409,18 @@ def orders_for(customer):
 
 
 # ═══════════════════════════════════════════════════════════
-#  نقطة البيع
+#  Point of sale
 # ═══════════════════════════════════════════════════════════
 #
-#  ⚠️  **الطلب واحد لكل القنوات.**
+#  ⚠️  **One order for every channel.**
 #
-#      الدالتان أدناه هما مدخل نقطة البيع إلى نفس نموذج الطلب —
-#      لا نموذج موازٍ. `pos` يستدعيهما ولا يعرف `Order` مباشرةً،
-#      و`orders` لا يعرف بوجود `pos` إطلاقًا: مدخلاته أصناف وأرقام.
+#      The two functions below are the point of sale's entry into the same
+#      order model — not a parallel one. `pos` calls them and never knows
+#      `Order` directly, and `orders` knows nothing at all about `pos`: its inputs are items and numbers.
 #
-#      البديل (`POSOrder` منفصل) يعني تقريرَي مبيعات ومخزونين
-#      ومصدرَي حقيقة — وأول سؤال محاسبي يكشف الفجوة بلا طريقة
-#      لحسمها.
+#      The alternative (a separate `POSOrder`) means two sales reports, two
+#      stock figures and two sources of truth — and the first accounting
+#      question exposes the gap with no way to settle it.
 
 
 @transaction.atomic
@@ -432,18 +434,19 @@ def create_pos_order(
     note: str = "",
 ) -> Order:
     """
-    طلب نقطة بيع — **مؤكَّد ومدفوع ومُسلَّم فورًا**.
+    A point-of-sale order — **confirmed, paid and delivered at once**.
 
-    ⚠️  يبدأ من `DELIVERED` لا من `PENDING`.
+    ⚠️  It starts at `DELIVERED`, not at `PENDING`.
 
-        البضاعة سُلّمت على الكاونتر والمال قُبض. تمريره بآلة الحالة
-        من «قيد الانتظار» إلى «مُسلَّم» ينتج خمسة أحداث وهمية في
-        السجل لعملية استغرقت ثانية، ويغرق العميل بخمسة إشعارات
-        عن طلب يحمله في يده.
+        The goods were handed over at the counter and the money taken. Walking
+        it through the state machine from "pending" to "delivered" produces five
+        phantom events in the log for an operation that took a second, and
+        floods the customer with five notifications about an order they are
+        holding in their hand.
 
-    ⚠️  و`customer` قد يكون `None`: البيع على الكاونتر لا يستلزم
-        حسابًا. الطلب حينها بلا مالك — وهو الحال الطبيعي في متجر
-        فعلي، لا نقص في البيانات.
+    ⚠️  And `customer` may be `None`: a counter sale requires no account. The
+        order then has no owner — which is the normal case in a physical shop,
+        not missing data.
     """
     order = Order.objects.create(
         customer=customer,
@@ -467,8 +470,8 @@ def create_pos_order(
             order=order,
             product=product,
             variant=entry.get("variant"),
-            # ⚠️  لقطات وقت البيع (ADR-30) — الفاتورة لا تتغيّر
-            #     بتغيّر اسم المنتج أو سعره غدًا.
+            # ⚠️  Snapshots at the time of sale (ADR-30) — the invoice does not change
+            #     when the product's name or price changes tomorrow.
             product_sku=product.sku,
             product_name_ar=product.name_ar,
             product_name_en=product.name_en,
@@ -477,9 +480,9 @@ def create_pos_order(
             discount_amount=entry.get("discount_amount", ZERO),
             tax_rate=entry.get("tax_rate", ZERO),
             tax_amount=entry.get("tax_amount", ZERO),
-            # ⚠️  لا `line_total`: إجمالي السطر **خاصية محسوبة**
-            #     (`net + tax_amount`) لا عمودًا. تخزينه يعني رقمين
-            #     قد يتباعدان — وأيّهما الصحيح سؤال بلا إجابة.
+            # ⚠️  No `line_total`: the line total is **a computed property**
+            #     (`net + tax_amount`), not a column. Storing it means two numbers
+            #     that may diverge — and which is correct is a question with no answer.
         )
 
     _record_status(order, "", OrderStatus.DELIVERED, note="بيع نقطة بيع", actor=cashier)
@@ -490,11 +493,12 @@ def create_pos_order(
 @transaction.atomic
 def refund_pos_order(order: Order, *, reason: str, actor=None) -> Order:
     """
-    استرداد بيعة نقطة بيع.
+    Refund a point-of-sale sale.
 
-    ⚠️  **لا حذف.** البيعة وقعت وضريبتها حُصّلت؛ حذفها يمحو
-        الاثنين من تقرير اليوم. الطلب يبقى ويُعلَّم `REFUNDED`،
-        وإعادة المخزون تقع في `pos` لأنها تخصّ موقع الجهاز.
+    ⚠️  **No deletion.** The sale happened and its tax was collected; deleting
+        it erases both from the day's report. The order remains and is marked
+        `REFUNDED`, and returning the stock happens in `pos` because it concerns
+        the register's location.
     """
     if order.channel != OrderChannel.POS:
         raise BusinessError(

@@ -1,18 +1,18 @@
 """
-بناء خريطة الموقع.
+Building the sitemap.
 
-⚠️  **الروابط تشير إلى الواجهة لا إلى الـ API.**
+⚠️  **The URLs point at the frontend, not at the API.**
 
-    `FRONTEND_BASE_URL` هو الموقع الذي يزوره الإنسان ويفهرسه
-    المزحف. إنتاج روابط بمضيف الـ API يعني خريطة تقود جوجل إلى
-    JSON لا إلى صفحات — وأرشفة صفحات لا يراها أحد.
+    `FRONTEND_BASE_URL` is the site a human visits and a crawler indexes.
+    Producing URLs on the API host means a sitemap that leads Google to JSON
+    rather than to pages — and indexes pages nobody sees.
 
-⚠️  **الترشيح بسياسات الوصول لا بـ `is_active` وحده.**
+⚠️  **Filtering by access policy, not by `is_active` alone.**
 
-    المنتج المقيّد بالصيادلة الموثّقين تعطي صفحته للمزحف رفضًا،
-    فيُسجَّل رابطًا مكسورًا في Search Console. و`accessible_filter`
-    بمستخدم مجهول يعطي بالضبط ما يراه الزائر — وهو تعريف «قابل
-    للأرشفة».
+    A product restricted to verified pharmacists gives the crawler a refusal, so
+    it is recorded as a broken link in Search Console. And `accessible_filter`
+    with an anonymous user gives exactly what a visitor sees — which is the
+    definition of "indexable".
 """
 
 from __future__ import annotations
@@ -27,9 +27,9 @@ from academic.models import StudyBundle
 from access import services as access
 from catalog.models import Category, Product
 
-#: أقصى عدد روابط في الملف الواحد — حد بروتوكول خرائط المواقع ٥٠٬٠٠٠.
-#: ⚠️  الحد هنا أقل بكثير عمدًا: الملف يُبنى في الذاكرة عند كل طلب،
-#:     وخريطة بخمسين ألف رابط تعني استعلامًا ثقيلًا يستدعيه أي أحد.
+#: The maximum number of URLs in one file — the sitemap protocol's limit is 50,000.
+#: ⚠️  The limit here is deliberately far lower: the file is built in memory on
+#:     every request, and a sitemap with fifty thousand URLs is a heavy query anyone can trigger.
 MAX_URLS = 5_000
 
 
@@ -46,7 +46,7 @@ class SitemapEntry:
         return f"{base}{self.path}"
 
 
-#: الصفحات الثابتة — بلا `lastmod` لأنها لا «تُعدَّل» بمعنى محتوى
+#: The static pages — with no `lastmod`, because they are not "edited" in a content sense
 STATIC_ENTRIES = (
     SitemapEntry("/", changefreq="daily", priority="1.0"),
     SitemapEntry("/products", changefreq="daily", priority="0.9"),
@@ -56,10 +56,10 @@ STATIC_ENTRIES = (
 
 def product_entries():
     """
-    صفحات المنتجات — بـ `slug` لا UUID (ADR-27).
+    Product pages — by `slug`, not UUID (ADR-27).
 
-    ⚠️  الترتيب بـ `-updated_at` لا بالإنشاء: حين يتجاوز الكتالوج
-        الحد، الأولى بالأرشفة هي الصفحات التي تغيّرت لا الأقدم.
+    ⚠️  Ordered by `-updated_at` rather than by creation: when the catalogue
+        exceeds the limit, the pages that changed deserve indexing before the oldest.
     """
     queryset = (
         Product.objects.filter(is_active=True)
@@ -76,9 +76,9 @@ def product_entries():
 
 def category_entries():
     """
-    ⚠️  الفئة تُفتح كفلتر على قائمة المنتجات لا كمسار خاص —
-        وهو ما تفعله الواجهة فعلًا. اختراع `/categories/<slug>`
-        هنا ينتج روابط تعطي «الصفحة غير موجودة».
+    ⚠️  A category is opened as a filter on the product list rather than as a
+        dedicated path — which is what the frontend actually does. Inventing
+        `/categories/<slug>` here produces URLs that give "page not found".
     """
     queryset = Category.objects.filter(is_active=True).only("slug", "updated_at")
 
@@ -90,11 +90,11 @@ def category_entries():
 
 def bundle_entries():
     """
-    ⚠️  الحزم **عامة** وإن كانت موجَّهة للطلاب.
+    ⚠️  Bundles are **public**, even though they target students.
 
-        صفحة الحزمة تُشارَك بين الطلاب ويُبحث عنها بالاسم
-        («مستلزمات صيدلة أولى»)، والخادم يفتحها لغير المسجَّل
-        (`BundleDetailAPI` بـ `AllowAny`).
+        A bundle page is shared between students and searched for by name
+        ("first-year pharmacy supplies"), and the server opens it to
+        unregistered visitors (`BundleDetailAPI` with `AllowAny`).
     """
     queryset = StudyBundle.objects.filter(is_active=True).only("slug", "updated_at")
 

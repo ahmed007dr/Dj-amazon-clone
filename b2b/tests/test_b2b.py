@@ -22,6 +22,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import AccountType, User
 from administration.models import AdminProfile
+from core.testing import grant_all_domains
 from b2b import services
 from b2b.models import (
     BusinessKind,
@@ -77,6 +78,7 @@ def manager(db):
     user.is_superuser = True
     user.save()
     AdminProfile.objects.create(user=user)
+    grant_all_domains(user)
     return user
 
 

@@ -1,18 +1,19 @@
 """
-نقاط الأرشفة — `robots.txt` و `sitemap.xml`.
+Sitemap endpoints — `robots.txt` and `sitemap.xml`.
 
-⚠️  **عامة بلا مصادقة عمدًا** — المزحف لا يملك حسابًا.
+⚠️  **Deliberately public and unauthenticated** — a crawler has no account.
 
-⚠️  وتُقدَّم من الخادم لا من ملفات ثابتة في حزمة الواجهة.
+⚠️  And they are served from the server rather than as static files in the frontend bundle.
 
-    الملف الثابت يُبنى وقت البناء، فيتجمّد على منتجات ذلك اليوم؛
-    وإضافة منتج تحتاج إعادة نشر الواجهة كي يُفهرَس. والخريطة من
-    الخادم تعكس الكتالوج لحظةَ يطلبها المزحف.
+    A static file is built at build time, so it freezes on that day's products;
+    and adding a product needs the frontend redeployed for it to be indexed. A
+    sitemap from the server reflects the catalogue at the moment the crawler
+    requests it.
 
-⚠️  **الوجهتان تُقدَّمان على أصل الواجهة لا على أصل الـ API.**
+⚠️  **Both are served on the frontend origin, not the API origin.**
 
-    المزحف يقرأ `/robots.txt` من جذر الموقع الذي يزوره. النشر
-    يوجّه المسارين إلى الخادم — انظر `seo/README.md`.
+    The crawler reads `/robots.txt` from the root of the site it visits. The
+    deployment routes both paths to the server — see `seo/README.md`.
 """
 
 from xml.sax.saxutils import escape
@@ -23,11 +24,11 @@ from django.views.decorators.cache import cache_page
 
 from seo.sitemaps import all_entries
 
-#: ⚠️  كاش ساعة على الاثنين.
+#: ⚠️  An hour's cache on both.
 #:
-#:     الخريطة تمرّ على الكتالوج كله، والمزحف قد يطلبها عشرات
-#:     المرات يوميًا. وساعة تأخير في ظهور منتج جديد لا تعني شيئًا
-#:     أمام تأخّر الفهرسة نفسه — وهو أيام.
+#:     The sitemap walks the whole catalogue, and a crawler may request it
+#:     dozens of times a day. And an hour's delay in a new product appearing means
+#:     nothing against the indexing delay itself — which is days.
 CACHE_SECONDS = 60 * 60
 
 
@@ -53,15 +54,16 @@ def sitemap_xml(request):
 @cache_page(CACHE_SECONDS)
 def robots_txt(request):
     """
-    ⚠️  المسارات الممنوعة ليست إجراءً أمنيًا.
+    ⚠️  The disallowed paths are not a security measure.
 
-        `robots.txt` **يُقرأ علنًا** — إدراج مسار فيه يُعلن وجوده.
-        الممنوع هنا هو ما لا معنى لأرشفته (سلة · حساب · لوحة)،
-        والحماية الحقيقية في الخادم بصرف النظر عن المزحف.
+        `robots.txt` **is read publicly** — listing a path in it announces its
+        existence. What is disallowed here is what is meaningless to index (the
+        cart · the account · the panel), and the real protection is in the
+        server regardless of the crawler.
 
-    ⚠️  ومنع الأرشفة كليًا في غير الإنتاج **إلزامي**: بيئة تجريبية
-        مفهرسة تنافس الموقع الحقيقي على نفس الكلمات، وتعرض بيانات
-        اختبار كأنها منتجات.
+    ⚠️  And blocking indexing entirely outside production is **mandatory**: an
+        indexed staging environment competes with the real site for the same
+        keywords, and exposes test data as though it were products.
     """
     site = settings.FRONTEND_BASE_URL.rstrip("/")
 

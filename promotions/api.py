@@ -1,14 +1,15 @@
 """
-واجهات الكوبونات.
+Coupon endpoints.
 
-⚠️  **لا قائمة عامة للكوبونات إطلاقًا.**
+⚠️  **There is no public coupon list at all.**
 
-    كشفها يجعل كل زائر يجرّب أعلى خصم متاح بدل الكود الذي وصله في
-    حملته. والتحقق من كود بعينه يقع في السلة (`cart/coupon/`) حيث
-    يُدخله العميل — لا هنا.
+    Exposing them makes every visitor try the highest available discount instead
+    of the code they were sent in their campaign. And validating a specific code
+    happens in the cart (`cart/coupon/`), where the customer enters it — not here.
 
-⚠️  والصرف لا يمرّ من هنا: `promotions.services` تصرفه داخل معاملة
-    الطلب. هذه الواجهات تحرّر الحملات وتقرأ سجلّها.
+⚠️  And redemption does not pass through here: `promotions.services` redeems it
+    inside the order's transaction. These endpoints edit the campaigns and read
+    their history.
 """
 
 from django.db.models import Q
@@ -36,8 +37,8 @@ class CouponListCreateAPI(generics.ListCreateAPIView):
         if search := params.get("search"):
             queryset = queryset.filter(Q(code__icontains=search) | Q(name_ar__icontains=search))
 
-        # ⚠️  الحالة تُحسب في الاستعلام لا في بايثون: التصفية بعد
-        #     الترقيم تعطي صفحات ناقصة بلا أن يلاحظ أحد.
+        # ⚠️  The status is computed in the query, not in Python: filtering after
+        #     pagination gives short pages with nobody noticing.
         status_filter = params.get("status")
         if status_filter == "running":
             queryset = queryset.filter(is_active=True, starts_at__lte=now).filter(
@@ -78,11 +79,11 @@ class CouponDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_destroy(self, instance):
         """
-        ⚠️  **الكوبون المستخدَم لا يُحذف — يُوقَف.**
+        ⚠️  **A used coupon is never deleted — it is disabled.**
 
-            سجلات الصرف تشير إليه، وحذفه يجعل «بكم بيع هذا الطلب
-            ولماذا؟» سؤالًا بلا جواب. والإيقاف يمنع الاستخدام
-            الجديد ويُبقي التاريخ سليمًا.
+            The redemption records point at it, and deleting it makes "how much
+            was this order sold for, and why?" a question with no answer. And
+            disabling prevents new use while keeping the history intact.
         """
         if instance.usage_count:
             raise BusinessError(
@@ -105,10 +106,10 @@ class CouponDetailAPI(generics.RetrieveUpdateDestroyAPIView):
 
 class CouponRedemptionListAPI(generics.ListAPIView):
     """
-    سجل الصرف — **للقراءة فقط**.
+    The redemption log — **read-only**.
 
-    ⚠️  التصحيح بقيد جديد لا بتحرير القديم: هذا سجل مالي يُبنى عليه
-        حساب أثر الحملة.
+    ⚠️  Corrections go through a new entry, not by editing the old one: this is
+        a financial record the campaign's impact is measured from.
     """
 
     permission_classes = [CanManagePricing]

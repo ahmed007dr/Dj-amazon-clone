@@ -1,5 +1,5 @@
 """
-خدمات الشحن.
+Shipping services.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from shipping.models import (
     ShippingZone,
 )
 
-#: الانتقالات المسموحة — أي انتقال خارجها مرفوض
+#: The permitted transitions — anything outside them is refused
 ALLOWED_TRANSITIONS = {
     ShipmentStatus.PENDING: {ShipmentStatus.PICKED, ShipmentStatus.FAILED},
     ShipmentStatus.PICKED: {ShipmentStatus.IN_TRANSIT, ShipmentStatus.FAILED},
@@ -34,17 +34,17 @@ ALLOWED_TRANSITIONS = {
         ShipmentStatus.FAILED,
     },
     ShipmentStatus.FAILED: {
-        ShipmentStatus.OUT_FOR_DELIVERY,  # إعادة محاولة
+        ShipmentStatus.OUT_FOR_DELIVERY,  # a retry
         ShipmentStatus.RETURNED,
     },
-    ShipmentStatus.DELIVERED: set(),  # نهائية
-    ShipmentStatus.RETURNED: set(),  # نهائية
+    ShipmentStatus.DELIVERED: set(),  # terminal
+    ShipmentStatus.RETURNED: set(),  # terminal
 }
 
 
 @dataclass(frozen=True)
 class ShippingQuote:
-    """عرض سعر شحن."""
+    """A shipping quote."""
 
     method_code: str
     method_name_ar: str
@@ -58,12 +58,12 @@ class ShippingQuote:
 
 def quote(governorate: str, subtotal: Decimal, *, weight_grams: int = 0) -> list[ShippingQuote]:
     """
-    عروض الشحن المتاحة لهذه المحافظة.
+    The shipping quotes available for this governorate.
 
-    ⚠️  تُحسب من المصدر عند كل استعلام.
+    ⚠️  Computed from the source on every request.
 
-        الواجهة لا ترسل رسوم الشحن ولا تُصدَّق عليها — إرسالها من
-        العميل يعني شحنًا مجانيًا بتعديل حقل في المتصفح.
+        The frontend does not send the shipping fee and is not trusted for it —
+        sending it from the client means free shipping by editing a field in the browser.
     """
     zone = ShippingZone.for_governorate(governorate)
     if zone is None:
@@ -102,7 +102,7 @@ def quote(governorate: str, subtotal: Decimal, *, weight_grams: int = 0) -> list
 
 
 def fee_for(method_code: str, governorate: str, subtotal: Decimal, *, weight_grams: int = 0):
-    """رسوم طريقة بعينها، أو `None` إن كانت غير متاحة."""
+    """The fee for a specific method, or `None` if it is unavailable."""
     for entry in quote(governorate, subtotal, weight_grams=weight_grams):
         if entry.method_code == method_code:
             return entry
@@ -120,10 +120,11 @@ def create_shipment(
     weight_grams: int = 0,
 ) -> Shipment:
     """
-    إنشاء شحنة بلقطة عنوان منسوخة.
+    Create a shipment with a copied address snapshot.
 
-    ⚠️  العنوان يُنسخ لا يُشار إليه — العميل قد يعدّله بعد الشحن،
-        ولقطة وقت الشحن هي ما يُدافَع عنه في أي نزاع.
+    ⚠️  The address is copied rather than referenced — the customer may edit it
+        after shipping, and the snapshot at shipping time is what is defended in
+        any dispute.
     """
     zone = ShippingZone.for_governorate(address.get("governorate", ""))
 
@@ -159,12 +160,12 @@ def transition(
     tracking_number: str = "",
 ) -> Shipment:
     """
-    نقل الشحنة إلى حالة جديدة.
+    Move the shipment to a new status.
 
-    ⚠️  الانتقالات المسموحة **معرّفة صراحةً**.
+    ⚠️  The permitted transitions are **declared explicitly**.
 
-        بلا آلة حالة، شحنة «سُلّمت» يمكن إعادتها إلى «قيد التجهيز»
-        بنداء API واحد — فيفسد كل تقرير تسليم.
+        Without a state machine, a "delivered" shipment can be returned to
+        "processing" with one API call — corrupting every delivery report.
     """
     allowed = ALLOWED_TRANSITIONS.get(shipment.status, set())
 

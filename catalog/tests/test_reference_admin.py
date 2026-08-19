@@ -10,6 +10,8 @@ Reference classification from the admin panel — categories, brands and manufac
 """
 
 import pytest
+
+from core.testing import grant_all_domains
 from django.apps import apps
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -30,6 +32,7 @@ def admin_client(db):
     admin.is_active = True
     admin.save()
     apps.get_model("administration", "AdminProfile").objects.create(user=admin)
+    grant_all_domains(admin)
 
     client = APIClient()
     client.force_authenticate(user=admin)

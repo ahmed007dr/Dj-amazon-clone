@@ -1,17 +1,18 @@
 """
-الموظفون ومندوبو المبيعات.
+Employees and sales representatives.
 
-⚠️  **الموظف ليس أدمن — وهذا أساس النطاق كله.**
+⚠️  **An employee is not an admin — and that is the basis of this whole domain.**
 
-    مندوب المبيعات يرى عملاءه هو، ويُنشئ لهم طلبات، ويقرأ أداءه.
-    ولا يرى قائمة العملاء كاملة، ولا يعدّل الأسعار، ولا يوقف
-    حسابات. منحه صلاحيات الأدمن «مؤقتًا» هو أكثر ما يُنسى.
+    A sales rep sees their own customers, creates orders for them, and reads
+    their own performance. They do not see the full customer list, do not edit
+    prices, and do not suspend accounts. Granting them admin permissions
+    "temporarily" is the thing most often forgotten.
 
-⚠️  و**`CustomerAssignment` يسكن هنا لا في `customers`** (ADR-12).
+⚠️  And **`CustomerAssignment` lives here, not in `customers`** (ADR-12).
 
-    حقل `assigned_employee` على العميل كان ينشئ دائرة
-    `customers ↔ employees`. الإسناد يملكه الطرف الأعلى، فيبقى
-    الاتجاه نازلًا: `employees → customers`.
+    An `assigned_employee` field on the customer created a
+    `customers ↔ employees` cycle. Assignment is owned by the upper side, so the
+    direction stays downward: `employees → customers`.
 """
 
 from __future__ import annotations
@@ -26,10 +27,10 @@ from core.models.base import BaseModel
 
 class EmployeeRoleKind(models.TextChoices):
     """
-    ⚠️  الأدوار **بيانات لا كود**.
+    ⚠️  Roles are **data, not code**.
 
-        هذه قائمة الأنواع المتوقَّعة، لكن الصلاحيات تُسنَد لكل دور
-        من اللوحة. تثبيتها في الكود يجعل «مندوب أول» يحتاج نشرًا.
+        This is the list of expected types, but permissions are assigned to each
+        role from the panel. Fixing them in code makes "senior rep" need a deployment.
     """
 
     SALES_REP = "SALES_REP", _("مندوب مبيعات")
@@ -43,13 +44,14 @@ class EmployeeRoleKind(models.TextChoices):
 
 class EmployeeRole(BaseModel):
     """
-    دور وظيفي — حزمة صلاحيات.
+    A job role — a bundle of permissions.
 
-    ⚠️  الصلاحيات على **الدور** لا على الشخص.
+    ⚠️  Permissions sit on the **role**, not on the person.
 
-        منحها فردًا يجعل كل موظف جديد يحتاج ضبطًا يدويًا، وأول
-        سهو يترك مندوبًا بلا صلاحية أو بصلاحية زائدة. والمراجعة
-        تصير مستحيلة: «من يستطيع الخصم؟» تحتاج مسح كل الحسابات.
+        Granting them to an individual makes every new employee need manual
+        configuration, and the first oversight leaves a rep with too few
+        permissions or too many. And review becomes impossible: "who can apply a
+        discount?" requires scanning every account.
     """
 
     code = models.SlugField(_("الرمز"), max_length=64, unique=True)
@@ -60,11 +62,11 @@ class EmployeeRole(BaseModel):
     name_ar = models.CharField(_("الاسم بالعربية"), max_length=120)
     name_en = models.CharField(_("الاسم بالإنجليزية"), max_length=120)
 
-    #: ⚠️  صلاحيات Django القياسية — لا نظام موازٍ.
+    #: ⚠️  Standard Django permissions — not a parallel system.
     #:
-    #:     `user.has_perm()` يعمل عليها في كل مكان: الواجهات
-    #:     والقوالب ولوحة Django. اختراع سلاسل خاصة يعني كتابة
-    #:     فاحص خاص لكل نقطة — وأول نقطة تُنسى هي الثغرة.
+    #:     `user.has_perm()` works on them everywhere: the endpoints,
+    #:     the templates and the Django panel. Inventing custom strings means
+    #:     writing a custom checker for every endpoint — and the first one forgotten is the hole.
     permissions = models.ManyToManyField(
         "auth.Permission",
         blank=True,
@@ -72,15 +74,15 @@ class EmployeeRole(BaseModel):
         verbose_name=_("الصلاحيات"),
     )
 
-    #: ⚠️  **مجموعة Django تسند الصلاحيات فعلًا.**
+    #: ⚠️  **The Django group is what actually confers the permissions.**
     #:
-    #:     تخزينها في `permissions` وحدها **زينة**: `has_perm`
-    #:     يقرأ صلاحيات المستخدم ومجموعاته، ولا يعرف بوجود هذا
-    #:     الجدول. فكان الدور يبدو مضبوطًا وكل فحص صلاحية يفشل —
-    #:     أو أسوأ: يُبنى فاحص خاص يتجاوز نظام Django كله.
+    #:     Storing them in `permissions` alone is **decoration**: `has_perm`
+    #:     reads the user's own permissions and their groups, and knows nothing
+    #:     about this table. So the role looked configured while every permission
+    #:     check failed — or worse: a custom checker gets built that bypasses Django entirely.
     #:
-    #:     المجموعة تُنشأ وتُزامَن في `services.sync_role_permissions`،
-    #:     وانضمام الموظف إليها في `services.set_role`.
+    #:     The group is created and synchronised in `services.sync_role_permissions`,
+    #:     and the employee joins it in `services.set_role`.
     group = models.OneToOneField(
         "auth.Group",
         on_delete=models.SET_NULL,
@@ -103,12 +105,13 @@ class EmployeeRole(BaseModel):
 
 class EmployeeProfile(BaseModel):
     """
-    ملف الموظف.
+    The employee profile.
 
-    ⚠️  الموظف الموقوف **لا يُحذف**.
+    ⚠️  A departed employee is **never deleted**.
 
-        حذفه يفقد نسبة كل طلب أنشأه ومَن كان مسؤولًا عن عملائه —
-        وهي بيانات تُحتاج في أي مراجعة أداء أو نزاع عمولة لاحق.
+        Deleting them loses the attribution of every order they created and who
+        was responsible for their customers — data needed in any performance
+        review or later commission dispute.
     """
 
     user = models.OneToOneField(
@@ -127,8 +130,8 @@ class EmployeeProfile(BaseModel):
         verbose_name=_("الدور"),
     )
 
-    #: ⚠️  المدير المباشر اختياري: مدير المبيعات نفسه بلا مدير
-    #:     أعلى داخل النظام، و`PROTECT` يمنع حذف مدير له فريق.
+    #: ⚠️  The line manager is optional: the sales manager themselves has no
+    #:     manager above them in the system, and `PROTECT` prevents deleting a manager with a team.
     manager = models.ForeignKey(
         "self",
         on_delete=models.PROTECT,
@@ -153,10 +156,10 @@ class EmployeeProfile(BaseModel):
 
     def has_permission(self, codename: str) -> bool:
         """
-        ⚠️  الموقوف عن العمل **يفقد كل صلاحياته فورًا**.
+        ⚠️  A departed employee **loses every permission immediately**.
 
-            الاكتفاء بتعطيل الحساب يترك فجوة: توكن صالح في يده
-            حتى انتهائه. والفحص هنا يُغلقها في أول طلب.
+            Disabling the account alone leaves a gap: a valid token in their
+            hand until it expires. The check here closes it on the first request.
         """
         if not self.is_active:
             return False
@@ -170,14 +173,15 @@ class AssignmentStatus(models.TextChoices):
 
 class CustomerAssignment(BaseModel):
     """
-    إسناد عميل إلى موظف — **يسكن هنا لا في `customers`** (ADR-12).
+    Assigning a customer to an employee — **it lives here, not in `customers`** (ADR-12).
 
-    ⚠️  **سجل تاريخي لا حقل حالي.**
+    ⚠️  **A historical record, not a current field.**
 
-        حقل `assigned_employee` على العميل يُكتب فوقه عند كل نقل،
-        فيضيع من كان مسؤولًا حين وقع الطلب. والعمولة في المرحلة
-        ١١ تُحسب على **من كان مسؤولًا وقتها** لا على من هو
-        مسؤول اليوم — بلا هذا السجل يصير الحساب مستحيلًا رجعيًا.
+        An `assigned_employee` field on the customer is overwritten on every
+        transfer, losing who was responsible when the order was placed. And the
+        commission in phase 11 is calculated on **whoever was responsible then**,
+        not on whoever is responsible today — without this record the
+        calculation becomes retrospectively impossible.
     """
 
     customer = models.ForeignKey(
@@ -222,11 +226,11 @@ class CustomerAssignment(BaseModel):
             models.Index(fields=["employee", "status"]),
         ]
         constraints = [
-            # ⚠️  عميل واحد لموظف واحد في اللحظة الواحدة.
+            # ⚠️  One customer to one employee at any one time.
             #
-            #     مندوبان يتقاسمان عميلًا يعني عمولةً مزدوجة على
-            #     نفس البيعة، وتضاربًا في المتابعة — يتصل به
-            #     الاثنان أو لا يتصل أحد.
+            #     Two reps sharing a customer means a double commission on the
+            #     same sale, and conflicting follow-up — either both call them
+            #     or neither does.
             models.UniqueConstraint(
                 fields=["customer"],
                 condition=models.Q(status="ACTIVE", deleted_at__isnull=True),

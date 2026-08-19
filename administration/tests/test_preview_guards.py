@@ -26,6 +26,7 @@ from access.preview import (
 from access.services import evaluate
 from accounts.models import AccountType, User, VerificationStatus
 from administration.models import AdminProfile
+from core.testing import grant_all_domains
 
 PASSWORD = "Str0ng-Test-Pass!23"
 
@@ -46,6 +47,7 @@ def admin(db):
     user.is_active = True
     user.save()
     AdminProfile.objects.create(user=user)
+    grant_all_domains(user)
     return user
 
 

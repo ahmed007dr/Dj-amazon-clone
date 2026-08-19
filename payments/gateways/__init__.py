@@ -1,38 +1,38 @@
 """
-محوّلات البوابات الخارجية.
+External gateway adapters.
 
-⚠️  **مطلوب تحقّق من البيئة التجريبية قبل الإنتاج.**
+⚠️  **Sandbox verification is required before production.**
 
-    الهيكل والتوقيعات والحقول مكتوبة وفق عقود Paymob و Fawry
-    المعروفة، لكن **لم تُختبر مقابل حساب حقيقي** — لا حساب ولا
-    مفاتيح بعد. البوابات تغيّر أسماء حقول ونسخ نقاط النهاية بلا
-    إشعار واسع.
+    The structure, the signatures and the fields are written against the known
+    Paymob and Fawry contracts, but they **have not been tested against a real
+    account** — there is no account and no keys yet. Gateways change field names
+    and endpoint versions without broad notice.
 
-    قبل التشغيل الحقيقي:
-      ١. افتح حساب البيئة التجريبية.
-      ٢. أضف المفاتيح من لوحة الأدمن (وضع تجريبي).
-      ٣. **سجّل عنوان الأحداث في لوحة البوابة نفسها**:
+    Before going live:
+      1. Open a sandbox account.
+      2. Add the keys from the admin panel (test mode).
+      3. **Register the events URL in the gateway's own panel**:
 
-             https://<المضيف>/api/v1/payments/webhooks/<رمز البوابة>/
+             https://<host>/api/v1/payments/webhooks/<gateway code>/
 
-         عنوان لكل بوابة، ورمزها هو `PaymentProvider.code`.
+         One URL per gateway, and its code is `PaymentProvider.code`.
 
-         ⚠️  نقطة لا تصلها البوابة تعني طلبات تبقى «قيد المعالجة»
-             بينما المال محصَّل — وهو فشل لا يظهر في أي سجل عندنا
-             لأن شيئًا لم يصل أصلًا.
+         ⚠️  An endpoint the gateway cannot reach means orders left "processing"
+             while the money is collected — a failure that appears in no log of
+             ours, because nothing arrived at all.
 
-      ٤. نفّذ عملية كاملة: دفع · ويب‌هوك · استرداد.
-      ٥. صحّح أي اسم حقل مختلف — الكود يسجّل الاستجابة الخام كاملة
-         في `PaymentTransaction.provider_response`، والحدث الوارد
-         كاملًا في `WebhookEvent.payload`، فيظهر الفرق فورًا.
+      4. Run a complete operation: payment · webhook · refund.
+      5. Correct any differing field name — the code records the full raw
+         response in `PaymentTransaction.provider_response` and the complete
+         inbound event in `WebhookEvent.payload`, so the difference shows immediately.
 
-⚠️  **التوقيع يصل من مكانين مختلفين**: Paymob في معامل الرابط
-    (`?hmac=…`) وFawry في الجسم (`messageSignature`). كلٌّ يقرؤه في
-    `parse_webhook` الخاص به — وقراءته من المكان الخطأ ترفض كل حدث
-    صحيح بصمت.
+⚠️  **The signature arrives from two different places**: Paymob in the URL
+    parameter (`?hmac=…`) and Fawry in the body (`messageSignature`). Each reads
+    it in its own `parse_webhook` — and reading it from the wrong place refuses
+    every valid event silently.
 
-⚠️  المبدأ الحاكم في الملفين: **لا نجاح صامت.**
+⚠️  The governing principle in both files: **no silent success.**
 
-    أي استجابة غير متوقَّعة تُعامَل كفشل مع حفظ جسمها الخام.
-    الاستنتاج المتفائل («لا خطأ ⟵ نجح») يعلّم طلبًا كمدفوع بلا مال.
+    Any unexpected response is treated as a failure, with its raw body saved.
+    An optimistic inference ("no error ⟵ it worked") marks an order paid with no money.
 """

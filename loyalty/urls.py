@@ -1,4 +1,4 @@
-"""مسارات الولاء — /api/v1/loyalty/"""
+"""Loyalty routes — /api/v1/loyalty/"""
 
 from django.urls import path
 
@@ -7,14 +7,14 @@ from loyalty import api
 app_name = "loyalty"
 
 urlpatterns = [
-    # ── العميل ─────────────────────────────────────────────
+    # ── Customer ───────────────────────────────────────────
     path("me/", api.MyLoyaltyAPI.as_view(), name="me"),
     path("me/points/", api.MyPointsAPI.as_view(), name="my-points"),
     path("me/redeem/quote/", api.RedemptionQuoteAPI.as_view(), name="redeem-quote"),
     path("me/redeem/", api.RedeemAPI.as_view(), name="redeem"),
     path("me/referral/", api.MyReferralAPI.as_view(), name="my-referral"),
     path("me/referral/apply/", api.ApplyReferralAPI.as_view(), name="apply-referral"),
-    # ── الأدمن: الضبط ──────────────────────────────────────
+    # ── Admin: configuration ───────────────────────────────
     path("admin/overview/", api.LoyaltyOverviewAPI.as_view(), name="overview"),
     path("admin/targeting/", api.TargetingOptionsAPI.as_view(), name="targeting"),
     path("admin/programs/", api.LoyaltyProgramListCreateAPI.as_view(), name="programs"),
@@ -35,11 +35,11 @@ urlpatterns = [
         api.ReferralProgramDetailAPI.as_view(),
         name="referral-program-detail",
     ),
-    # ── الأدمن: الدفاتر ────────────────────────────────────
+    # ── Admin: the ledgers ─────────────────────────────────
     path("admin/points/", api.AdminPointsListAPI.as_view(), name="admin-points"),
     path("admin/expire/", api.ExpirePointsAPI.as_view(), name="expire"),
-    # ⚠️  قبل `customers/<uuid:pk>/` عمدًا: المسارات الثابتة تسبق
-    #     المتغيّرة وإلا التقط `<uuid:pk>` ما ليس معرّفًا.
+    # ⚠️  Before `customers/<uuid:pk>/` deliberately: literal paths precede
+    #     variable ones, or `<uuid:pk>` captures what is not an id.
     path("admin/customers/", api.CustomerLookupAPI.as_view(), name="customer-lookup"),
     path(
         "admin/customers/<uuid:pk>/adjust/",

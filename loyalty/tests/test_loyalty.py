@@ -1,15 +1,16 @@
 """
-اختبارات الولاء والإحالة.
+Loyalty and referral tests.
 
-⚠️  بوابة الخروج للمرحلة ١٢:
+⚠️  The exit gate for phase 12:
 
-        المفتاح يوقف الكسب فعلًا · الاستهداف يحصر من يكسب ·
-        المرتجع يسحب · الاستبدال لا يتجاوز السقف · النقاط لا
-        تُمنَح مرتين لطلب واحد.
+        the switch genuinely stops earning · targeting confines who earns ·
+        a return withdraws · redemption does not exceed the cap · points are
+        not awarded twice for one order.
 
-    وأخطر ما تحرسه: أن يستمر الكسب بعد الإيقاف · أن يكسب من هو
-    خارج الفئة المستهدفة · أن يُستبدَل ما لا يملكه العميل · أن
-    يُصرَف كوبون النقاط لمن لم يدفع ثمنه.
+    And the greatest dangers it guards: earning continuing after the switch is
+    off · someone outside the targeted segment earning · a customer redeeming
+    what they do not have · a points coupon being spent by someone who did not
+    pay for it.
 """
 
 from datetime import timedelta
@@ -22,6 +23,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import AccountType, User
 from administration.models import AdminProfile
+from core.testing import grant_all_domains
 from core.errors import BusinessError
 from customers.models import CustomerProfile, CustomerSegment
 from inventory.models import LocationKind, StockLocation
@@ -41,7 +43,7 @@ PASSWORD = "Str0ng-Test-Pass!23"
 
 
 # ═══════════════════════════════════════════════════════════
-#  التجهيز
+#  Setup
 # ═══════════════════════════════════════════════════════════
 
 
@@ -102,17 +104,17 @@ def make_order(customer, location, total="200.00", tax="0.00", shipping="0.00", 
 
 
 # ═══════════════════════════════════════════════════════════
-#  المفتاح — أخطر ما في النظام
+#  The switch — the most dangerous thing in the system
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 class TestTheSwitch:
     """
-    ⚠️  المفتاح الذي يُفحَص في مسار ويُنسى في آخر ليس مفتاحًا.
+    ⚠️  A switch checked on one path and forgotten on another is not a switch.
 
-        هذه الفئة تفحص المسارات الأربعة معًا: الكسب · التسعير ·
-        الاستبدال · مكافأة الإحالة.
+        This class checks all four paths together: earning · pricing ·
+        redemption · the referral reward.
     """
 
     def test_no_program_means_no_points(self, customer, location):
@@ -128,8 +130,8 @@ class TestTheSwitch:
 
         services.award_for_order(make_order(customer, location))
 
-        # ⚠️  الرصيد **لا يُمحى** بالإيقاف: نقاط كُسبت وعُرضت للعميل
-        #     ومحوها يجعله يرى رصيده يختفي بلا سبب.
+        # ⚠️  The balance is **not erased** by disabling: points were earned and shown
+        #     to the customer, and erasing them makes their balance vanish for no reason.
         assert services.balance(customer) == 20
 
     def test_deactivating_blocks_redemption_too(self, customer, location, program):
@@ -147,9 +149,9 @@ class TestTheSwitch:
         self, customer, location, program
     ):
         """
-        ⚠️  مفتاحان لا واحد: إيقاف الصرف مع استمرار الكسب موقف
-            تشغيلي حقيقي (مراجعة الالتزام) — ودمجهما كان يجبر
-            الأدمن على إيقاف النظام كله.
+        ⚠️  Two switches, not one: stopping redemption while earning continues
+            is a real operational position (reviewing the liability) — and
+            merging them would have forced the admin to disable the whole system.
         """
         program.redemption_enabled = False
         program.save()
@@ -162,7 +164,7 @@ class TestTheSwitch:
 
 @pytest.mark.django_db
 class TestTargeting:
-    """⚠️  الاستهداف هو ما طلبه الأدمن: فئة بعينها أو الجميع."""
+    """⚠️  Targeting is what the admin asked for: a specific segment or everyone."""
 
     def test_empty_targeting_covers_everyone(self, location, program):
         for account_type in (AccountType.STUDENT, AccountType.PHARMACY, AccountType.DOCTOR):
@@ -199,8 +201,8 @@ class TestTargeting:
         assert services.balance(pharmacy) == 0
 
     def test_segment_and_account_type_apply_together(self, location, program):
-        """⚠️  الشرطان **معًا** لا أحدهما: «صيدليات مميّزة» لا
-            «كل صيدلية أو كل مميّز»."""
+        """⚠️  Both conditions **together**, not either: "featured pharmacies", not
+            "every pharmacy or every featured customer"."""
         program.account_types = [AccountType.PHARMACY]
         program.customer_segments = [CustomerSegment.VIP]
         program.save()
@@ -231,25 +233,25 @@ class TestTargeting:
         pharmacy = make_customer("ph3@example.com", AccountType.PHARMACY)
         services.award_for_order(make_order(pharmacy, location))
 
-        # ٢٠٠ ÷ ٥ = ٤٠ — من برنامج الصيدليات لا برنامج الطلاب
+        # 200 ÷ 5 = 40 — from the pharmacies programme, not the students one
         assert services.balance(pharmacy) == 40
 
 
 # ═══════════════════════════════════════════════════════════
-#  الكسب
+#  Earning
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 class TestEarning:
     def test_tax_and_shipping_are_excluded_by_default(self, customer, location, program):
-        """⚠️  الضريبة تُحصَّل للدولة والشحن يُدفَع للناقل — ولا
-            يُكافَأ العميل على ما لم نربح منه."""
+        """⚠️  Tax is collected for the state and shipping is paid to the carrier —
+            and the customer is not rewarded on what we did not profit from."""
         services.award_for_order(
             make_order(customer, location, total="200.00", tax="28.00", shipping="22.00")
         )
 
-        # (٢٠٠ − ٢٨ − ٢٢) ÷ ١٠ = ١٥
+        # (200 − 28 − 22) ÷ 10 = 15
         assert services.balance(customer) == 15
 
     def test_tax_can_be_included_by_configuration(self, customer, location, program):
@@ -310,7 +312,7 @@ class TestEarning:
 @pytest.mark.django_db
 class TestRefundReversal:
     def test_a_refund_pulls_the_points_back(self, customer, location, program):
-        """⚠️  بدونه: يشتري · يكسب · يُرجِع · ويحتفظ بالنقاط."""
+        """⚠️  Without it: buy · earn · return · and keep the points."""
         order = make_order(customer, location)
         services.award_for_order(order)
         assert services.balance(customer) == 20
@@ -327,8 +329,8 @@ class TestRefundReversal:
 
         services.reverse_for_order(order)
 
-        # ⚠️  ٨٠ نقطة استُبدلت سلفًا: السحب يقف عند الرصيد ولا
-        #     يخترع دَينًا بالنقاط.
+        # ⚠️  80 points already redeemed: the withdrawal stops at the balance and
+        #     does not invent a debt in points.
         assert services.balance(customer) == 0
 
     def test_reversal_can_be_switched_off(self, customer, location, program):
@@ -352,7 +354,7 @@ class TestRefundReversal:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الاستبدال
+#  Redemption
 # ═══════════════════════════════════════════════════════════
 
 
@@ -370,10 +372,10 @@ class TestRedemption:
 
     def test_a_redeemed_coupon_is_useless_to_anyone_else(self, customer, location, program):
         """
-        ⚠️  `usage_limit=1` يحدّ العدد لا الشخص.
+        ⚠️  `usage_limit=1` limits the count, not the person.
 
-            بلا مالك يكفي أن يُصوَّر الكود ويُرسَل ليصرفه غيرُه —
-            ونقاط صاحبه هي التي استُهلكت.
+            With no owner it is enough to photograph the code and send it for
+            someone else to spend it — on points that were its owner's.
         """
         from promotions import services as promo
 
@@ -389,18 +391,18 @@ class TestRedemption:
             coupon.code, customer.user, [], subtotal=Decimal("100.00")
         )
 
-        # ⚠️  الغريب يُردّ بـ«غير موجود» لا بـ«ليس لك»: التمييز بين
-        #     الردّين يحوّل الحقل إلى أداة استكشاف.
+        # ⚠️  A stranger is answered with "not found", not "not yours": distinguishing
+        #     the two responses turns the field into a discovery tool.
         assert stranger_result.reason is promo.RejectionReason.NOT_FOUND
 
-        # والمالك يعبر بوابة الملكية — ويقف عند سلة فارغة لا غير
+        # And the owner passes the ownership gate — stopping only at an empty cart
         assert owner_result.reason is promo.RejectionReason.NO_ELIGIBLE_ITEMS
 
     def test_redemption_is_capped_by_a_percentage_of_the_order(
         self, customer, location, program
     ):
-        """⚠️  بلا سقف يُدفَع طلب كامل بالنقاط — والنقاط لا تدفع
-            أجور الموردين."""
+        """⚠️  Without a cap a whole order is paid in points — and points do not
+            pay suppliers' invoices."""
         program.max_redemption_percent = Decimal("50.00")
         program.point_value = Decimal("1.0000")
         program.save()
@@ -420,8 +422,8 @@ class TestRedemption:
         assert services.balance(customer) == 20
 
     def test_oldest_expiring_batch_is_consumed_first(self, customer, location, program):
-        """⚠️  استهلاك الأحدث أولًا يجعل الأقدم ينتهي دائمًا بلا
-            استعمال — وهو ما يُقرأ غشًّا لا سياسة."""
+        """⚠️  Consuming the newest first makes the oldest always expire unused —
+            which reads as cheating rather than policy."""
         old = PointsEntry.objects.create(
             customer=customer,
             program=program,
@@ -488,7 +490,7 @@ class TestExpiry:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التسوية اليدوية
+#  Manual adjustment
 # ═══════════════════════════════════════════════════════════
 
 
@@ -514,7 +516,7 @@ class TestAdjustment:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الإحالة
+#  Referrals
 # ═══════════════════════════════════════════════════════════
 
 
@@ -550,8 +552,8 @@ class TestReferral:
     def test_the_reward_waits_for_the_first_completed_order(
         self, customer, location, program, referral_program
     ):
-        """⚠️  الصرف عند التسجيل يحوّل النظام إلى مزرعة حسابات
-            وهمية: كل بريد جديد نقاط."""
+        """⚠️  Paying at registration turns the system into a farm of fake
+            accounts: every new email is points."""
         code = services.ensure_referral_code(customer.user)
         friend = make_customer("buyer@example.com")
 
@@ -579,9 +581,9 @@ class TestReferral:
         self, customer, location, referral_program
     ):
         """
-        ⚠️  منح الطرفين من برنامج المُحيل كان يثقب الاستهداف:
-            صيدلية داخل البرنامج تُحيل طالبًا خارجه فيكسب من
-            برنامج لا يشمله.
+        ⚠️  Awarding both sides from the referrer's programme punched a hole in
+            the targeting: a pharmacy inside the programme refers a student
+            outside it, so they earn from a programme that does not cover them.
         """
         LoyaltyProgram.objects.create(
             code="pharmacies-only",
@@ -637,7 +639,7 @@ class TestReferral:
 
 
 # ═══════════════════════════════════════════════════════════
-#  المستمعون — الربط الفعلي بالطلبات
+#  The listeners — the actual wiring to orders
 # ═══════════════════════════════════════════════════════════
 
 
@@ -647,9 +649,9 @@ class TestListeners:
         self, customer, location, program
     ):
         """
-        ⚠️  نقطة البيع تُنشئ الطلب في حالته النهائية بلا مرور
-            بآلة الحالة، فلا `order_completed` تُبعَث. الاكتفاء
-            بالإشارة يجعل عميل الفرع لا يكسب شيئًا.
+        ⚠️  Point of sale creates the order in its final state with no state
+            machine, so no `order_completed` is emitted. Relying on the signal
+            means the branch's customer earns nothing.
         """
         make_order(customer, location, channel=OrderChannel.POS, status=OrderStatus.DELIVERED)
 
@@ -668,7 +670,7 @@ class TestListeners:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الواجهات
+#  Endpoints
 # ═══════════════════════════════════════════════════════════
 
 
@@ -682,6 +684,7 @@ def admin_client(db):
         is_superuser=True,
     )
     AdminProfile.objects.get_or_create(user=user)
+    grant_all_domains(user)
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -720,7 +723,7 @@ class TestAPI:
         assert data["enabled"] is True
         assert data["balance"] == 20
         assert data["next_tier"]["name_ar"] == "فضي"
-        # ⚠️  المبالغ نصًا (ADR-31)
+        # ⚠️  Amounts as strings (ADR-31)
         assert isinstance(data["program"]["point_value"], str)
 
     def test_a_customer_never_sees_another_ledger(self, customer, location, program):
@@ -749,8 +752,8 @@ class TestAPI:
         assert program.account_types == [AccountType.PHARMACY]
 
     def test_an_unknown_account_type_is_rejected(self, admin_client, program):
-        """⚠️  قيمة مكتوبة خطأً لا تطابق أحدًا: البرنامج يبدو
-            مفعَّلًا ولا يكسب فيه أحد — عطل صامت."""
+        """⚠️  A mistyped value matches nobody: the programme looks enabled and
+            nobody earns from it — a silent fault."""
         response = admin_client.patch(
             reverse("v1:loyalty:program-detail", args=[program.pk]),
             {"account_types": ["طالب"]},
@@ -783,11 +786,11 @@ class TestAPI:
 
     def test_everything_the_admin_needs_is_creatable_from_the_api(self, admin_client):
         """
-        ⚠️  **ما لا يُنشأ من الواجهة يُنشأ من `manage.py` — أي لا
-            يُنشأ.**
+        ⚠️  **What cannot be created from the frontend is created from
+            `manage.py` — that is, not created at all.**
 
-            الشاشة التي تعدّل ولا تُنشئ تجعل أول برنامج ثانٍ
-            يحتاج مبرمجًا. هذا الاختبار يمسك المسار من طرفه.
+            A screen that edits and does not create makes the first second
+            programme need a developer. This test covers the path end to end.
         """
         created = admin_client.post(
             reverse("v1:loyalty:programs"),
@@ -836,7 +839,7 @@ class TestAPI:
         )
         assert referral.status_code == 201, referral.data
 
-        # والحذف متاح ما دام البرنامج بلا تاريخ
+        # And deletion is available while the programme has no history
         assert (
             admin_client.delete(
                 reverse("v1:loyalty:tier-detail", args=[tier.data["id"]])
@@ -854,8 +857,9 @@ class TestAPI:
         self, admin_client, customer, location, program
     ):
         """
-        ⚠️  الحذف يترك حركات تشير إلى برنامج غير موجود، فلا يُقرأ
-            كشف عميل قديم. الإيقاف يفعل ما يريده الأدمن فعلًا.
+        ⚠️  Deletion leaves movements pointing at a programme that does not
+            exist, so an old customer's statement cannot be read. Disabling does
+            what the admin actually wants.
         """
         services.award_for_order(make_order(customer, location))
 
@@ -867,8 +871,8 @@ class TestAPI:
     def test_customer_lookup_shows_the_balance_before_adjusting(
         self, admin_client, customer, location, program
     ):
-        """⚠️  سحب ١٠٠ من رصيد ٣٠ يُقصّ صامتًا: الرصيد يجب أن
-            يُرى قبل كتابة الرقم لا بعد إرساله."""
+        """⚠️  Withdrawing 100 from a balance of 30 is silently clamped: the balance
+            must be seen before the number is written, not after it is sent."""
         services.award_for_order(make_order(customer, location))
 
         data = admin_client.get(
@@ -880,7 +884,7 @@ class TestAPI:
         assert data[0]["covered"] is True
 
     def test_a_one_letter_search_returns_nothing(self, admin_client, customer):
-        """⚠️  حرف واحد يعيد كل العملاء — تسريب قائمة لا بحث."""
+        """⚠️  A single character returns every customer — a list leak, not a search."""
         assert admin_client.get(reverse("v1:loyalty:customer-lookup"), {"search": "ع"}).data == []
 
     def test_adjusting_points_from_the_admin(self, admin_client, customer, program):

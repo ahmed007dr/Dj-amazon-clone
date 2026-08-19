@@ -1,11 +1,12 @@
 """
-محوّلات البريد.
+Mail serializers.
 
-⚠️  **الأسرار للكتابة فقط — بلا استثناء.**
+⚠️  **Secrets are write-only — without exception.**
 
-    ولا حتى «مقنّعة جزئيًا» في الاستجابة: آخر أربعة محارف من كلمة
-    مرور تكفي لتضييق التخمين، والقناع الحقيقي أن تكون القيمة **غير
-    موجودة في الحمولة أصلًا**. ما يخرج هو حالة الوجود لا القيمة.
+    Not even "partially masked" in the response: the last four characters of a
+    password are enough to narrow a guess, and the real mask is for the value to
+    be **absent from the payload entirely**. What goes out is whether it exists,
+    not what it is.
 """
 
 from rest_framework import serializers
@@ -23,11 +24,11 @@ from mailing.models import (
 
 
 class EmailAccountSerializer(serializers.ModelSerializer):
-    # ── أسرار: تدخل ولا تخرج ───────────────────────────────
+    # ── Secrets: they go in and never come out ─────────────
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     imap_password = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
-    # ── حالة الأسرار: تخرج ولا تدخل ────────────────────────
+    # ── Secret status: it comes out and never goes in ──────
     has_password = serializers.SerializerMethodField()
     has_imap_password = serializers.SerializerMethodField()
     is_failing = serializers.BooleanField(read_only=True)
@@ -88,11 +89,11 @@ class EmailAccountSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        ⚠️  التحقق يمرّ بـ`clean()` الموديل لا بنسخة ثانية منه هنا.
+        ⚠️  Validation passes through the model's `clean()` rather than a second copy of it here.
 
-            قاعدتان متوازيتان تنفصلان عند أول تعديل، فتقبل الشاشة ما
-            ترفضه لوحة الإدارة — والقاعدة التي تحمي رسائل الأمان من
-            حساب تسويقي لا تحتمل نسختين.
+            Two parallel rules diverge at the first edit, so the screen accepts
+            what the admin panel refuses — and the rule protecting security
+            messages from a marketing account does not tolerate two copies.
         """
         instance = self.instance or EmailAccount()
         for field, value in attrs.items():
@@ -103,11 +104,11 @@ class EmailAccountSerializer(serializers.ModelSerializer):
 
     def _store_secret(self, account: EmailAccount, key: str, value: str) -> None:
         """
-        ⚠️  الفراغ يعني «أبقِ الحالية» لا «امسح».
+        ⚠️  Empty means "keep the current one", not "clear it".
 
-            الشاشة تُقدَّم بحقل فارغ دائمًا (القيمة لا تُقرأ)، فحفظ
-            تعديل على المنفذ وحده كان سيمسح كلمة المرور بلا أن يقصد
-            أحد — ويوقف البريد كله.
+            The screen is always presented with an empty field (the value is
+            never read), so saving an edit to the port alone would have erased
+            the password with nobody intending it — and stopped all mail.
         """
         if not value:
             return
@@ -155,14 +156,15 @@ class MailRouteSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        ⚠️  يمرّ بـ`clean()` الموديل — لا نسخة ثانية من السياج هنا.
+        ⚠️  It passes through the model's `clean()` — not a second copy of the firewall here.
 
-            قاعدتان متوازيتان تنفصلان عند أول تعديل، فتقبل الشاشة ما
-            ترفضه لوحة الإدارة. والقاعدة التي تمنع رسائل الأمان من
-            حساب تسويقي لا تحتمل نسختين.
+            Two parallel rules diverge at the first edit, so the screen accepts
+            what the admin panel refuses. And the rule preventing security
+            messages from a marketing account does not tolerate two copies.
 
-            و`clean()` يصحّح الغرض من القالب، فتُعاد قيمته إلى
-            الحمولة — وإلا حُفظ ما أرسلته الشاشة لا ما صُحِّح.
+            And `clean()` corrects the purpose from the template, so its value
+            is written back into the payload — otherwise what the screen sent
+            would be saved rather than what was corrected.
         """
         instance = self.instance or MailRoute()
         for field, value in attrs.items():
@@ -174,11 +176,12 @@ class MailRouteSerializer(serializers.ModelSerializer):
 
 class OutboundMessageSerializer(serializers.ModelSerializer):
     """
-    ⚠️  **للقراءة بالكامل.**
+    ⚠️  **Entirely read-only.**
 
-        صفّ الصادر سجلّ ما جرى: تعديل حالته يدويًا لا يُرسل شيئًا ولا
-        يمنعه — يخلق فقط تناقضًا بين ما تقوله الشاشة وما وقع فعلًا.
-        الفعل الوحيد المتاح هو إعادة المحاولة، ولها نقطتها الخاصة.
+        An outbox row is a record of what happened: changing its status by hand
+        sends nothing and prevents nothing — it only creates a contradiction
+        between what the screen says and what actually occurred. The one
+        available action is a retry, and it has its own endpoint.
     """
 
     account_code = serializers.CharField(source="account.code", read_only=True, default="")
@@ -206,8 +209,9 @@ class OutboundMessageSerializer(serializers.ModelSerializer):
 
 class TemplateOverrideSerializer(serializers.ModelSerializer):
     """
-    ⚠️  `key` يُقرأ ولا يُكتب بعد الإنشاء: تغييره يحوّل تجاوزًا لقالب
-        إلى تجاوز لآخر، فيرث نصًّا كُتب لسياق مختلف تمامًا.
+    ⚠️  `key` is read and never written after creation: changing it turns an
+        override for one template into an override for another, so it inherits
+        text written for an entirely different context.
     """
 
     class Meta:
@@ -225,10 +229,11 @@ class TemplateOverrideSerializer(serializers.ModelSerializer):
 
 class TemplatePreviewSerializer(serializers.Serializer):
     """
-    معاينة قبل الحفظ.
+    A preview before saving.
 
-    ⚠️  الحقول اختيارية عمدًا: المعاينة تعمل على **ما في الشاشة الآن**
-        لا على ما حُفظ. معاينة لا تسبق الحفظ لا تمنع شيئًا.
+    ⚠️  The fields are optional deliberately: the preview works on **what is on
+        the screen now**, not on what was saved. A preview that does not precede
+        the save prevents nothing.
     """
 
     subject_ar = serializers.CharField(required=False, allow_blank=True)
@@ -246,11 +251,12 @@ class InboundAttachmentSerializer(serializers.ModelSerializer):
 
 class InboundMessageSerializer(serializers.ModelSerializer):
     """
-    ⚠️  **`body_html` غائب عن الحمولة عمدًا.**
+    ⚠️  **`body_html` is deliberately absent from the payload.**
 
-        رسالة من مجهول تحمل `<script>` تُعرَض في شاشة أدمن مسجَّل
-        الدخول هي XSS مباشر على أعلى صلاحية في النظام. النص الصريح
-        يكفي للقراءة والردّ، والـ HTML يبقى مخزَّنًا للأرشيف وحده.
+        A message from a stranger carrying `<script>` rendered on a logged-in
+        admin screen is direct XSS at the highest privilege in the system. Plain
+        text is enough to read and reply, and the HTML stays stored for the
+        archive alone.
     """
 
     attachments = InboundAttachmentSerializer(many=True, read_only=True)

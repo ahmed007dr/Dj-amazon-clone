@@ -1,10 +1,10 @@
 """
-خدمات الدفع — الواجهة المجرّدة.
+Payment services — the abstract interface.
 
-⚠️  `orders` و`pos` يستدعيان `charge()` ولا يعرفان أي بوابة.
+⚠️  `orders` and `pos` call `charge()` and know no gateway.
 
-    اختيار البوابة يحدث هنا حسب القناة وطريقة الدفع والعملة
-    والمبلغ والأولوية. إضافة بوابة أو تعطيلها لا يمس أي نطاق آخر.
+    Gateway selection happens here, by channel, payment method, currency, amount
+    and priority. Adding or disabling a gateway touches no other domain.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════
-#  اختيار البوابة
+#  Gateway selection
 # ═══════════════════════════════════════════════════════════
 
 
@@ -42,12 +42,12 @@ def available_providers(
     *, method: str, currency: str = "EGP", channel: str = "ONLINE", amount: Decimal = ZERO
 ) -> list[PaymentProvider]:
     """
-    البوابات الصالحة لهذه العملية، مرتّبة بالأولوية.
+    The gateways suitable for this operation, ordered by priority.
 
-    ⚠️  تُقرأ من قاعدة البيانات في كل مرة.
+    ⚠️  Read from the database every time.
 
-        بوابة يعطّلها الأدمن تختفي فورًا من الخيارات بلا إعادة نشر
-        — وهذا جوهر المتطلب.
+        A gateway the admin disables disappears from the options immediately
+        with no redeployment — and that is the heart of the requirement.
     """
     return [
         provider
@@ -74,7 +74,7 @@ def _build_adapter(provider: PaymentProvider) -> PaymentAdapter:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التحصيل
+#  Capture
 # ═══════════════════════════════════════════════════════════
 
 
@@ -93,13 +93,13 @@ def charge(
     metadata: dict | None = None,
 ) -> PaymentTransaction:
     """
-    تحصيل مبلغ.
+    Charge an amount.
 
-    ⚠️  `idempotency_key` يمنع التكرار.
+    ⚠️  `idempotency_key` prevents duplication.
 
-        نقرة مزدوجة أو إعادة محاولة على شبكة ضعيفة يجب ألا تنتج
-        عمليتي دفع. المفتاح الموجود يعيد المعاملة الأصلية بلا
-        تنفيذ ثانٍ.
+        A double-click or a retry on a weak connection must not produce two
+        payment operations. An existing key returns the original transaction
+        with no second execution.
     """
     if idempotency_key:
         existing = PaymentTransaction.objects.filter(idempotency_key=idempotency_key).first()
@@ -138,8 +138,8 @@ def charge(
             metadata=metadata or {},
         )
     except Exception as exc:
-        # ⚠️  فشل غير متوقع من المحوّل — تُسجَّل الحالة بوضوح
-        #     لا تُترك المعاملة معلّقة بلا تفسير.
+        # ⚠️  An unexpected failure from the adapter — the status is recorded clearly
+        #     rather than leaving the transaction suspended with no explanation.
         logger.exception("انهيار محوّل %s", provider.adapter_key)
         payment.status = TransactionStatus.FAILED
         payment.failure_code = "ADAPTER_ERROR"
@@ -165,10 +165,10 @@ def charge(
 @transaction.atomic
 def capture(payment: PaymentTransaction) -> PaymentTransaction:
     """
-    تحصيل مبلغ مُصرَّح.
+    Capture an authorised amount.
 
-    للدفع عند الاستلام: يُستدعى عند تسليم الطلب فعلًا — تعليمه
-    محصَّلًا قبل ذلك يعني إيرادًا وهميًا في التقارير.
+    For cash on delivery: called when the order is actually delivered — marking
+    it captured before that means phantom revenue in the reports.
     """
     if payment.status == TransactionStatus.CAPTURED:
         return payment
@@ -195,10 +195,10 @@ def refund(
     requested_by=None,
 ) -> Refund:
     """
-    استرداد كلي أو جزئي.
+    A full or partial refund.
 
-    ⚠️  المبلغ لا يتجاوز المتبقي القابل للاسترداد — واسترداد أكثر
-        مما دُفع خطأ محاسبي لا يُصحَّح بسهولة.
+    ⚠️  The amount does not exceed the remaining refundable balance — and
+        refunding more than was paid is an accounting error that is not easily corrected.
     """
     if not payment.is_successful:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="لا يمكن استرداد معاملة غير ناجحة")
@@ -249,10 +249,10 @@ def refund(
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأحداث الواردة
+#  Inbound events
 # ═══════════════════════════════════════════════════════════
 
-#: نتائج معالجة حدث وارد — تترجمها الواجهة إلى رمز HTTP.
+#: The outcomes of processing an inbound event — the endpoint translates them into an HTTP code.
 WEBHOOK_APPLIED = "applied"
 WEBHOOK_DUPLICATE = "duplicate"
 WEBHOOK_IGNORED = "ignored"
@@ -269,7 +269,7 @@ class WebhookResult:
     detail: str = ""
 
 
-#: نتيجة المحوّل ← حالة المعاملة
+#: The adapter's outcome ← the transaction status
 _OUTCOME_STATUS = {
     adapters.AUTHORIZED: TransactionStatus.AUTHORIZED,
     adapters.CAPTURED: TransactionStatus.CAPTURED,
@@ -288,24 +288,24 @@ def record_webhook(
     signature: str = "",
 ) -> tuple[WebhookEvent | None, bool]:
     """
-    تسجيل حدث وارد **موثَّق التوقيع**. يعيد `(الحدث, هل هو جديد)`.
+    Record an inbound event **with a verified signature**. Returns `(the event, whether it is new)`.
 
-    ⚠️  **التسجيل قبل المعالجة.**
+    ⚠️  **Recording comes before processing.**
 
-        البوابة تعيد إرسال الحدث عند غياب الرد. بلا سجل بمعرّف
-        فريد، الطلب يُعلَّم مدفوعًا مرتين — ومع الاسترداد يصير
-        المبلغ مضاعفًا.
+        The gateway resends the event when no response arrives. Without a record
+        under a unique id, the order is marked paid twice — and with a refund
+        the amount is doubled.
 
-    ⚠️  **والحدث المزوَّر لا يدخل الجدول أصلًا** — يعيد `(None, False)`.
+    ⚠️  **And a forged event never enters the table at all** — it returns `(None, False)`.
 
-        تسجيله كان يبدو أدق للتدقيق، وهو في الحقيقة ثغرة تعطيل:
-        الجدول مفتاحه `(البوابة, معرّف الحدث)`، فمن يرسل حدثًا
-        مزوَّرًا بمعرّف يخمّنه **يحجز الخانة**. ثم يصل الحدث الحقيقي
-        بنفس المعرّف فيبدو تكرارًا ويُهمَل — ويبقى طلب مدفوع بلا
-        تعليم، بنداء واحد بلا أي مفتاح.
+        Recording it looked more thorough for auditing, and is in truth a denial
+        hole: the table is keyed on `(gateway, event id)`, so whoever sends a
+        forged event with a guessed id **occupies the slot**. The real event
+        then arrives with the same id, looks like a repeat and is discarded —
+        leaving a paid order unmarked, from one call with no key at all.
 
-        المحاولات المرفوضة تُسجَّل في السجل النصي؛ وهذا الجدول
-        دفتر منع تكرار لا سجل اختراقات.
+        Rejected attempts are recorded in the text log; this table is a
+        deduplication ledger, not an intrusion log.
     """
     adapter = _build_adapter(provider)
 
@@ -327,20 +327,20 @@ def record_webhook(
 
 def handle_webhook(provider: PaymentProvider, *, payload: dict, params: dict) -> WebhookResult:
     """
-    المسار الكامل لحدث وارد: قراءة ← تحقّق ← منع تكرار ← تطبيق.
+    The full path for an inbound event: read ← verify ← deduplicate ← apply.
 
-    ⚠️  **التكرار يُقاس بالمعالجة لا بالتسجيل.**
+    ⚠️  **Duplication is measured by processing, not by recording.**
 
-        حدث سُجِّل ثم فشل تطبيقه يجب أن يُعاد تطبيقه حين تعيد
-        البوابة إرساله. قياسه بالتسجيل وحده كان يجعل أول فشل
-        نهائيًا: الحدث موجود ⟵ «تكرار» ⟵ يُهمَل إلى الأبد، والطلب
-        لا يُعلَّم مدفوعًا أبدًا.
+        An event that was recorded and then failed to apply must be reapplied
+        when the gateway resends it. Measuring by recording alone made the first
+        failure final: the event exists ⟵ "a duplicate" ⟵ discarded forever, and
+        the order is never marked paid.
 
-    ⚠️  والفشل غير المتوقع **يُرفع** لا يُبتلع.
+    ⚠️  And an unexpected failure **is raised**, not swallowed.
 
-        الاستجابة ٥٠٠ تجعل البوابة تعيد المحاولة — وهو ما نريده
-        بالضبط. ابتلاعه وإعادة ٢٠٠ يقول للبوابة «استلمتُه» عن حدث
-        لم يُطبَّق، فتتوقف عن الإرسال ويضيع نهائيًا.
+        A 500 response makes the gateway retry — which is exactly what we want.
+        Swallowing it and returning 200 tells the gateway "I have it" about an
+        event that was never applied, so it stops sending and it is lost for good.
     """
     adapter = _build_adapter(provider)
     envelope = adapter.parse_webhook(payload=payload, params=params)
@@ -376,17 +376,17 @@ def handle_webhook(provider: PaymentProvider, *, payload: dict, params: dict) ->
 @transaction.atomic
 def _apply_webhook(provider: PaymentProvider, envelope) -> WebhookResult:
     """
-    إسقاط الحدث على المعاملة.
+    Apply the event to the transaction.
 
-    ⚠️  `select_for_update` إلزامي: البوابة قد ترسل حدثين متتاليين
-        بأجزاء من الثانية، ومعالجتهما معًا تكتب حالتين فوق بعضهما
-        بترتيب غير مضمون.
+    ⚠️  `select_for_update` is mandatory: the gateway may send two events a
+        fraction of a second apart, and processing them together writes two
+        statuses over each other in an unguaranteed order.
     """
     payment = _locate_transaction(provider, envelope)
 
     if payment is None:
-        # ⚠️  لا معاملة بهذا المرجع — إعادة المحاولة لن تغيّر شيئًا.
-        #     يُسجَّل بوضوح ولا يُطلَب من البوابة أن تكرّر بلا فائدة.
+        # ⚠️  No transaction with this reference — a retry will change nothing.
+        #     It is logged clearly, and the gateway is not asked to repeat for nothing.
         logger.error(
             "حدث موثَّق بلا معاملة مطابقة — البوابة %s · مرجعنا %r · مرجعها %r",
             provider.code,
@@ -396,11 +396,11 @@ def _apply_webhook(provider: PaymentProvider, envelope) -> WebhookResult:
         return WebhookResult(WEBHOOK_UNKNOWN_TRANSACTION, detail="لا معاملة بهذا المرجع")
 
     if envelope.amount is not None and envelope.amount != payment.amount:
-        # ⚠️  التوقيع الصحيح يثبت **المُرسِل** لا **المبلغ الصحيح**.
+        # ⚠️  A valid signature proves **the sender**, not **the correct amount**.
         #
-        #     بوابة حصّلت غير ما طلبناه (أو دفعة جزئية في منفذ فوري)
-        #     تصل بتوقيع سليم تمامًا. تعليمها مدفوعة يخلق طلبًا
-        #     مكتملًا بمال ناقص — ولا يظهر إلا في مطابقة شهرية.
+        #     A gateway that collected something other than what we asked for (or a
+        #     partial payment at an outlet) arrives with a perfectly sound signature.
+        #     Marking it paid creates a completed order with money missing — visible only in a monthly reconciliation.
         logger.error(
             "مبلغ الحدث لا يطابق المعاملة %s: %s مقابل %s",
             payment.reference,
@@ -430,8 +430,8 @@ def _apply_webhook(provider: PaymentProvider, envelope) -> WebhookResult:
         payment.authorized_at = now
         updates.append("authorized_at")
     if new_status == TransactionStatus.CAPTURED:
-        # ⚠️  التحصيل يعني التصريح ضمنًا. معاملة محصَّلة بلا وقت
-        #     تصريح تكسر أي تقرير يقيس المدة بينهما.
+        # ⚠️  A capture implies an authorisation. A captured transaction with no
+        #     authorisation time breaks any report measuring the interval between them.
         if payment.authorized_at is None:
             payment.authorized_at = now
             updates.append("authorized_at")
@@ -446,10 +446,11 @@ def _apply_webhook(provider: PaymentProvider, envelope) -> WebhookResult:
 
 def _locate_transaction(provider: PaymentProvider, envelope) -> PaymentTransaction | None:
     """
-    ⚠️  مرجعنا أولًا ثم مرجع البوابة.
+    ⚠️  Our reference first, then the gateway's.
 
-        `merchant_reference` نحن من ولّده وأرسلناه، فهو الأوثق.
-        ومرجع البوابة احتياط للحالات التي لا تُعيده فيها.
+        `merchant_reference` is the one we generated and sent, so it is the most
+        reliable. The gateway's reference is a fallback for the cases where it
+        does not return ours.
     """
     locked = PaymentTransaction.objects.select_for_update()
 
@@ -468,11 +469,12 @@ def _locate_transaction(provider: PaymentProvider, envelope) -> PaymentTransacti
 
 def _is_forward(current: str, incoming: str) -> bool:
     """
-    ⚠️  الحالة لا تتراجع.
+    ⚠️  The status does not go backwards.
 
-        البوابة قد ترسل «مُصرَّح» بعد «محصَّل» (إعادة إرسال متأخرة
-        لحدث قديم)، والاسترداد نهائي. تطبيق كل وارد بلا حارس يعيد
-        معاملة مستردة إلى «محصَّلة» — فيظهر المال إيرادًا مرتين.
+        The gateway may send "authorised" after "captured" (a late resend of an
+        old event), and a refund is final. Applying everything inbound with no
+        guard returns a refunded transaction to "captured" — so the money
+        appears as revenue twice.
     """
     if current == incoming:
         return False
@@ -483,10 +485,10 @@ def _is_forward(current: str, incoming: str) -> bool:
 
 def _announce(payment: PaymentTransaction, status: str) -> None:
     """
-    ⚠️  **الإعلان لا الاستدعاء.**
+    ⚠️  **Announce, do not call.**
 
-        `payments` تحت `orders` في مخطط الطبقات، فلا يجوز أن يستورده
-        ليعلّم الطلب مدفوعًا. الإشارة تقلب الاتجاه — انظر
+        `payments` sits below `orders` in the layer diagram, so it must not
+        import it to mark the order paid. The signal inverts the direction — see
         `payments/events.py`.
     """
     signal = {
@@ -518,7 +520,7 @@ def transactions_for(reference_type: str, reference_id) -> list[PaymentTransacti
 
 
 def total_paid(reference_type: str, reference_id) -> Decimal:
-    """إجمالي المدفوع لمرجع — يدعم الدفع المقسّم."""
+    """The total paid against a reference — it supports split payment."""
     from django.db.models import Sum
 
     total = PaymentTransaction.objects.filter(

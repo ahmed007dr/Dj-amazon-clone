@@ -1,10 +1,11 @@
 """
-اختبارات الأرشفة.
+Sitemap tests.
 
-⚠️  هذه الشاشة الوحيدة التي **يقرأها آلي لا إنسان**.
+⚠️  This is the one screen **read by a machine, not a human**.
 
-    خطأ فيها لا يُكتشف بشكوى مستخدم: لا مستخدم يفتح `sitemap.xml`.
-    يُكتشف بعد شهور، حين يسأل أحدهم لماذا لا يظهر المتجر في جوجل.
+    An error in it is not discovered through a user complaint: no user opens
+    `sitemap.xml`. It is discovered months later, when somebody asks why the
+    store does not appear in Google.
 """
 
 from decimal import Decimal
@@ -72,7 +73,7 @@ def bundle(db):
 
 
 # ═══════════════════════════════════════════════════════════
-#  خريطة الموقع
+#  The sitemap
 # ═══════════════════════════════════════════════════════════
 
 
@@ -87,8 +88,8 @@ class TestSitemap:
 
     def test_excludes_restricted_product(self, catalog):
         """
-        ⚠️  المنتج المقيّد يعطي المزحف رفضًا — إدراجه ينتج روابط
-            مكسورة في Search Console وتسريبًا لما لا يُفترض عرضه.
+        ⚠️  A restricted product gives the crawler a refusal — including it
+            produces broken links in Search Console and leaks what is not meant to be shown.
         """
         body = APIClient().get(reverse("seo:sitemap")).content.decode()
 
@@ -106,7 +107,7 @@ class TestSitemap:
 
     def test_urls_point_at_the_frontend_not_the_api(self, settings, catalog):
         """
-        ⚠️  خريطة بمضيف الـ API تقود جوجل إلى JSON لا إلى صفحات.
+        ⚠️  A sitemap on the API host leads Google to JSON rather than to pages.
         """
         settings.FRONTEND_BASE_URL = "https://shop.example.com"
 
@@ -138,7 +139,7 @@ class TestSitemap:
 class TestRobots:
     def test_blocks_everything_when_indexing_is_disabled(self, settings):
         """
-        ⚠️  الافتراضي مغلق: بيئة تجريبية مفهرسة تنافس الموقع الحقيقي.
+        ⚠️  The default is off: an indexed staging environment competes with the real site.
         """
         settings.SEO_INDEXING_ENABLED = False
 

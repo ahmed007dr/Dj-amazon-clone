@@ -1,13 +1,13 @@
 """
-محوّلات بوابات الدفع.
+Payment gateway adapters.
 
-⚠️  **إضافة بوابة = محوّل هنا + تفعيلها من لوحة الأدمن.**
+⚠️  **Adding a gateway = an adapter here + enabling it from the admin panel.**
 
-    لا تعديل في `orders` ولا في `cart` ولا في أي نطاق آخر — كلها
-    تعرف `payments.services` فقط، لا أي بوابة بعينها. (ADR-15)
+    No change in `orders`, none in `cart`, and none in any other domain — all of
+    them know only `payments.services`, never a specific gateway. (ADR-15)
 
-⚠️  ولا بوابة **مثبتة في الكود**: السجل يُملأ وقت التشغيل، فبوابة
-    معطّلة تختفي من الخيارات بلا إعادة نشر.
+⚠️  And no gateway is **fixed in code**: the registry is populated at runtime,
+    so a disabled gateway disappears from the options with no redeployment.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ChargeResult:
-    """نتيجة محاولة تحصيل."""
+    """The result of a charge attempt."""
 
     success: bool
     provider_reference: str = ""
@@ -42,14 +42,14 @@ class RefundResult:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأحداث الواردة
+#  Inbound events
 # ═══════════════════════════════════════════════════════════
 
-#: النتائج التي يترجم إليها المحوّل حدثَ بوابته.
+#: The outcomes an adapter translates its gateway's event into.
 #:
-#: ⚠️  نصوص مجرّدة لا `TransactionStatus`: الطبقة هنا **لا تستورد
-#:     النماذج**. المحوّل يعرف عقد بوابته ولا يعرف كيف نخزّن الحالة،
-#:     والترجمة تقع في `payments.services` وحدها.
+#: ⚠️  Plain strings rather than `TransactionStatus`: this layer **does not
+#:     import the models**. The adapter knows its gateway's contract and does not
+#:     know how we store the status, and the translation lives in `payments.services` alone.
 AUTHORIZED = "AUTHORIZED"
 CAPTURED = "CAPTURED"
 FAILED = "FAILED"
@@ -62,42 +62,42 @@ OUTCOMES = frozenset({AUTHORIZED, CAPTURED, FAILED, PENDING, REFUNDED})
 @dataclass(frozen=True)
 class WebhookEnvelope:
     """
-    حدث وارد بعد ترجمته من لهجة البوابة إلى لغتنا.
+    An inbound event after translation from the gateway's dialect into ours.
 
-    ⚠️  `event_id` **يجب أن يكون فريدًا لكل تغيّر حالة** لا لكل
-        معاملة.
+    ⚠️  `event_id` **must be unique per status change**, not per transaction.
 
-        بوابة ترسل «صدر الرقم» ثم «دُفع» بنفس المعرّف تجعل الحدث
-        الثاني يبدو تكرارًا للأول — فيُهمَل، ويبقى الطلب غير مدفوع
-        بينما المال في الحساب.
+        A gateway sending "the number was issued" and then "paid" with the same
+        id makes the second event look like a repeat of the first — so it is
+        discarded, and the order stays unpaid while the money is in the account.
 
-    ⚠️  و`amount` ليس للعرض: يُقارَن بمبلغ معاملتنا قبل تعليمها
-        مدفوعة. توقيع صحيح على مبلغ مختلف يعني بوابة حصّلت غير ما
-        طلبناه — وهو ما لا يكشفه التحقّق من التوقيع وحده.
+    ⚠️  And `amount` is not for display: it is compared against our
+        transaction's amount before marking it paid. A valid signature on a
+        different amount means the gateway collected something other than what
+        we asked for — which signature verification alone does not reveal.
     """
 
     event_id: str
     event_type: str
     outcome: str
     signature: str = ""
-    #: مرجعنا نحن — `PaymentTransaction.reference`
+    #: Our own reference — `PaymentTransaction.reference`
     merchant_reference: str = ""
-    #: مرجع البوابة — يُستخدم حين يغيب مرجعنا
+    #: The gateway's reference — used when ours is absent
     provider_reference: str = ""
     amount: Decimal | None = None
 
 
 class PaymentAdapter(ABC):
     """
-    عقد المحوّل.
+    The adapter contract.
 
-    ⚠️  كل محوّل مسؤول عن **ألا يرفع استثناءً**.
+    ⚠️  Every adapter is responsible for **not raising**.
 
-        فشل البوابة حالة عمل متوقعة لا خطأ برمجي — رفع الاستثناء
-        يترك الطلب في حالة غامضة بين «دُفع» و«لم يُدفع».
+        A gateway failure is an expected business state, not a programming error
+        — raising leaves the order in an ambiguous state between "paid" and "not paid".
     """
 
-    #: يُسجَّل به في `PaymentProvider.adapter_key`
+    #: Registered under this in `PaymentProvider.adapter_key`
     key: str = ""
 
     def __init__(self, credentials: dict, *, sandbox: bool = True):
@@ -114,46 +114,46 @@ class PaymentAdapter(ABC):
 
     def verify_webhook(self, payload: dict, signature: str) -> bool:
         """
-        التحقق من توقيع الحدث الوارد.
+        Verifying the inbound event's signature.
 
-        ⚠️  الافتراضي `False` عمدًا.
+        ⚠️  The default is `False` deliberately.
 
-            محوّل لم ينفّذ التحقق يجب ألا يقبل أحداثًا — القبول
-            الافتراضي يعني أن أي طرف يستطيع تعليم طلب كمدفوع
-            بنداء واحد.
+            An adapter that has not implemented verification must accept no
+            events — accepting by default means any party can mark an order paid
+            with a single call.
         """
         return False
 
     def parse_webhook(self, *, payload: dict, params: dict) -> WebhookEnvelope | None:
         """
-        حمولة البوابة ← ظرف موحّد. `None` = لا يفهمها هذا المحوّل.
+        The gateway's payload ← a uniform envelope. `None` = this adapter does not understand it.
 
-        ⚠️  `params` معاملات الرابط لا الجسم — وليست ترفًا:
+        ⚠️  `params` are the URL parameters, not the body — and they are not a luxury:
 
-            Paymob ترسل التوقيع في **معامل رابط** (`?hmac=…`) بينما
-            Fawry ترسله داخل الجسم. محوّل يقرأ الجسم وحده يرفض كل
-            حدث من الأولى وهو صحيح.
+            Paymob sends the signature in a **URL parameter** (`?hmac=…`) while
+            Fawry sends it inside the body. An adapter reading the body alone
+            rejects every event from the first while it is perfectly valid.
 
-        ⚠️  والافتراضي `None` كنظيره في `verify_webhook`: محوّل لم
-            ينفّذ القراءة لا يستقبل شيئًا.
+        ⚠️  And the default is `None`, like its counterpart in `verify_webhook`:
+            an adapter that has not implemented reading receives nothing.
         """
         return None
 
 
 # ═══════════════════════════════════════════════════════════
-#  الدفع عند الاستلام
+#  Cash on delivery
 # ═══════════════════════════════════════════════════════════
 
 
 class CashOnDeliveryAdapter(PaymentAdapter):
     """
-    دفع عند الاستلام.
+    Cash on delivery.
 
-    ⚠️  لا تحصيل الآن — المال يُقبض عند التسليم.
+    ⚠️  No capture now — the money is taken on delivery.
 
-        المعاملة تُسجَّل بحالة `PENDING` وتُحصَّل يدويًا عند
-        التسليم. تعليمها `CAPTURED` فورًا يعني إيرادًا وهميًا في
-        كل تقرير مالي.
+        The transaction is recorded as `PENDING` and captured by hand on
+        delivery. Marking it `CAPTURED` immediately means phantom revenue in
+        every financial report.
     """
 
     key = "cash_on_delivery"
@@ -166,7 +166,7 @@ class CashOnDeliveryAdapter(PaymentAdapter):
         )
 
     def refund(self, *, provider_reference, amount, reason):
-        # لم يُقبض مال — لا استرداد فعلي
+        # No money was taken — there is no real refund
         return RefundResult(
             success=True,
             provider_reference=f"COD-REFUND-{provider_reference}",
@@ -175,7 +175,7 @@ class CashOnDeliveryAdapter(PaymentAdapter):
 
 
 class CashAdapter(PaymentAdapter):
-    """نقدي على الكاونتر — لنقطة البيع. التحصيل فوري وحقيقي."""
+    """Cash at the counter — for the point of sale. The capture is immediate and real."""
 
     key = "cash"
 
@@ -195,7 +195,7 @@ class CashAdapter(PaymentAdapter):
 
 
 class BankTransferAdapter(PaymentAdapter):
-    """تحويل بنكي — يُؤكَّد يدويًا بعد مراجعة الحساب."""
+    """Bank transfer — confirmed by hand after reviewing the account."""
 
     key = "bank_transfer"
 
@@ -215,7 +215,7 @@ class BankTransferAdapter(PaymentAdapter):
 
 
 # ═══════════════════════════════════════════════════════════
-#  السجل
+#  The registry
 # ═══════════════════════════════════════════════════════════
 
 _REGISTRY: dict[str, type[PaymentAdapter]] = {}
@@ -241,16 +241,16 @@ register(CashAdapter)
 register(BankTransferAdapter)
 
 # ═══════════════════════════════════════════════════════════
-#  البوابات الخارجية — Paymob · Fawry  (قاعدة العمل ٦، 2026-08-14)
+#  External gateways — Paymob · Fawry  (business rule 6, 2026-08-14)
 # ═══════════════════════════════════════════════════════════
 #
-#  ⚠️  الاستيراد **في آخر الملف** لا في رأسه.
+#  ⚠️  The import is **at the end of the file**, not at its top.
 #
-#      المحوّلان يستوردان `register` و`PaymentAdapter` من هنا؛
-#      استيرادهما في الأعلى قبل تعريفهما يرفع `ImportError` عند
-#      إقلاع Django — وهو فشل يظهر كخطأ استيراد غامض لا كسبب حقيقي.
+#      The two adapters import `register` and `PaymentAdapter` from here;
+#      importing them at the top before those are defined raises `ImportError`
+#      at Django startup — a failure that surfaces as an obscure import error rather than its real cause.
 #
-#  ⚠️  ولم يُختبرا مقابل حساب حقيقي بعد.
-#      انظر التحذير الكامل في `payments/gateways/__init__.py`.
+#  ⚠️  And they have not been tested against a real account yet.
+#      See the full warning in `payments/gateways/__init__.py`.
 
-from payments.gateways import fawry, paymob  # noqa: E402,F401  (تسجيل ذاتي)
+from payments.gateways import fawry, paymob  # noqa: E402,F401  (self-registration)

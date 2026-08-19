@@ -1,11 +1,12 @@
 """
-واجهات التقارير — **قراءة فقط**.
+Reporting endpoints — **read-only**.
 
-⚠️  لا نقطة كتابة واحدة هنا. التقرير يعكس ما وقع، ولا يغيّره.
+⚠️  There is not one write endpoint here. A report reflects what happened; it
+    does not change it.
 
-⚠️  والصلاحية **صريحة**: التقارير تكشف المبيعات والأرباح وأداء
-    كل موظف بالاسم. جعلها تابعة لدخول اللوحة يفتحها لمن يفتحها
-    لسبب آخر تمامًا.
+⚠️  And the permission is **explicit**: the reports reveal sales, profits and
+    every employee's performance by name. Tying them to panel access opens them
+    to anyone who opened it for an entirely different reason.
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ def _period(request) -> tuple[date, date]:
 
 
 class OverviewAPI(APIView):
-    """اللوحة الجامعة — المبيعات والربح والمخزون معًا."""
+    """The combined dashboard — sales, profit and stock together."""
 
     permission_classes = [CanViewReports]
 
@@ -48,11 +49,11 @@ class OverviewAPI(APIView):
 
 def _positive_int(request, name: str, default: int, ceiling: int) -> int:
     """
-    ⚠️  الحدّ **مسقوف**.
+    ⚠️  The limit is **capped**.
 
-        `?limit=100000` على جدول سطور الطلبات استعلامٌ يشلّ القاعدة،
-        ولا شاشة تعرض مئة ألف صف. السقف يجعل النقطة غير قابلة
-        للاستخدام كأداة إنهاك.
+        `?limit=100000` against the order lines table is a query that paralyses
+        the database, and no screen displays a hundred thousand rows. The cap
+        makes the endpoint unusable as an exhaustion tool.
     """
     raw = request.query_params.get(name)
     if raw is None:
@@ -129,12 +130,13 @@ class CustomersReportAPI(APIView):
 
 class PeakHoursAPI(APIView):
     """
-    أوقات الضغط — خريطة ٧×٢٤.
+    Peak hours — a 7×24 map.
 
-    ⚠️  تحت **نفس صلاحية التقارير** لا مجرد دخول اللوحة.
+    ⚠️  Under **the same reporting permission**, not mere panel access.
 
-        منحنى الحركة يكشف حجم النشاط بدقة الساعة — وهو ما مُنع
-        تسريبه في الترقيم حين حُذف `count` منه (ADR-32).
+        The traffic curve reveals the size of the business at hour resolution —
+        exactly what was blocked from leaking in pagination when `count` was
+        removed from it (ADR-32).
     """
 
     permission_classes = [CanViewReports]
@@ -145,7 +147,7 @@ class PeakHoursAPI(APIView):
 
 
 class PerformanceReportAPI(APIView):
-    """أداء الموظفين والموردين معًا — طرفا الحركة التجارية."""
+    """Employee and supplier performance together — the two ends of commercial activity."""
 
     permission_classes = [CanViewReports]
 

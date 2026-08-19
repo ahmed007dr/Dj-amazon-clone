@@ -1,4 +1,4 @@
-"""عقود التقييمات."""
+"""Review contracts."""
 
 from rest_framework import serializers
 
@@ -7,10 +7,10 @@ from reviews.models import Review
 
 class ReviewSerializer(serializers.ModelSerializer):
     """
-    التقييم كما يراه العامة.
+    The review as the public sees it.
 
-    ⚠️  اسم المُقيِّم مختصر — لا بريد ولا معرّف.
-        صفحة منتج عامة لا تكشف هوية المشترين.
+    ⚠️  The reviewer's name is abbreviated — no email and no id.
+        A public product page does not reveal the buyers' identities.
     """
 
     author = serializers.SerializerMethodField()
@@ -31,7 +31,7 @@ class ReviewSerializer(serializers.ModelSerializer):
         ]
 
     def get_author(self, obj) -> str:
-        """الاسم الأول والحرف الأول من الأخير — «أحمد م.»"""
+        """The first name and the initial of the surname — «Ahmed M.»"""
         first = (obj.user.first_name or "").strip()
         last = (obj.user.last_name or "").strip()
 
@@ -46,9 +46,9 @@ class ReviewSerializer(serializers.ModelSerializer):
 
 class ReviewWriteSerializer(serializers.ModelSerializer):
     """
-    ⚠️  `status` غير قابل للكتابة.
+    ⚠️  `status` is not writable.
 
-    السماح به يعني أن العميل ينشر تقييمه بنفسه متجاوزًا المراجعة.
+    Allowing it means the customer publishes their own review, bypassing moderation.
     """
 
     class Meta:
@@ -60,7 +60,7 @@ class ReviewWriteSerializer(serializers.ModelSerializer):
         request = self.context["request"]
         product = attrs.get("product") or getattr(self.instance, "product", None)
 
-        # تقييم واحد لكل مستخدم لكل منتج
+        # One review per user per product
         existing = Review.all_objects.filter(
             product=product, user=request.user, deleted_at__isnull=True
         )
@@ -76,7 +76,7 @@ class ReviewWriteSerializer(serializers.ModelSerializer):
 
 
 class AdminReviewSerializer(serializers.ModelSerializer):
-    """نسخة الأدمن — تكشف الهوية الكاملة للمراجعة."""
+    """The admin version — it exposes the full identity for moderation."""
 
     user_email = serializers.EmailField(source="user.email", read_only=True)
     product_sku = serializers.CharField(source="product.sku", read_only=True)

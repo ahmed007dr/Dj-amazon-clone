@@ -1,14 +1,15 @@
 """
-اختبارات نقطة البيع.
+Point-of-sale tests.
 
-⚠️  بوابة الخروج للمرحلة ٧:
+⚠️  The exit gate for phase 7:
 
-        إغلاق وردية **يوازن حسابيًا** · لا بيع بمخزون غير متاح ·
-        كل عملية POS تنتج `Order` قابلًا للتتبع في نفس نظام الطلبات.
+        closing a shift **balances arithmetically** · no selling from
+        unavailable stock · every POS operation produces an `Order` traceable in
+        the same orders system.
 
-    الاختبارات هنا تحرس الثلاثة، وتحرس ما هو أدقّ منها: أن الفرق
-    النقدي يُحسب من **حركات الصندوق** لا من المبيعات — وإلا اتُّهم
-    الكاشير بعجز يساوي كل مبيعات البطاقات.
+    The tests here guard all three, and something finer still: that the cash
+    discrepancy is computed from **the drawer movements**, not from the sales —
+    or the cashier is accused of a shortfall equal to every card sale.
 """
 
 from decimal import Decimal
@@ -23,6 +24,7 @@ from catalog.models import Category, Product
 from core.errors import BusinessError
 from core.models.settings import SystemSetting
 from core.models.tax import TaxClass
+from core.testing import grant_all_domains
 from inventory import services as inventory_services
 from inventory.models import LocationKind, StockLocation
 from orders.models import Order, OrderChannel, OrderStatus, PaymentStatus
@@ -33,7 +35,7 @@ PASSWORD = "Str0ng-Test-Pass!23"
 
 
 # ═══════════════════════════════════════════════════════════
-#  التجهيز
+#  Setup
 # ═══════════════════════════════════════════════════════════
 
 
@@ -75,16 +77,17 @@ def manager(db):
     user.is_active = True
     user.save()
     AdminProfile.objects.create(user=user)
+    grant_all_domains(user)
     return user
 
 
 @pytest.fixture
 def tax_free(db):
     """
-    ⚠️  ضريبة صفرية في الاختبارات المالية عمدًا.
+    ⚠️  Zero tax in the financial tests deliberately.
 
-        الأرقام المستديرة تجعل فشل التسوية مقروءًا: «توقّعت ١٠٠
-        وعددت ٩٠» أوضح من «١١٤.٠٠ مقابل ١٠٢.٦٠».
+        Round numbers make a failed reconciliation legible: "expected 100 and
+        counted 90" is clearer than "114.00 against 102.60".
     """
     SystemSetting.set("tax.enabled", False, value_type="BOOL", label_ar="ض", label_en="t")
     TaxClass.objects.create(
@@ -109,11 +112,11 @@ def product(db, tax_free, location):
 @pytest.fixture(autouse=True)
 def pos_payment_providers(db):
     """
-    ⚠️  بوابتا الكاونتر — **تجهيز صريح لا اعتماد على البذرة**.
+    ⚠️  The two counter gateways — **set up explicitly rather than relying on the seed**.
 
-        الاختبار الذي يعتمد على `seed_dev` يفشل حين تتغيّر البذرة
-        لسبب لا علاقة له بنقطة البيع، ورسالة الفشل («طريقة الدفع
-        غير متاحة») لا تدلّ على السبب إطلاقًا.
+        A test relying on `seed_dev` fails when the seed changes for a reason
+        unrelated to point of sale, and the failure message ("payment method
+        unavailable") gives no hint of the cause at all.
     """
     from payments.models import PaymentMethodKind, PaymentProvider
 
@@ -155,7 +158,7 @@ def card(amount: str):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الوردية
+#  The shift
 # ═══════════════════════════════════════════════════════════
 
 
@@ -163,8 +166,8 @@ def card(amount: str):
 class TestSession:
     def test_only_one_open_session_per_register(self, register, cashier, session):
         """
-        ⚠️  جهاز بورديتين مفتوحتين يعني بيعات تُنسب لأيّهما شاء
-            الاستعلام — وتسوية لا توازن أبدًا.
+        ⚠️  A register with two open shifts means sales attributed to whichever
+            the query prefers — and a reconciliation that never balances.
         """
         with pytest.raises(BusinessError):
             services.open_session(register, cashier)
@@ -184,8 +187,8 @@ class TestSession:
 
     def test_closed_session_cannot_close_twice(self, session, cashier):
         """
-        ⚠️  الإغلاق المكرر كان سيعيد كتابة `expected_cash` بلقطة
-            جديدة، فتتغيّر تسوية مُعتمدة بأثر رجعي.
+        ⚠️  A repeated close would have rewritten `expected_cash` with a fresh
+            snapshot, changing an approved reconciliation retroactively.
         """
         services.close_session(session, counted_cash=Decimal("200.00"), closed_by=cashier)
 
@@ -200,7 +203,7 @@ class TestSession:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التسوية النقدية — بوابة الخروج
+#  Cash reconciliation — the exit gate
 # ═══════════════════════════════════════════════════════════
 
 
@@ -208,7 +211,7 @@ class TestSession:
 class TestCashReconciliation:
     def test_a_perfect_shift_balances_to_zero(self, session, product, cashier):
         """
-        ⚠️  **بوابة الخروج الأولى:** إغلاق وردية يوازن حسابيًا.
+        ⚠️  **The first exit gate:** closing a shift balances arithmetically.
         """
         services.checkout(session, [services.SaleLine(product, 2)], [cash("100.00")])
 
@@ -220,18 +223,18 @@ class TestCashReconciliation:
 
     def test_card_sales_do_not_count_as_cash(self, session, product, cashier):
         """
-        ⚠️  **الفخّ الأخطر في التسوية.**
+        ⚠️  **The most dangerous trap in the reconciliation.**
 
-            بيعة بالبطاقة لا تضع نقدًا في الدرج. حسابها ضمن
-            المتوقَّع يُنتج عجزًا وهميًا بحجم كل مبيعات البطاقات —
-            ويُتَّهم الكاشير بما لم يفعله.
+            A card sale puts no cash in the drawer. Counting it in the expected
+            figure produces a phantom shortfall the size of all card sales — and
+            the cashier is accused of something they did not do.
         """
         services.checkout(session, [services.SaleLine(product, 2)], [card("100.00")])
 
         assert services.expected_cash_for(session) == Decimal("200.00"), "الافتتاحي وحده"
 
     def test_split_payment_counts_only_the_cash_part(self, session, product, cashier):
-        """نصفها نقدًا ونصفها بالبطاقة — حالة يومية على الكاونتر."""
+        """Half in cash and half by card — a daily occurrence at the counter."""
         services.checkout(
             session,
             [services.SaleLine(product, 4)],
@@ -252,15 +255,15 @@ class TestCashReconciliation:
 
     def test_shortage_above_threshold_requires_an_explanation(self, session, cashier):
         """
-        ⚠️  فرق بلا تفسير يتراكم شهورًا ثم يُكتشف كعجز لا يعرف أحد
-            مصدره — والتفسير وقت الإغلاق هو الوقت الوحيد الذي
-            يتذكّر فيه الكاشير ما جرى.
+        ⚠️  A discrepancy with no explanation accumulates for months and is then
+            discovered as a shortfall nobody can trace — and closing time is the
+            only moment the cashier still remembers what happened.
         """
         with pytest.raises(BusinessError) as failure:
             services.close_session(session, counted_cash=Decimal("100.00"), closed_by=cashier)
 
-        # ⚠️  `error_detail` لا `str(exc)`: الثاني يعيد رسالة الكتالوج
-        #     العامة، والتفصيل هو ما يقرأه الكاشير فعلًا.
+        # ⚠️  `error_detail`, not `str(exc)`: the latter returns the generic catalogue
+        #     message, and the detail is what the cashier actually reads.
         assert "التفسير إلزامي" in failure.value.error_detail
 
     def test_shortage_with_an_explanation_is_accepted(self, session, cashier):
@@ -275,13 +278,13 @@ class TestCashReconciliation:
         assert closed.variance_note
 
     def test_small_difference_needs_no_explanation(self, session, cashier):
-        """فكّة ناقصة بجنيهات ليست حادثة تستحق تحقيقًا."""
+        """Change short by a few pounds is not an incident deserving an investigation."""
         closed = services.close_session(session, counted_cash=Decimal("195.00"), closed_by=cashier)
         assert closed.variance == Decimal("-5.00")
 
     def test_variance_is_none_before_closing(self, session):
         """
-        ⚠️  الصفر يُقرأ «وازنت»، والوردية المفتوحة لم تُعدّ بعد.
+        ⚠️  Zero reads as "it balanced", and an open shift has not been counted yet.
         """
         assert session.variance is None
 
@@ -299,7 +302,7 @@ class TestCashReconciliation:
 
 
 # ═══════════════════════════════════════════════════════════
-#  البيع — بوابة الخروج
+#  Selling — the exit gate
 # ═══════════════════════════════════════════════════════════
 
 
@@ -307,11 +310,11 @@ class TestCashReconciliation:
 class TestCheckout:
     def test_a_sale_produces_a_normal_order(self, session, product):
         """
-        ⚠️  **بوابة الخروج الثالثة:** كل عملية POS تنتج `Order`
-            قابلًا للتتبع في نفس نظام الطلبات.
+        ⚠️  **The third exit gate:** every POS operation produces an `Order`
+            traceable in the same orders system.
 
-            النموذج الموازي كان سينتج تقريرَي مبيعات ومخزونين
-            ومصدرَي حقيقة.
+            A parallel model would have produced two sales reports, two stock
+            figures and two sources of truth.
         """
         result = services.checkout(session, [services.SaleLine(product, 2)], [cash("100.00")])
 
@@ -324,7 +327,7 @@ class TestCheckout:
 
     def test_stock_is_deducted_immediately(self, session, product, location):
         """
-        ⚠️  بلا حجز — البيع على الكاونتر لحظي والبضاعة تُسلَّم فورًا.
+        ⚠️  With no reservation — a counter sale is instantaneous and the goods are handed over at once.
         """
         before = inventory_services.available_quantity(product, location=location)
 
@@ -334,14 +337,14 @@ class TestCheckout:
         assert after == before - 3
 
     def test_selling_more_than_available_is_rejected(self, session, product):
-        """⚠️  **بوابة الخروج الثانية:** لا بيع بمخزون غير متاح."""
+        """⚠️  **The second exit gate:** no selling from unavailable stock."""
         with pytest.raises(BusinessError):
             services.checkout(session, [services.SaleLine(product, 500)], [cash("25000.00")])
 
     def test_a_rejected_sale_leaves_no_order_and_no_stock_change(self, session, product, location):
         """
-        ⚠️  المعاملة ذرّية: نفاد صنف في منتصف بيعة لا يترك طلبًا
-            يتيمًا ولا مخزونًا مخصومًا جزئيًا.
+        ⚠️  The transaction is atomic: an item running out mid-sale leaves no
+            orphan order and no partially deducted stock.
         """
         before = inventory_services.available_quantity(product, location=location)
         orders_before = Order.objects.count()
@@ -354,8 +357,8 @@ class TestCheckout:
 
     def test_payments_must_equal_the_total_exactly(self, session, product):
         """
-        ⚠️  الأقل يعني بيعة غير مسدَّدة تُسجَّل كمكتملة؛ والأكثر
-            يعني فائضًا لا يعرف النظام أين يذهب.
+        ⚠️  Less means an unsettled sale recorded as complete; more means a
+            surplus the system does not know where to put.
         """
         for amount in ("90.00", "110.00"):
             with pytest.raises(BusinessError) as failure:
@@ -364,9 +367,9 @@ class TestCheckout:
 
     def test_discount_above_the_cap_is_rejected(self, session, product):
         """
-        ⚠️  قاعدة العمل ١١ — الافتراضي صفر: لا خصم بلا اعتماد.
-            الافتراضي المتساهل يفتح بابًا يصعب إغلاقه بعد أن يعتاده
-            الكاشير.
+        ⚠️  Business rule 11 — the default is zero: no discount without
+            approval. A permissive default opens a door that is hard to close
+            once the cashier has grown used to it.
         """
         with pytest.raises(BusinessError) as failure:
             services.checkout(
@@ -402,15 +405,15 @@ class TestCheckout:
 
     def test_a_walk_in_sale_needs_no_customer(self, session, product):
         """
-        ⚠️  البيع على الكاونتر لا يستلزم حسابًا — الطلب بلا مالك
-            هو الحال الطبيعي في متجر فعلي لا نقص في البيانات.
+        ⚠️  A counter sale requires no account — an order with no owner is the
+            normal case in a physical shop, not missing data.
         """
         result = services.checkout(session, [services.SaleLine(product, 1)], [cash("50.00")])
         assert result.order.customer is None
 
 
 # ═══════════════════════════════════════════════════════════
-#  المرتجع
+#  Returns
 # ═══════════════════════════════════════════════════════════
 
 
@@ -418,8 +421,8 @@ class TestCheckout:
 class TestRefund:
     def test_refund_returns_stock_and_marks_the_order(self, session, product, location, manager):
         """
-        ⚠️  **لا حذف.** البيعة وقعت وضريبتها حُصّلت؛ حذفها يمحو
-            الاثنين من تقرير اليوم.
+        ⚠️  **No deletion.** The sale happened and its tax was collected;
+            deleting it erases both from the day's report.
         """
         result = services.checkout(session, [services.SaleLine(product, 2)], [cash("100.00")])
         after_sale = inventory_services.available_quantity(product, location=location)
@@ -438,8 +441,8 @@ class TestRefund:
 
     def test_cash_refund_leaves_the_drawer(self, session, product, manager):
         """
-        ⚠️  النقد المُعاد يخرج بحركة مسجَّلة — وإلا بدا الفرق عجزًا
-            عند الإغلاق.
+        ⚠️  The cash returned leaves as a recorded movement — or the discrepancy
+            looks like a shortfall at closing.
         """
         result = services.checkout(session, [services.SaleLine(product, 2)], [cash("100.00")])
         assert services.expected_cash_for(session) == Decimal("300.00")
@@ -464,14 +467,14 @@ class TestRefund:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الواجهة والصلاحيات
+#  The interface and permissions
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
 class TestPermissions:
     def test_a_customer_cannot_touch_pos(self, db):
-        """⚠️  نقطة البيع أداة داخلية — العميل لا يصل إليها مهما كان."""
+        """⚠️  Point of sale is an internal tool — a customer never reaches it under any circumstances."""
         customer = User.objects.create_user(email="c-pos@test.local", password=PASSWORD)
         customer.is_active = True
         customer.save()
@@ -484,8 +487,8 @@ class TestPermissions:
 
     def test_cashier_cannot_refund(self, session, cashier, product):
         """
-        ⚠️  الافتراضي الأشدّ حتى تُحسم قاعدة العمل ١١: توسيعه قرار
-            يُتخذ صراحةً لا يُورَث من افتراضي متساهل.
+        ⚠️  The stricter default until business rule 11 is settled: widening it
+            is a decision taken explicitly, not inherited from a permissive default.
         """
         result = services.checkout(session, [services.SaleLine(product, 1)], [cash("50.00")])
 
@@ -503,10 +506,11 @@ class TestPermissions:
         self, register, session, product, db
     ):
         """
-        ⚠️  الوردية تُستخرج من **المستخدم** لا من مُعامل الطلب.
+        ⚠️  The shift is derived from **the user**, not from a request parameter.
 
-            قبولها كمعرّف يعني كاشيرًا يسجّل بيعة على وردية زميله،
-            فتُنسب النقدية للشخص الخطأ ولا توازن أي تسوية.
+            Accepting it as an id means a cashier recording a sale on a
+            colleague's shift, so the cash is attributed to the wrong person and
+            no reconciliation balances.
         """
         other = User.objects.create_user(
             email="other-cashier@test.local",
@@ -527,7 +531,7 @@ class TestPermissions:
             },
             format="json",
         )
-        # لا وردية مفتوحة لهذا المستخدم — لا يرث وردية غيره
+        # No open shift for this user — they do not inherit someone else's shift
         assert response.status_code == 409
 
     def test_full_flow_through_the_api(self, register, cashier, product):
@@ -560,8 +564,9 @@ class TestPermissions:
 
     def test_expected_cash_is_hidden_until_closing(self, session, cashier):
         """
-        ⚠️  عرض المتوقَّع قبل العدّ يجعل الكاشير يعدّ حتى يطابقه —
-            فتصير التسوية شكلية والفرق صفرًا دائمًا.
+        ⚠️  Showing the expected figure before the count makes the cashier count
+            until it matches — so the reconciliation becomes a formality and the
+            discrepancy is always zero.
         """
         client = APIClient()
         client.force_authenticate(user=cashier)
@@ -572,7 +577,7 @@ class TestPermissions:
 
 
 # ═══════════════════════════════════════════════════════════
-#  البحث والتسعير — ما تراه شاشة الكاشير
+#  Search and pricing — what the cashier's screen sees
 # ═══════════════════════════════════════════════════════════
 
 
@@ -587,10 +592,10 @@ def cashier_client(cashier):
 class TestProductSearch:
     def test_barcode_returns_an_exact_match_only(self, cashier_client, product):
         """
-        ⚠️  الماسح يرسل رقمًا كاملًا.
+        ⚠️  The scanner sends a complete number.
 
-            مطابقته جزئيًا تعيد أصنافًا يشترك رقمها في مقطع —
-            فيضيف الكاشير الصنف الخطأ بضغطة واحدة ولا يلاحظ.
+            Matching it partially returns items whose numbers share a segment —
+            so the cashier adds the wrong item with one press and does not notice.
         """
         product.barcode = "6221001"
         product.save()
@@ -615,11 +620,12 @@ class TestProductSearch:
 
     def test_restricted_products_are_visible_to_the_cashier(self, cashier_client, product):
         """
-        ⚠️  **بلا فلترة سياسات — وهذا مقصود.**
+        ⚠️  **No policy filtering — and that is deliberate.**
 
-            الصيدلي على الكاونتر يبيع المقيّد قانونًا. إخفاؤه عن
-            جهازه يعني أن يسجّله يدويًا أو لا يسجّله، وفي الحالتين
-            ينهار المخزون. الحاجز هنا `CanOperatePOS` لا السياسة.
+            The pharmacist at the counter sells the restricted item lawfully.
+            Hiding it from their terminal means they record it by hand or not at
+            all, and either way the stock falls apart. The barrier here is
+            `CanOperatePOS`, not the policy.
         """
         from django.core.management import call_command
 
@@ -654,11 +660,11 @@ class TestProductSearch:
 class TestQuote:
     def test_quote_total_equals_what_checkout_charges(self, cashier_client, session, product):
         """
-        ⚠️  **هذا هو الاختبار الذي يبرّر وجود النقطة.**
+        ⚠️  **This is the test that justifies the endpoint's existence.**
 
-            الرقم المعروض والرقم المحصَّل يخرجان من نفس الدالة.
-            انفصالهما يظهر أولًا كفرق بين الشاشة والإيصال — والعميل
-            هو من يكتشفه.
+            The figure displayed and the figure charged come out of the same
+            function. Their divergence first shows up as a difference between
+            the screen and the receipt — and the customer is the one who finds it.
         """
         payload = {"lines": [{"product": str(product.pk), "quantity": 3}]}
 
@@ -676,7 +682,7 @@ class TestQuote:
         assert sale.data["order"]["grand_total"] == total
 
     def test_quote_changes_nothing(self, cashier_client, session, product):
-        """لا مخزون يُخصم ولا طلب يُنشأ — التسعير بلا أثر."""
+        """No stock deducted and no order created — pricing with no effect."""
         before = Order.objects.count()
 
         cashier_client.post(
@@ -692,10 +698,11 @@ class TestQuote:
         self, cashier_client, session, product
     ):
         """
-        ⚠️  الرفض عند الإدخال لا عند آخر ضغطة.
+        ⚠️  Refusal at entry, not on the last press.
 
-            تركه للإتمام وحده يجعل الكاشير يبني بيعة كاملة أمام
-            العميل ثم يُرفض — والأصل أن يُمنع الخصم لحظة إدخاله.
+            Leaving it to checkout alone makes the cashier build a whole sale in
+            front of the customer and then be refused — when the discount should
+            be blocked the moment it is entered.
         """
         response = cashier_client.post(
             reverse("v1:pos:quote"),
@@ -734,7 +741,7 @@ class TestQuote:
 
 @pytest.mark.django_db
 def test_cash_movements_are_append_only(session):
-    """التصحيح بحركة معاكسة لا بتحرير — السجل أساس التسوية."""
+    """Corrections go through an offsetting movement, not an edit — the log is the basis of the reconciliation."""
     movement = services.record_cash(
         session, kind=CashMovementKind.PAY_IN, amount=Decimal("10.00"), reason="فكّة"
     )
@@ -746,7 +753,7 @@ def test_cash_movements_are_append_only(session):
 
 @pytest.mark.django_db
 def test_session_closed_event_fires(session, cashier):
-    """المالية في المرحلة ٨ تستمع لهذا الحدث لتقيّد النقد."""
+    """Finance in phase 8 listens for this event to post the cash."""
     from pos.events import pos_session_closed
 
     received = []
@@ -765,22 +772,59 @@ def test_session_closed_event_fires(session, cashier):
 
 
 # ═══════════════════════════════════════════════════════════
-#  إدارة الكاونترات — من اللوحة
+#  Managing registers — from the panel
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.fixture
 def manager_client(manager):
+    """
+    ⚠️  **The admin profile no longer opens anything on its own.**
+
+        After the gates were tightened, reviewing shifts and managing registers
+        require `pos.view_possession` explicitly; and a manager with no grants
+        is answered with 403 — which is exactly the intended behaviour.
+    """
+    from django.contrib.auth.models import Permission
+
+    manager.user_permissions.add(
+        Permission.objects.get(content_type__app_label="pos", codename="view_possession")
+    )
+
     client = APIClient()
     client.force_authenticate(user=manager)
     return client
 
 
 @pytest.mark.django_db
+def test_a_manager_without_the_permission_is_refused(db):
+    """
+    ⚠️  The gate is tested from the refusal side as well: a grant opens, and its absence closes.
+
+    ⚠️  And a dedicated user rather than the `manager` fixture: that one grants
+        the domains in full (feature tests do not test the gate), so it cannot
+        prove a denial.
+    """
+    from administration.models import AdminProfile
+
+    user = User.objects.create_user(
+        email="pos-bare@test.local", password=PASSWORD, account_type=AccountType.ADMIN
+    )
+    user.is_active = True
+    user.save()
+    AdminProfile.objects.create(user=user)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    assert client.get(reverse("v1:pos:admin-registers")).status_code == 403
+
+
+@pytest.mark.django_db
 class TestRegisterAdmin:
     """
-    ⚠️  بوابة الخروج: الكاونتر يُنشأ ويُعدَّل ويُوقَف **من الشاشة**،
-        ولا يُحذف، ولا يُنقل ووردية مفتوحة عليه.
+    ⚠️  The exit gate: a register is created, edited and disabled **from the
+        screen**, is never deleted, and is not moved while a shift is open on it.
     """
 
     def test_creating_a_register_from_the_panel(self, manager_client, location):
@@ -814,8 +858,8 @@ class TestRegisterAdmin:
 
     def test_an_open_session_blocks_deactivation(self, manager_client, register, session):
         """
-        ⚠️  إيقاف كاونتر بوردية مفتوحة يترك نقدًا في درج لا يظهر
-            في أي شاشة، ولا سبيل لإقفاله بعدها من البوابة.
+        ⚠️  Disabling a register with an open shift leaves cash in a drawer that
+            appears on no screen, with no way to close it from the portal afterwards.
         """
         response = manager_client.patch(
             reverse("v1:pos:admin-register-detail", args=[register.pk]),
@@ -831,9 +875,9 @@ class TestRegisterAdmin:
         self, manager_client, register, session, db
     ):
         """
-        ⚠️  النقل أثناء وردية يجعل نصف البيعات تخصم من فرع والنصف
-            الآخر من فرع ثانٍ — ولا شيء في الدفتر يقول أين وقع
-            الانقسام.
+        ⚠️  Moving it mid-shift makes half the sales deduct from one branch and
+            the other half from a second — and nothing in the ledger says where
+            the split happened.
         """
         other = StockLocation.objects.create(
             code="branch-2",
@@ -852,7 +896,7 @@ class TestRegisterAdmin:
         assert response.status_code == 409
 
     def test_a_closed_register_still_moves(self, manager_client, register, location):
-        """⚠️  المنع مشروط بالوردية المفتوحة لا بوجود تاريخ."""
+        """⚠️  The block is conditioned on an open shift, not on having any history."""
         other = StockLocation.objects.create(
             code="branch-3",
             name_ar="فرع ثالث",
@@ -870,7 +914,7 @@ class TestRegisterAdmin:
         assert response.status_code == 200
 
     def test_the_register_is_never_deleted(self, manager_client, register):
-        """⚠️  كل وردية تشير إليه — والحذف يقطع تاريخ الفرع."""
+        """⚠️  Every shift points at it — and deleting severs the branch's history."""
         response = manager_client.delete(
             reverse("v1:pos:admin-register-detail", args=[register.pk])
         )

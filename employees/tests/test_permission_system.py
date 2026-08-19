@@ -251,8 +251,9 @@ class TestDeploymentSafetyNet:
         """
         ⚠️  Without this command **every existing admin** loses access the moment it deploys.
         """
-        from django.core.management import call_command
         from io import StringIO
+
+        from django.core.management import call_command
 
         admin = make_admin("existing@test.local")
         client = client_for(admin)
@@ -269,8 +270,9 @@ class TestDeploymentSafetyNet:
         ⚠️  Finance, suppliers and loyalty were already guarded by explicit
             permissions — granting them here would have turned a tightening into a widening.
         """
-        from django.core.management import call_command
         from io import StringIO
+
+        from django.core.management import call_command
 
         admin = make_admin("existing2@test.local")
         call_command("grant_admin_permissions", stdout=StringIO())
@@ -286,8 +288,9 @@ class TestDeploymentSafetyNet:
     def test_the_owner_is_left_out_of_the_group(self, db):
         """⚠️  The owner passes by definition; including them conflates who holds
             by office with who holds by grant."""
-        from django.core.management import call_command
         from io import StringIO
+
+        from django.core.management import call_command
 
         owner = make_admin("boss4@test.local", owner=True)
         call_command("grant_admin_permissions", stdout=StringIO())

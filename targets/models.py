@@ -1,17 +1,17 @@
 """
-أهداف المبيعات الشهرية.
+Monthly sales targets.
 
-⚠️  **هدف لكل شهر — لا هدف دائم واحد.**
+⚠️  **A target per month — not one permanent target.**
 
-    الهدف الدائم يجعل شهر رمضان وشهر أغسطس متساويين في التقييم،
-    ويجعل رفع الهدف يُعيد كتابة تاريخ كل شهر مضى. كل شهر فترة
-    أداء مستقلة تُقفَل ولا تُعاد كتابتها.
+    A permanent target makes Ramadan and August equal in assessment, and makes
+    raising the target rewrite the history of every month past. Each month is an
+    independent performance period that is closed and never rewritten.
 
-⚠️  و**نوع الهدف حقل لا فرع في الكود**.
+⚠️  And **the target type is a field, not a branch in the code**.
 
-    المطلوب دعم أنواع متعددة بلا إعادة بناء: مبيعات · صافي ·
-    ربح · عدد طلبات · عدد عملاء. تثبيت «المبيعات» في البنية يجعل
-    إضافة «الربح» لاحقًا تمسّ كل استعلام.
+    The requirement is to support several types with no rebuild: sales · net ·
+    profit · order count · customer count. Fixing "sales" into the structure
+    makes adding "profit" later touch every query.
 """
 
 from __future__ import annotations
@@ -28,12 +28,12 @@ from core.money import ZERO, RateField
 
 class TargetType(models.TextChoices):
     """
-    ما الذي يُقاس.
+    What is measured.
 
-    ⚠️  القيمة المخزَّنة واحدة (`target_value`) ومعناها يتبع النوع.
+    ⚠️  The stored value is a single one (`target_value`) and its meaning follows the type.
 
-        جدول بعمود لكل نوع يترك معظم الأعمدة فارغة في كل صف،
-        ويجبر كل استعلام على معرفة أيّها يقرأ.
+        A table with a column per type leaves most columns empty on every row,
+        and forces every query to know which one it is reading.
     """
 
     SALES_AMOUNT = "SALES_AMOUNT", _("إجمالي المبيعات")
@@ -43,7 +43,7 @@ class TargetType(models.TextChoices):
     CUSTOMER_COUNT = "CUSTOMER_COUNT", _("عدد العملاء النشطين")
 
 
-#: الأنواع التي قيمتها **مبلغ** — الباقي عدد صحيح
+#: The types whose value is **an amount** — the rest are integers
 MONETARY_TYPES = {
     TargetType.SALES_AMOUNT,
     TargetType.NET_SALES,
@@ -53,10 +53,11 @@ MONETARY_TYPES = {
 
 class TargetStatus(models.TextChoices):
     """
-    ⚠️  الهدف يبدأ **مسوّدة**.
+    ⚠️  A target starts as a **draft**.
 
-        هدف يُنشأ نشطًا فورًا يعني أن خطأ إدخال يصير التزامًا على
-        المندوب قبل أن يراجعه أحد — ويُبنى عليه حساب عمولة.
+        A target created active immediately means an entry error becomes an
+        obligation on the rep before anyone has reviewed it — and a commission
+        calculation gets built on it.
     """
 
     DRAFT = "DRAFT", _("مسوّدة")
@@ -66,13 +67,13 @@ class TargetStatus(models.TextChoices):
 
 class MonthlyTarget(BaseModel):
     """
-    هدف موظف في شهر.
+    An employee's target for a month.
 
-    ⚠️  **الإقفال يُجمّد لقطة ولا يُعاد حسابه.**
+    ⚠️  **Closing freezes a snapshot and never recomputes it.**
 
-        الشهر المقفل مستند يُبنى عليه صرف عمولة. إعادة حسابه من
-        بيانات اليوم تعني أن مرتجعًا وقع في مارس يغيّر عمولة يناير
-        المصروفة — ولا أحد يعرف أي نسخة كانت صحيحة.
+        A closed month is a document a commission payment is built on.
+        Recomputing it from today's data means a return that occurred in March
+        changes January's paid commission — and nobody knows which version was correct.
     """
 
     employee = models.ForeignKey(
@@ -100,10 +101,10 @@ class MonthlyTarget(BaseModel):
         help_text=_("مبلغ للأنواع المالية · عدد صحيح لما عداها"),
     )
 
-    #: ⚠️  دون هذه النسبة **لا عمولة إطلاقًا**.
+    #: ⚠️  Below this percentage there is **no commission at all**.
     #:
-    #:     بلا حدّ أدنى يستحق مندوب باع ٥٪ من هدفه عمولةً — وهي
-    #:     مكافأة على الإخفاق. الصفر يعني «بلا حدّ» ويُختار صراحةً.
+    #:     With no minimum, a rep who sold 5% of their target earns a commission —
+    #:     a reward for failure. Zero means "no minimum" and is chosen explicitly.
     minimum_achievement_percent = RateField(_("الحد الأدنى للتحقيق ٪"), default=ZERO)
 
     status = models.CharField(
@@ -116,8 +117,8 @@ class MonthlyTarget(BaseModel):
 
     note = models.TextField(_("ملاحظة"), blank=True)
 
-    # ── لقطة الإقفال ───────────────────────────────────────
-    # ⚠️  تُكتب مرة عند الإقفال ولا تُمسّ بعدها.
+    # ── The closing snapshot ───────────────────────────────
+    # ⚠️  Written once at closing and never touched afterwards.
     achieved_value = models.DecimalField(
         _("المُحقَّق"), max_digits=14, decimal_places=2, null=True, blank=True
     )
@@ -138,10 +139,10 @@ class MonthlyTarget(BaseModel):
         verbose_name_plural = _("الأهداف الشهرية")
         ordering = ["-year", "-month"]
         constraints = [
-            # ⚠️  هدف واحد لكل موظف في الشهر.
+            # ⚠️  One target per employee per month.
             #
-            #     هدفان يعنيان نسبتَي تحقيق ونتيجتَي عمولة، ولا
-            #     قاعدة تحسم أيّهما يُصرَف.
+            #     Two targets mean two achievement percentages and two commission
+            #     results, with no rule to settle which is paid.
             models.UniqueConstraint(
                 fields=["employee", "year", "month"],
                 condition=models.Q(deleted_at__isnull=True),
@@ -165,10 +166,10 @@ class MonthlyTarget(BaseModel):
 
     def close(self, *, achieved, percent, by=None) -> None:
         """
-        ⚠️  الإقفال **مرة واحدة**.
+        ⚠️  Closing happens **once**.
 
-            إعادته تكتب لقطة جديدة فوق مُعتمَدة، فتتغيّر عمولة
-            صُرفت بأثر رجعي.
+            Repeating it writes a new snapshot over an approved one, changing a
+            paid commission retroactively.
         """
         self.achieved_value = achieved
         self.achievement_percent = percent

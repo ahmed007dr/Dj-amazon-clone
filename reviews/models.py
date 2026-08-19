@@ -1,13 +1,13 @@
 """
-تقييمات المنتجات.
+Product reviews.
 
-⚠️  فُصل عن `catalog` عمدًا.
+⚠️  Deliberately separated from `catalog`.
 
-    الكود القديم وضع `avg_rate` و`reviews_count` كـ **properties**
-    على `Product`، فكل قائمة منتجات كانت تُطلق استعلامين لكل صف:
-    عشرون منتجًا = ٤١ استعلامًا.
+    The legacy code put `avg_rate` and `reviews_count` on `Product` as
+    **properties**, so every product list fired two queries per row:
+    twenty products = 41 queries.
 
-    هنا التجميع **مُخزَّن مسبقًا** في `ProductRating` ويُحدَّث بالحدث.
+    Here the aggregate is **pre-stored** in `ProductRating` and updated by the event.
 """
 
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -19,10 +19,10 @@ from core.models.base import BaseModel
 
 class ReviewStatus(models.TextChoices):
     """
-    ⚠️  المراجعة قبل النشر **افتراضية**.
+    ⚠️  Moderation before publication is **the default**.
 
-    تقييم منشور فورًا يعني إساءة أو تسريب بيانات شخصية على صفحة
-    منتج عام قبل أن يراه أحد من الفريق.
+    A review published immediately means abuse or a leak of personal data on a
+    public product page before anyone on the team has seen it.
     """
 
     PENDING = "PENDING", _("قيد المراجعة")
@@ -85,7 +85,7 @@ class Review(BaseModel):
         verbose_name_plural = _("التقييمات")
         ordering = ["-created_at"]
         constraints = [
-            # تقييم واحد لكل مستخدم لكل منتج — التعدد يفسد المتوسط
+            # One review per user per product — several corrupt the average
             models.UniqueConstraint(
                 fields=["product", "user"],
                 condition=models.Q(deleted_at__isnull=True),
@@ -107,14 +107,14 @@ class Review(BaseModel):
 
 class ProductRating(models.Model):
     """
-    تجميع مُخزَّن مسبقًا لكل منتج.
+    A pre-stored aggregate per product.
 
-    ⚠️  هذا الجدول **هو** الحل لمشكلة الـ N+1 القديمة.
+    ⚠️  This table **is** the solution to the old N+1 problem.
 
-        صف واحد لكل منتج، يُحدَّث عند تغيّر تقييم منشور فقط.
-        القوائم تقرأه بـ `select_related` واحد بدل استعلامين لكل صف.
+        One row per product, updated only when a published review changes.
+        The lists read it with a single `select_related` instead of two queries per row.
 
-    مفتاح BigInt — جدول داخلي لا يظهر في رابط.
+    A BigInt key — an internal table that appears in no URL.
     """
 
     product = models.OneToOneField(
@@ -127,7 +127,7 @@ class ProductRating(models.Model):
     average = models.DecimalField(_("المتوسط"), max_digits=3, decimal_places=2, default=0)
     count = models.PositiveIntegerField(_("عدد التقييمات"), default=0)
 
-    # توزيع النجوم — لعرض الأشرطة بلا استعلام إضافي
+    # The star distribution — for rendering the bars with no extra query
     count_1 = models.PositiveIntegerField(default=0)
     count_2 = models.PositiveIntegerField(default=0)
     count_3 = models.PositiveIntegerField(default=0)
@@ -156,7 +156,7 @@ class ProductRating(models.Model):
 
 
 class ReviewHelpfulVote(models.Model):
-    """صوت «هذا التقييم مفيد» — صوت واحد لكل مستخدم."""
+    """A "this review was helpful" vote — one vote per user."""
 
     review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name="helpful_votes")
     user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="+")

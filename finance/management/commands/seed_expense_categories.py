@@ -1,20 +1,21 @@
 """
-بذر بنود المصروفات القياسية.
+Seed the standard expense categories.
 
     python manage.py seed_expense_categories
 
-قابل للتشغيل مرارًا — يُحدّث الأسماء ولا يكرّر.
+Re-runnable — it updates the names and does not duplicate.
 
-⚠️  **هذه توصية لا قرار — قاعدة العمل ١٣ لم تُحسم.**
+⚠️  **This is a recommendation, not a decision — business rule 13 is not settled.**
 
-    البنود أدناه تغطية معقولة لنشاط تجزئة طبي في مصر، وهي نقطة
-    بداية تُعدَّل من اللوحة. ما يهمّ معماريًا أنها **بيانات لا
-    كود**: تغييرها لا يحتاج نشرًا.
+    The categories below are reasonable coverage for a medical retail business
+    in Egypt, and are a starting point to be edited from the panel. What matters
+    architecturally is that they are **data, not code**: changing them needs no
+    deployment.
 
-⚠️  ولا يُلمَس `is_active` عند التحديث.
+⚠️  And `is_active` is not touched on update.
 
-    إعادة التشغيل كانت ستُعيد تفعيل بندٍ عطّله المحاسب عمدًا —
-    فيظهر في قائمة اختيار كان قد أزاله.
+    Re-running would have reactivated a category the accountant deliberately
+    disabled — so it would reappear in a select list they had removed it from.
 """
 
 from django.core.management.base import BaseCommand
@@ -28,16 +29,16 @@ CATEGORIES = [
     ("shipping", "شحن وتوصيل", "Shipping & delivery", None),
     ("marketing", "تسويق وإعلان", "Marketing & advertising", None),
     ("utilities", "مرافق", "Utilities", None),
-    # ⚠️  المرافق تُفصَّل: «كهرباء ارتفعت» معلومة، و«مرافق ارتفعت»
-    #     سؤال. والشجرة موجودة لهذا بالضبط.
+    # ⚠️  Utilities are broken out: "electricity went up" is information, and
+    #     "utilities went up" is a question. The tree exists for exactly this.
     ("utilities-power", "كهرباء", "Electricity", "utilities"),
     ("utilities-water", "مياه", "Water", "utilities"),
     ("utilities-internet", "إنترنت واتصالات", "Internet & telecom", "utilities"),
     ("maintenance", "صيانة", "Maintenance", None),
     ("supplies", "مستلزمات تشغيل", "Operating supplies", None),
-    # ⚠️  الرسوم البنكية وعمولات البوابات بند مستقل لا «أخرى».
-    #     نسبتها من كل عملية دفع إلكتروني، فدفنها يخفي تكلفة
-    #     حقيقية للقناة الأونلاين عند مقارنتها بالكاونتر.
+    # ⚠️  Bank charges and gateway commissions are their own category, not "other".
+    #     They are a percentage of every electronic payment, so burying them
+    #     hides a real cost of the online channel when comparing it to the counter.
     ("fees", "رسوم بنكية وعمولات بوابات", "Bank & gateway fees", None),
     ("licenses", "تراخيص واشتراكات", "Licenses & subscriptions", None),
     ("other", "أخرى", "Other", None),
@@ -52,8 +53,8 @@ class Command(BaseCommand):
         created = 0
         updated = 0
 
-        # ⚠️  الآباء أولًا: البند الفرعي يحتاج أباه موجودًا.
-        #     القائمة مرتّبة كذلك، والفرز هنا حارس لا اعتماد.
+        # ⚠️  Parents first: a subcategory needs its parent to exist.
+        #     The list is ordered accordingly, and the sort here is a guard, not a reliance.
         ordered = sorted(CATEGORIES, key=lambda row: row[3] is not None)
 
         for index, (code, name_ar, name_en, parent_code) in enumerate(ordered):

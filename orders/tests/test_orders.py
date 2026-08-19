@@ -1,11 +1,11 @@
 """
-اختبارات الطلبات — دورة الشراء الكاملة.
+Order tests — the complete purchase cycle.
 
-⚠️  المجموعات الحرجة:
-      ١. اللقطات — الفاتورة الصادرة لا تتغيّر بتغيّر الكتالوج
-      ٢. آلة الحالة — الانتقال غير المسموح مرفوض
-      ٣. إعادة التحقق — لا طلب بسعر قديم أو مخزون ناقص
-      ٤. الإلغاء — مخزون وكوبون يعودان معًا
+⚠️  The critical groups:
+      1. snapshots — an issued invoice does not change as the catalogue changes
+      2. the state machine — a disallowed transition is refused
+      3. re-validation — no order at a stale price or with missing stock
+      4. cancellation — stock and coupon both come back
 """
 
 from decimal import Decimal
@@ -28,13 +28,13 @@ from promotions.models import Coupon, CouponKind, CouponRedemption
 PASSWORD = "Str0ng-Test-Pass!23"
 
 
-# ⚠️  مراجع نصية لا استيراد — **وكسولة**.
+# ⚠️  String references rather than imports — **and lazy ones**.
 #
-#     `orders` في L6 و`inventory` في L3، والعقد يمنع استيراد
-#     موديلات نطاق آخر مباشرةً. الاختبار ليس استثناءً.
+#     `orders` is in L6 and `inventory` in L3, and the contract forbids
+#     importing another domain's models directly. The test is not an exception.
 #
-#     والكسل ضروري: `apps.get_model` على مستوى الوحدة يُنفَّذ قبل
-#     تحميل سجل التطبيقات فيفشل بـ AppRegistryNotReady.
+#     And the laziness is necessary: `apps.get_model` at module level runs
+#     before the app registry is loaded and fails with AppRegistryNotReady.
 
 
 def stock_model():
@@ -114,7 +114,7 @@ def make_order(cart, customer, **kwargs):
 
 
 # ═══════════════════════════════════════════════════════════
-#  اللقطات —  ADR-30
+#  Snapshots —  ADR-30
 # ═══════════════════════════════════════════════════════════
 
 
@@ -126,15 +126,15 @@ class TestSnapshots:
 
         assert line.unit_price == Decimal("100.00")
         assert line.tax_rate == Decimal("14.00")
-        assert line.tax_amount == Decimal("28.00")  # ١٤٪ على ٢٠٠
+        assert line.tax_amount == Decimal("28.00")  # 14% on 200
         assert line.product_sku == "P-001"
         assert line.product_name_ar == "منتج"
 
     def test_price_change_does_not_alter_issued_order(self, cart, customer, product):
         """
-        ⚠️  **جوهر اللقطة.**
+        ⚠️  **The heart of the snapshot.**
 
-        الفاتورة الصادرة لا تتغيّر بتغيّر سعر الكتالوج بعدها.
+        An issued invoice does not change when the catalogue price changes afterwards.
         """
         order = make_order(cart, customer)
         original_total = order.grand_total
@@ -150,9 +150,9 @@ class TestSnapshots:
 
     def test_tax_rate_change_does_not_alter_issued_order(self, cart, customer, tax_class):
         """
-        ⚠️  النسبة تتغيّر بقرار حكومي؛ الفواتير القديمة تبقى بنسبتها.
+        ⚠️  The rate changes by government decree; old invoices keep their rate.
 
-        حسابها لاحقًا من النسبة الحالية يزوّر السجل المحاسبي.
+        Computing it later from the current rate falsifies the accounting record.
         """
         order = make_order(cart, customer)
 
@@ -174,14 +174,14 @@ class TestSnapshots:
     def test_totals_are_consistent(self, cart, customer):
         order = make_order(cart, customer)
 
-        # ٢ × ١٠٠ = ٢٠٠ · ضريبة ٢٨ · الإجمالي ٢٢٨
+        # 2 × 100 = 200 · tax 28 · total 228
         assert order.subtotal == Decimal("200.00")
         assert order.tax_total == Decimal("28.00")
         assert order.grand_total == Decimal("228.00")
 
 
 # ═══════════════════════════════════════════════════════════
-#  الحقول المبكرة —  ADR-09
+#  Early fields —  ADR-09
 # ═══════════════════════════════════════════════════════════
 
 
@@ -192,17 +192,17 @@ class TestEarlyFields:
 
     def test_channel_supports_pos_before_phase_seven(self, cart, customer, location):
         """
-        ⚠️  نقطة البيع في المرحلة ٧، والحقل يعمل الآن.
+        ⚠️  Point of sale arrives in phase 7, and the field works now.
 
-        إضافته بعد تراكم الطلبات تعني أن كل طلب سابق بلا قناة —
-        فلا تقرير مبيعات يفصل القنوات رجعيًا.
+        Adding it after orders have accumulated means every previous order has
+        no channel — so no sales report can separate the channels retrospectively.
         """
         order = make_order(cart, customer, channel=OrderChannel.POS, location=location)
         assert order.channel == OrderChannel.POS
         assert order.location == location
 
     def test_attribution_fields_exist_and_stay_empty(self, cart, customer):
-        """حقول الإسناد تُخلق الآن وتُملأ في المرحلة ١٠."""
+        """The attribution fields are created now and populated in phase 10."""
         order = make_order(cart, customer)
 
         assert order.owner_employee is None
@@ -216,7 +216,7 @@ class TestEarlyFields:
 
 
 # ═══════════════════════════════════════════════════════════
-#  آلة الحالة
+#  The state machine
 # ═══════════════════════════════════════════════════════════
 
 
@@ -239,8 +239,8 @@ class TestStateMachine:
 
     def test_illegal_transition_is_rejected(self, cart, customer):
         """
-        ⚠️  بلا آلة حالة، طلب «مكتمل» يعود إلى «قيد الانتظار» بنداء
-            واحد — فيفسد كل تقرير مبيعات وكل عمولة محسوبة.
+        ⚠️  Without a state machine, a "completed" order returns to "pending" in
+            one call — corrupting every sales report and every computed commission.
         """
         order = make_order(cart, customer)
 
@@ -263,13 +263,13 @@ class TestStateMachine:
         order_services.transition(order, OrderStatus.CONFIRMED, note="دفع مؤكد")
 
         history = order.status_history.all()
-        assert history.count() == 2  # الإنشاء + التأكيد
+        assert history.count() == 2  # creation + confirmation
         assert history.filter(to_status=OrderStatus.CONFIRMED, note="دفع مؤكد").exists()
 
     def test_payment_status_is_independent_of_order_status(self, cart, customer):
         """
-        ⚠️  طلب مؤكد قد يكون غير مدفوع (دفع عند الاستلام)، وطلب
-            ملغى قد يكون مدفوعًا وينتظر الاسترداد.
+        ⚠️  A confirmed order may be unpaid (cash on delivery), and a cancelled
+            order may be paid and awaiting a refund.
         """
         order = make_order(cart, customer)
         assert order.payment_status == PaymentStatus.UNPAID
@@ -293,7 +293,7 @@ class TestStateMachine:
 
 
 # ═══════════════════════════════════════════════════════════
-#  المخزون
+#  Stock
 # ═══════════════════════════════════════════════════════════
 
 
@@ -301,10 +301,10 @@ class TestStateMachine:
 class TestInventoryIntegration:
     def test_order_reserves_not_deducts(self, cart, customer, product, location):
         """
-        ⚠️  الطلب يحجز؛ الشحن يخصم.
+        ⚠️  The order reserves; shipping deducts.
 
-        الخصم عند الإنشاء يعني بضاعة مفقودة من الرصيد لطلب قد
-        يُلغى بعد دقيقة.
+        Deducting at creation means goods missing from the balance for an order
+        that may be cancelled a minute later.
         """
         make_order(cart, customer)
 
@@ -336,11 +336,11 @@ class TestInventoryIntegration:
         assert stock.available == 50
 
     def test_order_fails_when_stock_ran_out(self, user, customer, product, location):
-        """المخزون قد ينفد بين الإضافة وإتمام الشراء."""
+        """Stock may run out between adding to the cart and checking out."""
         cart = cart_services.get_active_cart(user=user)
         cart_services.add_line(cart, product, 10, user=user)
 
-        # مشترٍ آخر يستهلك كل المخزون
+        # Another buyer consumes all the stock
         inventory_services.sell_immediately(product, 50, location=location)
 
         with pytest.raises(BusinessError) as exc:
@@ -349,7 +349,7 @@ class TestInventoryIntegration:
 
 
 # ═══════════════════════════════════════════════════════════
-#  إعادة التحقق
+#  Re-validation
 # ═══════════════════════════════════════════════════════════
 
 
@@ -372,9 +372,9 @@ class TestRevalidation:
 
     def test_price_is_recomputed_not_taken_from_client(self, user, customer, product, location):
         """
-        ⚠️  ما ترسله الواجهة من أسعار يُتجاهَل تمامًا.
+        ⚠️  Any prices the frontend sends are ignored entirely.
 
-        السعر يُعاد حسابه من المصدر عند إنشاء الطلب.
+        The price is recomputed from the source when the order is created.
         """
         cart = cart_services.get_active_cart(user=user)
         cart_services.add_line(cart, product, 1, user=user)
@@ -394,7 +394,7 @@ class TestRevalidation:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الكوبونات
+#  Coupons
 # ═══════════════════════════════════════════════════════════
 
 
@@ -415,7 +415,7 @@ class TestCouponIntegration:
         order = make_order(cart, customer)
 
         assert order.coupon_code == "SAVE10"
-        assert order.coupon_discount == Decimal("20.00")  # ١٠٪ من ٢٠٠
+        assert order.coupon_discount == Decimal("20.00")  # 10% of 200
 
     def test_redemption_is_recorded(self, cart, customer, coupon, user):
         cart_services.apply_coupon(cart, "SAVE10")
@@ -429,10 +429,10 @@ class TestCouponIntegration:
 
     def test_cancelling_the_order_restores_the_coupon(self, cart, customer, coupon):
         """
-        ⚠️  السجل يبقى والعدّاد ينقص.
+        ⚠️  The record remains and the counter decrements.
 
-        الحذف يمحو أثر التدقيق: لا يبقى ما يثبت أن هذا العميل
-        استخدم الكوبون ثم ألغى.
+        Deleting erases the audit trail: nothing is left to prove this customer
+        used the coupon and then cancelled.
         """
         cart_services.apply_coupon(cart, "SAVE10")
         order = make_order(cart, customer)
@@ -446,13 +446,13 @@ class TestCouponIntegration:
         assert redemption.cancelled_at is not None
 
     def test_lowercase_code_is_accepted(self, cart, customer, coupon):
-        """`SAVE10` و`save10` كوبون واحد."""
+        """`SAVE10` and `save10` are one coupon."""
         snapshot = cart_services.apply_coupon(cart, "save10")
         assert snapshot.coupon_result.is_valid
 
 
 # ═══════════════════════════════════════════════════════════
-#  الإلغاء
+#  Cancellation
 # ═══════════════════════════════════════════════════════════
 
 
@@ -489,7 +489,7 @@ class TestCancellation:
 
 
 # ═══════════════════════════════════════════════════════════
-#  حدود النطاق
+#  Domain boundaries
 # ═══════════════════════════════════════════════════════════
 
 
@@ -497,8 +497,8 @@ class TestCancellation:
 class TestDomainBoundaries:
     def test_orders_does_not_import_inventory_models(self):
         """
-        ⚠️  الكود القديم عدّل `product.quantity` مباشرةً من
-            `orders/api.py` — نطاق يكتب في موديل نطاق آخر.
+        ⚠️  The legacy code edited `product.quantity` directly from
+            `orders/api.py` — one domain writing into another domain's model.
         """
         import inspect
 
@@ -510,8 +510,8 @@ class TestDomainBoundaries:
 
     def test_orders_does_not_reimplement_coupon_logic(self):
         """
-        ⚠️  المنطق كان منفّذًا مرتين متباعدتين — كوبون يُقبل من
-            مسار ويُرفض من آخر.
+        ⚠️  The logic was implemented twice, in two places that drifted apart —
+            a coupon accepted on one path and refused on another.
         """
         import inspect
 
@@ -519,10 +519,10 @@ class TestDomainBoundaries:
 
         source = inspect.getsource(services)
         assert "promotion_services.validate" not in source
-        assert "promotion_services" in source  # يستدعي لا يكرّر
+        assert "promotion_services" in source  # it calls rather than duplicating
 
     def test_order_number_is_not_the_url_identifier(self, cart, customer):
-        """`ORD-2026-XXXXXX` للعرض · الرابط يحمل UUID."""
+        """`ORD-2026-XXXXXX` for display · the URL carries a UUID."""
         import uuid
 
         order = make_order(cart, customer)

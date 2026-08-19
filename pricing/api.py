@@ -1,14 +1,15 @@
 """
-واجهات التسعير — للأدمن حصرًا.
+Pricing endpoints — admin only.
 
-⚠️  **لا نقطة عامة هنا إطلاقًا.**
+⚠️  **There is no public endpoint here at all.**
 
-    السعر الذي يدفعه العميل يصل إليه محسوبًا داخل المنتج والسلة
-    والطلب. كشف قوائم الأسعار وقواعدها للعامة يعطي المنافس هيكل
-    تسعيرك كاملًا — وهو من أثمن ما تملك.
+    The price the customer pays reaches them already computed inside the
+    product, the cart and the order. Exposing the price lists and their rules to
+    the public hands a competitor your entire pricing structure — one of the
+    most valuable things you own.
 
-⚠️  والحساب يبقى في `services.price_for()` وحده. هذه الواجهات
-    تحرّر **البيانات** التي يقرؤها، ولا تحسب شيئًا.
+⚠️  And the calculation stays in `services.price_for()` alone. These endpoints
+    edit the **data** it reads, and compute nothing.
 """
 
 from django.db.models import Q
@@ -23,7 +24,7 @@ from pricing.models import PriceList, PriceOverride, PriceRule
 
 
 class _PricingAdmin:
-    """صلاحية الأدمن وتسجيل التدقيق — مشتركة بين كل نقاط النطاق."""
+    """Admin permission and audit logging — shared by every endpoint in the domain."""
 
     permission_classes = [CanManagePricing]
 
@@ -32,9 +33,9 @@ class _PricingAdmin:
     def _audit(self, instance, action, **changes):
         AuditLog.objects.create(
             actor=self.request.user,
-            # ⚠️  `PRICE_CHANGE` لا `SETTING_CHANGE`: تغيير سعر
-            #     سؤالٌ يُسأل في كل مراجعة مالية، ودفنه بين تغييرات
-            #     الإعدادات يجعله غير قابل للتصفية.
+            # ⚠️  `PRICE_CHANGE`, not `SETTING_CHANGE`: a price change is
+            #     a question asked in every financial review, and burying it among
+            #     setting changes makes it impossible to filter for.
             action=action,
             object_repr=f"{self.label} {instance}",
             changes=changes,
@@ -43,7 +44,7 @@ class _PricingAdmin:
 
 
 # ═══════════════════════════════════════════════════════════
-#  قوائم الأسعار
+#  Price lists
 # ═══════════════════════════════════════════════════════════
 
 
@@ -76,10 +77,11 @@ class PriceListDetailAPI(_PricingAdmin, generics.RetrieveUpdateDestroyAPIView):
 
     def perform_destroy(self, instance):
         """
-        ⚠️  **الافتراضية لا تُحذف**، والمملوءة تُحذف بقواعدها.
+        ⚠️  **The default is never deleted**, and a populated one is deleted with its rules.
 
-            حذف الافتراضية يترك كل عميل بلا قائمة تنطبق عليه — فلا
-            سعر لأي منتج. والرفض هنا أرخص من متجر بلا أسعار.
+            Deleting the default leaves every customer with no applicable list —
+            so no product has a price. Refusing here is cheaper than a store
+            with no prices.
         """
         if instance.is_default:
             raise BusinessError(
@@ -101,13 +103,13 @@ class PriceListDetailAPI(_PricingAdmin, generics.RetrieveUpdateDestroyAPIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  قواعد التسعير
+#  Pricing rules
 # ═══════════════════════════════════════════════════════════
 
 
 class PriceRuleListCreateAPI(_PricingAdmin, generics.ListCreateAPIView):
     """
-    ⚠️  مُرقَّمة: قائمة واحدة قد تحمل قاعدة لكل منتج في الكتالوج.
+    ⚠️  Paginated: one list may carry a rule for every product in the catalogue.
     """
 
     serializer_class = s.PriceRuleSerializer
@@ -127,8 +129,8 @@ class PriceRuleListCreateAPI(_PricingAdmin, generics.ListCreateAPIView):
                 Q(product__sku__icontains=search) | Q(product__name_ar__icontains=search)
             )
 
-        # ⚠️  الأكبر كمية أولًا داخل كل منتج — نفس ترتيب المطابقة
-        #     في `price_for`، فما يراه الأدمن هو ما يقرؤه المحرك.
+        # ⚠️  Largest quantity first within each product — the same matching order
+        #     as in `price_for`, so what the admin sees is what the engine reads.
         return queryset.order_by("product__sku", "-min_quantity")
 
     def perform_create(self, serializer):
@@ -148,8 +150,8 @@ class PriceRuleDetailAPI(_PricingAdmin, generics.RetrieveUpdateDestroyAPIView):
         previous = str(self.get_object().unit_price)
         instance = serializer.save()
 
-        # ⚠️  السعر القديم في السجل: «متى صار هذا الصنف بهذا السعر؟»
-        #     سؤال يُسأل بعد شهور، ولا يُجاب إلا بقيمة محفوظة.
+        # ⚠️  The old price in the log: "when did this item become this price?"
+        #     is a question asked months later, answerable only from a stored value.
         self._audit(
             instance,
             AuditAction.PRICE_CHANGE,
@@ -162,7 +164,7 @@ class PriceRuleDetailAPI(_PricingAdmin, generics.RetrieveUpdateDestroyAPIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الخصومات الترويجية
+#  Promotional discounts
 # ═══════════════════════════════════════════════════════════
 
 
@@ -177,8 +179,8 @@ class PriceOverrideListCreateAPI(_PricingAdmin, generics.ListCreateAPIView):
 
         if product := params.get("product"):
             queryset = queryset.filter(product_id=product)
-        # ⚠️  «الجارية الآن» لا تُحسب في بايثون: القائمة قد تطول،
-        #     والتصفية بعد الترقيم تعطي صفحات ناقصة.
+        # ⚠️  "Currently running" is not computed in Python: the list may be long,
+        #     and filtering after pagination gives short pages.
         if params.get("running") == "true":
             from django.utils import timezone
 

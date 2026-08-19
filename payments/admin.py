@@ -1,15 +1,16 @@
 """
-لوحة الدفع.
+Payments admin panel.
 
-⚠️  **بيانات الاعتماد للكتابة فقط** (ADR-15).
+⚠️  **Credentials are write-only** (ADR-15).
 
-    القيمة لا تُعرض ولا تُعاد في أي مكان — حتى للمدير الأعلى. الحقل
-    يُقدَّم فارغًا دائمًا: تركه فارغًا يُبقي القيمة الحالية، وملؤه
-    يستبدلها. صورة شاشة واحدة لمفتاح بوابة تكفي لسحب أموال حقيقية.
+    The value is never displayed and never returned anywhere — not even to the
+    top administrator. The field is always presented empty: leaving it empty
+    keeps the current value, and filling it replaces it. One screenshot of a
+    gateway key is enough to move real money.
 
-⚠️  المعاملات والاسترجاعات **للقراءة فقط**. تغيير حالة معاملة يدويًا
-    لا يغيّر شيئًا لدى البوابة — يخلق فقط تناقضًا بين دفترنا ودفترها.
-    العمليات الحقيقية عبر `payments.services`.
+⚠️  Transactions and refunds are **read-only**. Changing a transaction's status
+    by hand changes nothing at the gateway — it only creates a contradiction
+    between our ledger and theirs. The real operations go through `payments.services`.
 """
 
 from django import forms

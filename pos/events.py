@@ -1,19 +1,19 @@
 """
-أحداث نقطة البيع.
+Point-of-sale events.
 
-⚠️  `pos` يبعث ولا يعرف من يستمع.
+⚠️  `pos` emits and does not know who listens.
 
-    `finance` في المرحلة ٨ سيستمع لـ `pos_session_closed` ليقيّد
-    النقد؛ واستيراده من هنا يعني أن نقطة البيع تعرف المحاسبة —
-    فيصير كل تغيير في القيود مسًّا بشاشة الكاشير.
+    `finance` in phase 8 will listen for `pos_session_closed` to post the cash;
+    and importing it from here would mean the point of sale knowing accounting —
+    so every change to the entries would touch the cashier's screen.
 """
 
 import django.dispatch
 
-#: يُبعث عند إغلاق وردية بعد حساب الفرق.
+#: Emitted when a shift closes, after the discrepancy is computed.
 #:     sender=POSSession  ·  session
 pos_session_closed = django.dispatch.Signal()
 
-#: يُبعث عند إتمام بيعة — بعد إنشاء الطلب وخصم المخزون.
+#: Emitted when a sale completes — after the order is created and the stock deducted.
 #:     sender=POSSession  ·  session · order
 pos_sale_completed = django.dispatch.Signal()

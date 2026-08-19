@@ -1,16 +1,17 @@
 """
-صلاحيات نقطة البيع.
+Point-of-sale permissions.
 
-⚠️  **الكاشير موظف لا أدمن.**
+⚠️  **A cashier is an employee, not an admin.**
 
-    استخدام `IsAdminAccount` هنا كان سيمنح كل كاشير صلاحيات لوحة
-    الأدمن كاملةً — تعديل الأسعار والمنتجات وإيقاف الحسابات. وهو
-    خطأ يمرّ صامتًا لأن الشاشة تعمل.
+    Using `IsAdminAccount` here would have granted every cashier the full admin
+    panel permissions — editing prices and products and suspending accounts. And
+    it is a mistake that passes silently because the screen works.
 
-⚠️  والصلاحيات الدقيقة (`pos.refund` · `pos.discount`) تنتظر حسم
-    قاعدة العمل ١١ (صلاحيات الكاشير). الافتراضي الحالي **الأشدّ**:
-    الاسترداد للأدمن وحده، والخصم بسقف صفر. توسيعه قرار يُتخذ
-    صراحةً لا يُورَث من افتراضي متساهل.
+⚠️  And the fine-grained permissions (`pos.refund` · `pos.discount`) await the
+    settlement of business rule 11 (cashier permissions). The current default is
+    **the stricter one**: refunds for the admin alone, and a discount cap of
+    zero. Widening it is a decision taken explicitly, not inherited from a
+    permissive default.
 """
 
 from rest_framework.permissions import BasePermission
@@ -20,9 +21,10 @@ from accounts.models import AccountType
 
 class CanOperatePOS(BasePermission):
     """
-    من يشغّل نقطة البيع: الموظف أو الأدمن.
+    Who operates the point of sale: the employee or the admin.
 
-    ⚠️  العميل لا يصل هنا مهما كان — نقطة البيع أداة داخلية.
+    ⚠️  A customer never reaches here under any circumstances — point of sale is
+        an internal tool.
     """
 
     message = "نقطة البيع للموظفين والمديرين فقط"
@@ -36,10 +38,11 @@ class CanOperatePOS(BasePermission):
 
 class CanRefund(BasePermission):
     """
-    ⚠️  الاسترداد للأدمن وحده حتى تُحسم قاعدة العمل ١١.
+    ⚠️  Refunds are for the admin alone until business rule 11 is settled.
 
-        التوصية المكتوبة: «لا خصم ولا ارتجاع بلا اعتماد مدير».
-        وتخفيفها لاحقًا أسهل من تشديدها بعد أن يعتاده الكاشير.
+        The written recommendation: "no discount and no return without a
+        manager's approval". And relaxing it later is easier than tightening it
+        after the cashier has grown used to it.
     """
 
     message = "الاسترداد يحتاج اعتماد مدير"

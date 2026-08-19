@@ -1,8 +1,8 @@
 """
-اختبارات محرك التسعير.
+Pricing engine tests.
 
-⚠️  هذا المحرك يستبدل **أربعة** مواضع حساب متعارضة في الكود القديم
-    (الانتهاك H5). الاختبارات هنا تحرس أن يبقى مصدرًا واحدًا.
+⚠️  This engine replaces **four** conflicting calculation sites in the legacy
+    code (violation H5). The tests here guard that it stays a single source.
 """
 
 from decimal import Decimal
@@ -69,7 +69,7 @@ def student_list(db):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأساس
+#  Fundamentals
 # ═══════════════════════════════════════════════════════════
 
 
@@ -93,12 +93,12 @@ class TestBasePricing:
 
         assert line.subtotal == Decimal("300.00")
         assert line.net == Decimal("300.00")
-        assert line.tax_amount == Decimal("42.00")  # ١٤٪
+        assert line.tax_amount == Decimal("42.00")  # 14%
         assert line.total == Decimal("342.00")
 
 
 # ═══════════════════════════════════════════════════════════
-#  قوائم الأسعار
+#  Price lists
 # ═══════════════════════════════════════════════════════════
 
 
@@ -118,10 +118,10 @@ class TestPriceLists:
 
     def test_highest_priority_wins_on_multiple_matches(self, product, retail):
         """
-        ⚠️  صيدلية قد تطابق «جملة» و«مهنيون» معًا.
+        ⚠️  A pharmacy may match both "wholesale" and "professionals".
 
-        بلا أولوية صريحة يصير السعر رهن ترتيب الصفوف في قاعدة
-        البيانات — أي عشوائيًا فعليًا.
+        With no explicit priority the price becomes a matter of row ordering in
+        the database — that is, effectively random.
         """
         low = PriceList.objects.create(
             code="wholesale",
@@ -154,7 +154,7 @@ class TestPriceLists:
 
 
 # ═══════════════════════════════════════════════════════════
-#  أسعار الكميات
+#  Quantity pricing
 # ═══════════════════════════════════════════════════════════
 
 
@@ -180,7 +180,7 @@ class TestQuantityBreaks:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الخصومات الترويجية
+#  Promotional discounts
 # ═══════════════════════════════════════════════════════════
 
 
@@ -194,9 +194,9 @@ class TestOverrides:
         )
         line = services.price_for(product, 2)
 
-        assert line.discount_amount == Decimal("40.00")  # ٢٠٪ × ٢
+        assert line.discount_amount == Decimal("40.00")  # 20% × 2
         assert line.net == Decimal("160.00")
-        assert line.tax_amount == Decimal("22.40")  # الضريبة على الصافي
+        assert line.tax_amount == Decimal("22.40")  # tax on the net
 
     def test_fixed_discount(self, product, retail):
         PriceOverride.objects.create(
@@ -230,7 +230,7 @@ class TestOverrides:
         assert services.price_for(product, 1).discount_amount == Decimal("0.00")
 
     def test_fixed_discount_never_exceeds_price(self, product, retail):
-        """خصم أكبر من السعر يعني سطرًا سالبًا."""
+        """A discount larger than the price means a negative line."""
         PriceOverride.objects.create(
             product=product,
             discount_kind=DiscountKind.FIXED,
@@ -243,7 +243,7 @@ class TestOverrides:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الضريبة —  ADR-30
+#  Tax —  ADR-30
 # ═══════════════════════════════════════════════════════════
 
 
@@ -251,9 +251,10 @@ class TestOverrides:
 class TestTax:
     def test_tax_is_computed_on_net_after_discount(self, product, retail):
         """
-        ⚠️  الضريبة على الصافي لا على الإجمالي.
+        ⚠️  Tax on the net, not on the gross.
 
-        حسابها قبل الخصم يضخّم الفاتورة ويخالف القاعدة الضريبية.
+        Computing it before the discount inflates the invoice and contradicts
+        the tax rule.
         """
         PriceOverride.objects.create(
             product=product,
@@ -263,7 +264,7 @@ class TestTax:
         line = services.price_for(product, 1)
 
         assert line.net == Decimal("50.00")
-        assert line.tax_amount == Decimal("7.00")  # ١٤٪ من ٥٠ لا من ١٠٠
+        assert line.tax_amount == Decimal("7.00")  # 14% of 50, not of 100
 
     def test_rate_is_captured_as_snapshot(self, product, retail, tax_class):
         line = services.price_for(product, 1)
@@ -299,7 +300,7 @@ class TestTax:
 
 
 # ═══════════════════════════════════════════════════════════
-#  السلة
+#  The cart
 # ═══════════════════════════════════════════════════════════
 
 
@@ -330,8 +331,8 @@ class TestCartPricing:
         )
 
         assert cart.subtotal == Decimal("250.00")
-        assert cart.tax_total == Decimal("35.00")  # ١٤٪ من ٢٥٠
-        assert cart.total == Decimal("315.00")  # + ٣٠ شحن
+        assert cart.tax_total == Decimal("35.00")  # 14% of 250
+        assert cart.total == Decimal("315.00")  # + 30 shipping
         assert cart.item_count == 3
 
     def test_coupon_discount_reduces_the_total(self, product, retail):
@@ -342,7 +343,7 @@ class TestCartPricing:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الدقة العشرية
+#  Decimal precision
 # ═══════════════════════════════════════════════════════════
 
 
@@ -350,10 +351,10 @@ class TestCartPricing:
 class TestDecimalPrecision:
     def test_no_float_drift(self, db, retail, tax_class):
         """
-        ⚠️  النموذج القديم استخدم `FloatField` في تسعة مواضع.
+        ⚠️  The legacy model used `FloatField` in nine places.
 
-        مع ضريبة وخصومات ومرتجعات، فروق الفاصلة العائمة تتراكم
-        حتى تكسر أي مطابقة محاسبية.
+        With tax, discounts and returns, floating-point discrepancies accumulate
+        until they break any accounting reconciliation.
         """
         category = Category.objects.create(name_ar="فئة", name_en="Category")
         product = Product.objects.create(
@@ -369,4 +370,4 @@ class TestDecimalPrecision:
 
         assert line.subtotal == Decimal("99.99")
         assert isinstance(line.total, Decimal)
-        assert line.total == Decimal("113.99")  # ٩٩٫٩٩ + ١٤٪ = ١١٣٫٩٨٨٦ ⟵ ١١٣٫٩٩
+        assert line.total == Decimal("113.99")  # 99.99 + 14% = 113.9886 ⟵ 113.99

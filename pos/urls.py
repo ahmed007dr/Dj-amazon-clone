@@ -1,4 +1,4 @@
-"""مسارات نقطة البيع — /api/v1/pos/"""
+"""Point-of-sale routes — /api/v1/pos/"""
 
 from django.urls import path
 
@@ -7,7 +7,7 @@ from pos import api
 app_name = "pos"
 
 urlpatterns = [
-    # ── الكاشير ────────────────────────────────────────────
+    # ── Cashier ────────────────────────────────────────────
     path("registers/", api.RegisterListAPI.as_view(), name="registers"),
     path("session/", api.MySessionAPI.as_view(), name="session"),
     path("session/open/", api.OpenSessionAPI.as_view(), name="session-open"),
@@ -17,7 +17,7 @@ urlpatterns = [
     path("quote/", api.QuoteAPI.as_view(), name="quote"),
     path("checkout/", api.CheckoutAPI.as_view(), name="checkout"),
     path("refund/", api.POSRefundAPI.as_view(), name="refund"),
-    # ── الأدمن ─────────────────────────────────────────────
+    # ── Admin ──────────────────────────────────────────────
     path("admin/registers/", api.AdminRegisterListCreateAPI.as_view(), name="admin-registers"),
     path(
         "admin/registers/<uuid:pk>/",

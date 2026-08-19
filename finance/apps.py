@@ -7,8 +7,8 @@ class FinanceConfig(AppConfig):
     verbose_name = "المالية"
 
     def ready(self):
-        # ⚠️  الاستيراد هنا لا في أعلى الملف.
+        # ⚠️  Imported here rather than at the top of the file.
         #
-        #     المستمعون يلمسون موديلات `orders` و`pos`، وسجل
-        #     التطبيقات لم يكتمل بعد وقت استيراد الوحدة.
+        #     The listeners touch the `orders` and `pos` models, and the app
+        #     registry is not yet complete at module import time.
         from finance import listeners  # noqa: F401

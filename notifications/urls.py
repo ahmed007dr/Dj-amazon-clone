@@ -1,4 +1,4 @@
-"""مسارات الإشعارات — /api/v1/notifications/"""
+"""Notification routes — /api/v1/notifications/"""
 
 from django.urls import path
 

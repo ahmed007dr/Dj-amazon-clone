@@ -1,12 +1,12 @@
 """
-خدمات المالية.
+Finance services.
 
-⚠️  **الالتقاط لا الحساب.**
+⚠️  **Capture, not calculation.**
 
-    الإيراد يُقيَّد لحظة اكتمال الطلب من أرقام الطلب المخزَّنة
-    (ADR-30)، والتكلفة من حركات المخزون التي وقعت فعلًا. لا شيء
-    هنا يعيد حساب سعر أو ضريبة — إعادة الحساب من قيم اليوم تنتج
-    تقريرًا يخالف الفواتير الصادرة.
+    Revenue is posted at the moment the order completes, from the order's stored
+    figures (ADR-30), and cost from the stock movements that actually occurred.
+    Nothing here recomputes a price or a tax — recomputing from today's values
+    produces a report that contradicts the invoices already issued.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 def _money_sum(queryset, field: str) -> Decimal:
-    """مجموع مالي لا يعيد `None` أبدًا."""
+    """A financial sum that never returns `None`."""
     total = queryset.aggregate(
         total=Coalesce(
             Sum(field), Value(ZERO), output_field=DecimalField(max_digits=14, decimal_places=2)
@@ -46,30 +46,30 @@ def _money_sum(queryset, field: str) -> Decimal:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التقاط الإيراد
+#  Revenue capture
 # ═══════════════════════════════════════════════════════════
 
 
 @transaction.atomic
 def record_order_revenue(order) -> RevenueEntry | None:
     """
-    يقيّد إيراد طلب مكتمل — **مرة واحدة مهما تكرّر الحدث**.
+    Posts a completed order's revenue — **once, however often the event repeats**.
 
-    ⚠️  الازدواج يُمنع بقيد قاعدة البيانات لا بفحص هنا وحده.
+    ⚠️  Duplication is prevented by a database constraint, not by a check here alone.
 
-        الفحص المسبق يخسر السباق بين حدثين متزامنين؛ والقيد
-        الفريد يحسمه. الفحص هنا يوفّر الاستثناء في الحالة الشائعة.
+        A pre-check loses the race between two concurrent events; the unique
+        constraint settles it. The check here saves the exception in the common case.
     """
     existing = RevenueEntry.objects.filter(source=RevenueSource.ORDER, order=order).first()
     if existing is not None:
         logger.info("إيراد الطلب %s مقيَّد سلفًا — تجاهل", order.number)
         return existing
 
-    # ⚠️  الضريبة تُطرح من الإيراد.
+    # ⚠️  Tax is subtracted from the revenue.
     #
-    #     المتجر يحصّلها نيابةً عن الدولة ولا يملكها. احتسابها
-    #     إيرادًا يضخّم الربح بنسبتها كاملة — وهو خطأ يمرّ صامتًا
-    #     لأن الرقم يبدو أكبر لا أصغر.
+    #     The store collects it on the state's behalf and does not own it.
+    #     Counting it as revenue inflates the profit by its full rate — an error
+    #     that passes silently because the number looks larger, not smaller.
     net = quantize(order.grand_total - order.tax_total)
 
     entry = RevenueEntry.objects.create(
@@ -80,14 +80,14 @@ def record_order_revenue(order) -> RevenueEntry | None:
         tax=order.tax_total,
         net=net,
         channel=order.channel,
-        # ⚠️  تاريخ اكتمال الطلب لا تاريخ اليوم: إعادة تشغيل
-        #     الالتقاط لطلبات قديمة كانت ستكدّسها في شهر واحد.
-        # ⚠️  `localdate(...)` لا `.date()` المجرّدة.
+        # ⚠️  The order's completion date, not today's date: re-running the
+        #     capture for old orders would have piled them all into one month.
+        # ⚠️  `localdate(...)`, not a bare `.date()`.
         #
-        #     `completed_at` مخزَّن بـ UTC، واستخراج تاريخه مباشرةً
-        #     يُقيّد بيعة الواحدة صباحًا بالقاهرة في **يوم أمس**
-        #     المحاسبي. النتيجة: إقفال يومي لا يطابق درج الكاشير،
-        #     والفارق يظهر كل ليلة في آخر ثلاث ساعات من الوردية.
+        #     `completed_at` is stored in UTC, and taking its date directly
+        #     posts a 1am Cairo sale on **the previous day**
+        #     accounting day. The result: a daily close that does not match the
+        #     cashier's drawer, with the discrepancy showing every night in the shift's last three hours.
         occurred_on=timezone.localdate(order.completed_at or timezone.now()),
     )
 
@@ -98,19 +98,20 @@ def record_order_revenue(order) -> RevenueEntry | None:
 @transaction.atomic
 def record_refund(order, amount: Decimal | None = None) -> RevenueEntry | None:
     """
-    قيد مرتجع — **سالب**.
+    A return entry — **negative**.
 
-    ⚠️  لا يُحذف قيد الإيراد الأصلي.
+    ⚠️  The original revenue entry is never deleted.
 
-        حذفه يمحو أن البيعة وقعت، فيختل عدد الطلبات ومتوسط قيمة
-        الطلب وكل ما يُبنى عليهما. التصحيح بقيد معاكس.
+        Deleting it erases that the sale happened, so the order count, the
+        average order value and everything built on them break. Corrections go
+        through an offsetting entry.
     """
     if RevenueEntry.objects.filter(source=RevenueSource.REFUND, order=order).exists():
         return None
 
     original = RevenueEntry.objects.filter(source=RevenueSource.ORDER, order=order).first()
     if original is None:
-        # مرتجع لطلب لم يُقيَّد إيراده — لا شيء يُعكَس
+        # A return for an order whose revenue was never posted — there is nothing to reverse
         logger.warning("مرتجع الطلب %s بلا قيد إيراد أصلي", order.number)
         return None
 
@@ -124,8 +125,8 @@ def record_refund(order, amount: Decimal | None = None) -> RevenueEntry | None:
         tax=-original.tax,
         net=-refunded,
         channel=original.channel,
-        # ⚠️  `localdate()` لا `now().date()`: القيد بتاريخ UTC
-        #     يقع في يوم الأمس المحاسبي، فيغيب عن تقرير اليوم.
+        # ⚠️  `localdate()`, not `now().date()`: an entry on the UTC date
+        #     lands on the previous accounting day, so it is absent from today's report.
         occurred_on=timezone.localdate(),
     )
 
@@ -133,21 +134,22 @@ def record_refund(order, amount: Decimal | None = None) -> RevenueEntry | None:
 @transaction.atomic
 def record_cogs(entry: RevenueEntry) -> COGSEntry:
     """
-    تكلفة البضاعة المباعة لقيد إيراد.
+    The cost of goods sold for a revenue entry.
 
-    ⚠️  **من حركات المخزون لا من الكتالوج.**
+    ⚠️  **From the stock movements, not from the catalogue.**
 
-        الحركة تحمل الدفعة التي خرجت منها البضاعة وتكلفتها
-        وقتها (FEFO). أي حساب آخر — متوسط · آخر تكلفة شراء —
-        يعطي ربحًا لا يطابق بيعة وقعت، ويتغيّر بأثر رجعي كلما
-        وصلت دفعة جديدة.
+        The movement carries the batch the goods left from and its cost at that
+        time (FEFO). Any other calculation — an average · the last purchase cost
+        — gives a profit matching no sale that happened, and it changes
+        retroactively every time a new batch arrives.
 
-    ⚠️  و**تُحدِّث القيد القائم لا تُنشئ ثانيًا**.
+    ⚠️  And it **updates the existing entry rather than creating a second**.
 
-        بيعة الكاونتر تُنشئ الطلب قبل أن تُربَط حركات مخزونها به،
-        فأول حساب يقع على صفر حركات. `pos_sale_completed` تُعيد
-        الاستدعاء بعد الربط — ولولا التحديث لانفجرت على قيد
-        `OneToOne` قائم، ولبقيت كل بيعة كاونتر بتكلفة صفر.
+        A counter sale creates the order before its stock movements are linked
+        to it, so the first calculation happens on zero movements.
+        `pos_sale_completed` calls it again after the linking — and without the
+        update it would blow up on the existing `OneToOne` constraint, leaving
+        every counter sale at zero cost.
     """
     from inventory.models import MovementType, StockMovement
 
@@ -164,8 +166,8 @@ def record_cogs(entry: RevenueEntry) -> COGSEntry:
     for movement in movements:
         quantity += movement.quantity
         if movement.unit_cost is None:
-            # ⚠️  بضاعة بلا دفعة: تكلفتها مجهولة لا صفر.
-            #     الصفر يجعل الربح يظهر أعلى بثمنها كاملًا.
+            # ⚠️  Goods with no batch: their cost is unknown, not zero.
+            #     Zero makes the profit appear higher by their full price.
             unknown += movement.quantity
             continue
         total += movement.unit_cost * movement.quantity
@@ -189,16 +191,17 @@ def record_cogs(entry: RevenueEntry) -> COGSEntry:
 
 
 # ═══════════════════════════════════════════════════════════
-#  المصروفات
+#  Expenses
 # ═══════════════════════════════════════════════════════════
 
 
 def assert_period_open(on_date: date) -> None:
     """
-    ⚠️  الفترة المقفلة ترفض الكتابة.
+    ⚠️  A closed period rejects writes.
 
-        تقرير صدر واتُّخذ عليه قرار ثم تغيّر بأثر رجعي هو أسوأ ما
-        يقع في نظام مالي: لا أحد يعرف أي نسخة كانت صحيحة.
+        A report that was issued, acted upon, and then changed retroactively is
+        the worst thing that can happen in a financial system: nobody knows
+        which version was correct.
     """
     if FiscalPeriod.is_locked(on_date):
         raise BusinessError(
@@ -211,11 +214,11 @@ def assert_period_open(on_date: date) -> None:
 @transaction.atomic
 def approve_expense(expense: Expense, *, approved_by) -> Expense:
     """
-    ⚠️  الاعتماد **فعل منفصل عن الإدخال** — ومن شخص آخر مبدئيًا.
+    ⚠️  Approval is **an act separate from entry** — and in principle by a different person.
 
-        قاعدة العمل ١٣ لم تُحسم بعد فيمن يعتمد؛ الحالي: أي مالي
-        مخوَّل. الفصل نفسه هو ما يجعل تشديدها لاحقًا تعديل صلاحية
-        لا إعادة بناء.
+        Business rule 13 has not settled who approves; for now: any authorised
+        finance user. The separation itself is what makes tightening it later a
+        permission change rather than a rebuild.
     """
     if expense.status == ExpenseStatus.APPROVED:
         raise BusinessError(ErrorCode.CONFLICT, detail="المصروف معتمد سلفًا", status_code=409)
@@ -234,7 +237,7 @@ def approve_expense(expense: Expense, *, approved_by) -> Expense:
 
 @transaction.atomic
 def reject_expense(expense: Expense, *, rejected_by, reason: str) -> Expense:
-    """⚠️  السبب إلزامي: رفض بلا سبب يُعاد إدخاله كما هو."""
+    """⚠️  The reason is mandatory: a rejection with no reason is re-entered unchanged."""
     if not reason.strip():
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="سبب الرفض إلزامي")
 
@@ -249,18 +252,18 @@ def reject_expense(expense: Expense, *, rejected_by, reason: str) -> Expense:
 
 
 # ═══════════════════════════════════════════════════════════
-#  قائمة الأرباح والخسائر
+#  The profit and loss statement
 # ═══════════════════════════════════════════════════════════
 
 
 @dataclass(frozen=True)
 class ProfitAndLoss:
     """
-    قائمة أرباح لفترة.
+    A profit statement for a period.
 
-    ⚠️  كل حقل هنا **مجموع صفوف قابلة للعرض** لا رقم مشتق.
+    ⚠️  Every field here is **a sum of rows that can be displayed**, not a derived figure.
 
-        `net_profit` وحده محسوب — وبقية الحقول تُفتح على قيودها.
+        `net_profit` alone is computed — the rest of the fields open onto their entries.
     """
 
     start: date
@@ -278,41 +281,42 @@ class ProfitAndLoss:
     expenses: Decimal
     net_profit: Decimal
 
-    #: ⚠️  عدد الوحدات المباعة بتكلفة مجهولة — يجعل مجمل الربح
-    #:     أعلى من حقيقته. يُعرَض ولا يُبتلع.
+    #: ⚠️  The number of units sold at an unknown cost — it makes the gross profit
+    #:     higher than reality. It is displayed, not swallowed.
     unknown_cost_units: int
 
-    #: مصروفات مسوّدة لم تُعتمد — خارج الحساب لكن يجب أن تُرى
+    #: Draft expenses not yet approved — outside the calculation, but they must be seen
     pending_expenses: Decimal
 
     @property
     def gross_margin(self) -> Decimal:
-        """هامش مجمل الربح ٪ — أو صفر بلا مبيعات (لا قسمة على صفر)."""
+        """Gross profit margin % — or zero with no sales (no division by zero)."""
         if self.net_sales == ZERO:
             return ZERO
         return quantize(self.gross_profit / self.net_sales * Decimal("100"))
 
     @property
     def is_reliable(self) -> bool:
-        """⚠️  تقرير فيه تكلفة مجهولة يُقرأ بحذر — ويُقال ذلك صراحةً."""
+        """⚠️  A report containing unknown cost is read with caution — and that is stated explicitly."""
         return self.unknown_cost_units == 0
 
 
 def profit_and_loss(start: date, end: date) -> ProfitAndLoss:
     """
     ```text
-    الإيراد − المرتجعات − الخصومات
-      = صافي المبيعات
-      − تكلفة البضاعة المباعة
-      = مجمل الربح
-      − المصروفات التشغيلية
-      = صافي الربح
+    revenue − returns − discounts
+      = net sales
+      − cost of goods sold
+      = gross profit
+      − operating expenses
+      = net profit
     ```
 
-    ⚠️  المرتجعات **قيود سالبة أصلًا** فتُجمَع لا تُطرح.
+    ⚠️  Returns are **already negative entries**, so they are added, not subtracted.
 
-        طرحها مرة ثانية كان يضاعف أثرها — وهو خطأ إشارة لا يظهر
-        إلا حين يقع مرتجع، أي بعد أن يكون التقرير قد صدر مرارًا.
+        Subtracting them a second time doubled their effect — a sign error that
+        surfaces only when a return occurs, that is, after the report has been
+        issued repeatedly.
     """
     entries = RevenueEntry.objects.filter(occurred_on__gte=start, occurred_on__lte=end)
 
@@ -320,7 +324,7 @@ def profit_and_loss(start: date, end: date) -> ProfitAndLoss:
     refunds = entries.filter(source=RevenueSource.REFUND)
 
     revenue = _money_sum(sales, "net")
-    refunded = _money_sum(refunds, "net")  # سالب سلفًا
+    refunded = _money_sum(refunds, "net")  # already negative
     discounts = _money_sum(sales, "discounts")
     tax = _money_sum(sales, "tax")
 
@@ -356,7 +360,7 @@ def profit_and_loss(start: date, end: date) -> ProfitAndLoss:
 
 
 def expenses_by_category(start: date, end: date) -> list[dict]:
-    """تفصيل المصروفات المعتمدة ببندها — لقراءة «أين صُرف المال»."""
+    """A breakdown of approved expenses by category — for reading "where the money went"."""
     rows = (
         Expense.objects.filter(
             incurred_on__gte=start,
@@ -381,10 +385,10 @@ def expenses_by_category(start: date, end: date) -> list[dict]:
 
 def revenue_by_channel(start: date, end: date) -> list[dict]:
     """
-    الإيراد بالقناة — أونلاين مقابل الكاونتر.
+    Revenue by channel — online versus the counter.
 
-    ⚠️  يشمل المرتجعات في نفس القناة، وإلا بدت قناة كثيرة
-        المرتجعات أربح مما هي.
+    ⚠️  It includes returns in the same channel, or a channel with many returns
+        would look more profitable than it is.
     """
     rows = (
         RevenueEntry.objects.filter(occurred_on__gte=start, occurred_on__lte=end)
@@ -398,21 +402,21 @@ def revenue_by_channel(start: date, end: date) -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التدفق النقدي
+#  Cash flow
 # ═══════════════════════════════════════════════════════════
 
 
 @dataclass(frozen=True)
 class CashFlow:
     """
-    الوارد والصادر النقدي.
+    Cash in and cash out.
 
-    ⚠️  **مشتق لا مخزَّن — وهذا قرار.**
+    ⚠️  **Derived, not stored — and that is a decision.**
 
-        الوارد يعرفه `payments` والصادر تعرفه المصروفات. تخزينه
-        ثالثًا ينشئ رقمًا يجب أن يوازي مصدرين، وأول انحراف بينهما
-        لا يملك أحد حسمه. الاشتقاق أبطأ بقدر لا يُلاحَظ على مدى
-        شهر، ولا يكذب أبدًا.
+        `payments` knows the inflow and the expenses know the outflow. Storing
+        it a third time creates a number that must match two sources, and at the
+        first divergence between them nobody can settle it. Deriving is slower
+        by an amount unnoticeable over a month, and it never lies.
     """
 
     start: date

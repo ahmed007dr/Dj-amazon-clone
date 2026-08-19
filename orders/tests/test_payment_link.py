@@ -1,14 +1,15 @@
 """
-ربط تأكيد الدفع بالطلب.
+Linking a payment confirmation to the order.
 
-⚠️  **الحلقة المفقودة**: `charge()` تُصدر رابط بوابة ولا تعرف إن دفع
-    العميل. التأكيد يصل ويب‌هوكًا فيعلّم المعاملة محصَّلة — وبلا
-    المستمع يقف الأمر هناك: المال في الحساب والطلب «غير مدفوع».
+⚠️  **The missing link**: `charge()` issues a gateway link and does not know
+    whether the customer paid. The confirmation arrives by webhook and marks the
+    transaction captured — and without the listener it stops there: the money is
+    in the account and the order is "unpaid".
 
-⚠️  والاختبار يبعث الإشارة مباشرةً لا عبر HTTP.
+⚠️  And the test emits the signal directly rather than over HTTP.
 
-    مسار الويب‌هوك كاملًا مُختبَر في `payments/tests/test_webhooks.py`.
-    المختبَر هنا هو الطرف الآخر: ماذا يفعل `orders` حين تصله.
+    The full webhook path is covered in `payments/tests/test_webhooks.py`. What
+    is covered here is the other side: what `orders` does when it arrives.
 """
 
 from decimal import Decimal
@@ -73,7 +74,7 @@ def transaction_for(provider, order, **overrides):
 
 
 # ═══════════════════════════════════════════════════════════
-#  التحصيل
+#  Capture
 # ═══════════════════════════════════════════════════════════
 
 
@@ -87,7 +88,7 @@ class TestCaptured:
         assert order.payment_status == PaymentStatus.PAID
 
     def test_paying_confirms_a_pending_order(self, provider, order):
-        """الدفع يؤكد الطلب تلقائيًا — لا ينتظر ضغطة أدمن."""
+        """Payment confirms the order automatically — it does not wait for an admin click."""
         assert order.status == OrderStatus.PENDING
         payment = transaction_for(provider, order)
 
@@ -98,8 +99,8 @@ class TestCaptured:
 
     def test_higher_layers_hear_that_the_order_was_paid(self, provider, order):
         """
-        ⚠️  `order_paid` كانت معرَّفة بلا باعث — تعريف بلا إرسال يجعل
-            كل مستمع لها كودًا ميتًا.
+        ⚠️  `order_paid` was defined with no emitter — a definition with no send
+            makes every listener for it dead code.
         """
         heard = []
 
@@ -118,11 +119,11 @@ class TestCaptured:
 
     def test_a_second_confirmation_is_harmless(self, provider, order):
         """
-        ⚠️  «مدفوع بالفعل» ليس فشلًا بل الحالة المطلوبة.
+        ⚠️  "Already paid" is not a failure but the desired state.
 
-            البوابة تعيد الإرسال، وقد تصل محاولتان بمعرّفين مختلفين
-            لنفس الطلب. رفع الاستثناء كان يُنتج ٥٠٠ تعيد المحاولة
-            إلى الأبد على طلب لا ينقصه شيء.
+            The gateway resends, and two attempts may arrive with different ids
+            for the same order. Raising produced a 500 that retried forever on
+            an order that lacks nothing.
         """
         first = transaction_for(provider, order)
         second = transaction_for(provider, order)
@@ -135,16 +136,16 @@ class TestCaptured:
 
 
 # ═══════════════════════════════════════════════════════════
-#  ما لا يخصّ الطلبات
+#  What does not belong to orders
 # ═══════════════════════════════════════════════════════════
 
 
 class TestScoping:
     def test_a_pos_sale_reference_is_ignored(self, provider, order):
         """
-        ⚠️  التصفية بنوع المرجع إلزامية: بيعة كاونتر ودفعة آجل
-            يمرّان بنفس الجدول بمراجع من أنواع أخرى، ومطابقة
-            المعرّف وحده تعلّم طلبًا لا علاقة له بالدفعة.
+        ⚠️  Filtering by reference type is mandatory: a counter sale and a
+            credit payment pass through the same table with references of other
+            kinds, and matching the id alone marks an order unrelated to the payment.
         """
         payment = transaction_for(provider, order, reference_type="pos_session")
 
@@ -173,12 +174,13 @@ class TestScoping:
 
     def test_a_reference_that_is_not_a_uuid_does_not_crash(self, provider, order):
         """
-        ⚠️  **انحدار**: `reference_id` حقل نصّي حرّ ومفتاح الطلب UUID.
+        ⚠️  **A regression**: `reference_id` is a free-text field and the order's key is a UUID.
 
-            تمرير نصّ غير صالح إلى `filter(pk=…)` يرفع
-            `ValidationError` قبل أن تصل قاعدة البيانات — فينهار
-            الويب‌هوك بـ ٥٠٠ وتظلّ البوابة تعيد إرسال حدث لن ينجح
-            أبدًا. والمرجع الغريب ليس خطأ: هو دفعة لا تخصّ الطلبات.
+            Passing an invalid string to `filter(pk=…)` raises
+            `ValidationError` before it reaches the database — so the webhook
+            collapses with a 500 and the gateway keeps resending an event that
+            will never succeed. And an unfamiliar reference is not an error: it
+            is a payment that does not belong to orders.
         """
         payment = transaction_for(provider, order, reference_id="ORD-1")
 
@@ -189,7 +191,7 @@ class TestScoping:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الفشل والاسترداد
+#  Failure and refund
 # ═══════════════════════════════════════════════════════════
 
 
@@ -204,9 +206,9 @@ class TestFailureAndRefund:
 
     def test_a_late_failure_never_unpays_a_paid_order(self, provider, order):
         """
-        ⚠️  المحاولة الفاشلة قد تصل **بعد** الناجحة (إعادة إرسال
-            متأخرة). تطبيقها بلا حارس يمسح دفعة حقيقية ويجعل الطلب
-            يبدو غير مسدَّد.
+        ⚠️  A failed attempt may arrive **after** a successful one (a late
+            resend). Applying it with no guard erases a genuine payment and
+            makes the order look unsettled.
         """
         payment = transaction_for(provider, order)
         payment_captured.send(sender=PaymentTransaction, payment=payment)
@@ -218,8 +220,9 @@ class TestFailureAndRefund:
 
     def test_a_refund_marks_payment_only_not_the_order_status(self, provider, order):
         """
-        ⚠️  ردّ المال لا يعني أن الطلب ملغى: قد تكون بضاعة سُلِّمت
-            ثم رُدّ ثمنها. تحريك حالة الطلب قرار الأدمن.
+        ⚠️  Refunding the money does not mean the order is cancelled: goods may
+            have been delivered and then refunded. Moving the order's status is
+            the admin's decision.
         """
         payment = transaction_for(provider, order)
         payment_captured.send(sender=PaymentTransaction, payment=payment)
@@ -235,18 +238,18 @@ class TestFailureAndRefund:
 
 
 # ═══════════════════════════════════════════════════════════
-#  المسار كاملًا
+#  The full path
 # ═══════════════════════════════════════════════════════════
 
 
 class TestEndToEnd:
     def test_a_gateway_webhook_marks_the_order_paid(self, provider, order):
         """
-        ⚠️  **الاختبار الذي يثبت أن الحلقة أُغلقت.**
+        ⚠️  **The test that proves the loop is closed.**
 
-            من نداء HTTP توقّعه البوابة إلى `payment_status = PAID`
-            على الطلب — بلا استدعاء يدوي في المنتصف. كل حلقة على
-            حدة كانت تمرّ بينما السلسلة مقطوعة.
+            From an HTTP call the gateway makes through to
+            `payment_status = PAID` on the order — with no manual call in the
+            middle. Every link individually used to pass while the chain was broken.
         """
         import hashlib
         import hmac

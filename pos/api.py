@@ -1,10 +1,10 @@
 """
-واجهات نقطة البيع.
+Point-of-sale endpoints.
 
-⚠️  الكاشير يعمل على وردية **مفتوحة خاصة به**.
+⚠️  The cashier works on **an open shift of their own**.
 
-    كل نقطة أدناه تستخرج الوردية من المستخدم لا من الطلب — فلا
-    يستطيع كاشير تسجيل بيعة على وردية زميله بتمرير معرّف.
+    Every endpoint below derives the shift from the user, not from the request —
+    so a cashier cannot record a sale on a colleague's shift by passing an id.
 """
 
 from django.db.models import Q
@@ -27,17 +27,18 @@ from pos.permissions import CanOperatePOS, CanRefund
 
 def _resolve_lines(entries: list[dict]) -> list[services.SaleLine]:
     """
-    يحوّل أسطر الطلب إلى كائنات بيع.
+    Converts the request's lines into sale objects.
 
-    ⚠️  المنتجات تُحمَّل **باستعلام واحد** لا واحد لكل سطر.
+    ⚠️  The products are loaded in **a single query**, not one per line.
 
-        بيعة بعشرين صنفًا كانت ستنتج عشرين استعلامًا بينما العميل
-        واقف — وهو أسوأ مكان لبطء يمكن تفاديه.
+        A sale with twenty items would have produced twenty queries while the
+        customer stands there — the worst possible place for avoidable slowness.
 
-    ⚠️  ومشتركة بين `/quote/` و`/checkout/` عمدًا.
+    ⚠️  And it is deliberately shared between `/quote/` and `/checkout/`.
 
-        نسختان من نفس التحويل تعنيان أن التسعير المعروض يقرأ السطر
-        بطريقة والتحصيل بأخرى — وهو فرق لا يظهر إلا في فاتورة.
+        Two copies of the same conversion mean the displayed pricing reads the
+        line one way and the capture another — a difference that only shows up
+        on an invoice.
     """
     products = Product.objects.in_bulk([entry["product"] for entry in entries])
 
@@ -65,10 +66,11 @@ def _resolve_lines(entries: list[dict]) -> list[services.SaleLine]:
 
 class SessionMixin:
     """
-    ⚠️  الوردية تُستخرج من **المستخدم** لا من مُعامل الطلب.
+    ⚠️  The shift is derived from **the user**, not from a request parameter.
 
-        قبولها كمعرّف يعني أن كاشيرًا يسجّل بيعة على وردية زميله
-        بتغيير رقم — فتُنسب النقدية للشخص الخطأ ولا توازن أي تسوية.
+        Accepting it as an id means a cashier recording a sale on a colleague's
+        shift by changing a number — so the cash is attributed to the wrong
+        person and no reconciliation balances.
     """
 
     def current_session(self) -> POSSession:
@@ -88,7 +90,7 @@ class SessionMixin:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأجهزة
+#  Registers
 # ═══════════════════════════════════════════════════════════
 
 
@@ -110,20 +112,21 @@ class AdminRegisterListCreateAPI(generics.ListCreateAPIView):
 
 class AdminRegisterDetailAPI(generics.RetrieveUpdateAPIView):
     """
-    تعديل كاونتر — **بلا حذف**.
+    Edit a register — **with no deletion**.
 
-    ⚠️  **الكاونتر يُوقَف ولا يُحذف.**
+    ⚠️  **A register is disabled, never deleted.**
 
-        كل وردية وكل بيعة تشير إليه؛ حذفه يقطع تاريخ الفرع كله عن
-        مصدره فلا يُقرأ إقفال قديم ولا يُنسب فرق نقدي إلى درجه.
-        و`is_active=False` يفعل ما يريده الأدمن فعلًا: يختفي من
-        بوابة الكاشير ويبقى تاريخه.
+        Every shift and every sale points at it; deleting it severs the whole
+        branch's history from its source, so an old close cannot be read and a
+        cash discrepancy cannot be attributed to its drawer. And
+        `is_active=False` does what the admin actually wants: it disappears from
+        the cashier portal and its history remains.
 
-    ⚠️  و**الموقع لا يُنقل ووردية مفتوحة عليه**.
+    ⚠️  And **the location is not moved while a shift is open on it**.
 
-        الكاونتر يخصم من مخزون موقعه؛ نقله أثناء وردية يجعل
-        النصف الأول من البيعات يخصم من فرع والنصف الثاني من
-        آخر — ولا شيء في الدفتر يقول أين وقع الانقسام.
+        The register deducts from its location's stock; moving it mid-shift
+        makes the first half of the sales deduct from one branch and the second
+        half from another — and nothing in the ledger says where the split happened.
     """
 
     permission_classes = [CanViewPOSSessions]
@@ -150,12 +153,12 @@ class AdminRegisterDetailAPI(generics.RetrieveUpdateAPIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الوردية
+#  The shift
 # ═══════════════════════════════════════════════════════════
 
 
 class MySessionAPI(SessionMixin, APIView):
-    """الوردية المفتوحة للكاشير الحالي — أو `null`."""
+    """The current cashier's open shift — or `null`."""
 
     permission_classes = [CanOperatePOS]
     serializer_class = s.SessionSerializer
@@ -167,7 +170,7 @@ class MySessionAPI(SessionMixin, APIView):
             .first()
         )
 
-        # ⚠️  `null` لا `404`: غياب وردية حالة عادية في بداية اليوم
+        # ⚠️  `null`, not `404`: having no shift is a normal state at the start of the day
         if session is None:
             return Response(None)
 
@@ -199,9 +202,10 @@ class OpenSessionAPI(APIView):
 
 class CloseSessionAPI(SessionMixin, APIView):
     """
-    إغلاق الوردية بتسوية نقدية.
+    Close the shift with a cash reconciliation.
 
-    ⚠️  الفرق فوق الحد يوجب تفسيرًا — يفرضه `services.close_session`.
+    ⚠️  A discrepancy above the threshold requires an explanation — enforced by
+        `services.close_session`.
     """
 
     permission_classes = [CanOperatePOS]
@@ -235,7 +239,7 @@ class CloseSessionAPI(SessionMixin, APIView):
 
 
 class SessionCashAPI(SessionMixin, APIView):
-    """إيداع أو سحب من الدرج."""
+    """A drawer pay-in or pay-out."""
 
     permission_classes = [CanOperatePOS]
     serializer_class = s.CashMovementInputSerializer
@@ -261,18 +265,18 @@ class SessionCashAPI(SessionMixin, APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  البيع
+#  Selling
 # ═══════════════════════════════════════════════════════════
 
 
 class CheckoutAPI(SessionMixin, APIView):
     """
-    إتمام بيعة.
+    Complete a sale.
 
-    ⚠️  المنتجات تُحمَّل **باستعلام واحد** لا واحد لكل سطر.
+    ⚠️  The products are loaded in **a single query**, not one per line.
 
-        بيعة بعشرين صنفًا كانت ستنتج عشرين استعلامًا بينما العميل
-        واقف — وهو أسوأ مكان لبطء يمكن تفاديه.
+        A sale with twenty items would have produced twenty queries while the
+        customer stands there — the worst possible place for avoidable slowness.
     """
 
     permission_classes = [CanOperatePOS]
@@ -322,14 +326,15 @@ class CheckoutAPI(SessionMixin, APIView):
 
 class QuoteAPI(SessionMixin, APIView):
     """
-    تسعير السلة الحالية بلا إتمام.
+    Price the current basket without completing it.
 
-    ⚠️  **الإجمالي على الشاشة يأتي من هنا لا من حساب في المتصفح.**
+    ⚠️  **The total on the screen comes from here, not from a calculation in the browser.**
 
-        جمع الأسعار في الواجهة يعني أن الشرائح والخصومات والضريبة
-        المتغيّرة (وقد تكون غائبة أصلًا) تُحاكى في مكانين. أول
-        اختلاف بينهما يظهر كفرق بين ما قاله الجهاز وما طُبع على
-        الإيصال — والعميل واقف.
+        Adding the prices up in the frontend means the tiers, the discounts and
+        the variable tax (which may be absent entirely) get simulated in two
+        places. The first divergence between them shows up as a difference
+        between what the terminal said and what was printed on the receipt —
+        with the customer standing there.
     """
 
     permission_classes = [CanOperatePOS]
@@ -380,7 +385,7 @@ class QuoteAPI(SessionMixin, APIView):
 
 class POSRefundAPI(SessionMixin, APIView):
     """
-    ⚠️  الاسترداد يحتاج اعتماد مدير — قاعدة العمل ١١ (توصية مطبَّقة).
+    ⚠️  A refund needs a manager's approval — business rule 11 (the recommendation as implemented).
     """
 
     permission_classes = [CanOperatePOS, CanRefund]
@@ -417,34 +422,36 @@ class POSRefundAPI(SessionMixin, APIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  بحث الأصناف — للكاشير
+#  Item search — for the cashier
 # ═══════════════════════════════════════════════════════════
 
 
 class POSProductSearchAPI(generics.ListAPIView):
     """
-    بحث أصناف الكاونتر.
+    Counter item search.
 
-    ⚠️  **بلا فلترة سياسات — وهذا مقصود.**
+    ⚠️  **No policy filtering — and that is deliberate.**
 
-        السياسات تحكم مَن يشتري عبر الموقع. أما على الكاونتر فالبائع
-        صيدلي في فرع مرخَّص، والمشتري أمامه بورقته. تمرير البحث
-        بمرشِّح السياسات كان يعني أن الكاشير **لا يجد** الدواء
-        المقيّد في جهازه بينما يبيعه قانونًا — فيسجّله يدويًا أو لا
-        يسجّله، وفي الحالتين ينهار المخزون.
+        The policies govern who buys through the website. At the counter the
+        seller is a pharmacist in a licensed branch, and the buyer is standing
+        in front of them with their prescription. Passing the search through the
+        policy filter meant the cashier **cannot find** the restricted medicine
+        on their terminal while selling it lawfully — so they record it by hand
+        or not at all, and either way the stock falls apart.
 
-        وهذا يطابق `CheckoutAPI` التي تحمّل المنتجات بلا فلترة
-        أصلًا: بحث أضيق من الإتمام تناقض لا حماية.
+        And this matches `CheckoutAPI`, which loads the products with no
+        filtering anyway: a search narrower than the checkout is a contradiction,
+        not a protection.
 
-    ⚠️  و`CanOperatePOS` هو الحاجز الحقيقي — لا يصلها عميل.
+    ⚠️  And `CanOperatePOS` is the real barrier — no customer reaches it.
     """
 
     permission_classes = [CanOperatePOS]
     serializer_class = s.POSProductSerializer
     pagination_class = None
 
-    #: ⚠️  سقف صارم: الكاشير يكتب حرفين فيعود بآلاف الصفوف والعميل
-    #:     واقف. العشرون تكفي للاختيار وتُبقي الاستجابة فورية.
+    #: ⚠️  A hard cap: the cashier types two characters and gets thousands of rows
+    #:     back with the customer standing there. Twenty is enough to choose from and keeps the response instant.
     LIMIT = 20
 
     def get_queryset(self):
@@ -453,14 +460,14 @@ class POSProductSearchAPI(generics.ListAPIView):
         queryset = Product.objects.filter(is_active=True).select_related("category")
 
         if not term:
-            # ⚠️  بلا بحث نعيد المميّزة لا كل شيء — شاشة أولى مفيدة
-            #     بدل قائمة عشوائية بحجم الكتالوج.
+            # ⚠️  With no search we return the featured items rather than everything — a useful
+            #     first screen instead of a random list the size of the catalogue.
             return queryset.filter(is_featured=True)[: self.LIMIT]
 
-        # ⚠️  الباركود والـ SKU بمطابقة تامة أولًا.
+        # ⚠️  Barcode and SKU by exact match first.
         #
-        #     الماسح يرسل رقمًا كاملًا؛ ومطابقته جزئيًا تعيد أصنافًا
-        #     يشترك رقمها في مقطع — فيضيف الكاشير الصنف الخطأ بضغطة.
+        #     The scanner sends a complete number; matching it partially returns items
+        #     whose numbers share a segment — so the cashier adds the wrong item with one press.
         exact = queryset.filter(Q(barcode__iexact=term) | Q(sku__iexact=term))
         if exact.exists():
             return exact[: self.LIMIT]
@@ -474,12 +481,12 @@ class POSProductSearchAPI(generics.ListAPIView):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الأدمن
+#  Admin
 # ═══════════════════════════════════════════════════════════
 
 
 class AdminSessionListAPI(generics.ListAPIView):
-    """كل الورديات — لمراجعة الفروق النقدية."""
+    """Every shift — for reviewing cash discrepancies."""
 
     permission_classes = [CanViewPOSSessions]
     serializer_class = s.SessionSerializer

@@ -1,10 +1,11 @@
 """
-اختبارات بريد الطلبات.
+Order mail tests.
 
-⚠️  المستمعون كانوا يُنشئون إشعارًا داخل التطبيق **بلا بريد**.
+⚠️  The listeners used to create an in-app notification **with no email**.
 
-    فالعميل الذي لا يفتح الموقع لا يعرف أن طلبه شُحن. و`notify`
-    ترسل البريد حين يُمرَّر قالب — والغياب كان يُقرأ كأنه اختيار.
+    So a customer who does not open the website never knew their order had
+    shipped. And `notify` sends the email when a template is passed — the
+    absence was read as though it were a choice.
 """
 
 from decimal import Decimal
@@ -47,7 +48,7 @@ def make_order(customer, **overrides):
 
 
 # ═══════════════════════════════════════════════════════════
-#  القوالب
+#  Templates
 # ═══════════════════════════════════════════════════════════
 
 
@@ -67,7 +68,7 @@ class TestTemplates:
 
     def test_both_languages_are_filled(self):
         """
-        ⚠️  قالب بلغة واحدة يعني مستخدمًا يتلقى رسالة لا يفهمها.
+        ⚠️  A template in one language means a user receiving a message they cannot read.
         """
         for key in self.ORDER_KEYS:
             template = mail_templates.TEMPLATES[key]
@@ -76,10 +77,10 @@ class TestTemplates:
 
     def test_order_number_appears_in_every_subject(self):
         """
-        ⚠️  العميل يبحث في بريده **برقم الطلب**.
+        ⚠️  The customer searches their mail **by order number**.
 
-            دفنه في منتصف فقرة يجعل البحث يفشل ويصير السؤال مكالمةً
-            للدعم.
+            Burying it mid-paragraph makes the search fail and turns the
+            question into a support call.
         """
         for key in self.ORDER_KEYS:
             template = mail_templates.TEMPLATES[key]
@@ -88,8 +89,8 @@ class TestTemplates:
 
     def test_rendering_fills_every_placeholder(self):
         """
-        ⚠️  حقل ناقص يرفع `KeyError` **وقت الإرسال** لا وقت الكتابة —
-            أي بريد لا يصل وطلب يبدو كأنه لم يُسجَّل.
+        ⚠️  A missing field raises `KeyError` **at send time**, not at write
+            time — that is, an email that never arrives and an order that looks unrecorded.
         """
         context = {
             "name": "نور",
@@ -110,7 +111,7 @@ class TestTemplates:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الإرسال الفعلي عبر المستمعين
+#  Actual sending through the listeners
 # ═══════════════════════════════════════════════════════════
 
 
@@ -118,8 +119,9 @@ class TestTemplates:
 class TestOrderMailDelivery:
     def test_new_order_sends_confirmation(self, customer, django_capture_on_commit_callbacks):
         """
-        ⚠️  التسليم على `on_commit`: المعاملة التي تُلغى بعد إنشاء
-            الطلب كانت تترك العميل ومعه رسالة عن طلب لا وجود له.
+        ⚠️  Delivery on `on_commit`: a transaction rolled back after the order
+            was created used to leave the customer holding a message about an
+            order that does not exist.
         """
         with django_capture_on_commit_callbacks(execute=True):
             make_order(customer)
@@ -154,9 +156,9 @@ class TestOrderMailDelivery:
 
     def test_internal_edits_send_nothing(self, customer, django_capture_on_commit_callbacks):
         """
-        ⚠️  إشعار عند كل حفظ يغرق العميل برسائل لا تخصّه.
+        ⚠️  A notification on every save floods the customer with messages that do not concern them.
 
-            «قيد التجهيز» تعنيه؛ أما تعديل ملاحظة داخلية فلا.
+            "Processing" concerns them; editing an internal note does not.
         """
         order = make_order(customer)
         django_mail.outbox.clear()
@@ -171,8 +173,8 @@ class TestOrderMailDelivery:
         self, customer, django_capture_on_commit_callbacks
     ):
         """
-        ⚠️  الأدمن ينقل الحالة بواجهة إنجليزية — والعميل العربي يجب
-            أن يتلقّى رسالته بالعربية.
+        ⚠️  The admin moves the status through an English interface — and the
+            Arabic-speaking customer must receive their message in Arabic.
         """
         customer.user.preferred_language = "en"
         customer.user.save()

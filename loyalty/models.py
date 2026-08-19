@@ -1,18 +1,18 @@
 """
-الولاء والإحالة.
+Loyalty and referrals.
 
-⚠️  **هذا النظام يُنشئ التزامًا ماليًا بلا بيع مقابل.**
+⚠️  **This system creates a financial liability with no sale against it.**
 
-    كل ما بُني قبله يسجّل مالًا دخل أو خرج؛ والنقطة تَعِد بخصم
-    مستقبلي على شراء لم يقع. الخطأ هنا لا يظهر اليوم بل بعد أشهر
-    حين يستبدل آلاف العملاء دفعةً واحدة — ولهذا كل رقم فيه قابل
-    للضبط، وكل نقطة قابلة للتتبع.
+    Everything built before it records money in or out; a point promises a
+    future discount on a purchase that has not happened. An error here does not
+    show today but months later, when thousands of customers redeem at once —
+    which is why every figure in it is configurable and every point traceable.
 
-⚠️  و**التشغيل والاستهداف من اللوحة لا من الكود.**
+⚠️  And **enablement and targeting come from the panel, not from the code.**
 
-    البرنامج يُوقَف بمفتاح، ويُوجَّه لأنواع حسابات بعينها (طلاب ·
-    صيادلة · أطباء) أو لتصنيفات عملاء أو للجميع. تثبيت أيٍّ من ذلك
-    في الكود يجعل تغيير حملة تسويقية نشرًا.
+    The programme is disabled with a switch, and targeted at specific account
+    types (students · pharmacists · doctors), or customer segments, or everyone.
+    Fixing any of that in code makes changing a marketing campaign a deployment.
 """
 
 from __future__ import annotations
@@ -29,35 +29,36 @@ from core.money import ZERO, MoneyField, RateField
 
 class LoyaltyProgram(BaseModel):
     """
-    برنامج ولاء — **مفتاح تشغيل واستهداف وقواعد كسب**.
+    A loyalty programme — **an on/off switch, targeting, and earning rules**.
 
-    ⚠️  **الإيقاف لا يمحو النقاط المكتسَبة.**
+    ⚠️  **Disabling does not erase points already earned.**
 
-        العميل كسبها بشراء فعلي؛ ومحوها بإيقاف البرنامج سرقة
-        صريحة تُكتشف بشكوى. الإيقاف يمنع الكسب الجديد ويترك
-        الرصيد قائمًا — والاستبدال يبقى متاحًا ما لم يُوقَف صراحةً.
+        The customer earned them through a real purchase; erasing them by
+        disabling the programme is outright theft, discovered through a
+        complaint. Disabling stops new earning and leaves the balance standing —
+        and redemption remains available unless it is explicitly disabled.
 
-    ⚠️  وبرنامج نشط واحد لكل نوع حساب.
+    ⚠️  And one active programme per account type.
 
-        برنامجان يشملان الطلاب يعنيان معدَّلي كسب، ويصير المطبَّق
-        تابعًا لترتيب الاستعلام لا لقرار.
+        Two programmes covering students mean two earning rates, and which
+        applies becomes a matter of query ordering rather than decision.
     """
 
     code = models.SlugField(_("الرمز"), max_length=64, unique=True)
     name_ar = models.CharField(_("الاسم بالعربية"), max_length=120)
     name_en = models.CharField(_("الاسم بالإنجليزية"), max_length=120)
 
-    # ── التشغيل والاستهداف ─────────────────────────────────
+    # ── Enablement and targeting ───────────────────────────
     is_active = models.BooleanField(
         _("مفعّل"),
         default=False,
         db_index=True,
         help_text=_("إيقافه يمنع الكسب الجديد ولا يمحو الأرصدة"),
     )
-    #: ⚠️  الاستبدال مفتاح منفصل عن الكسب.
+    #: ⚠️  Redemption is a switch separate from earning.
     #:
-    #:     إيقاف البرنامج عند تغيير القواعد يجب ألا يمنع العميل من
-    #:     استبدال ما كسبه — وإلا صار رصيده محتجَزًا بلا سبب يفهمه.
+    #:     Disabling the programme while changing the rules must not stop the
+    #:     customer redeeming what they earned — or their balance is held for no reason they understand.
     redemption_enabled = models.BooleanField(_("الاستبدال مفعّل"), default=True)
 
     account_types = models.JSONField(
@@ -73,14 +74,14 @@ class LoyaltyProgram(BaseModel):
         help_text=_("فارغ = الجميع · يُطبَّق مع أنواع الحسابات معًا"),
     )
 
-    # ── قواعد الكسب ────────────────────────────────────────
-    #: كم جنيهًا يلزم لكسب نقطة — الافتراضي محافظ (١٠ ج = نقطة)
+    # ── Earning rules ──────────────────────────────────────
+    #: How many pounds are needed to earn a point — the default is conservative (10 EGP = a point)
     currency_per_point = MoneyField(
         _("قيمة الجنيه لكل نقطة"),
         default=10,
         validators=[MinValueValidator(1)],
     )
-    #: قيمة النقطة عند الاستبدال — الافتراضي قرش (أي ١٪ فعليًا)
+    #: The value of a point on redemption — the default is a piastre (1% in effect)
     point_value = MoneyField(
         _("قيمة النقطة"),
         max_digits=8,
@@ -89,28 +90,28 @@ class LoyaltyProgram(BaseModel):
         validators=[MinValueValidator(0)],
     )
 
-    #: ⚠️  الكسب على البضاعة لا على الضريبة والشحن.
+    #: ⚠️  Earning is on the goods, not on tax and shipping.
     #:
-    #:     الضريبة تُحصَّل للدولة ولا نملكها، والشحن يُدفَع للناقل.
-    #:     مكافأة العميل عليهما تكافئه على ما لم نربح منه.
+    #:     Tax is collected for the state and we do not own it, and shipping is paid
+    #:     to the carrier. Rewarding the customer on them rewards them on what we did not profit from.
     earns_on_tax = models.BooleanField(_("الكسب على الضريبة"), default=False)
     earns_on_shipping = models.BooleanField(_("الكسب على الشحن"), default=False)
 
     min_order_amount = MoneyField(_("الحد الأدنى للطلب"), default=ZERO)
 
-    #: ⚠️  الانتهاء إلزامي عمليًا: بلا مدة يتراكم التزام لا سقف له
-    #:     في الدفتر، ويصير رقمًا يفاجئ صاحب النشاط بعد سنوات.
+    #: ⚠️  Expiry is mandatory in practice: with no term, an uncapped liability
+    #:     accumulates in the ledger and becomes a figure that shocks the owner years later.
     expiry_months = models.PositiveSmallIntegerField(
         _("مدة الصلاحية (شهر)"),
         default=12,
         help_text=_("صفر = بلا انتهاء — يُختار صراحةً"),
     )
 
-    #: ⚠️  المرتجع يسحب النقاط. بدونه: يشتري · يكسب · يُرجِع ·
-    #:     ويحتفظ بالنقاط. وهو أبسط استغلال ممكن.
+    #: ⚠️  A return withdraws the points. Without it: buy · earn · return ·
+    #:     and keep the points. The simplest possible exploit.
     reverse_on_refund = models.BooleanField(_("سحب النقاط عند المرتجع"), default=True)
 
-    #: سقف نقاط الاستبدال في الطلب الواحد — نسبة من إجماليه
+    #: The cap on points redeemed in a single order — a percentage of its total
     max_redemption_percent = RateField(
         _("أقصى نسبة استبدال ٪"),
         default=50,
@@ -129,12 +130,13 @@ class LoyaltyProgram(BaseModel):
 
     def covers(self, user, customer=None) -> bool:
         """
-        هل يشمل هذا البرنامج هذا العميل؟
+        Does this programme cover this customer?
 
-        ⚠️  **القائمة الفارغة تعني الجميع** — لا «لا أحد».
+        ⚠️  **An empty list means everyone** — not "nobody".
 
-            العكس يجعل برنامجًا يُنشأ بلا استهداف لا يكافئ أحدًا،
-            ويظهر مفعّلًا وبلا أثر — وهو أسوأ من إيقافه.
+            The reverse makes a programme created with no targeting reward
+            nobody, appearing enabled and having no effect — which is worse than
+            disabling it.
         """
         if self.account_types and user.account_type not in self.account_types:
             return False
@@ -148,10 +150,10 @@ class LoyaltyProgram(BaseModel):
 
     def points_for(self, amount) -> int:
         """
-        ⚠️  الكسر يُهمَل لا يُقرَّب لأعلى.
+        ⚠️  The fraction is discarded, not rounded up.
 
-            التقريب لأعلى يمنح نقطة على ٩ جنيهات في نظام معدّله
-            ١٠ — فيتضاعف الالتزام على آلاف الطلبات الصغيرة.
+            Rounding up awards a point on 9 pounds in a system with a rate of
+            10 — so the liability doubles across thousands of small orders.
         """
         if self.currency_per_point <= ZERO:
             return 0
@@ -160,12 +162,12 @@ class LoyaltyProgram(BaseModel):
 
 class TierLevel(BaseModel):
     """
-    فئة ولاء — مضاعِف كسب عند بلوغ إنفاق معيّن.
+    A loyalty tier — an earning multiplier reached at a given spend.
 
-    ⚠️  **العتبات بيانات لا كود** — المتطلبات صريحة في ذلك.
+    ⚠️  **The thresholds are data, not code** — the requirements say so explicitly.
 
-        «ذهبي عند ٥٠ ألفًا» قرار تسويقي يتغيّر كل موسم؛ تثبيته
-        يجعل تعديله نشرًا.
+        "Gold at fifty thousand" is a marketing decision that changes every
+        season; fixing it makes editing it a deployment.
     """
 
     program = models.ForeignKey(
@@ -176,9 +178,9 @@ class TierLevel(BaseModel):
     name_ar = models.CharField(_("الاسم بالعربية"), max_length=120)
     name_en = models.CharField(_("الاسم بالإنجليزية"), max_length=120)
 
-    #: إجمالي الإنفاق المطلوب لبلوغ الفئة
+    #: The total spend required to reach the tier
     threshold = MoneyField(_("عتبة الإنفاق"), default=ZERO)
-    #: مضاعِف الكسب — ١٫٠٠ يعني المعدّل الأساسي
+    #: The earning multiplier — 1.00 means the base rate
     multiplier = models.DecimalField(
         _("مضاعِف الكسب"),
         max_digits=4,
@@ -207,11 +209,11 @@ class TierLevel(BaseModel):
 
 class PointsKind(models.TextChoices):
     """
-    ⚠️  الإشارة جزء من المعنى لا من الحقل.
+    ⚠️  The sign is part of the meaning, not of the field.
 
-        `EARN` يزيد الرصيد و`REDEEM` ينقصه. تخزين رقم سالب
-        للاستبدال يجعل كل استعلام يحتاج معرفة الاصطلاح، وأول من
-        ينساه يقلب رصيد العميل.
+        `EARN` increases the balance and `REDEEM` decreases it. Storing a
+        negative number for a redemption would make every query need to know the
+        convention, and the first person to forget it inverts the customer's balance.
     """
 
     EARN = "EARN", _("كسب")
@@ -220,27 +222,28 @@ class PointsKind(models.TextChoices):
     REVERSE = "REVERSE", _("سحب — مرتجع")
     REFERRAL = "REFERRAL", _("مكافأة إحالة")
     ADJUSTMENT = "ADJUSTMENT", _("تسوية يدوية — إضافة")
-    #: ⚠️  السحب اليدوي نوع مستقل لا «تسوية بنقاط سالبة».
+    #: ⚠️  A manual withdrawal is its own type, not "an adjustment with negative points".
     #:
-    #:     `points` حقل موجب بحكم تعريفه، فلا سبيل لتمثيل السحب
-    #:     داخل `ADJUSTMENT`. ودمجهما كان سيجبر على السماح
-    #:     بالسالب — وأول استعلام ينسى الإشارة يقلب رصيد العميل.
+    #:     `points` is a positive field by definition, so there is no way to
+    #:     represent a withdrawal inside `ADJUSTMENT`. Merging them would have
+    #:     forced allowing negatives — and the first query to forget the sign inverts the balance.
     DEDUCTION = "DEDUCTION", _("تسوية يدوية — سحب")
 
 
-#: الحركات التي **تزيد** رصيد العميل
+#: The movements that **increase** the customer's balance
 CREDIT_KINDS = {PointsKind.EARN, PointsKind.REFERRAL, PointsKind.ADJUSTMENT}
 
 
 class PointsEntry(BaseModel):
     """
-    حركة نقاط — **إضافة فقط**.
+    A points movement — **append-only**.
 
-    ⚠️  الرصيد يُشتق من الدفتر ولا يُخزَّن حقلًا.
+    ⚠️  The balance is derived from the ledger and never stored as a field.
 
-        حقل `points_balance` يُحدَّث بالجمع والطرح ينحرف عند أول
-        استثناء في منتصف معاملة. وانحرافه يعني عميلًا يستبدل ما
-        لا يملك، أو يُمنَع مما يملك — وكلاهما شكوى.
+        A `points_balance` field updated by addition and subtraction drifts at
+        the first exception mid-transaction. And its drift means a customer
+        redeeming what they do not have, or being denied what they do — both a
+        complaint.
     """
 
     customer = models.ForeignKey(
@@ -268,10 +271,10 @@ class PointsEntry(BaseModel):
         verbose_name=_("الطلب"),
     )
 
-    #: ⚠️  تاريخ انتهاء هذه الدفعة من النقاط — الأقدم يُستهلك أولًا
+    #: ⚠️  The expiry date of this batch of points — the oldest is consumed first
     expires_on = models.DateField(_("تنتهي في"), null=True, blank=True, db_index=True)
 
-    #: ما تبقّى من هذه الدفعة بعد الاستبدال — للكسب فقط
+    #: What remains of this batch after redemption — for earning batches only
     points_remaining = models.PositiveIntegerField(_("المتبقي من الدفعة"), default=0)
 
     reference = models.CharField(_("المرجع"), max_length=64, blank=True)
@@ -295,10 +298,10 @@ class PointsEntry(BaseModel):
             models.Index(fields=["kind", "expires_on"]),
         ]
         constraints = [
-            # ⚠️  طلب واحد لا يُكسِب نقاطًا مرتين.
+            # ⚠️  One order does not earn points twice.
             #
-            #     `order_completed` قد تُبعَث مرتين بإعادة محاولة —
-            #     وبلا القيد يُضاعَف الالتزام بلا أن يظهر خطأ.
+            #     `order_completed` may be emitted twice on a retry — and without
+            #     the constraint the liability doubles with no error showing.
             models.UniqueConstraint(
                 fields=["order", "kind"],
                 condition=models.Q(deleted_at__isnull=True, order__isnull=False),
@@ -325,11 +328,11 @@ class PointsEntry(BaseModel):
 
     def save(self, *args, **kwargs):
         """
-        ⚠️  **إضافة فقط** — عدا `points_remaining`.
+        ⚠️  **Append-only** — except for `points_remaining`.
 
-            الاستهلاك يُحدِّث المتبقي من الدفعة، وهو الحقل الوحيد
-            الذي يتغيّر بعد الإنشاء. أما المبلغ والنوع فلا: تعديلهما
-            يغيّر رصيدًا رآه العميل.
+            Consumption updates what remains of the batch, and it is the only
+            field that changes after creation. The amount and the type do not:
+            editing them changes a balance the customer has seen.
         """
         if not self._state.adding:
             allowed = {"points_remaining", "updated_at"}
@@ -340,19 +343,19 @@ class PointsEntry(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الإحالة
+#  Referrals
 # ═══════════════════════════════════════════════════════════
 
 
 class ReferralProgram(BaseModel):
     """
-    برنامج إحالة — **مفتاح وقواعد مكافأة**.
+    A referral programme — **a switch and reward rules**.
 
-    ⚠️  المكافأة تُصرَف عند **أول طلب مكتمل** لا عند التسجيل.
+    ⚠️  The reward is paid on the **first completed order**, not at registration.
 
-        الصرف عند التسجيل يحوّل النظام إلى مزرعة حسابات وهمية:
-        كل بريد جديد نقاط. والطلب المكتمل يعني بضاعة خرجت ومال
-        دخل — وهو ما لا يُزوَّر مجانًا.
+        Paying at registration turns the system into a farm of fake accounts:
+        every new email is points. A completed order means goods went out and
+        money came in — and that is not forged for free.
     """
 
     code = models.SlugField(_("الرمز"), max_length=64, unique=True)
@@ -368,7 +371,7 @@ class ReferralProgram(BaseModel):
     referrer_points = models.PositiveIntegerField(_("نقاط المُحيل"), default=100)
     referee_points = models.PositiveIntegerField(_("نقاط المُحال"), default=50)
 
-    #: ⚠️  سقف لكل مُحيل: بلا سقف يصير الاستغلال مربحًا بلا حدّ
+    #: ⚠️  A cap per referrer: without one, the exploit becomes profitable without limit
     max_referrals_per_user = models.PositiveIntegerField(
         _("أقصى إحالات لكل مستخدم"),
         default=0,
@@ -385,7 +388,7 @@ class ReferralProgram(BaseModel):
 
 
 class ReferralCode(BaseModel):
-    """كود إحالة شخصي."""
+    """A personal referral code."""
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -412,12 +415,12 @@ class ReferralStatus(models.TextChoices):
 
 class Referral(BaseModel):
     """
-    إحالة مسجَّلة.
+    A recorded referral.
 
-    ⚠️  **المُحال يُسجَّل مرة واحدة إلى الأبد.**
+    ⚠️  **The referee is recorded once, forever.**
 
-        بلا هذا القيد يُحيل المستخدم نفسه عبر حسابه القديم مرارًا،
-        أو يتقاسم مُحيلان مكافأة عميل واحد.
+        Without this constraint a user refers themselves through their old
+        account repeatedly, or two referrers share one customer's reward.
     """
 
     program = models.ForeignKey(
@@ -458,8 +461,8 @@ class Referral(BaseModel):
     rewarded_at = models.DateTimeField(_("وقت المكافأة"), null=True, blank=True)
     rejection_reason = models.TextField(_("سبب الرفض"), blank=True)
 
-    #: ⚠️  يُحفَظ وقت التسجيل للكشف عن مزارع الحسابات: عشرون إحالة
-    #:     من عنوان واحد نمط لا صدفة.
+    #: ⚠️  Kept at registration time to detect account farms: twenty referrals
+    #:     from one address is a pattern, not a coincidence.
     signup_ip = models.GenericIPAddressField(_("عنوان التسجيل"), null=True, blank=True)
 
     class Meta:

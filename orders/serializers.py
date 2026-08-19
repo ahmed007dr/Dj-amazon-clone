@@ -1,10 +1,11 @@
 """
-عقود الطلبات.
+Order contracts.
 
-⚠️  المبالغ **مخرجات محسوبة** — كلها `read_only`.
+⚠️  Amounts are **computed outputs** — all of them `read_only`.
 
-    ما يرسله العميل من إجماليات يُتجاهَل: الطلب يُسعَّر من المصدر
-    عند إنشائه. قبول الرقم من الواجهة يعني عميلًا يحدد ما يدفعه.
+    Any totals the client sends are ignored: the order is priced from the source
+    when it is created. Accepting the figure from the frontend means a customer
+    setting what they pay.
 """
 
 from rest_framework import serializers
@@ -23,10 +24,10 @@ class MoneyField(serializers.DecimalField):
 
 class OrderLineSerializer(serializers.ModelSerializer):
     """
-    سطر طلب — كل حقل **لقطة وقت البيع**.
+    An order line — every field **a snapshot at the time of sale**.
 
-    الاسم والسعر والنسبة الضريبية منسوخة، فتبقى الفاتورة مقروءة
-    وصحيحة بعد تغيّر الكتالوج أو الضريبة.
+    The name, the price and the tax rate are copied, so the invoice stays
+    readable and correct after the catalogue or the tax changes.
     """
 
     product_slug = serializers.CharField(source="product.slug", read_only=True)
@@ -68,7 +69,7 @@ class OrderStatusHistorySerializer(serializers.ModelSerializer):
 
 
 class OrderListSerializer(serializers.ModelSerializer):
-    """صف في «طلباتي»."""
+    """A row in "my orders"."""
 
     item_count = serializers.IntegerField(read_only=True)
 
@@ -123,10 +124,10 @@ class OrderDetailSerializer(OrderListSerializer):
 
     def get_can_cancel(self, obj) -> bool:
         """
-        ⚠️  يُحسب من آلة الحالة نفسها لا من قائمة موازية.
+        ⚠️  Computed from the state machine itself, not from a parallel list.
 
-            قائمة ثانية في الواجهة تتباعد عن القواعد الحقيقية
-            فيظهر زر إلغاء يفشل عند الضغط.
+            A second list in the frontend diverges from the real rules, so a
+            cancel button appears and fails when pressed.
         """
         from orders import services
 
@@ -134,7 +135,7 @@ class OrderDetailSerializer(OrderListSerializer):
 
 
 class AdminOrderSerializer(OrderDetailSerializer):
-    """نسخة الأدمن — تكشف الإسناد والملاحظات الداخلية."""
+    """The admin version — it exposes the attribution and the internal notes."""
 
     customer_email = serializers.EmailField(source="customer.user.email", read_only=True)
     customer_number = serializers.CharField(source="customer.customer_number", read_only=True)
@@ -155,7 +156,7 @@ class AdminOrderSerializer(OrderDetailSerializer):
 
 
 # ═══════════════════════════════════════════════════════════
-#  المدخلات
+#  Inputs
 # ═══════════════════════════════════════════════════════════
 
 
@@ -171,10 +172,10 @@ class AddressSerializer(serializers.Serializer):
 
 class CheckoutSerializer(serializers.Serializer):
     """
-    ⚠️  **لا حقول مبالغ هنا إطلاقًا.**
+    ⚠️  **No amount fields here at all.**
 
-        الطلب يُسعَّر من المصدر عند إنشائه. قبول `total` من العميل
-        يعني أن الفاتورة يحددها المتصفح.
+        The order is priced from the source when it is created. Accepting
+        `total` from the customer means the browser sets the invoice.
     """
 
     address_id = serializers.UUIDField(

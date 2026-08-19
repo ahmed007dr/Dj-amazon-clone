@@ -559,8 +559,14 @@ const router = createBrowserRouter([
     // ⚠️  `isStaff` matches `IsEmployee` on the server (employee or admin).
     //     The shell itself turns away anyone without an active employee profile.
     path: '/staff',
+    // ⚠️  **An active employee profile, not an account type.**
+    //
+    //     The server requires `HasEmployeeProfile` (a profile that exists and is
+    //     active); and the guard here checked the account type alone, so every
+    //     admin with no employee profile passed into a rep dashboard where every
+    //     call fails with 403 — a screen that looks broken rather than "not yours".
     element: (
-      <RequireAuth allow={isStaff}>
+      <RequireAuth allow={(user) => user.has_employee_profile || user.is_owner}>
         <Lazy>
           <StaffShell />
         </Lazy>

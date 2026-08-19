@@ -1,5 +1,5 @@
 """
-عقود الكوبونات.
+Coupon contracts.
 """
 
 from rest_framework import serializers
@@ -9,11 +9,11 @@ from promotions.models import Coupon, CouponRedemption
 
 class CouponSerializer(serializers.ModelSerializer):
     """
-    ⚠️  `usage_count` **للقراءة فقط**.
+    ⚠️  `usage_count` is **read-only**.
 
-        عدّاد الاستخدام يزيده الخادم عند كل صرف. السماح بكتابته
-        يعني أن تعديلًا في اللوحة يعيد فتح كوبون استُنفد — أو
-        يغلق كوبونًا جاريًا — بلا أثر في أي سجل صرف.
+        The server increments the usage counter on every redemption. Allowing it
+        to be written means an edit in the panel reopens an exhausted coupon —
+        or closes a running one — with no trace in any redemption record.
     """
 
     usage_count = serializers.IntegerField(read_only=True)
@@ -53,11 +53,12 @@ class CouponSerializer(serializers.ModelSerializer):
 
     def validate_code(self, value: str) -> str:
         """
-        ⚠️  التوحيد بحروف كبيرة يقع في الموديل، والتحقق من التكرار
-            يجب أن يقع **على الصيغة الموحّدة**.
+        ⚠️  Upper-casing happens in the model, and the duplicate check must run
+            **on the normalised form**.
 
-            بدونه يمرّ `summer10` بجوار `SUMMER10` في التحقق ثم
-            يصطدمان عند الحفظ بخطأ قاعدة بيانات لا رسالة حقل.
+            Without that, `summer10` passes alongside `SUMMER10` in validation
+            and they then collide on save with a database error rather than a
+            field message.
         """
         normalised = value.strip().upper()
 
@@ -77,12 +78,12 @@ class CouponSerializer(serializers.ModelSerializer):
         start = attrs.get("starts_at", getattr(instance, "starts_at", None))
         end = attrs.get("ends_at", getattr(instance, "ends_at", None))
 
-        # ⚠️  نسبة فوق ١٠٠٪ تجعل الطلب سالبًا — المتجر يدفع للعميل.
+        # ⚠️  A rate above 100% makes the order negative — the store pays the customer.
         if kind == "PERCENTAGE" and value is not None and value > 100:
             raise serializers.ValidationError({"value": "النسبة لا تتجاوز ١٠٠٪"})
 
-        # ⚠️  خصم بقيمة صفر ليس خطأً تقنيًا لكنه كوبون بلا أثر:
-        #     العميل يُدخله ويرى «طُبّق» ولا يتغيّر شيء.
+        # ⚠️  A zero-value discount is not a technical error but a coupon with no effect:
+        #     the customer enters it, sees "applied", and nothing changes.
         if kind in ("PERCENTAGE", "FIXED") and value is not None and value <= 0:
             raise serializers.ValidationError({"value": "قيمة الخصم يجب أن تكون أكبر من صفر"})
 
@@ -96,8 +97,8 @@ class CouponSerializer(serializers.ModelSerializer):
 
 class CouponRedemptionSerializer(serializers.ModelSerializer):
     """
-    ⚠️  سجل دائم يبقى بعد إلغاء الطلب — التدقيق يحتاج معرفة من
-        استخدم ماذا ومتى.
+    ⚠️  A permanent record that survives the order's cancellation — auditing
+        needs to know who used what and when.
     """
 
     coupon_code = serializers.CharField(source="coupon.code", read_only=True)
@@ -114,8 +115,8 @@ class CouponRedemptionSerializer(serializers.ModelSerializer):
             "reference_type",
             "reference_id",
             "discount_amount",
-            # ⚠️  الملغى يبقى في السجل ويُميَّز: الإحصاء يحتاج فصل
-            #     الاستخدام الحقيقي عن استخدام طلبٍ أُلغي.
+            # ⚠️  A cancelled one stays in the log and is marked: the statistics need to
+            #     separate a real use from the use of an order that was cancelled.
             "is_cancelled",
             "cancelled_at",
             "created_at",

@@ -1,24 +1,25 @@
 """
-الإرسال — نقطة الدخول الوحيدة للبريد في النظام.
+Sending — the single entry point for mail in the system.
 
-⚠️  **ثلاث طبقات إعداد، وترتيبها مقصود:**
+⚠️  **Three configuration layers, and their order is deliberate:**
 
-        حساب مفعّل في قاعدة البيانات   ← يضبطه الأدمن من الشاشة
-                 ↓ إن لم يوجد
-        إعداد `.env` (EMAIL_*)          ← تركيب جديد قبل أول ضبط
-                 ↓ إن لم يوجد
-        الطرفية                          ← لا يُرسَل شيء ولا يفشل شيء
+        an enabled account in the database  ← the admin sets it from the screen
+                 ↓ if absent
+        the `.env` configuration (EMAIL_*)  ← a fresh install before any setup
+                 ↓ if absent
+        the console                         ← nothing is sent and nothing fails
 
-    الطبقة الثالثة ليست ترفًا: تركيب جديد بقاعدة بيانات فارغة لا حساب
-    فيه، وتفعيل أول أدمن يحتاج بريد تفعيل. بلا السقوط الآمن يصير
-    النظام غير قابل للإقلاع من الصفر.
+    The third layer is not a luxury: a fresh install has an empty database with
+    no account in it, and activating the first admin needs an activation email.
+    Without the safe fallback the system becomes impossible to bootstrap.
 
-⚠️  **ولا تُعدَّل `settings.EMAIL_*` وقت التشغيل أبدًا.**
+⚠️  **And `settings.EMAIL_*` is never modified at runtime.**
 
-    `settings` عالمية وليست آمنة على الخيوط، والحساب يُختار **لكل
-    رسالة** حسب مسؤوليتها. تعديلها كان يجعل رسالتين متزامنتين
-    تتبادلان الحسابين: بريد تسويقي يخرج من حساب الأمان والعكس —
-    وهو خطأ لا يظهر إلا تحت حِمل، ولا يتكرّر عند التشخيص.
+    `settings` is global and not thread-safe, and the account is chosen **per
+    message** according to its responsibility. Modifying it made two concurrent
+    messages swap accounts: marketing mail going out from the security account
+    and vice versa — a defect that appears only under load and never reproduces
+    during diagnosis.
 """
 
 from __future__ import annotations
@@ -54,12 +55,12 @@ CONSOLE_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 
 # ═══════════════════════════════════════════════════════════
-#  اختيار الحساب
+#  Account selection
 # ═══════════════════════════════════════════════════════════
 
 
 def sending_accounts():
-    """الحسابات الصالحة للإرسال، بالأولوية."""
+    """The accounts fit to send, in priority order."""
     return EmailAccount.objects.filter(
         is_active=True,
         direction__in=["OUT", "BOTH"],
@@ -68,20 +69,21 @@ def sending_accounts():
 
 def resolve_account(purpose: str = "", template_key: str = "") -> EmailAccount | None:
     """
-    الحساب الذي يخرج منه هذا البريد — من الأخصّ إلى الأعمّ.
+    The account this mail goes out from — from the most specific to the most general.
 
-        قالب بعينه  →  الغرض  →  الافتراضي  →  أعلى أولوية  →  `.env`
+        a specific template  →  the purpose  →  the default  →  highest priority  →  `.env`
 
-    ⚠️  **نهاية افتراضية إلزامية.**
+    ⚠️  **A default terminus is mandatory.**
 
-        بلا سقوط إلى الافتراضي، قالب يُضاف غدًا لا يُرسَل — لا بخطأ
-        بل بصمت. الشاشة تقول إن الإشعار أُرسل، والعميل لم يصله شيء،
-        ولا سطر في أي سجل يفسّر لماذا.
+        Without falling back to the default, a template added tomorrow is not
+        sent — not with an error but silently. The screen says the notification
+        was sent, the customer received nothing, and no line in any log explains why.
 
-    ⚠️  **والغرض يُشتقّ من القالب لا من المُنادي.**
+    ⚠️  **And the purpose is derived from the template, not from the caller.**
 
-        نداءٌ يمرّر غرضًا يخالف غرض قالبه كان يُخرج «إعادة تعيين كلمة
-        المرور» من حساب التسويق. القالب يعلن غرضه، وهو المصدر.
+        A call passing a purpose contradicting its template's used to send
+        "password reset" from the marketing account. The template declares its
+        purpose, and it is the source.
     """
     template = TEMPLATES.get(template_key) if template_key else None
     if template is not None:
@@ -102,7 +104,7 @@ def resolve_account(purpose: str = "", template_key: str = "") -> EmailAccount |
 
 
 def _routes_for(purpose: str, template_key: str):
-    """المسؤوليات المطابقة، الأخصّ أولًا."""
+    """The matching responsibilities, most specific first."""
     if not purpose:
         return []
 
@@ -115,22 +117,23 @@ def _routes_for(purpose: str, template_key: str):
 
 def _fence_allows(account: EmailAccount, purpose: str) -> bool:
     """
-    ⚠️  **السياج مطبَّق مرتين عمدًا** — هنا وفي `MailRoute.clean()`.
+    ⚠️  **The firewall is applied twice deliberately** — here and in `MailRoute.clean()`.
 
-        التكرار ليس سهوًا: `clean()` يحرس ما يُكتب من الشاشة، وهذا
-        يحرس ما يُقرأ. صفٌّ كُتب قبل القاعدة، أو حساب صار تسويقيًا
-        **بعد** إسناده، يمرّ من الأول ولا يمرّ من الثاني. والثمن
-        المحتمل — رسالة أمان من حساب مُدرَج في القوائم السوداء —
-        أغلى من فحص منطقي واحد.
+        The duplication is not an oversight: `clean()` guards what is written
+        from the screen, and this guards what is read. A row written before the
+        rule existed, or an account that became a marketing one **after** being
+        assigned, passes the first and does not pass the second. And the
+        potential price — a security message from a blacklisted account — is
+        dearer than one logical check.
     """
     return not (account.is_marketing and purpose in SECURITY_PURPOSES)
 
 
 def connection_for(account: EmailAccount | None):
     """
-    اتصال SMTP مبنيّ من الحساب — لا من `settings`.
+    An SMTP connection built from the account — not from `settings`.
 
-    ⚠️  `None` تعني «استعمل إعداد `.env`»: الطبقة الثانية.
+    ⚠️  `None` means "use the `.env` configuration": the second layer.
     """
     if account is None:
         return None
@@ -151,7 +154,7 @@ def connection_for(account: EmailAccount | None):
 
 
 # ═══════════════════════════════════════════════════════════
-#  الصحّة
+#  Health
 # ═══════════════════════════════════════════════════════════
 
 
@@ -165,11 +168,11 @@ def record_success(account: EmailAccount | None) -> None:
 
 def record_failure(account: EmailAccount | None, error: str) -> None:
     """
-    ⚠️  `F` لا قراءة-فزيادة: رسالتان تفشلان معًا فتقرأ كلٌّ العدّاد
-        قبل كتابة الأخرى، فيُسجَّل فشل واحد بدل اثنين — ويُقرأ حسابٌ
-        منهار على أنه متعثّر قليلًا.
+    ⚠️  `F`, not read-then-increment: two messages failing together each read
+        the counter before the other writes, so one failure is recorded instead
+        of two — and a collapsed account reads as slightly troubled.
 
-    ⚠️  ولا يُحدَّث الكائن في الذاكرة: `update` تكتب في الصف مباشرة.
+    ⚠️  And the in-memory object is not updated: `update` writes to the row directly.
     """
     if account is None:
         return
@@ -182,7 +185,7 @@ def record_failure(account: EmailAccount | None, error: str) -> None:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الإرسال
+#  Sending
 # ═══════════════════════════════════════════════════════════
 
 
@@ -196,23 +199,25 @@ def send_mail(
     purpose: str = "",
 ) -> bool:
     """
-    تقييد رسالة في الطابور وجدولة تسليمها بعد الإيداع.
+    Enqueue a message and schedule its delivery after the commit.
 
-    ⚠️  **لم يعد إرسالًا متزامنًا — والفرق ليس أداءً بل صحّة.**
+    ⚠️  **It is no longer a synchronous send — and the difference is correctness, not performance.**
 
-        الإرسال داخل المعاملة كان يقع قبل إيداعها، فمعاملة تُلغى بعد
-        الإرسال تعني عميلًا يتلقّى «استلمنا طلبك ORD-…» لطلب غير
-        موجود في قاعدة البيانات. والصفّ هنا يُكتب داخل نفس المعاملة
-        فيُلغى معها، والتسليم يبدأ على `on_commit` — أي بعد أن يصير
-        الحدث حقيقة.
+        Sending inside the transaction happened before it committed, so a
+        transaction rolled back after the send meant a customer receiving "we
+        have received your order ORD-…" for an order that does not exist in the
+        database. The row here is written inside the same transaction and is
+        rolled back with it, and delivery starts on `on_commit` — that is, once
+        the event has become a fact.
 
-    ⚠️  **وفشل SMTP لم يعد يعني رسالة ضائعة.**
+    ⚠️  **And an SMTP failure no longer means a lost message.**
 
-        `fail_silently=True` كان يبتلع الفشل بلا إعادة محاولة: طلب
-        إعادة تعيين كلمة مرور يُفقد نهائيًا لأن الخادم كان متوقفًا
-        ثانيتين. الصفّ يبقى ويُعاد بتراجع تدريجي.
+        `fail_silently=True` swallowed the failure with no retry: a password
+        reset request was lost permanently because the server was down for two
+        seconds. The row remains and is retried with a gradual backoff.
 
-    القيمة المعادة تعني **«قُيِّد»** لا «وصل». وصوله يعرفه الصفّ.
+    The return value means **"enqueued"**, not "delivered". Whether it arrived
+    is known from the row.
     """
     message = enqueue(template_key, to=to, language=language, context=context, purpose=purpose)
     return message is not None
@@ -227,12 +232,13 @@ def enqueue(
     purpose: str = "",
 ) -> OutboundMessage:
     """
-    تصيير الآن، وتسليم بعد الإيداع.
+    Render now, deliver after the commit.
 
-    ⚠️  **التصيير هنا لا عند التسليم** — النص لقطة لا مرجع.
+    ⚠️  **Rendering happens here, not at delivery** — the text is a snapshot, not a reference.
 
-        القالب قد يُحرَّر في الأثناء، والسياق قد يتغيّر: «إجمالي طلبك
-        ٤٥٠» تصير رقمًا آخر بعد مرتجع. الرسالة تصف لحظة الحدث.
+        The template may be edited in the meantime, and the context may change:
+        "your order total is 450" becomes another figure after a return. The
+        message describes the moment of the event.
     """
     template = TEMPLATES.get(template_key)
     if template is None:
@@ -250,10 +256,10 @@ def enqueue(
         language=language,
     )
 
-    # ⚠️  `on_commit` لا استدعاء مباشر: التسليم يبدأ بعد أن يصير
-    #     الحدث حقيقة في قاعدة البيانات. والاستثناء داخل المُستدعى
-    #     يُبتلع في `deliver` — لأنه يقع **بعد** الاستجابة، فرفعُه
-    #     يُسقط الطلب على عمل تمّ بنجاح.
+    # ⚠️  `on_commit`, not a direct call: delivery starts once the event has
+    #     become a fact in the database. And an exception inside the callback
+    #     is swallowed in `deliver` — because it happens **after** the response,
+    #     so raising it would fail a request whose work already succeeded.
     transaction.on_commit(lambda: deliver(message.pk))
 
     return message
@@ -261,9 +267,9 @@ def enqueue(
 
 def send_to_user(template_key: str, user, context: dict, **kwargs) -> bool:
     """
-    يستنتج اللغة والعنوان من المستخدم.
+    Derives the language and address from the user.
 
-    ⚠️  `user` مُمرَّر لا مستورَد — هذا النطاق لا يعرف بوجود `accounts`.
+    ⚠️  `user` is passed in, not imported — this domain knows nothing of `accounts`.
     """
     payload = {"name": user.get_short_name(), **context}
     return send_mail(
@@ -276,19 +282,20 @@ def send_to_user(template_key: str, user, context: dict, **kwargs) -> bool:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الفحص — قبل أول عميل لا بعده
+#  The check — before the first customer, not after
 # ═══════════════════════════════════════════════════════════
 
 
 def verify(account: EmailAccount) -> tuple[bool, str]:
     """
-    مصافحة SMTP فعلية بلا إرسال رسالة.
+    A real SMTP handshake with no message sent.
 
-    ⚠️  **أهم زرّ في شاشة البريد.**
+    ⚠️  **The most important button on the mail screen.**
 
-        ضبط SMTP بلا تحقق فوري يعني أن الخطأ يُكتشف عند أول عميل
-        حقيقي فقد كلمة مروره — أي في أسوأ لحظة ممكنة وعلى أهم رسالة
-        في النظام.
+        Configuring SMTP with no immediate verification means the fault is
+        discovered by the first real customer who has lost their password — that
+        is, at the worst possible moment and on the most important message in
+        the system.
     """
     connection = connection_for(account)
 
@@ -308,11 +315,12 @@ def verify(account: EmailAccount) -> tuple[bool, str]:
 
 def send_test(account: EmailAccount, *, to: str) -> tuple[bool, str]:
     """
-    رسالة تجريبية من حساب بعينه.
+    A test message from a specific account.
 
-    ⚠️  تتجاوز `resolve_account` عمدًا: السؤال هنا «هل يعمل **هذا**
-        الحساب؟» لا «من المسؤول عن هذا الغرض؟». تمريرها بالحلّال
-        كان يفحص حسابًا غير الذي يجلس المشغّل أمامه.
+    ⚠️  It deliberately bypasses `resolve_account`: the question here is "does
+        **this** account work?", not "who is responsible for this purpose?".
+        Passing it through the resolver tested an account other than the one the
+        operator is sitting in front of.
     """
     message = EmailMultiAlternatives(
         subject=f"رسالة تجريبية — {account.label_ar}",
@@ -338,10 +346,10 @@ def send_test(account: EmailAccount, *, to: str) -> tuple[bool, str]:
 
 
 # ═══════════════════════════════════════════════════════════
-#  خريطة المسؤوليات — النتيجة مرئية لا مستنتَجة
+#  The responsibility map — the result is visible, not inferred
 # ═══════════════════════════════════════════════════════════
 
-#: من أين جاء الحساب — تعرضه الشاشة بجوار كل قالب
+#: Where the account came from — the screen shows it beside every template
 SOURCE_TEMPLATE = "template"
 SOURCE_PURPOSE = "purpose"
 SOURCE_DEFAULT = "default"
@@ -351,14 +359,15 @@ SOURCE_ENV = "env"
 
 def routing_map() -> list[dict]:
     """
-    لكل قالب: من أي حساب يخرج فعلًا، **ومن أين جاء هذا الجواب**.
+    For each template: which account it actually goes out from, **and where that answer came from**.
 
-    ⚠️  السبب هو المهمّ لا النتيجة وحدها.
+    ⚠️  The reason matters, not the result alone.
 
-        شاشة تعرض «الطلبات ← الحساب الأساسي» تترك المشغّل يظنّ أنه
-        أسنده، بينما هو سقوط إلى الافتراضي. فإذا غيّر الافتراضي يومًا
-        تحرّكت معه رسائل ظنّها مثبّتة. عمود «المصدر» يجعل الفرق بين
-        «مُسنَد» و«ساقط إلى الافتراضي» ظاهرًا قبل أن يفاجئ.
+        A screen showing "Orders ← the primary account" leaves the operator
+        believing they assigned it, when it is in fact a fallback to the
+        default. So if they change the default one day, messages they thought
+        were pinned move with it. The "source" column makes the difference
+        between "assigned" and "fell back to the default" visible before it surprises anyone.
     """
     routes = list(MailRoute.objects.filter(is_active=True).select_related("account"))
     by_template = {r.template_key: r for r in routes if r.template_key}
@@ -399,19 +408,19 @@ def routing_map() -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التصيير — التجاوز يعلو الكود
+#  Rendering — the override outranks the code
 # ═══════════════════════════════════════════════════════════
 
 
 def source_for(template_key: str):
     """
-    النسخة الفعّالة: تجاوز مفعّل إن وُجد، وإلا نسخة الكود.
+    The effective version: an enabled override if one exists, otherwise the code version.
 
-    ⚠️  والغياب حالة صالحة لا نقص.
+    ⚠️  And absence is a valid state, not a gap.
 
-        الجدول **تجاوزات** لا قوالب: النظام يعمل كاملًا بلا صفّ
-        واحد فيه، وحذف التجاوز يعيد النص الأصلي فورًا — بلا نشر ولا
-        استعادة نسخة احتياطية.
+        The table holds **overrides**, not templates: the system works fully
+        with not a single row in it, and deleting the override restores the
+        original text immediately — with no deployment and no backup restore.
     """
     override = TemplateOverride.objects.filter(key=template_key, is_active=True).first()
     return override or TEMPLATES.get(template_key)
@@ -419,11 +428,12 @@ def source_for(template_key: str):
 
 def render(template_key: str, language: str, context: dict) -> tuple[str, str]:
     """
-    ⚠️  والفشل هنا يسقط إلى نص الكود لا إلى رسالة فارغة.
+    ⚠️  And a failure here falls back to the code text, not to an empty message.
 
-        التجاوز يحرّره إنسان، وإنسان يخطئ. وأي خلل فيه يجب ألا يمنع
-        وصول «إعادة تعيين كلمة المرور» — النسخة الأصلية قائمة دائمًا،
-        فاستعمالها أرخص من إسقاط الرسالة.
+        The override is edited by a human, and humans make mistakes. And no
+        defect in it must be able to stop "password reset" arriving — the
+        original version is always there, and using it is cheaper than dropping
+        the message.
     """
     default = TEMPLATES.get(template_key)
     source = source_for(template_key)
@@ -438,22 +448,24 @@ def render(template_key: str, language: str, context: dict) -> tuple[str, str]:
 
 
 # ═══════════════════════════════════════════════════════════
-#  التسليم — من الطابور إلى الخادم
+#  Delivery — from the queue to the server
 # ═══════════════════════════════════════════════════════════
 
 
 def _claim(message_id) -> OutboundMessage | None:
     """
-    حجز صفّ للتسليم — **بشرطٍ ذرّي لا بقراءة ثم كتابة**.
+    Claim a row for delivery — **with an atomic condition, not read-then-write**.
 
-    ⚠️  عاملان يقرآن نفس الصفّ «في الطابور» فيرسلانه مرتين: العميل
-        يتلقّى رسالتين متطابقتين. و`UPDATE … WHERE status = 'PENDING'`
-        يجعل الفائز واحدًا مهما تزامنا — من يعيد `1` هو من يملكه.
+    ⚠️  Two workers reading the same "pending" row send it twice: the customer
+        receives two identical messages. And `UPDATE … WHERE status = 'PENDING'`
+        makes exactly one of them the winner however concurrent they are —
+        whoever gets `1` back owns it.
 
-    ⚠️  والحجز يمتدّ `STUCK_MINUTES` ثم يسقط.
+    ⚠️  And the claim lasts `STUCK_MINUTES` and then lapses.
 
-        العملية التي تسقط بين الحجز والإرسال كانت تترك الصفّ محجوزًا
-        إلى الأبد: رسالة تضيع بلا فشل ظاهر — أسوأ من فشل معلن.
+        A process that died between the claim and the send used to leave the row
+        claimed forever: a message lost with no visible failure — worse than a
+        declared one.
     """
     now = timezone.now()
 
@@ -474,10 +486,11 @@ def _claim(message_id) -> OutboundMessage | None:
 
 def deliver(message_id) -> bool:
     """
-    محاولة تسليم صفّ واحد.
+    An attempt to deliver a single row.
 
-    ⚠️  **لا ترفع أبدًا.** تُستدعى من `on_commit` — أي بعد أن يكون
-        العمل قد تمّ ونجح. استثناء هنا كان يُسقط الطلب على بريد.
+    ⚠️  **It never raises.** It is called from `on_commit` — that is, after the
+        work has been done and has succeeded. An exception here used to fail a
+        request over an email.
     """
     try:
         message = _claim(message_id)
@@ -492,8 +505,8 @@ def deliver(message_id) -> bool:
 def _attempt(message: OutboundMessage) -> bool:
     account = resolve_account(purpose=message.purpose, template_key=message.template_key)
 
-    # ⚠️  ترويسات المحادثة تُضاف عند التسليم لا عند التقييد: الصفّ
-    #     يحمل المعرّفات، والبناء هنا يبقيها في مكان واحد.
+    # ⚠️  Threading headers are added at delivery, not at enqueueing: the row
+    #     carries the ids, and building them here keeps it all in one place.
     headers = {}
     if message.in_reply_to:
         headers["In-Reply-To"] = message.in_reply_to
@@ -529,11 +542,12 @@ def _attempt(message: OutboundMessage) -> bool:
 
 def _record_attempt_failure(message: OutboundMessage, account, error: str) -> None:
     """
-    ⚠️  الفشل النهائي **حالة معلنة** لا صفّ يبقى ينتظر إلى الأبد.
+    ⚠️  Final failure is **a declared state**, not a row that waits forever.
 
-        الصفّ الذي يُعاد بلا حدّ يخفي عطلًا دائمًا (عنوان خاطئ ·
-        صندوق ممتلئ) وسط ضجيج المحاولات، فلا يعرف أحد أن الرسالة لن
-        تصل أبدًا. `FAILED` تجعلها سطرًا في الشاشة يُقرأ ويُعالَج.
+        A row retried without limit hides a permanent fault (a wrong address · a
+        full mailbox) in the noise of the attempts, so nobody knows the message
+        will never arrive. `FAILED` turns it into a line on the screen that gets
+        read and dealt with.
     """
     attempts = message.attempts + 1
     exhausted = attempts >= MAX_ATTEMPTS
@@ -560,13 +574,14 @@ def _record_attempt_failure(message: OutboundMessage, account, error: str) -> No
 
 def deliver_pending(limit: int = 100) -> int:
     """
-    المهمة الدورية: تسليم ما حان وقته.
+    The periodic task: deliver what is due.
 
-    ⚠️  الحجز يقع **قبل** الإرسال وخارج أي معاملة طويلة.
+    ⚠️  The claim happens **before** the send and outside any long transaction.
 
-        الإرسال داخل معاملة يُبقي القفل على الصفّ طوال مصافحة SMTP —
-        وخادم بطيء يعلّق الجدول كله. الحجز الذرّي يحرّر القفل فورًا
-        ويترك الشرط وحده يمنع الازدواج.
+        Sending inside a transaction holds the lock on the row for the whole
+        SMTP handshake — and a slow server stalls the entire table. The atomic
+        claim releases the lock immediately and lets the condition alone prevent
+        duplication.
     """
     now = timezone.now()
 
@@ -584,10 +599,10 @@ def deliver_pending(limit: int = 100) -> int:
 
 def retry(message: OutboundMessage) -> bool:
     """
-    إعادة يدوية من الشاشة — تصفّر التراجع لا العدّاد.
+    A manual retry from the screen — it resets the backoff, not the counter.
 
-    ⚠️  العدّاد يبقى: هو سجل ما جرى. تصفيره يجعل رسالة فشلت عشرين
-        مرة تبدو كأنها في محاولتها الأولى.
+    ⚠️  The counter remains: it is the record of what happened. Resetting it
+        makes a message that failed twenty times look like it is on its first attempt.
     """
     OutboundMessage.objects.filter(pk=message.pk).update(
         status=DeliveryState.PENDING, next_attempt_at=timezone.now()
@@ -596,7 +611,7 @@ def retry(message: OutboundMessage) -> bool:
 
 
 # ═══════════════════════════════════════════════════════════
-#  الردّ على الوارد
+#  Replying to inbound mail
 # ═══════════════════════════════════════════════════════════
 
 
@@ -611,11 +626,11 @@ def enqueue_raw(
     references: str = "",
 ) -> OutboundMessage:
     """
-    رسالة بنصّ حرّ — للردّ الذي يكتبه موظف.
+    A free-text message — for a reply written by an employee.
 
-    ⚠️  تمرّ بنفس الطابور لا بإرسال مباشر: الردّ اليدوي يستحق ما
-        يستحقه البريد الآلي من إعادة محاولة وسجل. وأسوأ رسالة تُفقد
-        هي التي كتبها إنسان مرة واحدة.
+    ⚠️  It goes through the same queue rather than a direct send: a manual reply
+        deserves the retry and the record that automated mail gets. And the
+        worst message to lose is the one a human wrote once.
     """
     message = OutboundMessage.objects.create(
         to_email=to,
@@ -632,13 +647,14 @@ def enqueue_raw(
 
 def reply(inbound, *, body: str, subject: str = "", actor=None) -> OutboundMessage:
     """
-    ردّ على رسالة واردة — داخل سلسلتها.
+    A reply to an inbound message — inside its thread.
 
-    ⚠️  **ولا يُردّ على رسالة آلية أبدًا.**
+    ⚠️  **And an automated message is never replied to.**
 
-        ردّان آليان متقابلان يولّدان آلاف الرسائل في دقائق، وينتهيان
-        بالدومين في القوائم السوداء — فيسقط معه بريد الطلبات وإعادة
-        تعيين كلمات المرور. المنع هنا لا في الشاشة: الشاشة تُلتَفّ.
+        Two auto-replies facing each other generate thousands of messages in
+        minutes, and end with the domain blacklisted — taking order mail and
+        password resets down with it. The block belongs here, not on the screen:
+        screens get bypassed.
     """
     from core.errors import BusinessError, ErrorCode
     from mailing.models import InboundState
@@ -649,8 +665,8 @@ def reply(inbound, *, body: str, subject: str = "", actor=None) -> OutboundMessa
             detail="لا يُردّ على رسالة آلية — حماية من حلقات البريد",
         )
 
-    # ⚠️  السلسلة تُبنى بإضافة معرّف الرسالة إلى مراجعها لا باستبداله:
-    #     الاستبدال يقطع الخيط عند العميل فيظهر الردّ محادثةً جديدة.
+    # ⚠️  The thread is built by appending the message id to its references, not replacing them:
+    #     replacing breaks the thread at the customer's end, so the reply appears as a new conversation.
     references = " ".join(filter(None, [inbound.references, inbound.message_id]))
 
     outbound = enqueue_raw(

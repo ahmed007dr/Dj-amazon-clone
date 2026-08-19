@@ -1,0 +1,82 @@
+.role-permissions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.role-permissions p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.role-permissions fieldset {
+  padding: var(--space-3);
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.role-permissions legend {
+  padding-inline: var(--space-2);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.role-permissions__all {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-block-size: var(--touch-target);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.role-permissions__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-block-start: var(--space-2);
+}
+
+.role-permissions__list label {
+  display: flex;
+  gap: var(--space-2);
+  align-items: start;
+  /* ⚠️  مساحة لمس كاملة: القائمة تُضغط على تابلت لا بفأرة. */
+  min-block-size: var(--touch-target);
+  padding-block: var(--space-1);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.role-permissions__list input {
+  margin-block-start: 0.35rem;
+}
+
+.role-permissions__list span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+/* ⚠️  صلاحية المنح نفسها: من يملكها يمنح نفسه كل شيء. تُعلَّم
+   بلون تحذيري ولا تُخفى — إخفاؤها يجعلها تُمنح بلا انتباه. */
+.role-permissions__list label.is-dangerous {
+  padding-inline: var(--space-2);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  border-radius: var(--radius-sm);
+}
+
+.role-permissions__list em {
+  font-size: 0.75rem;
+  font-style: normal;
+  color: var(--color-danger);
+}
+
+.role-permissions__actions {
+  display: flex;
+  gap: var(--space-2);
+  padding-block-start: var(--space-3);
+  border-block-start: 1px solid var(--color-border);
+}
