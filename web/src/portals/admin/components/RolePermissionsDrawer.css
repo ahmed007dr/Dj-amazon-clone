@@ -43,7 +43,7 @@
   display: flex;
   gap: var(--space-2);
   align-items: start;
-  /* ⚠️  مساحة لمس كاملة: القائمة تُضغط على تابلت لا بفأرة. */
+  /* ⚠️  A full touch area: the list is pressed on a tablet, not with a mouse. */
   min-block-size: var(--touch-target);
   padding-block: var(--space-1);
   font-size: 0.875rem;
@@ -60,8 +60,9 @@
   gap: 0.1rem;
 }
 
-/* ⚠️  صلاحية المنح نفسها: من يملكها يمنح نفسه كل شيء. تُعلَّم
-   بلون تحذيري ولا تُخفى — إخفاؤها يجعلها تُمنح بلا انتباه. */
+/* ⚠️  The granting permission itself: whoever holds it grants themselves
+   everything. It is flagged in a warning colour and never hidden — hiding it
+   makes it get granted unnoticed. */
 .role-permissions__list label.is-dangerous {
   padding-inline: var(--space-2);
   background: color-mix(in srgb, var(--color-danger) 8%, transparent);

@@ -1,12 +1,12 @@
 import './ColorField.css';
 
 /**
- * حقل لون.
+ * A colour field.
  *
- * ⚠️  منتقي لوني **وحقل نصي معًا**.
+ * ⚠️  A colour picker **and a text field together**.
  *
- *     المنتقي وحده يمنع لصق كود العلامة التجارية الدقيق؛ والحقل
- *     وحده يجبر على معرفة الست عشري. الاثنان يغطّيان الحالتين.
+ *     The picker alone prevents pasting the exact brand code; and the field
+ *     alone forces the user to know hex. The two together cover both cases.
  */
 export function ColorField({
   label,
@@ -40,8 +40,8 @@ export function ColorField({
           spellCheck={false}
           onChange={(event) => {
             const next = event.target.value;
-            // ⚠️  لا نمرّر قيمة ناقصة إلى المنتقي: `#ab` يجعله يقفز
-            //     إلى الأسود بينما المستخدم في منتصف الكتابة.
+            // ⚠️  We do not pass an incomplete value to the picker: `#ab` makes it jump
+            //     to black while the user is mid-typing.
             if (/^#[0-9a-fA-F]{0,6}$/.test(next)) onChange(next);
           }}
         />

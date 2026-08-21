@@ -16,13 +16,13 @@ import { useToast } from '@/shared/ui/useToast';
 import './LoyaltyProgramCard.css';
 
 /**
- * بطاقة برنامج إحالة.
+ * A referral programme card.
  *
- * ⚠️  **نفس شكل بطاقة الولاء ونفس موضع المفتاح.**
+ * ⚠️  **The same shape as the loyalty card and the same switch position.**
  *
- *     بطاقتان لقرارين متشابهين بتخطيطين مختلفين تجعلان الأدمن
- *     يبحث عن المفتاح في كل مرة. التشابه هنا ليس كسلًا — هو ما
- *     يجعل الشاشة تُتعلَّم مرة واحدة.
+ *     Two cards for two similar decisions with two different layouts make the
+ *     admin hunt for the switch every time. The similarity here is not laziness
+ *     — it is what makes the screen learnable once.
  */
 export function ReferralProgramCard({ program }: { program: ReferralProgram }) {
   const { t } = useTranslation();
@@ -191,9 +191,9 @@ export function ReferralProgramCard({ program }: { program: ReferralProgram }) {
               />
             </label>
 
-            {/* ⚠️  السقف صفر = بلا سقف، ويُقال في التلميح: الحقل
-                الفارغ المعنى يجعل الأدمن يكتب رقمًا كبيرًا ظنًّا
-                منه أنه يفتح الباب. */}
+            {/* ⚠️  A cap of zero = no cap, and the hint says so: a field whose
+                emptiness carries meaning makes the admin type a large number
+                believing that is what opens the door. */}
             <label>
               {t('loyalty.referralCap')}
               <input

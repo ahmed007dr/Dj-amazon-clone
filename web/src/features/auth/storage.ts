@@ -1,30 +1,33 @@
 /**
- * حفظ توكن التحديث.
+ * Storing the refresh token.
  *
- * ⚠️  **مقايضة أمنية واعية — اقرأها قبل تغييرها.**
+ * ⚠️  **A deliberate security trade-off — read this before changing it.**
  *
- *     الأفضل نظريًا هو كوكي `HttpOnly` لا يصله JavaScript إطلاقًا،
- *     فلا يسرّبه أي سكربت مُحقَن. لكنه **لا يعمل هنا**:
+ *     The theoretically better option is an `HttpOnly` cookie that JavaScript
+ *     never reaches, so no injected script can leak it. But it **does not work
+ *     here**:
  *
- *       · الواجهة على أصل مختلف عن الـ API (منفذ ٥١٧٣ مقابل ٨٠٠٠).
- *       · الكوكي عبر الأصول يحتاج `SameSite=None; Secure`.
- *       · و`Secure` يعني HTTPS — والمتصفح يرفض الكوكي بلا ذلك.
+ *       · The frontend is on a different origin from the API (port 5173 vs 8000).
+ *       · A cross-origin cookie needs `SameSite=None; Secure`.
+ *       · And `Secure` means HTTPS — which the browser refuses the cookie without.
  *
- *     فرضُه الآن يعني إما تعطيل التطوير، أو إعدادًا مختلفًا بين
- *     البيئتين — وهي بالضبط الفجوة التي تُخفي الأخطاء حتى النشر.
+ *     Forcing it now means either breaking development, or a different
+ *     configuration in each environment — which is exactly the gap that hides
+ *     defects until deployment.
  *
- * ⚠️  ما يخفّف الأثر فعلًا، وهو مطبَّق بالفعل:
+ * ⚠️  What genuinely mitigates the risk, and is already in place:
  *
- *       · توكن الوصول عمره **عشر دقائق** (لا يُحفظ أصلًا).
- *       · توكن التحديث **يدور** عند كل استخدام، والقديم يُدرَج في
- *         القائمة السوداء فورًا — فالمسروق يُبطَل عند أول تجديد شرعي.
- *       · إيقاف الحساب يقطع الوصول فورًا بثلاث طبقات (ADR-16).
- *       · الجلسات قابلة للإلغاء من شاشة «أجهزتي».
+ *       · The access token lives **ten minutes** (and is never stored at all).
+ *       · The refresh token **rotates** on every use, and the old one is
+ *         blacklisted immediately — so a stolen one is void at the first legitimate refresh.
+ *       · Suspending an account cuts access off immediately across three layers (ADR-16).
+ *       · Sessions can be revoked from the "my devices" screen.
  *
- * ⚠️  **مسار الإزالة:** حين تُنشر الواجهة والـ API خلف **نطاق واحد**
- *     (`example.com` و`example.com/api`)، يصير الكوكي من نفس الأصل
- *     فيكفيه `SameSite=Lax` بلا `Secure` المشروط. عندها يُنقل التوكن
- *     إلى كوكي `HttpOnly` ويُحذف هذا الملف.
+ * ⚠️  **The path to removing this:** once the frontend and the API are deployed
+ *     behind **one domain** (`example.com` and `example.com/api`), the cookie
+ *     becomes same-origin and `SameSite=Lax` suffices with no conditional
+ *     `Secure`. At that point the token moves to an `HttpOnly` cookie and this
+ *     file is deleted.
  */
 
 const KEY = 'refresh-token';
@@ -33,7 +36,7 @@ export function readRefreshToken(): string | null {
   try {
     return localStorage.getItem(KEY);
   } catch {
-    // وضع التصفّح الخاص في بعض المتصفحات يرفض الكتابة والقراءة
+    // Private browsing in some browsers refuses both writing and reading
     return null;
   }
 }
@@ -46,8 +49,8 @@ export function writeRefreshToken(token: string | null): void {
       localStorage.removeItem(KEY);
     }
   } catch {
-    // ⚠️  الفشل صامت عمدًا: التطبيق يعمل بلا حفظ، والمستخدم يعيد
-    //     الدخول عند إعادة التحميل. رمي خطأ هنا يمنع تسجيل الدخول
-    //     أصلًا في وضع التصفّح الخاص.
+    // ⚠️  The failure is deliberately silent: the app works without storing, and
+    //     the user logs in again on reload. Throwing here would prevent logging in
+    //     at all in private browsing.
   }
 }

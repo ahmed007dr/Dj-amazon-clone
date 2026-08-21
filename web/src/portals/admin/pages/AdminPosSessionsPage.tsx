@@ -18,17 +18,17 @@ import { formatDate } from '@/shared/utils/format';
 import './AdminPosSessionsPage.css';
 
 /**
- * ورديات نقطة البيع.
+ * Point-of-sale shifts.
  *
- * ⚠️  **الشاشة تُقرأ عمود الفرق أولًا — وبُنيت لذلك.**
+ * ⚠️  **The screen is read by the discrepancy column first — and was built for that.**
  *
- *     الأدمن لا يفتحها ليتصفّح الورديات بل ليجد الفرق النقدي غير
- *     الصفري. قائمة تعرض كل شيء بنفس الوزن تدفن الوردية التي بها
- *     عجز مئة جنيه بين ثلاثين وردية متوازنة — فلا يراها أحد حتى
- *     يتكرّر العجز شهرًا.
+ *     The admin does not open it to browse shifts but to find the non-zero cash
+ *     discrepancy. A list showing everything at the same weight buries the
+ *     shift a hundred pounds short among thirty balanced ones — so nobody sees
+ *     it until the shortfall recurs for a month.
  */
 
-/** ⚠️  فرق أكبر من هذا يُبرز بصريًا — يوازي `pos.cash_variance_threshold`. */
+/** ⚠️  A discrepancy larger than this is highlighted visually — it mirrors `pos.cash_variance_threshold`. */
 const NOTABLE_VARIANCE = 20;
 
 export function AdminPosSessionsPage() {
@@ -87,8 +87,8 @@ export function AdminPosSessionsPage() {
       header: t('pos.counted'),
       align: 'end',
       secondary: true,
-      // ⚠️  شرطة لا صفر للوردية المفتوحة: الصفر رقم يُقرأ كعدّ
-      //     حصل ونتيجته لا شيء، والفارق بينهما هو كل المعنى.
+      // ⚠️  A dash rather than zero for an open shift: zero is a figure read as a count
+      //     that happened and came to nothing, and the difference between them is the whole meaning.
       render: (session) => <span dir="ltr">{session.counted_cash ?? '—'}</span>,
     },
     {
@@ -103,9 +103,9 @@ export function AdminPosSessionsPage() {
     <>
       <PageHeader title={t('pos.sessions')} />
 
-      {/* ⚠️  الكاونترات هنا لا في «النظام»: من يقرأ ورديات فرع هو
-          من يضيف كاونتره الثاني ويوقف المعطّل — وفصلهما يجعل
-          فتح فرع جديد رحلة بين شاشتين. */}
+      {/* ⚠️  The registers are here rather than in "system": whoever reads a branch's
+          shifts is who adds its second register and disables the broken one —
+          and separating them makes opening a new branch a journey between two screens. */}
       <div className="pos-view-tabs" role="tablist">
         {(['sessions', 'registers'] as const).map((value) => (
           <button
@@ -133,8 +133,8 @@ export function AdminPosSessionsPage() {
             setStatus(value);
             setPage(1);
           }}
-          // ⚠️  بلا خيار «الكل»: `FilterSelect` تضعه بنفسها
-          //     كخيار فارغ يحمل التسمية — وإضافته هنا تكرّره.
+          // ⚠️  No "all" option: `FilterSelect` adds it itself
+          //     as an empty option carrying the label — and adding it here duplicates it.
           options={[
             { value: 'OPEN', label: t('pos.open') },
             { value: 'CLOSED', label: t('pos.closed') },
@@ -162,8 +162,8 @@ export function AdminPosSessionsPage() {
             key: 'actions',
             header: '',
             align: 'end',
-            // ⚠️  التفصيل يُطلَب ولا يُجلب لكل صفّ: الصفحة تعرض
-            //     عشرين وردية وتُقرأ منها واحدة.
+            // ⚠️  The detail is requested rather than fetched for every row: the page shows
+            //     twenty shifts and one of them gets read.
             render: (row) => (
               <Button size="sm" variant="ghost" onClick={() => setDetailOf(row.id)}>
                 {t('pos.sessionDetail')}
@@ -209,8 +209,8 @@ export function AdminPosSessionsPage() {
               </div>
             ))}
 
-            {/* ⚠️  تفسير الفرق هو المحتوى لا حاشية: وردية بفرق
-                بلا تفسير هي بالضبط ما تبحث عنه المراجعة. */}
+            {/* ⚠️  The discrepancy's explanation is the content, not a footnote: a
+                shift with a discrepancy and no explanation is exactly what the review is looking for. */}
             {detail.data.variance_note ? (
               <div className="session-detail__note">
                 <dt>{t('pos.varianceNote')}</dt>
@@ -225,13 +225,13 @@ export function AdminPosSessionsPage() {
 }
 
 /**
- * خلية الفرق.
+ * The discrepancy cell.
  *
- * ⚠️  **اللون ليس وحده الإشارة.**
+ * ⚠️  **The colour is not the only signal.**
  *
- *     أحمر بلا نص يختفي تمامًا على من لا يميّز الألوان — وهي
- *     الحالة التي يُفترض أن تُلتقط بنظرة. الإشارة هنا اللون
- *     **والخط العريض والعلامة** معًا.
+ *     Red with no text disappears entirely for anyone who cannot distinguish
+ *     colours — and this is the case that is meant to be caught at a glance.
+ *     The signal here is the colour **and the bold weight and the sign** together.
  */
 function VarianceCell({ session }: { session: Session }) {
   if (session.variance === null) return <span>—</span>;

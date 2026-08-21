@@ -5,11 +5,12 @@ import { http } from '@/shared/http';
 import type { CursorPage, Review } from '@/features/catalog/types';
 
 /**
- * ⚠️  التقييم يبدأ **معلّقًا** دائمًا.
+ * ⚠️  A review always starts **pending**.
  *
- *     الخادم يفرضه ولا يقبل `status` من العميل — وإلا نشر كلٌّ
- *     تقييمه بنفسه متجاوزًا المراجعة. والواجهة تقول ذلك صراحةً
- *     بعد الإرسال بدل أن يبحث المستخدم عن تقييمه في الصفحة.
+ *     The server enforces it and accepts no `status` from the client — otherwise
+ *     everyone would publish their own review, bypassing moderation. And the
+ *     frontend says so explicitly after submission rather than leaving the user
+ *     to hunt for their review on the page.
  */
 export type ReviewStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -28,10 +29,11 @@ export interface ReviewDraft {
 const MINE_KEY = ['reviews', 'mine'] as const;
 
 /**
- * تقييماتي — بما فيها المعلّقة والمرفوضة.
+ * My reviews — including the pending and the rejected.
  *
- * ⚠️  قائمة منفصلة عن تقييمات المنتج: الأخيرة تعرض المعتمد وحده،
- *     فلا يجد المستخدم تقييمه فيها بعد الإرسال ويظنّه ضاع.
+ * ⚠️  A list separate from the product's reviews: the latter shows only what is
+ *     approved, so the user cannot find their review in it after submitting and
+ *     assumes it was lost.
  */
 export function useMyReviews(enabled = true) {
   return useQuery({
@@ -43,11 +45,11 @@ export function useMyReviews(enabled = true) {
 }
 
 /**
- * ⚠️  إبطال **تقييمات المنتج وتقييماتي والمنتج نفسه**.
+ * ⚠️  Invalidate **the product's reviews, my reviews and the product itself**.
  *
- *     الحذف يعيد حساب متوسط التقييم على الخادم، فبطاقة المنتج
- *     ونجومها تتقادم مع كل كتابة. إبطال قائمة واحدة يترك المتوسط
- *     القديم بجوار المراجعة الجديدة.
+ *     Deleting recomputes the average rating on the server, so the product card
+ *     and its stars go stale with every write. Invalidating one list leaves the
+ *     old average beside the new review.
  */
 function useReviewMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();
@@ -58,8 +60,8 @@ function useReviewMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult
       void queryClient.invalidateQueries({ queryKey: ['catalog', 'reviews'] });
       void queryClient.invalidateQueries({ queryKey: MINE_KEY });
       void queryClient.invalidateQueries({ queryKey: ['catalog', 'product'] });
-      // ⚠️  والتقييم المجمَّع معها: كاتب المراجعة ينظر إلى المتوسط
-      //     مباشرةً بعد الإرسال، ورقمٌ لم يتحرّك يُقرأ «لم تُحفظ».
+      // ⚠️  And the aggregated rating with them: whoever wrote the review looks at
+      //     the average straight after submitting, and a figure that has not moved reads as "it was not saved".
       void queryClient.invalidateQueries({ queryKey: ['reviews', 'rating'] });
     },
   });
@@ -80,11 +82,12 @@ export function useDeleteReview() {
 }
 
 /**
- * التصويت «مفيدة» — **تبديل لا زيادة**.
+ * The "helpful" vote — **a toggle, not an increment**.
  *
- * ⚠️  الخادم يعيد `voted` و`helpful_count` معًا: الأول لحالة الزر
- *     والثاني للعدّاد. استنتاج العدّاد محليًا بالزيادة ينحرف عن
- *     الخادم عند أول تصويت من نافذة أخرى.
+ * ⚠️  The server returns `voted` and `helpful_count` together: the first for the
+ *     button's state and the second for the counter. Deriving the counter
+ *     locally by incrementing drifts from the server at the first vote from
+ *     another window.
  */
 export function useToggleHelpful() {
   return useReviewMutation((id: string) =>
@@ -93,7 +96,7 @@ export function useToggleHelpful() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  الأدمن — المراجعة
+//  Admin — moderation
 // ═══════════════════════════════════════════════════════════
 
 export interface AdminReview {
@@ -123,15 +126,16 @@ export function useAdminReviews(params: { status?: string; page?: number }) {
 }
 
 /**
- * اعتماد مراجعة أو رفضها.
+ * Approving or rejecting a review.
  *
- * ⚠️  **سبب الرفض إلزامي** — الخادم يفرضه.
+ * ⚠️  **The rejection reason is mandatory** — the server enforces it.
  *
- *     الرفض بلا سبب لا يُشرح للعميل، فيعيد كتابة نفس النص ظنًّا
- *     أن شيئًا تعطّل. والسبب هو ما يجعل الرفض قابلًا للتصحيح.
+ *     A rejection with no reason cannot be explained to the customer, so they
+ *     rewrite the same text assuming something broke. And the reason is what
+ *     makes the rejection correctable.
  *
- * ⚠️  والاعتماد يعيد حساب متوسط المنتج على الخادم — ولذلك يُبطَل
- *     الكتالوج معه، وإلا بقيت النجوم القديمة على بطاقة المنتج.
+ * ⚠️  And approval recomputes the product's average on the server — which is why
+ *     the catalogue is invalidated with it, or the old stars stay on the product card.
  */
 export function useModerateReview() {
   const queryClient = useQueryClient();

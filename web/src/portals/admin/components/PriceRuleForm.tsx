@@ -17,14 +17,14 @@ import { useToast } from '@/shared/ui/useToast';
 import './PricingForms.css';
 
 /**
- * سعر منتج في قائمة — أو خصم ترويجي عليه.
+ * A product's price in a list — or a promotional discount on it.
  *
- * ⚠️  **نموذج واحد لأنهما نفس القرار بمخرجين**: «كم يدفع مقابل هذا
- *     الصنف؟». يتشاركان منتقي المنتج ومنطق الأخطاء، ونسختان تعنيان
- *     أن إصلاح المنتقي يحتاج تعديلين.
+ * ⚠️  **One form, because they are the same decision with two outputs**: "what
+ *     do they pay for this item?". They share the product picker and the error
+ *     handling, and two copies would mean fixing the picker takes two edits.
  *
- * ⚠️  و**الشريحة تُقرأ «من ١٠ فأكثر» لا «١٠»**: الرقم وحده يُقرأ
- *     كمية ثابتة، فيظن الأدمن أنه سعّر عشر قطع بالضبط.
+ * ⚠️  And **a tier reads as "from 10 upwards", not "10"**: the number alone
+ *     reads as a fixed quantity, so the admin believes they priced exactly ten units.
  */
 export function PriceRuleForm({
   priceListId,
@@ -69,8 +69,8 @@ export function PriceRuleForm({
   const submit = () => {
     setFieldErrors({});
 
-    // ⚠️  التعديل يُبقي المنتج كما هو: تغييره يعني قاعدة أخرى
-    //     تمامًا، والصواب حذف هذه وإنشاء تلك.
+    // ⚠️  Editing keeps the product as it is: changing it means an entirely
+    //     different rule, and the right move is to delete this one and create that.
     const productId = rule ? rule.product : product?.id;
     if (!productId) return;
 
@@ -80,7 +80,7 @@ export function PriceRuleForm({
           discount_kind: discountKind,
           discount_value: discountValue,
           ...(startsAt ? { starts_at: new Date(startsAt).toISOString() } : {}),
-          // فارغ = بلا نهاية
+          // Empty = no end
           ends_at: endsAt ? new Date(endsAt).toISOString() : null,
         }
       : {

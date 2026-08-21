@@ -1,12 +1,12 @@
-/* ⚠️  خمسة أزرار في ترويسة الصفحة تلتفّ على الهاتف ولا تُضغط:
-       صفٌّ واحد كان يخرج من الشاشة أفقيًا فيختفي زر «تلف» تمامًا. */
+/* ⚠️  Five buttons in the page header wrap on a phone rather than being squeezed:
+       a single row used to run off the screen horizontally, so the "damage" button disappeared entirely. */
 .inventory-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
 }
 
-/* الإشارة تُقرأ من اللون أيضًا لا من الرمز وحده */
+/* The sign is read from the colour too, not from the symbol alone */
 .inventory-in {
   color: var(--color-success);
 }
@@ -15,9 +15,9 @@
   color: var(--color-danger);
 }
 
-/* ⚠️  حقلان صغيران في الخلية لا نموذج: نقطة إعادة الطلب رقم
-   يُضبط بالتجربة، ودفنه خلف شاشة تعديل يجعله يبقى على قيمته
-   الأولى للأبد فتصير التنبيهات ضجيجًا يُتجاهَل. */
+/* ⚠️  Two small fields in the cell rather than a form: the reorder point is a
+   number tuned by experiment, and burying it behind an edit screen makes it
+   stay on its first value forever, so the alerts become noise that gets ignored. */
 .stock-thresholds {
   display: inline-flex;
   gap: var(--space-1);

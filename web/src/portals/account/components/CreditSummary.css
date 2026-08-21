@@ -46,7 +46,7 @@
   gap: var(--space-5);
 }
 
-/* ⚠️  المتاح أكبر عنصر: هو ما يُبنى عليه قرار الشراء. */
+/* ⚠️  Available credit is the largest element: it is what the purchase decision is built on. */
 .credit-summary__available {
   display: flex;
   flex-direction: column;
@@ -95,7 +95,7 @@
   transition: inline-size var(--transition);
 }
 
-/* ⚠️  الامتلاء هنا خطر لا إنجاز — واللون يقول ذلك. */
+/* ⚠️  Filling up here is a danger, not an achievement — and the colour says so. */
 .credit-summary__bar.is-warning span {
   background: var(--color-warning);
 }

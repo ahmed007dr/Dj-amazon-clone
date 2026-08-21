@@ -3,13 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { http } from '@/shared/http';
 
 /**
- * التصنيف المرجعي — الفئات والبراندات والمصنّعون.
+ * Reference classification — categories, brands and manufacturers.
  *
- * ⚠️  **هذه شرطٌ لإضافة أي منتج**: الفئة إلزامية على المنتج، فمتجر
- *     بلا شاشة فئات لا يستطيع إضافة صنفه الأول من لوحته.
+ * ⚠️  **This is a precondition for adding any product**: the category is
+ *     mandatory on a product, so a store with no categories screen cannot add
+ *     its first item from its panel.
  *
- * ⚠️  وكلها **بلا ترقيم**: عشرات الصفوف لا آلاف، والشجرة تُقرأ
- *     كاملة أو لا تُقرأ.
+ * ⚠️  And all of them are **unpaginated**: tens of rows, not thousands, and the
+ *     tree is read in full or not at all.
  */
 
 export interface AdminCategory {
@@ -22,9 +23,9 @@ export interface AdminCategory {
   description_en: string;
   image: string | null;
   icon: string;
-  /** محسوب على الخادم — «sup/med/dis» */
+  /** Computed on the server — "sup/med/dis" */
   path: string;
-  /** «أدوية ← مسكّنات» للعرض في قائمة مسطّحة */
+  /** "Medicines ← Painkillers" for display in a flat list */
   path_label: string;
   depth: number;
   display_order: number;
@@ -91,11 +92,11 @@ export function useBrands(enabled = true) {
 }
 
 /**
- * ⚠️  إبطال **شجرة المرجع كلها وخيارات نموذج المنتج معًا**.
+ * ⚠️  Invalidate **the whole reference tree and the product form options together**.
  *
- *     فئة جديدة يجب أن تظهر في قائمة اختيار الفئة داخل نموذج
- *     المنتج فورًا — وإلا أضافها الأدمن ثم لم يجدها حيث يحتاجها،
- *     فأعاد إضافتها.
+ *     A new category must appear in the category select inside the product form
+ *     immediately — otherwise the admin adds it, cannot find it where they need
+ *     it, and adds it again.
  */
 function useReferenceMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();
@@ -124,8 +125,9 @@ export function useUpdateReference(kind: ReferenceKind) {
 }
 
 /**
- * ⚠️  الخادم يردّ ٤٠٩ برسالة **تعدّ** ما يمنع الحذف: «لهذه الفئة
- *     ١٢ منتجًا و٣ فئات فرعية». تُعرض كما هي لا تُستبدل برسالة عامة.
+ * ⚠️  The server answers 409 with a message that **counts** what blocks the
+ *     deletion: "this category has 12 products and 3 subcategories". It is
+ *     displayed as it is, never replaced with a generic message.
  */
 export function useDeleteReference(kind: ReferenceKind) {
   return useReferenceMutation((id: string) =>

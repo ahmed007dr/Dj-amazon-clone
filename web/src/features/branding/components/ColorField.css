@@ -30,7 +30,7 @@
   min-block-size: 2.75rem;
   padding-inline: var(--space-3);
 
-  /* الأكواد لاتينية دائمًا */
+  /* The codes are always Latin */
   direction: ltr;
   text-align: start;
   font-family: ui-monospace, monospace;

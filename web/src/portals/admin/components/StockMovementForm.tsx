@@ -23,21 +23,23 @@ import './StockMovementForm.css';
 export type MovementAction = 'receive' | 'adjust' | 'transfer' | 'damage';
 
 /**
- * تنفيذ حركة مخزون.
+ * Performing a stock movement.
  *
- * ⚠️  **نموذج واحد لأربع عمليات لا أربعة نماذج.**
+ * ⚠️  **One form for four operations, not four forms.**
  *
- *     الأربع تتشارك المنتج والموقع والكمية؛ وتفرّقها حقول قليلة.
- *     أربع نسخ كانت تعني أن إصلاح منتقي المنتج يحتاج أربعة تعديلات
- *     — وأن المنسيّ منها يبقى معطوبًا.
+ *     All four share the product, the location and the quantity; a few fields
+ *     separate them. Four copies would have meant fixing the product picker
+ *     takes four edits — and that the forgotten one stays broken.
  *
- * ⚠️  و**كل حركة تُسجَّل ولا تُمحى**. التصحيح بحركة معاكسة لا
- *     بتحرير القديمة — ولذلك لا يوجد هنا زر تعديل ولا حذف.
+ * ⚠️  And **every movement is recorded and never erased**. Corrections go
+ *     through an offsetting movement rather than editing the old one — which is
+ *     why there is no edit and no delete button here.
  *
- * ⚠️  والسبب **إلزامي** في التسوية والتلف.
+ * ⚠️  And the reason is **mandatory** for adjustments and damage.
  *
- *     تسوية بلا سبب ثغرة في الجرد: الفرق يظهر بعد شهر ولا أحد
- *     يعرف إن كان سرقة أو خطأ عدّ أو تلفًا لم يُسجَّل.
+ *     An adjustment with no reason is a hole in the stock count: the
+ *     discrepancy appears a month later and nobody knows whether it was theft,
+ *     a counting error, or damage that went unrecorded.
  */
 export function StockMovementForm({
   action,
@@ -114,8 +116,8 @@ export function StockMovementForm({
         {
           product: product.id,
           location: location || null,
-          // ⚠️  الإشارة من زرّي الاتجاه لا من كتابة `-` في الحقل.
-          //     السالب المكتوب يدويًا يُنسى، فتُسجَّل زيادة مكان نقص.
+          // ⚠️  The sign comes from the two direction buttons, not from typing `-` in the field.
+          //     A hand-written minus gets forgotten, so an increase is recorded in place of a decrease.
           quantity: direction === 'down' ? -count : count,
           reason,
         },
@@ -311,10 +313,10 @@ export function StockMovementForm({
 }
 
 /**
- * ⚠️  الموقع الافتراضي مُنتقى مسبقًا.
+ * ⚠️  The default location is pre-selected.
  *
- *     أغلب المنشآت لها مخزن واحد؛ وإجبار الأدمن على اختياره في كل
- *     حركة خطوة بلا قرار.
+ *     Most businesses have one warehouse; and forcing the admin to choose it on
+ *     every movement is a step with no decision in it.
  */
 function defaultLocation(locations: StockLocation[]): string {
   return locations.find((row) => row.is_default)?.id ?? '';

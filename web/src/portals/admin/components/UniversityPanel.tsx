@@ -28,13 +28,14 @@ const EMPTY = {
 };
 
 /**
- * الجامعات — **جذر الشجرة**.
+ * Universities — **the root of the tree**.
  *
- * ⚠️  **الحذف يُسأل عنه ويُرفض عند وجود كليات.**
+ * ⚠️  **Deletion is confirmed and refused where faculties exist.**
  *
- *     الجامعة تحمل كلياتها وطلابها؛ حذفها يقطع كل طالب عن جامعته.
- *     والتعطيل (`is_active`) هو ما يريده الأدمن فعلًا حين يتوقّف
- *     التعامل مع جامعة: تختفي من التسجيل ويبقى طلابها.
+ *     A university carries its faculties and their students; deleting it
+ *     severs every student from their university. And deactivating
+ *     (`is_active`) is what the admin actually wants when dealings with a
+ *     university stop: it disappears from registration and its students remain.
  */
 export function UniversityPanel() {
   const { t } = useTranslation();
@@ -183,7 +184,7 @@ export function UniversityPanel() {
               />
             </label>
 
-            {/* ⚠️  الاسمان معًا (ADR-34): الطالب قد يتصفّح بالإنجليزية */}
+            {/* ⚠️  Both names together (ADR-34): the student may browse in English */}
             <label>
               {t('academic.nameAr')}
               <input

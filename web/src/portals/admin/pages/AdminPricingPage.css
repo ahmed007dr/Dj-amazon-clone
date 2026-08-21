@@ -5,9 +5,9 @@
   justify-content: flex-end;
 }
 
-/* ⚠️  فتات الخبز يعيد المسار: القواعد تُفتح داخل قائمة، والخروج
-       منها بلا رابط صريح يجعل الأدمن يستخدم زر الرجوع فيغادر
-       الشاشة كلها. */
+/* ⚠️  The breadcrumb restores the path: the rules open inside a list, and
+       leaving them with no explicit link makes the admin use the back button
+       and leave the screen entirely. */
 .pricing-crumb {
   display: flex;
   flex-wrap: wrap;

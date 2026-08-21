@@ -41,8 +41,8 @@
   font-weight: 600;
 }
 
-/* ⚠️  طبقة تلتقط النقر خارج القائمة فتغلقها — بدونها تبقى مفتوحة
-   على الهاتف حتى يعيد المستخدم النقر على الزر نفسه */
+/* ⚠️  A layer that captures clicks outside the menu and closes it — without it
+   the menu stays open on a phone until the user taps the button again */
 .account-menu__scrim {
   position: fixed;
   inset: 0;
@@ -55,7 +55,7 @@
   position: absolute;
   z-index: var(--z-drawer);
   inset-block-start: calc(100% + var(--space-2));
-  /* منطقي: ينفتح تحت الزر على حافة النهاية في الاتجاهين */
+  /* Logical: it opens beneath the button on the end edge in both directions */
   inset-inline-end: 0;
 
   display: grid;

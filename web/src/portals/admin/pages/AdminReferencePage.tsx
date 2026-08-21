@@ -27,15 +27,16 @@ import './AdminReferencePage.css';
 type Row = AdminCategory | AdminBrand | AdminManufacturer;
 
 /**
- * التصنيف المرجعي.
+ * Reference classification.
  *
- * ⚠️  **شاشة واحدة بثلاثة تبويبات لا ثلاث شاشات.**
+ * ⚠️  **One screen with three tabs, not three screens.**
  *
- *     الثلاثة تُضبط في جلسة واحدة عند التجهيز: تُنشأ الشركة، ثم
- *     براندها، ثم تُسنَد الفئة. تفريقها على ثلاثة مسارات يجعل كل
- *     خطوة تفقد سياق ما قبلها.
+ *     All three are configured in a single session at setup: the company is
+ *     created, then its brand, then the category is assigned. Splitting them
+ *     across three routes makes every step lose the context of the one before it.
  *
- * ⚠️  و**الفئات أولًا**: هي الإلزامية على المنتج، والبقية اختيارية.
+ * ⚠️  And **categories first**: they are the mandatory one on a product, and the
+ *     rest are optional.
  */
 export function AdminReferencePage() {
   const { t } = useTranslation();
@@ -49,7 +50,7 @@ export function AdminReferencePage() {
   const categories = useCategories(kind === 'categories');
   const brands = useBrands(kind === 'brands');
   const manufacturers = useManufacturers(kind === 'manufacturers');
-  // الفئات مطلوبة دائمًا في نموذج الفئة نفسه (اختيار الأب)
+  // Categories are always needed in the category form itself (choosing the parent)
   const allCategories = useCategories();
   const allManufacturers = useManufacturers();
 
@@ -66,8 +67,8 @@ export function AdminReferencePage() {
         setPendingDelete(null);
       },
       onError: (error) => {
-        // ⚠️  رسالة الخادم تُعرض كما هي: هي التي تعدّ ما يمنع الحذف
-        //     («لهذه الفئة ١٢ منتجًا») — والرسالة العامة تُضيّع ذلك.
+        // ⚠️  The server's message is shown as it is: it is what counts what blocks the
+        //     deletion ("this category has 12 products") — and a generic message loses that.
         notify(isApiError(error) ? error.displayMessage : t('state.errorTitle'), 'danger');
         setPendingDelete(null);
       },
@@ -79,8 +80,8 @@ export function AdminReferencePage() {
     header: t('admin.productName'),
     render: (row) =>
       'path_label' in row ? (
-        // ⚠️  الإزاحة بالعمق تجعل القائمة المسطّحة تُقرأ كشجرة —
-        //     «أقراص» وحدها غامضة تحت «أدوية» و«مكمّلات» معًا.
+        // ⚠️  Indenting by depth makes the flat list read as a tree —
+        //     "Tablets" alone is ambiguous under both "Medicines" and "Supplements".
         <span style={{ paddingInlineStart: `${row.depth * 1.25}rem` }}>
           {row.depth > 0 ? <span className="ref-branch" aria-hidden>└ </span> : null}
           {row.name_ar}
@@ -106,8 +107,8 @@ export function AdminReferencePage() {
     header: t('reference.usage'),
     align: 'end',
     secondary: true,
-    // ⚠️  العدد ظاهر **قبل** الضغط على حذف: رؤيته تحوّل القرار من
-    //     تخمين إلى معرفة، بدل رسالة رفض بعد المحاولة.
+    // ⚠️  The count is visible **before** pressing delete: seeing it turns the
+    //     decision from a guess into knowledge, rather than a refusal message after the attempt.
     render: (row) =>
       'product_count' in row
         ? t('reference.products', { count: row.product_count })

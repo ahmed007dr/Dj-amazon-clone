@@ -10,14 +10,16 @@ import { Button } from '@/shared/ui/Button';
 import { Field } from '@/shared/ui/Field';
 
 /**
- * طلب تغيير البريد.
+ * Requesting an email change.
  *
- * ⚠️  **خطوتان لا واحدة**: طلب هنا، ثم تأكيد برابط يصل **العنوان
- *     الجديد**. الخطوة الواحدة تسمح بتحويل الحساب إلى بريد لا
- *     يملكه صاحبه — وهي أسرع طريق لسرقة حساب من جلسة مفتوحة.
+ * ⚠️  **Two steps, not one**: a request here, then confirmation through a link
+ *     sent to **the new address**. A single step allows an account to be moved
+ *     to an email its owner does not control — the fastest route to stealing an
+ *     account from an open session.
  *
- * ⚠️  و**كلمة المرور مطلوبة** لنفس السبب: جهاز مفتوح بلا صاحبه
- *     يكفي لتغيير البريد ثم الاستيلاء عبر «نسيت كلمة المرور».
+ * ⚠️  And **the password is required** for the same reason: an unattended
+ *     unlocked device is enough to change the email and then take over through
+ *     "forgot password".
  */
 export function EmailChangeForm() {
   const { t } = useTranslation();
@@ -46,8 +48,8 @@ export function EmailChangeForm() {
   });
 
   if (sent) {
-    // ⚠️  الرسالة تسمّي **العنوان الجديد** لا القديم: المستخدم قد
-    //     يكون أخطأ في كتابته، وذكره هو ما يجعله يلاحظ.
+    // ⚠️  The message names **the new address**, not the old one: the user may
+    //     have mistyped it, and naming it is what makes them notice.
     return <Alert tone="success">{t('account.emailChangeSent')}</Alert>;
   }
 

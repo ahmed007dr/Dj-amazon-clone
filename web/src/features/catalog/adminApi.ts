@@ -4,20 +4,21 @@ import { http } from '@/shared/http';
 import type { PagedResponse } from '@/features/orders/adminApi';
 
 /**
- * ⚠️  المنتج المحذوف ناعمًا **يبقى مرئيًا للأدمن** بعلم `include_deleted`.
+ * ⚠️  A soft-deleted product **stays visible to the admin** through the `include_deleted` flag.
  *
- *     الحذف الناعم بلا طريقة لرؤية المحذوف يجعله حذفًا نهائيًا من
- *     منظور المستخدم — وأول سؤال بعد حذف بالخطأ هو «أين ذهب؟».
+ *     A soft delete with no way to see what was deleted is a permanent delete
+ *     from the user's point of view — and the first question after an
+ *     accidental delete is "where did it go?".
  *
- * ⚠️  **لا يرث `ProductDetail`** — وهذا تصحيح لا تفصيل.
+ * ⚠️  **It does not inherit `ProductDetail`** — and that is a correction, not a detail.
  *
- *     `AdminProductSerializer` هو `ModelSerializer` عاري العلاقات:
- *     `category` و`brand` و`manufacturer` تعود **معرّفات نصية** لا
- *     كائنات، ولا وجود لـ `images` ولا `rating` ولا `primary_image`.
- *     الوراثة كانت تَعِد بحقول لا يرسلها الخادم، فيمرّ الفحص
- *     الثابت بينما تعرض الشاشة فراغًا: `localized(uuid, 'name')`
- *     تعيد سلسلة فارغة بلا خطأ — وهو بالضبط ما كان يحدث في عمود
- *     الفئة.
+ *     `AdminProductSerializer` is a `ModelSerializer` stripped of relations:
+ *     `category`, `brand` and `manufacturer` come back as **string ids**, not
+ *     objects, and there is no `images`, no `rating` and no `primary_image`.
+ *     The inheritance promised fields the server does not send, so the static
+ *     check passed while the screen displayed nothing:
+ *     `localized(uuid, 'name')` returns an empty string with no error — which
+ *     is exactly what was happening in the category column.
  */
 export interface AdminProduct {
   id: string;
@@ -33,7 +34,7 @@ export interface AdminProduct {
   kind: string;
   base_price: string;
 
-  /** معرّفات لا كائنات — تُحلّ أسماؤها من `useProductFormOptions` */
+  /** Ids, not objects — their names are resolved from `useProductFormOptions` */
   category: string | null;
   brand: string | null;
   manufacturer: string | null;
@@ -74,7 +75,7 @@ export const updateAdminProduct = (id: string, body: Partial<AdminProduct>) =>
   http.patch<AdminProduct>(`/catalog/admin/products/${id}/`, body);
 
 // ═══════════════════════════════════════════════════════════
-//  خيارات النموذج
+//  Form options
 // ═══════════════════════════════════════════════════════════
 
 export interface Choice {
@@ -86,7 +87,7 @@ export interface CategoryOption {
   id: string;
   name_ar: string;
   name_en: string;
-  /** المسار الكامل — «أدوية ← مسكّنات ← أقراص» */
+  /** The full path — "Medicines ← Painkillers ← Tablets" */
   path_label: string;
 }
 
@@ -97,10 +98,11 @@ export interface NamedOption {
 }
 
 /**
- * سياسة وصول — جواب السؤال «مَن يرى هذا المنتج؟».
+ * An access policy — the answer to "who sees this product?".
  *
- * ⚠️  الشرطان يُعرضان مع الاسم لا بعده: «مهنيون موثّقون» وحدها لا
- *     تقول إن الطبيب المسجَّل غير الموثّق ممنوع.
+ * ⚠️  Both conditions are shown alongside the name rather than after it:
+ *     "verified professionals" alone does not say that a registered but
+ *     unverified doctor is blocked.
  */
 export interface AccessPolicyOption {
   id: string;
@@ -136,13 +138,15 @@ export interface ProductFormOptions {
 }
 
 /**
- * ⚠️  القوائم من الخادم لا مكرّرة هنا.
+ * ⚠️  The lists come from the server rather than being duplicated here.
  *
- *     تثبيت الأشكال الدوائية في كود الواجهة يجعل إضافة قيمة في
- *     الخادم لا تظهر للأدمن، وحذفها يترك خيارًا يفشل عند الحفظ.
+ *     Hard-coding the dosage forms in frontend code means a value added on the
+ *     server never reaches the admin, and one removed leaves an option that
+ *     fails on save.
  *
- * ⚠️  ومهلة طويلة: هذه بيانات مرجعية تتغيّر بالشهور لا بالدقائق،
- *     وإعادة جلبها مع كل فتح للنموذج تُبطئ الشاشة بلا مقابل.
+ * ⚠️  And a long stale time: this is reference data that changes by the month,
+ *     not the minute, and refetching it every time the form opens slows the
+ *     screen for nothing.
  */
 export function useProductFormOptions(enabled = true) {
   return useQuery({
@@ -154,14 +158,14 @@ export function useProductFormOptions(enabled = true) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  الكتابة
+//  Writing
 // ═══════════════════════════════════════════════════════════
 
 /**
- * ⚠️  إبطال قائمة المنتجات **وخيارات النموذج معًا** بعد أي كتابة.
+ * ⚠️  Invalidate the product list **and the form options together** after any write.
  *
- *     القائمة وحدها تكفي للحذف والتعديل، لكن المنتج الجديد قد
- *     يكون أول ما يُسنَد إلى فئة، ويبقى عدّاد الشاشة قديمًا.
+ *     The list alone suffices for a delete or an edit, but a new product may be
+ *     the first assigned to a category, leaving the screen's counter stale.
  */
 function useProductMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();
@@ -187,8 +191,8 @@ export function useUpdateProduct() {
 }
 
 /**
- * ⚠️  حذف ناعم على الخادم — الصف يبقى وتشير إليه الطلبات التاريخية.
- *     ولذلك يقابله `useRestoreProduct` لا حذف نهائي.
+ * ⚠️  A soft delete on the server — the row remains and historical orders point at it.
+ *     Which is why it is paired with `useRestoreProduct` rather than a hard delete.
  */
 export function useDeleteProduct() {
   return useProductMutation((id: string) =>

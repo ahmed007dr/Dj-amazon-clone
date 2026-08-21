@@ -28,11 +28,11 @@ export interface AdminPalette {
   border: string;
   text: string;
   text_muted: string;
-  /** ⚠️  يُحسب عند كل عرض — تخزينه يعني رقمًا يتقادم عند أول تعديل. */
+  /** ⚠️  Computed on every display — storing it means a figure going stale at the first edit. */
   contrast: ContrastEntry[];
 }
 
-/** الأصول الخمسة — كلها صور يرفعها الأدمن. */
+/** The five assets — all images uploaded by the admin. */
 export type AssetField = 'logo_light' | 'logo_dark' | 'icon' | 'favicon' | 'og_image';
 
 export const ASSET_FIELDS: AssetField[] = [
@@ -50,7 +50,7 @@ export interface AdminBrandProfile {
   name_en: string;
   tagline_ar: string;
   tagline_en: string;
-  /** مسارات نسبية — تُحوَّل بـ `mediaUrl` قبل العرض */
+  /** Relative paths — converted with `mediaUrl` before display */
   logo_light: string | null;
   logo_dark: string | null;
   icon: string | null;
@@ -89,13 +89,13 @@ export const updatePalette = (
 ) => http.patch<AdminPalette>(`/branding/admin/profiles/${profileId}/palettes/${paletteId}/`, body);
 
 /**
- * معاينة لوحة **قبل حفظها**.
+ * Preview a palette **before saving it**.
  *
- * ⚠️  لا تكتب شيئًا في الخادم.
+ * ⚠️  It writes nothing to the server.
  *
- *     «جرّب ثم تراجع» على الهوية يعني أن كل زائر خلال المحاولة رأى
- *     ألوانًا مكسورة. المعاينة تحسب الرموز والتباين وتعيدهما بلا
- *     مساس بالمفعّل.
+ *     "Try it and undo" on the identity means every visitor during the attempt
+ *     saw broken colours. The preview computes the tokens and the contrast and
+ *     returns them without touching what is active.
  */
 export const previewPalette = (body: Partial<AdminPalette>) =>
   http.post<{
@@ -108,16 +108,17 @@ export const activateProfile = (id: string) =>
   http.post<AdminBrandProfile>(`/branding/admin/profiles/${id}/activate/`);
 
 // ═══════════════════════════════════════════════════════════
-//  الخطّافات
+//  Hooks
 // ═══════════════════════════════════════════════════════════
 
 export const BRANDING_KEY = ['admin', 'branding'] as const;
 
 /**
- * ⚠️  إبطال **شجرة الهوية والثيم العام معًا** بعد أي كتابة.
+ * ⚠️  Invalidate **the identity tree and the public theme together** after any write.
  *
- *     الأولى تحدّث شاشة التحرير، والثاني هو ما يجعل الأدمن يرى
- *     اللوجو الجديد في ترويسة لوحته فورًا بدل إعادة تحميل الصفحة.
+ *     The first refreshes the editing screen, and the second is what makes the
+ *     admin see the new logo in their panel's header immediately rather than
+ *     reloading the page.
  */
 function useBrandingMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();
@@ -142,12 +143,12 @@ export function useUpdateProfile() {
 }
 
 /**
- * رفع أصل واحد.
+ * Upload a single asset.
  *
- * ⚠️  `FormData` لا JSON — الحمولة ملف.
+ * ⚠️  `FormData`, not JSON — the payload is a file.
  *
- * ⚠️  و**حقل واحد لكل نداء**: إرسال الخمسة معًا يعني أن رفض ملف
- *     منها يُفشل الأربعة الأخرى، والأدمن يعيد اختيارها كلها.
+ * ⚠️  And **one field per call**: sending all five together means a rejection of
+ *     one file fails the other four, and the admin re-selects them all.
  */
 export function useUploadAsset() {
   return useBrandingMutation(({ id, field, file }: { id: string; field: AssetField; file: File }) => {
@@ -158,11 +159,12 @@ export function useUploadAsset() {
 }
 
 /**
- * المسح — **JSON بقيمة `null` لا نموذجًا بقيمة فارغة**.
+ * Clearing — **JSON with a `null` value, not a form with an empty value**.
  *
- * ⚠️  الحقل الفارغ في حمولة `multipart` يتجاهله DRF بصمت: يردّ ٢٠٠
- *     ويُبقي الصورة مكانها. فيضغط الأدمن «حذف» ويرى نجاحًا واللوجو
- *     لم يتغيّر — وهو أسوأ أنواع الفشل لأنه يبدو نجاحًا.
+ * ⚠️  An empty field in a `multipart` payload is silently ignored by DRF: it
+ *     answers 200 and leaves the image in place. So the admin presses "delete",
+ *     sees success, and the logo has not changed — the worst kind of failure,
+ *     because it looks like success.
  */
 export function useClearAsset() {
   return useBrandingMutation(({ id, field }: { id: string; field: AssetField }) =>

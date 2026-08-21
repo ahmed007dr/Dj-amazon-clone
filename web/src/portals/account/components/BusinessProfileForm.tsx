@@ -11,18 +11,19 @@ import { useToast } from '@/shared/ui/useToast';
 import './BusinessProfileForm.css';
 
 /**
- * بيانات منشأتي — **يعدّلها العميل التجاري بنفسه**.
+ * My business details — **edited by the business customer themselves**.
  *
- * ⚠️  **تجديد الترخيص هو سبب وجود هذه الشاشة.**
+ * ⚠️  **Licence renewal is why this screen exists.**
  *
- *     الترخيص المنتهي يوقف الشراء بالآجل فورًا. بلا هذه الشاشة
- *     يتصل صاحب الصيدلية بخدمة العملاء ليحدّث تاريخًا يعرفه هو
- *     وحده — وينتظر يومًا بينما بضاعته متوقفة.
+ *     An expired licence stops credit purchasing immediately. Without this
+ *     screen the pharmacy owner calls customer service to update a date only
+ *     they know — and waits a day while their goods are held up.
  *
- * ⚠️  و**الحد الائتماني غير معروض هنا للتعديل**.
+ * ⚠️  And **the credit limit is not shown here for editing**.
  *
- *     يمنحه الأدمن بمسار موثَّق. عرضه حقلًا قابلًا للكتابة — ولو
- *     رفضه الخادم — يجعل العميل يظن أنه يملك تغييره.
+ *     The admin grants it through a documented path. Showing it as a writable
+ *     field — even if the server refuses it — makes the customer believe it is
+ *     theirs to change.
  */
 export function BusinessProfileForm() {
   const { t } = useTranslation();
@@ -104,7 +105,7 @@ export function BusinessProfileForm() {
         <small>{t('b2b.licenseExpirySelfHint')}</small>
       </label>
 
-      {/* ⚠️  الحد والحالة **للعرض فقط** — يُمنحان من الأدمن. */}
+      {/* ⚠️  The limit and the status are **display only** — they are granted by the admin. */}
       <dl className="business-profile__readonly">
         <div>
           <dt>{t('b2b.creditLimit')}</dt>

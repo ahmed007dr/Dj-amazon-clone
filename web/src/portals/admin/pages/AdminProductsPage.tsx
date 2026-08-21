@@ -28,7 +28,7 @@ import { formatMoney } from '@/shared/utils/format';
 
 import './AdminProductsPage.css';
 
-/** اللوح المفتوح — نموذج أو صور. */
+/** The open panel — the form or the images. */
 type Panel =
   | { mode: 'create' }
   | { mode: 'edit'; product: AdminProduct }
@@ -44,17 +44,17 @@ export function AdminProductsPage() {
   const [showDeleted, setShowDeleted] = useState('');
   const [page, setPage] = useState(1);
 
-  // ⚠️  لوح لا مسار.
+  // ⚠️  A panel, not a route.
   //
-  //     صفحة بمسار خاص تعني مغادرة القائمة وفقدان البحث والصفحة
-  //     والفلاتر — والأدمن يحرّر عشرة منتجات متتالية فيعود إلى
-  //     الصفحة الأولى في كل مرة.
+  //     A page with its own route means leaving the list and losing the search,
+  //     the page and the filters — and the admin edits ten products in a row and
+  //     returns to the first page every time.
   const [panel, setPanel] = useState<Panel | null>(null);
 
-  // ⚠️  الحذف يمرّ بتأكيد يذكر **اسم المنتج**.
+  // ⚠️  Deletion goes through a confirmation that names **the product**.
   //
-  //     «هل أنت متأكد؟» المجرّدة تُضغط بلا قراءة؛ والاسم في الرسالة
-  //     هو ما يجعل الأدمن يلاحظ أنه ضغط على الصف الخطأ.
+  //     A bare "are you sure?" is pressed without reading; and the name in the
+  //     message is what makes the admin notice they pressed the wrong row.
   const [pendingDelete, setPendingDelete] = useState<AdminProduct | null>(null);
 
   const debouncedSearch = useDebounced(search);
@@ -71,11 +71,11 @@ export function AdminProductsPage() {
     staleTime: 60 * 1000,
   });
 
-  // ⚠️  يُجلب هنا أيضًا لحلّ **أسماء الفئات** في الجدول.
+  // ⚠️  Fetched here as well to resolve **the category names** in the table.
   //
-  //     الخادم يرسل `category` معرّفًا لا كائنًا، فكان العمود يعرض
-  //     فراغًا في كل صف بلا خطأ. والاستعلام نفسه يخدم النموذج
-  //     فلا نداء إضافي.
+  //     The server sends `category` as an id rather than an object, so the column
+  //     displayed a blank in every row with no error. And the same query serves
+  //     the form, so there is no extra call.
   const options = useProductFormOptions();
 
   const categoryNames = new Map(
@@ -109,8 +109,8 @@ export function AdminProductsPage() {
       key: 'name',
       header: t('admin.productName'),
       render: (product) => (
-        // ⚠️  الرابط إلى صفحة المتجر العامة: الأدمن يريد رؤية ما
-        //     يراه العميل بالضبط قبل أن يحكم على المنتج.
+        // ⚠️  The link goes to the public store page: the admin wants to see exactly
+        //     what the customer sees before judging the product.
         <Link to={`/products/${product.slug}`} target="_blank">
           {localized(product, 'name')}
         </Link>
@@ -146,10 +146,10 @@ export function AdminProductsPage() {
       header: t('admin.actions'),
       align: 'end',
       render: (product) =>
-        // ⚠️  المحذوف يعرض **الاسترجاع وحده**.
+        // ⚠️  A deleted one shows **restore alone**.
         //
-        //     تعديل منتج محذوف أو رفع صوره عمل يضيع: لا يراه أحد
-        //     ما دام محذوفًا. الخطوة الأولى إرجاعه.
+        //     Editing a deleted product or uploading its images is wasted work: nobody
+        //     sees it while it is deleted. The first step is to bring it back.
         product.deleted_at ? (
           <Button
             size="sm"
@@ -259,9 +259,9 @@ export function AdminProductsPage() {
       ) : null}
 
       <Drawer open={panel !== null} onClose={() => setPanel(null)} title={panelTitle}>
-        {/* ⚠️  اللوح يُركَّب عند الفتح فقط، ومفتاحه يتغيّر مع المنتج.
-            إبقاؤه مركّبًا يجعل النموذج يحتفظ بمسوّدة منتج سابق،
-            ويعرض صور المنتج السابق للحظة عند فتح التالي. */}
+        {/* ⚠️  The panel is mounted only on opening, and its key changes with the product.
+            Leaving it mounted makes the form keep a previous product's draft,
+            and shows the previous product's images for a moment when the next one opens. */}
         {panel?.mode === 'images' ? (
           <ProductImagesPanel key={panel.product.id} productId={panel.product.id} />
         ) : null}

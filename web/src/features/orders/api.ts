@@ -17,7 +17,7 @@ interface CursorPage<T> {
 
 export const listMyOrders = () => http.get<CursorPage<OrderListItem>>('/orders/');
 
-/** ⚠️  المعرّف UUID لا رقم الطلب — الرقم للعرض فقط. (ADR-25) */
+/** ⚠️  The identifier is a UUID, not the order number — the number is for display only. (ADR-25) */
 export const getOrder = (id: string) => http.get<OrderDetail>(`/orders/${id}/`);
 
 export const checkout = (payload: CheckoutPayload) =>

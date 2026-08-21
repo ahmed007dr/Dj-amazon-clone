@@ -1,5 +1,5 @@
-/* ⚠️  يتمرّر أفقيًا داخل حاويته: شهر كامل على هاتف لا يتسع،
-   ودفع الصفحة للتمرّر يكسر التخطيط كله. */
+/* ⚠️  It scrolls horizontally inside its container: a whole month does not fit
+   on a phone, and making the page scroll breaks the entire layout. */
 .trend {
   display: flex;
   align-items: flex-end;

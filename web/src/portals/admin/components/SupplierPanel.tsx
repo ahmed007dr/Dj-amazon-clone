@@ -20,13 +20,13 @@ type Tab = 'profile' | 'account' | 'orders' | 'statement' | 'ledger';
 const TABS: Tab[] = ['profile', 'account', 'orders', 'statement', 'ledger'];
 
 /**
- * لوح المورّد بأربعة تبويبات.
+ * The supplier panel with four tabs.
  *
- * ⚠️  **الحساب المالي قبل أوامر الشراء في الترتيب.**
+ * ⚠️  **The financial account comes before the purchase orders in the order.**
  *
- *     من يفتح مورّدًا يسأل أولًا «كم عليّ له ومتى يستحق؟» ثم
- *     ينتقل إلى الأوامر. الترتيب العكسي يجعله يتصفّح أوامر ليصل
- *     إلى رقم واحد.
+ *     Whoever opens a supplier asks first "how much do I owe them and when is
+ *     it due?" and then moves to the orders. The reverse order makes them
+ *     browse orders to reach a single figure.
  */
 export function SupplierPanel({ supplier }: { supplier: Supplier }) {
   const { t, i18n } = useTranslation();
@@ -36,8 +36,8 @@ export function SupplierPanel({ supplier }: { supplier: Supplier }) {
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
 
-  // ⚠️  كشف الحساب يخدم تبويبين: «الحساب المالي» يقرأ تجميعاته،
-  //     و«كشف الحساب» يقرأ حركاته. نداء واحد لا اثنان.
+  // ⚠️  The account statement serves two tabs: "financial account" reads its
+  //     aggregates, and "account statement" reads its movements. One call, not two.
   const statement = useStatement(supplier.id, {});
   const payment = useSupplierPayment();
 
@@ -200,8 +200,8 @@ export function SupplierPanel({ supplier }: { supplier: Supplier }) {
                         {t(`suppliers.kind.${entry.kind}`)}
                         {entry.reference ? <code> {entry.reference}</code> : null}
                       </td>
-                      {/* ⚠️  عمودان منفصلان لا عمود بإشارة: هكذا
-                          يقرأه المحاسب وهكذا يطابقه بدفتره. */}
+                      {/* ⚠️  Two separate columns rather than one with a sign: that is
+                          how an accountant reads it and how they reconcile it against their ledger. */}
                       <td dir="ltr">{entry.increases_debt ? entry.amount : '—'}</td>
                       <td dir="ltr">{entry.increases_debt ? '—' : entry.amount}</td>
                     </tr>
@@ -219,9 +219,9 @@ export function SupplierPanel({ supplier }: { supplier: Supplier }) {
         ) : null
       ) : null}
 
-      {/* ⚠️  الكشف الكامل تبويب مستقل عن «كشف الحساب»: الأول
-          يجيب «متى دفعنا له آخر مرة؟» والثاني «كم عليه في هذه
-          الفترة؟» — وسؤالان مختلفان لا يُدمجان في جدول واحد. */}
+      {/* ⚠️  The full statement is a tab separate from "account statement": the first
+          answers "when did we last pay them?" and the second "how much do they
+          owe in this period?" — two different questions not merged into one table. */}
       {tab === 'ledger' ? <SupplierLedgerTab supplier={supplier.id} /> : null}
     </div>
   );

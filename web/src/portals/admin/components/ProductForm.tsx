@@ -20,24 +20,25 @@ import { useToast } from '@/shared/ui/useToast';
 import './ProductForm.css';
 
 /**
- * إنشاء منتج أو تعديله.
+ * Creating or editing a product.
  *
- * ⚠️  **الحقول الدوائية مطويّة خلف نوع المنتج.**
+ * ⚠️  **The pharmaceutical fields are folded behind the product type.**
  *
- *     التركيز والشكل الدوائي والمادة الفعّالة بلا معنى لكتاب أو
- *     جهاز. عرضها دائمًا يجعل نموذج إضافة كتاب أربعة أضعاف طوله
- *     الضروري، فيُملأ بعضها بقيم لا تعني شيئًا لمجرّد أن الحقل ظاهر.
+ *     Strength, dosage form and active ingredient are meaningless for a book or
+ *     a device. Showing them always makes the add-a-book form four times longer
+ *     than it needs to be, so some get filled with values that mean nothing
+ *     simply because the field is visible.
  *
- * ⚠️  و**رمز المنتج لا يُعدَّل بعد الإنشاء.**
+ * ⚠️  And **the product code is not edited after creation.**
  *
- *     الرمز يُطبع على الرفوف ويُمسح على الكاونتر ويظهر في طلبات
- *     صادرة. تغييره يجعل ورقة الرف تشير إلى لا شيء — والتصحيح
- *     الصحيح منتج جديد لا رمز جديد.
+ *     The code is printed on the shelves, scanned at the counter, and appears
+ *     in orders already issued. Changing it makes the shelf label point at
+ *     nothing — and the correct fix is a new product, not a new code.
  *
- * ⚠️  والحفظ يرسل **الحقول المعروضة وحدها**.
+ * ⚠️  And the save sends **only the displayed fields**.
  *
- *     إرسال الكائن كاملًا في التعديل يكتب فوق حقول لا يعرضها هذا
- *     النموذج (بيانات SEO مثلًا) بقيم قديمة قرأها عند الفتح.
+ *     Sending the whole object on edit overwrites fields this form does not
+ *     display (the SEO data, for instance) with stale values read when it opened.
  */
 export function ProductForm({
   product,
@@ -97,8 +98,8 @@ export function ProductForm({
 
   const data = options.data;
 
-  // ⚠️  الدواء وحده يعرض الحقول الدوائية — لا شرط على التصنيف
-  //     التنظيمي، فهو حقل يُملأ داخل هذه المجموعة نفسها.
+  // ⚠️  Medicines alone show the pharmaceutical fields — no condition on the
+  //     regulatory classification, which is a field filled in inside this same group.
   const isMedicine = form.kind === 'MEDICINE';
 
   const submit = () => {
@@ -110,9 +111,9 @@ export function ProductForm({
       name_en: form.name_en,
       kind: form.kind,
       category: form.category,
-      // ⚠️  `null` لا `''` للعلاقات الاختيارية: السلسلة الفارغة
-      //     تصل الخادم كمعرّف غير صالح فيردّ «قيمة خاطئة» على حقل
-      //     تركه الأدمن فارغًا عمدًا.
+      // ⚠️  `null`, not `''`, for the optional relations: an empty string reaches
+      //     the server as an invalid id, so it answers "wrong value" on a field
+      //     the admin deliberately left blank.
       brand: form.brand || null,
       manufacturer: form.manufacturer || null,
       base_price: form.base_price,
@@ -128,23 +129,23 @@ export function ProductForm({
       pack_size: form.pack_size,
       storage_condition: form.storage_condition,
       weight_grams: form.weight_grams === '' ? null : Number(form.weight_grams),
-      // ⚠️  فارغ = `null` = السياسة الافتراضية على الخادم. وهذا
-      //     صريح في الواجهة: الخيار الأول يقول «الافتراضية» باسمها.
+      // ⚠️  Empty = `null` = the default policy on the server. And this is
+      //     explicit in the frontend: the first option says "the default" by name.
       access_policy: form.access_policy || null,
       tax_class: form.tax_class || null,
       is_active: form.is_active,
       is_featured: form.is_featured,
     };
 
-    // الرمز يُرسَل عند الإنشاء وحده — انظر تحذير الرأس
+    // The code is sent on creation alone — see the warning at the top
     if (!isEdit) body.sku = form.sku;
 
     const onError = (error: unknown) => {
       if (isApiError(error)) {
-        // ⚠️  أخطاء الحقول تُعرَض **تحت حقولها** لا في شريط واحد.
+        // ⚠️  Field errors are shown **beneath their fields**, not in a single bar.
         //
-        //     نموذج بعشرين حقلًا ورسالة «بيانات غير صالحة» في
-        //     أعلاه يجعل الأدمن يبحث عن الحقل المرفوض بالتجربة.
+        //     A form with twenty fields and an "invalid data" message at
+        //     the top makes the admin hunt for the rejected field by trial.
         const next: Record<string, string> = {};
         for (const key of Object.keys(error.fields)) {
           next[key] = error.fieldError(key) ?? '';
@@ -171,17 +172,18 @@ export function ProductForm({
   const busy = create.isPending || update.isPending;
   const ready = form.name_ar !== '' && form.category !== '' && (isEdit || form.sku !== '');
 
-  // السياسة المختارة — أو الافتراضية حين يُترك الحقل فارغًا
+  // The chosen policy — or the default when the field is left empty
   const chosenPolicy =
     data.access_policies.find((row) => row.id === form.access_policy) ??
     data.access_policies.find((row) => row.is_default);
 
   /**
-   * ⚠️  أثر السياسة **مكتوب** لا مستنتَج من اسمها.
+   * ⚠️  The policy's effect is **written out**, not inferred from its name.
    *
-   *     «مهنيون موثّقون» لا تقول إن الطبيب المسجَّل غير الموثّق
-   *     ممنوع، ولا تسمّي الأنواع المسموحة. والأدمن يكتشف الفارق
-   *     بشكوى عميل لا يرى الصنف.
+   *     "Verified professionals" does not say that a registered but unverified
+   *     doctor is blocked, and it does not name the permitted types. And the
+   *     admin discovers the difference through a complaint from a customer who
+   *     cannot see the item.
    */
   const policyEffect = (() => {
     if (!chosenPolicy) return t('products.policyNoneConfigured');
@@ -199,7 +201,7 @@ export function ProductForm({
 
   return (
     <div className="product-form">
-      {/* ── الأساسيات ─────────────────────────────── */}
+      {/* ── The basics ────────────────────────────── */}
       <h4 className="product-form__legend">{t('products.sectionBasics')}</h4>
 
       <div className="product-form__row">
@@ -315,7 +317,7 @@ export function ProductForm({
         />
       </div>
 
-      {/* ── التنظيمي والدوائي ─────────────────────── */}
+      {/* ── Regulatory and pharmaceutical ─────────── */}
       <h4 className="product-form__legend">{t('products.sectionRegulatory')}</h4>
 
       <div className="product-form__row">
@@ -395,7 +397,7 @@ export function ProductForm({
         </>
       ) : null}
 
-      {/* ── مَن يرى هذا المنتج ────────────────────── */}
+      {/* ── Who sees this product ─────────────────── */}
       <h4 className="product-form__legend">{t('products.sectionAudience')}</h4>
 
       <Select
@@ -409,9 +411,10 @@ export function ProductForm({
         {...(fieldErrors.access_policy ? { error: fieldErrors.access_policy } : {})}
       />
 
-      {/* ⚠️  أثر الاختيار مكتوب تحته لا مخبوء في اسم السياسة.
-          «مهنيون موثّقون» وحدها لا تقول إن الطبيب المسجَّل غير
-          الموثّق ممنوع — والأدمن يكتشف ذلك بشكوى عميل. */}
+      {/* ⚠️  The choice's effect is written beneath it rather than buried in the
+          policy's name. "Verified professionals" alone does not say that a
+          registered but unverified doctor is blocked — and the admin discovers
+          that through a customer complaint. */}
       <p className="product-form__policy-effect">{policyEffect}</p>
 
       <Select
@@ -426,7 +429,7 @@ export function ProductForm({
         {...(fieldErrors.tax_class ? { error: fieldErrors.tax_class } : {})}
       />
 
-      {/* ── النشر ─────────────────────────────────── */}
+      {/* ── Publishing ────────────────────────────── */}
       <h4 className="product-form__legend">{t('products.sectionPublishing')}</h4>
 
       <Checkbox
@@ -456,11 +459,12 @@ export function ProductForm({
 }
 
 /**
- * ⚠️  الافتراضية تُعرض **باسمها** لا كـ«بلا اختيار».
+ * ⚠️  The default is shown **by name** rather than as "no selection".
  *
- *     «فارغ» يوحي بأن المنتج بلا سياسة، والحقيقة أنه يرث الافتراضية
- *     — وهي «عام للجميع» عادةً. الفرق بين الإيحاءين هو الفرق بين
- *     أدمن يعرف أنه نشر للجميع وأدمن يظن أنه لم يقرّر بعد.
+ *     "Empty" suggests the product has no policy, when in truth it inherits the
+ *     default — which is usually "public to everyone". The difference between
+ *     those two impressions is the difference between an admin who knows they
+ *     published to everyone and one who thinks they have not decided yet.
  */
 function defaultPolicyLabel(policies: AccessPolicyOption[], fallback: string): string {
   const fallbackPolicy = policies.find((row) => row.is_default);
@@ -468,11 +472,11 @@ function defaultPolicyLabel(policies: AccessPolicyOption[], fallback: string): s
 }
 
 /* ═══════════════════════════════════════════════════════════
-   عناصر محلية — لا تُصدَّر.
+   Local elements — not exported.
 
-   ⚠️  محلية عمدًا: لا يوجد `Select` مشترك في `shared/ui` بعد،
-       وإضافته هناك قرار يخصّ نظام التصميم لا هذه الشاشة. حين
-       يحتاجه ثالثٌ يُنقَل كما هو.
+   ⚠️  Deliberately local: there is no shared `Select` in `shared/ui` yet, and
+       adding one there is a decision for the design system rather than this
+       screen. When a third place needs it, it moves as it is.
    ═══════════════════════════════════════════════════════════ */
 
 function Select({

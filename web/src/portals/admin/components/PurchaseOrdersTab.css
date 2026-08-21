@@ -75,8 +75,9 @@
   font-style: normal;
 }
 
-/* ⚠️  الوفر والزيادة بلونين مختلفين **وسهمين**: اللون وحده يختفي
-   على من لا يميّزه، وهو رقم يُقيَّم به المشتري. */
+/* ⚠️  Savings and overspend in two different colours **and two arrows**: colour
+   alone disappears for anyone who cannot distinguish it, and this is a figure
+   the buyer is judged on. */
 .po-saving {
   color: var(--color-success);
   font-style: normal;

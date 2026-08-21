@@ -5,18 +5,18 @@ import type { AccountSummary } from '@/features/b2b/api';
 import './CreditSummary.css';
 
 /**
- * ملخّص الائتمان.
+ * The credit summary.
  *
- * ⚠️  **المتاح هو الرقم الأكبر على الشاشة.**
+ * ⚠️  **Available credit is the largest figure on the screen.**
  *
- *     صاحب الصيدلية يبني طلبه على «كم أستطيع أن أشتري الآن» لا
- *     على حدّه الكلي. إبرازهما بنفس الوزن يجعله يخطّط على رقم
- *     ثم يُرفض عند الإتمام.
+ *     A pharmacy owner builds their order on "how much can I buy now", not on
+ *     their total limit. Giving the two equal weight makes them plan against
+ *     one figure and then be refused at checkout.
  *
- * ⚠️  والشريط يمتلئ باتجاه الخطر لا باتجاه الإنجاز.
+ * ⚠️  And the bar fills towards danger, not towards achievement.
  *
- *     شريط تقدّم يمتلئ عادةً يعني نجاحًا؛ وهنا يعني اقترابًا من
- *     السقف. اللون يتدرّج مع الامتلاء ليقرأ المعنى الصحيح.
+ *     A progress bar filling usually means success; here it means approaching
+ *     the ceiling. The colour shifts as it fills so it reads with the correct meaning.
  */
 export function CreditSummary({ account }: { account: AccountSummary }) {
   const { t } = useTranslation();
@@ -24,7 +24,7 @@ export function CreditSummary({ account }: { account: AccountSummary }) {
   const limit = Number(account.credit_limit);
   const outstanding = Number(account.outstanding);
 
-  // ⚠️  حارس القسمة على صفر: حساب بلا ائتمان حده صفر.
+  // ⚠️  A division-by-zero guard: an account with no credit has a limit of zero.
   const usedPercent = limit > 0 ? Math.min((outstanding / limit) * 100, 100) : 0;
   const tone = usedPercent >= 90 ? 'is-critical' : usedPercent >= 70 ? 'is-warning' : '';
 

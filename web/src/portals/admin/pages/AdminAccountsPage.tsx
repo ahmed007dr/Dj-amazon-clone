@@ -35,12 +35,13 @@ const ACCOUNT_TYPES = [
 ];
 
 /**
- * الحسابات والمراقبة.
+ * Accounts and monitoring.
  *
- * ⚠️  «من يستخدم النظام الآن» يُحدَّث تلقائيًا كل نصف دقيقة.
+ * ⚠️  "Who is using the system now" refreshes automatically every half minute.
  *
- *     شاشة مراقبة لا تتحدّث ليست مراقبة — والأدمن الذي يرى قائمة
- *     ثابتة يظن أن أحدًا لم يدخل، بينما الشاشة عمرها ساعة.
+ *     A monitoring screen that does not update is not monitoring — and an admin
+ *     seeing a static list assumes nobody has logged in, while the screen is an
+ *     hour old.
  */
 export function AdminAccountsPage() {
   const { t, i18n } = useTranslation();
@@ -69,7 +70,7 @@ export function AdminAccountsPage() {
   const online = useQuery({
     queryKey: ['admin', 'online-now'],
     queryFn: getOnlineNow,
-    // ⚠️  التحديث الدوري هو ما يجعلها مراقبة لا لقطة
+    // ⚠️  The polling is what makes it monitoring rather than a snapshot
     refetchInterval: 30 * 1000,
     staleTime: 0,
   });
@@ -132,9 +133,9 @@ export function AdminAccountsPage() {
       align: 'end',
       render: (account) => (
         <div className="admin-accounts__actions">
-          {/* ⚠️  «التاريخ» قبل «الإيقاف»: من يوشك أن يوقف حسابًا
-              يحتاج أن يرى ماذا فعل صاحبه أولًا — والترتيب يقود
-              إلى القراءة قبل القرار. */}
+          {/* ⚠️  "History" before "suspend": whoever is about to suspend an account
+              needs to see what its owner did first — and the order leads to
+              reading before deciding. */}
           <Button variant="ghost" size="sm" onClick={() => setHistoryOf(account)}>
             {t('admin.history.title')}
           </Button>

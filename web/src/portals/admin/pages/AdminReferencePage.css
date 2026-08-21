@@ -5,8 +5,8 @@
   justify-content: flex-end;
 }
 
-/* ⚠️  علامة الفرع رمادية خفيفة: هي إشارة بنية لا محتوى، وإبرازها
-       يسرق الانتباه من اسم الفئة نفسه. */
+/* ⚠️  The branch marker is a light grey: it is a structural signal rather than
+       content, and emphasising it steals attention from the category's own name. */
 .ref-branch {
   color: var(--color-text-muted);
 }

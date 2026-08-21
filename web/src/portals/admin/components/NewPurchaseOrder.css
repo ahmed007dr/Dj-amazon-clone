@@ -67,7 +67,7 @@
   border-radius: var(--radius-sm);
 }
 
-/* ⚠️  سعر العرض تحت الحقل: بدونه لا يعرف المشتري أنه غيّره. */
+/* ⚠️  The offer price beneath the field: without it the buyer does not know they changed it. */
 .new-po__was {
   color: var(--color-warning);
   font-size: 0.625rem;

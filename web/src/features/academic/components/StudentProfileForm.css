@@ -28,8 +28,8 @@
   border-color: var(--color-primary);
 }
 
-/* ⚠️  القائمة المعطّلة تبقى مقروءة: الرمادي الباهت على خلفية فاتحة
-   يسقط تحت حد التباين، فيقرأ الطالب «اختر الكلية» بالكاد. */
+/* ⚠️  A disabled select stays readable: pale grey on a light background falls
+   below the contrast threshold, so the student can barely read "choose a faculty". */
 .student-form__select:disabled {
   color: var(--color-text-muted);
   background: var(--color-bg);
@@ -46,10 +46,11 @@
   gap: var(--space-2);
 }
 
-/* ⚠️  عرض محدود لا عمودان.
-   النموذج تسلسلي: كل قائمة تُشتق مما قبلها. توزيعه على عمودين
-   يضع «الكلية» بجانب «الجامعة» فيبدو أنهما يُملآن معًا، بينما
-   الثانية معطّلة حتى تُختار الأولى. */
+/* ⚠️  A limited width rather than two columns.
+   The form is sequential: each list is derived from the one before it. Laying
+   it out in two columns puts "faculty" beside "university" so they look as
+   though they are filled in together, while the second is disabled until the
+   first is chosen. */
 @media (min-width: 768px) {
   .student-form {
     max-inline-size: 34rem;

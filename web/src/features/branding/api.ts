@@ -1,7 +1,7 @@
 /**
- * واجهة الهوية البصرية.
+ * The visual identity API.
  *
- * ⚠️  مسارات نسبية فقط — العنوان الكامل يبنيه `shared/http` وحده.
+ * ⚠️  Relative paths only — the full URL is built by `shared/http` alone.
  */
 
 import { http } from '@/shared/http';

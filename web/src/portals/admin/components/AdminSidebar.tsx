@@ -8,24 +8,24 @@ import { AdminLogo } from './AdminLogo';
 import './AdminSidebar.css';
 
 /**
- * قائمة لوحة الأدمن.
+ * The admin panel menu.
  *
- * ⚠️  **كل رابط يعلن ما يفحصه الخادم بالضبط — لا ما يبدو معقولًا.**
+ * ⚠️  **Every link declares exactly what the server checks — not what seems reasonable.**
  *
- *     كانت اثنا عشر رابطًا تعلن صلاحية لا يفحصها الخادم إطلاقًا
- *     (`catalog.view_product` بينما الحارس `IsAdminAccount`).
- *     الفلترة بها كانت ستُخفي شاشات يملكها المستخدم فعلًا —
- *     وهو أسوأ من إظهار ما لا يملك: يستنتج أن الميزة غير موجودة
- *     ويطلبها من جديد.
+ *     Twelve links used to declare a permission the server never checks at all
+ *     (`catalog.view_product` while the guard is `IsAdminAccount`). Filtering
+ *     on them would have hidden screens the user genuinely holds — which is
+ *     worse than showing what they do not: they conclude the feature does not
+ *     exist and ask for it again.
  *
- * ⚠️  والفلترة هنا **تحسين تجربة لا أمان**: الخادم يرفض بصرف
- *     النظر عمّا يظهر. والاثنان مطلوبان معًا.
+ * ⚠️  And the filtering here is **an experience improvement, not security**: the
+ *     server refuses regardless of what appears. Both are needed together.
  */
 interface AdminLink {
   to: string;
   key: string;
   end?: boolean;
-  /** صلاحية Django التي يفحصها الخادم — أو `null` لبلا شرط. */
+  /** The Django permission the server checks — or `null` for no condition. */
   permission: string | null;
 }
 
@@ -39,55 +39,55 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
     links: [
       { to: '/admin/orders', key: 'nav.orders', permission: 'orders.change_order' },
       { to: '/admin/products', key: 'nav.products', permission: 'catalog.change_product' },
-      // ⚠️  تحت المنتجات لا في «النظام»: الفئة إلزامية على المنتج،
-      //     فهي خطوة في إضافة صنف لا إعدادًا يُضبط مرة.
+      // ⚠️  Under products rather than in "system": the category is mandatory on a
+      //     product, so it is a step in adding an item rather than a setting configured once.
       { to: '/admin/reference', key: 'nav.reference', permission: 'catalog.change_product' },
-      // ⚠️  الشجرة الأكاديمية بجوار المرجعيات: كلاهما بيانات أساسية
-      //     تُضبط قبل أن يعمل ما فوقها — والطالب لا يُسجَّل أصلًا
-      //     قبل وجود جامعته وكليته في النظام.
+      // ⚠️  The academic tree beside the reference data: both are foundational data
+      //     configured before anything above them works — and a student cannot be
+      //     registered at all before their university and faculty exist in the system.
       {
         to: '/admin/academic',
         key: 'academic.adminTitle',
         permission: 'academic.change_university',
       },
-      // ⚠️  التسعير تحت الكتالوج لا في «النظام»: السعر قرار تجاري
-      //     يومي يتغيّر مع كل حملة، لا إعداد يُضبط مرة.
+      // ⚠️  Pricing under the catalogue rather than in "system": a price is a daily
+      //     commercial decision that changes with every campaign, not a setting configured once.
       { to: '/admin/pricing', key: 'nav.pricing', permission: 'pricing.change_pricelist' },
       { to: '/admin/reviews', key: 'nav.reviews', permission: 'reviews.change_review' },
       { to: '/admin/inventory', key: 'nav.inventory', permission: 'inventory.change_stock' },
-      // ⚠️  الموردون بجوار المخزون: الشراء يغذّيه، ومن
-      //     يتابع النقص هو من يُنشئ أمر الشراء.
+      // ⚠️  Suppliers beside inventory: purchasing feeds it, and whoever
+      //     watches the shortages is who creates the purchase order.
       { to: '/admin/suppliers', key: 'suppliers.title', permission: 'suppliers.add_purchaseorder' },
-      // ⚠️  الورديات تحت «التجارة» لا «النظام»: الفرق النقدي شأن
-      //     تشغيلي يومي يُراجَع مع الطلبات، لا إعداد يُضبط مرة.
+      // ⚠️  Shifts under "trade" rather than "system": a cash discrepancy is a daily
+      //     operational matter reviewed alongside the orders, not a setting configured once.
       { to: '/admin/pos-sessions', key: 'pos.sessions', permission: 'pos.view_possession' },
-      // ⚠️  الولاء تحت «التجارة» لا «النظام».
+      // ⚠️  Loyalty under "trade" rather than "system".
       //
-      //     مفتاح البرنامج يُقلَب استجابةً لحملة أو شكوى، لا
-      //     يُضبط مرة عند التركيب. ودفنه في إعدادات النظام يجعل
-      //     من يحتاجه لا يجده.
+      //     The programme's switch is flipped in response to a campaign or a
+      //     complaint, not configured once at installation. And burying it in the
+      //     system settings means whoever needs it cannot find it.
       { to: '/admin/loyalty', key: 'loyalty.title', permission: 'loyalty.change_loyaltyprogram' },
     ],
   },
   {
-    // ⚠️  قسم مستقل لا داخل «النظام».
+    // ⚠️  Its own section rather than inside "system".
     //
-    //     رؤية الأرباح صلاحية صريحة لا يملكها أغلب من يفتح
-    //     اللوحة (قاعدة ١٤). خلطها بإعدادات النظام يجعل الرابط
-    //     يظهر لمن سيُرفض عند الضغط.
+    //     Seeing profits is an explicit permission most people who open
+    //     the panel do not hold (rule 14). Mixing it into the system settings
+    //     makes the link appear to someone who will be refused on click.
     key: 'finance',
     links: [
-      // ⚠️  التقارير أول القسم المالي: هي ما يُفتح يوميًا،
-      //     وقائمة الأرباح تُقرأ عند الإقفال.
+      // ⚠️  Reports first in the finance section: they are what gets opened daily,
+      //     and the profit statement is read at closing.
       { to: '/admin/reports', key: 'reports.title', permission: 'finance.view_revenueentry' },
-      // ⚠️  الضغط بجوار التقارير لا في «النظام»: «متى يشتري الناس؟»
-      //     سؤال تجاري يُبنى عليه جدول المناوبات والعروض، لا إعداد.
+      // ⚠️  Load beside the reports rather than in "system": "when do people buy?"
+      //     is a commercial question the shift rota and the offers are built on, not a setting.
       { to: '/admin/traffic', key: 'traffic.title', permission: 'finance.view_revenueentry' },
       { to: '/admin/finance', key: 'finance.title', permission: 'finance.view_revenueentry' },
       { to: '/admin/expenses', key: 'finance.expensesTitle', permission: 'finance.add_expense' },
       { to: '/admin/businesses', key: 'b2b.businesses', permission: 'b2b.change_businessprofile' },
-      // ⚠️  الموظفون هنا لا في «النظام»: الإسناد شأن تجاري
-      //     يومي — عميل بلا مسؤول مبيعة ضائعة لا إعداد.
+      // ⚠️  Employees here rather than in "system": assignment is a daily
+      //     commercial matter — a customer with no owner is a lost sale, not a setting.
       { to: '/admin/staff', key: 'staff.staffTitle', permission: 'employees.change_customerassignment' },
       { to: '/admin/targets', key: 'targets.title', permission: 'commissions.change_commissionrecord' },
     ],
@@ -109,10 +109,10 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   const can = useCan();
 
-  // ⚠️  **القسم الفارغ يختفي بعنوانه.**
+  // ⚠️  **An empty section disappears along with its heading.**
   //
-  //     ترشيح الروابط وحدها يترك عناوين أقسام معلّقة فوق فراغ —
-  //     فيقرأها المستخدم «هنا شيء لم يُحمَّل» لا «هنا ما لا يخصّك».
+  //     Filtering the links alone leaves section headings hanging over nothing —
+  //     so the user reads them as "something failed to load" rather than "here is what is not yours".
   const sections = SECTIONS.map((section) => ({
     ...section,
     links: section.links.filter((link) => can(link.permission)),

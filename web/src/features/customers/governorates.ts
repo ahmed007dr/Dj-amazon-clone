@@ -1,15 +1,16 @@
 /**
- * محافظات مصر.
+ * Egypt's governorates.
  *
- * ⚠️  **قائمة مغلقة عمدًا** — لا حقل نصي حر.
+ * ⚠️  **A deliberately closed list** — not a free-text field.
  *
- *     رسوم الشحن تُحسب في الخادم بمطابقة اسم المحافظة حرفيًا مع
- *     `ShippingZone.governorates`. أي اختلاف إملائي («الجيزه» ·
- *     «الجيزة » بمسافة زائدة) يسقط العنوان إلى المنطقة الافتراضية
- *     بأعلى رسوم — والعميل يدفع الفرق بلا أن يعرف السبب.
+ *     Shipping fees are computed on the server by matching the governorate name
+ *     literally against `ShippingZone.governorates`. Any spelling difference
+ *     ("Giza" misspelled · "Giza " with a trailing space) drops the address into
+ *     the default zone at the highest fee — and the customer pays the
+ *     difference without knowing why.
  *
- * ⚠️  والأسماء هنا **يجب أن تطابق** ما في `devtools/seeds/logistics.py`
- *     حرفًا بحرف. أي تعديل في أحدهما يحتاج الآخر.
+ * ⚠️  And the names here **must match** those in `devtools/seeds/logistics.py`
+ *     character for character. Any edit to one needs the other.
  */
 export const GOVERNORATES = [
   'القاهرة',

@@ -8,24 +8,24 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import { useAuth } from '../useAuth';
 
 /**
- * حارس المسار.
+ * The route guard.
  *
- * ⚠️  **ليس أمانًا.** الخادم يرفض بصرف النظر عن هذا المكوّن.
+ * ⚠️  **This is not security.** The server refuses regardless of this component.
  *
- *     فائدته أن المستخدم يرى شاشة دخول بدل شاشة مليئة برسائل ٤٠٣.
+ *     Its value is that the user sees a login screen instead of a screen full of 403 messages.
  *
- * ⚠️  ينتظر انتهاء استعادة الجلسة قبل أن يحكم.
+ * ⚠️  It waits for the session restore to finish before judging.
  *
- *     بدون ذلك يُطرد كل مستخدم عائد إلى صفحة الدخول في اللحظة التي
- *     يُقلع فيها التطبيق — لأن `user` لم يصل بعد وإن كانت جلسته
- *     صالحة تمامًا.
+ *     Without that, every returning user is thrown back to the login page at the
+ *     moment the app boots — because `user` has not arrived yet, even though
+ *     their session is perfectly valid.
  */
 export function RequireAuth({
   children,
   allow,
 }: {
   children: ReactNode;
-  /** فحص إضافي على الحساب — أدمن مثلًا. */
+  /** An extra check on the account — an admin, for instance. */
   allow?: (user: NonNullable<ReturnType<typeof useAuth>['user']>) => boolean;
 }) {
   const { t } = useTranslation();
@@ -35,7 +35,7 @@ export function RequireAuth({
   if (isRestoring) return <Spinner />;
 
   if (!user) {
-    // ⚠️  الوجهة تُحفَظ ليعود إليها بعد الدخول بدل أن يبدأ من الرئيسية
+    // ⚠️  The destination is saved so they return to it after logging in rather than starting at the home page
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 

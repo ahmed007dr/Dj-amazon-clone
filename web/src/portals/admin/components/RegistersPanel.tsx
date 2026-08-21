@@ -17,19 +17,19 @@ import './RegistersPanel.css';
 const EMPTY = { code: '', name_ar: '', name_en: '', location: '', is_active: true };
 
 /**
- * الكاونترات.
+ * Registers.
  *
- * ⚠️  **بلا هذه الشاشة لا تُفتح نقطة البيع أصلًا.**
+ * ⚠️  **Without this screen the point of sale does not open at all.**
  *
- *     بوابة الكاشير تعرض «لا جهاز متاح» ولا سبيل لتجاوزها؛ وكان
- *     إنشاء كاونتر يحتاج سطر أوامر أو بذرة تطوير — أي أن فرعًا
- *     جديدًا لا يبيع حتى يتدخّل مبرمج.
+ *     The cashier gate shows "no register available" with no way past it; and
+ *     creating a register used to need the command line or a development seed —
+ *     meaning a new branch does not sell until a developer steps in.
  *
- * ⚠️  و**الإيقاف لا الحذف**: كل وردية وبيعة تشير إليه، والخادم لا
- *     يعرض `DELETE` إطلاقًا.
+ * ⚠️  And **disabling rather than deleting**: every shift and every sale points
+ *     at it, and the server exposes no `DELETE` at all.
  *
- * ⚠️  والوردية المفتوحة تمنع الإيقاف والنقل — الخادم يردّ ٤٠٩،
- *     والشاشة تُعلّم الكاونتر المشغول قبل الضغط.
+ * ⚠️  And an open shift blocks disabling and moving — the server answers 409,
+ *     and the screen flags the busy register before the press.
  */
 export function RegistersPanel() {
   const { t } = useTranslation();
@@ -88,8 +88,8 @@ export function RegistersPanel() {
           <Badge tone={row.is_active ? 'success' : 'neutral'}>
             {row.is_active ? t('pos.registerActive') : t('pos.registerStopped')}
           </Badge>
-          {/* ⚠️  المشغول يُعلَّم قبل الضغط: الإيقاف والنقل يُرفضان
-              بـ ٤٠٩ ووردية مفتوحة عليه. */}
+          {/* ⚠️  A busy one is flagged before the press: disabling and moving are
+              refused with 409 while a shift is open on it. */}
           {row.has_open_session ? <Badge tone="warning">{t('pos.busy')}</Badge> : null}
         </span>
       ),
@@ -162,8 +162,8 @@ export function RegistersPanel() {
               <input
                 dir="ltr"
                 required
-                // ⚠️  الرمز يُكتب مرة: هو ما يظهر على الإيصال وفي
-                //     تقارير الإقفال، وتغييره يقطع ربطها بالدرج.
+                // ⚠️  The code is written once: it is what appears on the receipt and in
+                //     the closing reports, and changing it severs their link to the drawer.
                 disabled={editingId !== null}
                 value={draft.code}
                 onChange={(event) => setDraft({ ...draft, code: event.target.value })}
@@ -196,8 +196,8 @@ export function RegistersPanel() {
                 value={draft.location}
                 onChange={(event) => setDraft({ ...draft, location: event.target.value })}
               >
-                {/* ⚠️  المواقع غير البائعة مُستبعدة: الحجر موقع
-                    للتالف، وكاونتر عليه يبيع بضاعة عُزلت عمدًا. */}
+                {/* ⚠️  Non-selling locations are excluded: quarantine is a location
+                    for damaged goods, and a register on it sells stock that was deliberately isolated. */}
                 {sellable.map((row) => (
                   <option key={row.id} value={row.id}>
                     {localized(row, 'name')}

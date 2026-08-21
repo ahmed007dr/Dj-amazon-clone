@@ -31,19 +31,20 @@ import './AdminSettingsPage.css';
 type Row = StockLocation | ExpenseCategory | AccessPolicy;
 
 /**
- * إعدادات مرجعية.
+ * Reference settings.
  *
- * ⚠️  ثلاثة نطاقات مختلفة في شاشة واحدة — والجامع بينها **متى
- *     تُضبط** لا أين تعيش: كلها تُملأ مرة عند التجهيز ثم نادرًا
- *     ما تُمسّ. تفريقها على ثلاثة مسارات يجعل التجهيز رحلة.
+ * ⚠️  Three different domains on one screen — and what unites them is **when
+ *     they are configured** rather than where they live: all of them are filled
+ *     in once at setup and then rarely touched. Splitting them across three
+ *     routes makes the setup a journey.
  */
 export function AdminSettingsPage() {
   const { t } = useTranslation();
   const { notify } = useToast();
 
-  // ⚠️  المصفوفة تبويب للعرض لا نوعًا يُحرَّر: `SettingsKind` يقود
-  //     نموذج الإنشاء، وضمّها إليه كان يُلزم النموذج بحقول لكيان
-  //     لا يُنشأ من هنا إطلاقًا.
+  // ⚠️  The matrix is a display tab rather than a kind that gets edited:
+  //     `SettingsKind` drives the creation form, and including it forced the form
+  //     to carry fields for an entity that is never created from here at all.
   const [tab, setTab] = useState<SettingsKind | 'matrix'>('locations');
   const kind: SettingsKind = tab === 'matrix' ? 'policies' : tab;
   const [editing, setEditing] = useState<Row | null>(null);

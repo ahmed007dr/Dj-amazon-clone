@@ -15,18 +15,20 @@ import { useToast } from '@/shared/ui/useToast';
 import './PointsAdjustPanel.css';
 
 /**
- * التسوية اليدوية.
+ * The manual adjustment.
  *
- * ⚠️  **أخطر شاشة في النظام: نقاط تُخلَق أو تُمحى بلا طلب يقابلها.**
+ * ⚠️  **The most dangerous screen in the system: points created or erased with no order against them.**
  *
- *     ولذلك ثلاثة حواجز: العميل يُختار من بحث لا يُكتب معرّفه ·
- *     رصيده يظهر قبل كتابة الرقم · والسبب إلزامي ويُسجَّل باسم من
- *     كتبه.
+ *     Hence three barriers: the customer is chosen from a search rather than
+ *     having their id typed · their balance appears before the number is
+ *     written · and the reason is mandatory and recorded under the name of
+ *     whoever wrote it.
  *
- * ⚠️  و**الرصيد يُعرض في نتيجة البحث لا بعد الاختيار**.
+ * ⚠️  And **the balance appears in the search result rather than after selection**.
  *
- *     سحب ١٠٠ من رصيد ٣٠ يُقصّ صامتًا إلى ٣٠ على الخادم، فيظن
- *     الأدمن أنه سحب ما نوى — ولا يكتشف الفارق إلا بشكوى.
+ *     Withdrawing 100 from a balance of 30 is silently clamped to 30 on the
+ *     server, so the admin believes they withdrew what they intended — and only
+ *     discovers the difference through a complaint.
  */
 export function PointsAdjustPanel() {
   const { t } = useTranslation();
@@ -94,9 +96,9 @@ export function PointsAdjustPanel() {
 
                   <span className="adjust-panel__balance" dir="ltr">
                     {row.balance}
-                    {/* ⚠️  «خارج البرنامج» يظهر قبل الاختيار: الخادم
-                        يرفض التسوية على حساب لا يشمله برنامج،
-                        وإخفاء ذلك يجعل الرفض يبدو عطلًا. */}
+                    {/* ⚠️  "Outside the programme" appears before selection: the server
+                        refuses an adjustment on an account no programme
+                        covers, and hiding that makes the refusal look like a fault. */}
                     {!row.covered ? (
                       <Badge tone="warning">{t('loyalty.notCovered')}</Badge>
                     ) : null}
@@ -133,9 +135,9 @@ export function PointsAdjustPanel() {
           ) : null}
 
           <div className="adjust-panel__inputs">
-            {/* ⚠️  حقل واحد بإشارة لا زرّان «أضف/اسحب»: الزرّان
-                يجعلان الاتجاه حالةً منفصلة عن الرقم، وأول خطأ فيها
-                يسحب ما نوى الأدمن إضافته. */}
+            {/* ⚠️  One field with a sign rather than "add"/"withdraw" buttons: the
+                buttons make the direction a state separate from the number, and
+                the first mistake in it withdraws what the admin meant to add. */}
             <label>
               {t('loyalty.adjustPoints')}
               <input

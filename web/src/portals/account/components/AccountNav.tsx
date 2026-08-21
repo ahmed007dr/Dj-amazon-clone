@@ -8,13 +8,13 @@ import { useMyLoyalty } from '@/features/loyalty/api';
 import './AccountNav.css';
 
 /**
- * تنقّل بوابة الحساب.
+ * Account portal navigation.
  *
- * ⚠️  «حزم دراستي» تظهر **للطلاب وحدهم**.
+ * ⚠️  "My study bundles" appears **to students alone**.
  *
- *     القسم الذي لا يملكه المستخدم لا يظهر في التنقّل ولا تُجلب
- *     بياناته — وإظهاره ثم رفضه عند الضغط تجربة سيئة، وإخفاؤه
- *     ليس أمنًا: الخادم يرفض بصرف النظر.
+ *     A section the user does not have appears in neither the navigation nor
+ *     the data fetching — showing it and then refusing on click is a bad
+ *     experience, and hiding it is not security: the server refuses regardless.
  */
 export function AccountNav({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
@@ -32,17 +32,17 @@ export function AccountNav({ onNavigate }: { onNavigate?: () => void }) {
           { to: '/account/bundles', key: 'nav.bundles' },
         ]
       : []),
-    // ⚠️  «حسابي التجاري» للحسابات التجارية وحدها.
+    // ⚠️  "My business account" is for business accounts alone.
     //
-    //     الرابط لغير التجاري يقود إلى شاشة تقول «لا ملف تجاري»
-    //     — رسالة صحيحة لكن لا معنى لعرضها لعميل تجزئة لن يملك
-    //     ملفًا أبدًا.
+    //     The link for a non-business account leads to a screen saying "no business
+    //     profile" — a correct message, but there is no point showing it to a
+    //     retail customer who will never have one.
     ...(isTrade(user) ? [{ to: '/account/trade', key: 'b2b.title' }] : []),
-    // ⚠️  «نقاطي» يظهر لمن يشمله برنامج **أو له تاريخ نقاط**.
+    // ⚠️  "My points" appears to anyone a programme covers **or who has points history**.
     //
-    //     الظهور الدائم كان يقود عميلًا خارج الاستهداف إلى شاشة
-    //     «غير متاح» بلا سبب يفهمه — والإخفاء المطلق كان يُخفي
-    //     رصيدًا قائمًا عن صاحبه لحظة إيقاف البرنامج.
+    //     Showing it always led a customer outside the targeting to an
+    //     "unavailable" screen for no reason they understand — and hiding it
+    //     absolutely hid an existing balance from its owner the moment the programme was disabled.
     ...(loyalty.data?.enabled ? [{ to: '/account/loyalty', key: 'loyalty.myPoints' }] : []),
     { to: '/account/notifications', key: 'notifications.title' },
     { to: '/account/security', key: 'account.security' },

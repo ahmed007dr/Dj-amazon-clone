@@ -16,7 +16,7 @@ interface CursorPage<T> {
 export const listNotifications = (params?: { unread?: boolean; category?: string }) =>
   http.get<CursorPage<Notification>>('/notifications/', {
     params: {
-      // ⚠️  `'true'` نصًّا: الخادم يقارن بالنص لا بالمنطقي
+      // ⚠️  `'true'` as text: the server compares against the string, not the boolean
       unread: params?.unread ? 'true' : undefined,
       category: params?.category,
     },

@@ -8,13 +8,14 @@ import type { BundleItem } from '../types';
 import './BundleItemList.css';
 
 /**
- * أصناف الحزمة.
+ * The bundle's items.
  *
- * ⚠️  **بلا أسعار.**
+ * ⚠️  **No prices.**
  *
- *     السعر يحسبه الخادم لكل عميل حسب قائمته، والحزمة لا تحمله.
- *     عرض رقم هنا يعني إما نداءً لكل صنف أو رقمًا يتقادم — والطالب
- *     يرى الإجمالي الصحيح في السلة، محسوبًا بقائمة الطلاب.
+ *     The server computes the price per customer from their list, and the
+ *     bundle does not carry it. Showing a figure here means either a call per
+ *     item or a number going stale — and the student sees the correct total in
+ *     the cart, computed against the student price list.
  */
 export function BundleItemList({ items }: { items: BundleItem[] }) {
   const { t } = useTranslation();

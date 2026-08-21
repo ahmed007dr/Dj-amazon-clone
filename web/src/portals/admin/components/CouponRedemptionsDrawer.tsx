@@ -11,15 +11,17 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import './CouponRedemptionsDrawer.css';
 
 /**
- * سجل صرف الكوبون.
+ * The coupon's redemption log.
  *
- * ⚠️  **`usage_count` رقم واحد — وهذا السجل هو الجواب الحقيقي.**
+ * ⚠️  **`usage_count` is a single number — and this log is the real answer.**
  *
- *     «صُرف ٣٠٠ مرة» لا يقول من صرفه ولا بكم ولا كم منها لطلبات
- *     أُلغيت. وقرار تمديد الحملة يُتخذ على الفرق بين الرقمين.
+ *     "Redeemed 300 times" says neither who redeemed it, nor for how much, nor
+ *     how many of those were cancelled orders. And the decision to extend the
+ *     campaign is taken on the difference between the two figures.
  *
- * ⚠️  و**الملغى يُطلَب صراحةً**: يبقى في السجل مُعلَّمًا لأن
- *     التدقيق يحتاجه، لكن ضمّه افتراضيًا يضخّم أثر الحملة.
+ * ⚠️  And **cancelled ones are requested explicitly**: they stay in the log
+ *     flagged, because auditing needs them, but including them by default
+ *     inflates the campaign's impact.
  */
 export function CouponRedemptionsDrawer({
   coupon,

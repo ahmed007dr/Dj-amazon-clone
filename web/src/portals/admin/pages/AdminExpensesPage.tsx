@@ -30,12 +30,12 @@ const TONE: Record<string, 'info' | 'success' | 'danger'> = {
 };
 
 /**
- * المصروفات.
+ * Expenses.
  *
- * ⚠️  **التبويب الافتراضي «مسوّدة» لا «الكل».**
+ * ⚠️  **The default tab is "draft", not "all".**
  *
- *     من يفتح هذه الشاشة يفتحها ليحسم ما ينتظره؛ وقائمة الكل
- *     تدفن الثلاثة الجديدة تحت مئتين معتمدة.
+ *     Whoever opens this screen opens it to settle what is waiting; and an "all"
+ *     list buries the three new ones under two hundred approved.
  */
 export function AdminExpensesPage() {
   const { t, i18n } = useTranslation();
@@ -50,8 +50,8 @@ export function AdminExpensesPage() {
   const decide = useExpenseDecision();
 
   const act = (expense: Expense, decision: 'APPROVE' | 'REJECT') => {
-    // ⚠️  سبب الرفض إلزامي على الخادم — يُطلَب هنا قبل الإرسال
-    //     لئلا يعود ٤٠٠ بعد ضغطة بلا شرح.
+    // ⚠️  The rejection reason is mandatory on the server — it is requested here
+    //     before submitting, so a 400 does not come back after a press with no explanation.
     const reason =
       decision === 'REJECT' ? window.prompt(t('finance.rejectReason')) ?? '' : undefined;
 
@@ -110,10 +110,10 @@ export function AdminExpensesPage() {
       header: '',
       align: 'end',
       render: (row) =>
-        // ⚠️  أزرار الحسم تظهر للمسوّدة وحدها.
+        // ⚠️  The decision buttons appear for drafts alone.
         //
-        //     إظهارها للمعتمد يدعو إلى ضغطة تعيد ٤٠٩ — والمعتمد
-        //     لا يُعدَّل لأنه دخل تقريرًا صدر فعلًا.
+        //     Showing them for an approved one invites a press that returns 409 — and
+        //     an approved expense is not edited because it has entered a report already issued.
         row.status === 'DRAFT' ? (
           <div className="expense-actions">
             <Button size="sm" loading={decide.isPending} onClick={() => act(row, 'APPROVE')}>

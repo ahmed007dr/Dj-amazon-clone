@@ -10,13 +10,14 @@ import { useShippingQuotes } from '../hooks';
 import './OptionList.css';
 
 /**
- * اختيار طريقة الشحن.
+ * Choosing the shipping method.
  *
- * ⚠️  الرسوم من الخادم عند كل تغيير محافظة — لا جدول محلي.
+ * ⚠️  The fees come from the server on every governorate change — no local table.
  *
- *     الشحن المجاني فوق حدّ يختلف بالمنطقة، والرسوم تُعدَّل من لوحة
- *     الأدمن. جدول في الواجهة يجعل تعديل الأدمن بلا أثر حتى النشر،
- *     ويعرض للعميل رقمًا يخالف فاتورته.
+ *     Free shipping applies above a threshold that differs by zone, and the
+ *     fees are edited from the admin panel. A table in the frontend makes the
+ *     admin's edit take no effect until deployment, and shows the customer a
+ *     figure differing from their invoice.
  */
 export function ShippingPicker({
   governorate,
@@ -41,7 +42,7 @@ export function ShippingPicker({
   if (error) return <StateMessage icon="⚠" title={t('state.errorTitle')} />;
 
   if (quotes.length === 0) {
-    // ⚠️  محافظة بلا طريقة شحن حالة حقيقية (منطقة نائية بلا سريع)
+    // ⚠️  A governorate with no shipping method is a real case (a remote zone with no express)
     return <StateMessage icon="⌀" title={t('checkout.noShipping')} />;
   }
 

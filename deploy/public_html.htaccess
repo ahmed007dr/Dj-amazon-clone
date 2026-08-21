@@ -1,0 +1,119 @@
+# ═══════════════════════════════════════════════════════════
+#  ⇒  /home/medboxne/public_html/.htaccess
+#
+#  جذر الموقع الذي يزوره الإنسان — يخدم بناء الواجهة (web/dist)
+#  ولا يمرّ عليه Django إطلاقًا. الخادم على api.med-box.net.
+#
+#  ⚠️  الترتيب هنا مقصود: HTTPS ← منع الخاص ← الملفات الحقيقية ← SPA.
+#      قاعدة SPA تبتلع كل ما لم تلتقطه القواعد قبلها، فأي قاعدة
+#      توضع بعدها لا تُنفَّذ أبدًا.
+# ═══════════════════════════════════════════════════════════
+
+Options -Indexes
+
+RewriteEngine On
+
+
+# ── ١. إجبار HTTPS ─────────────────────────────────────────
+# ⚠️  Django يفرض HTTPS على نطاقه وحده (SECURE_SSL_REDIRECT في prod.py).
+#     هذا النطاق ملفات ثابتة لا يمرّ بـ Django، فلا شيء يفرضه عليه سوى هنا.
+#
+# ⚠️  والشرطان لأن LiteSpeed خلف موازن أحمال قد لا يضبط %{HTTPS}:
+#     الاعتماد على واحد فقط يُنتج إمّا حلقة إعادة توجيه لا تنتهي
+#     وإمّا موقعًا يبقى على http بصمت.
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+
+# ── ٢. الميديا الخاصة — ممنوعة ─────────────────────────────
+# ⚠️  **هذا الحاجز الوحيد.** MEDIA_ROOT لم يُفصل بعد إلى عام وخاص
+#     (config/settings/base.py:442 غير قابل للتجاوز بمتغيّر بيئة)،
+#     فمجلد الميديا كامل يصل إلى هنا عبر وصلة رمزية — بما فيه:
+#
+#         private/customer-documents/   تراخيص الصيدليات ووثائق التحقق
+#         private/expense-attachments/  فواتير باسم المؤجّر ومبلغه
+#         mail/inbound/                 مرفقات البريد الوارد
+#
+#     تقديمها الشرعي يمرّ عبر Django بتوقيع عمره ٥ دقائق وفحص ملكية
+#     (customers/api.py:133) الذي يقرأ من القرص مباشرة — فمنع المسار
+#     هنا لا يكسر التحميل السليم، ويقطع المسار المباشر وحده.
+#
+# ⚠️  و404 لا 403: الثاني يؤكّد أن الملف موجود.
+RedirectMatch 404 ^/media/private/
+RedirectMatch 404 ^/media/mail/
+
+
+# ── ٣. لا تنفيذ داخل مجلد الرفع ────────────────────────────
+# ⚠️  مجلد يرفع إليه المستخدمون وهو تحت جذر الويب = تنفيذ عن بُعد
+#     إن نجح رفع ملف ينتهي بامتداد ينفّذه الخادم. الفحص في
+#     core/files.py يقصر الأنواع على قائمة سماح، وهذه الطبقة الثانية:
+#     حتى لو مرّ ملف، يُقدَّم نصًّا ولا يُنفَّذ.
+#
+# ⚠️  <Directory> **لا يعمل داخل .htaccess** — إنه توجيه إعداد خادم،
+#     ووضعه هنا يُسقط الموقع كله بخطأ 500. تعطيل المحرّك داخل مجلد
+#     الميديا مكانه deploy/media.htaccess الذي يوضع في ذلك المجلد نفسه.
+<FilesMatch "\.(php|phtml|php[0-9]|pl|py|cgi|sh|lua)$">
+    Require all denied
+</FilesMatch>
+
+
+# ── ٤. الملفات الموجودة فعلًا تُخدم كما هي ─────────────────
+# ⚠️  /media وصلة رمزية إلى /home/medboxne/med-box/media، و/static
+#     ناتج collectstatic. استثناؤهما هنا يمنع قاعدة SPA من ابتلاعهما
+#     وإرجاع index.html بدل الصورة — وهو العطل الذي يظهر كصور مكسورة
+#     في كل صفحة بينما الخادم يردّ 200.
+RewriteCond %{REQUEST_URI} ^/(media|static)/ [OR]
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+
+# ── ٥. مسارات الواجهة أحادية الصفحة ────────────────────────
+# ⚠️  React Router يوجّه في المتصفح، والخادم لا يعرف /cart ولا /orders.
+#     بدون هذا السطر يعمل التنقّل داخل التطبيق ويفشل تحديث الصفحة
+#     أو فتح الرابط مباشرة بـ404 — عطل يظهر عند المستخدم لا عند المطوّر.
+RewriteRule ^ /index.html [L]
+
+
+# ── ٦. التخزين المؤقّت ─────────────────────────────────────
+# ⚠️  index.html بلا تخزين، والأصول بأقصاه.
+#     Vite يبني أسماء الأصول ببصمة محتواها (app-4f2a9c.js)، فتغيّر
+#     المحتوى يغيّر الاسم — سنة كاملة آمنة. أمّا index.html فهو الذي
+#     يحمل أسماء الأصول الجديدة، وتخزينه يعني نشرًا لا يصل الزائر أبدًا.
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css                 "access plus 1 year"
+    ExpiresByType application/javascript   "access plus 1 year"
+    ExpiresByType image/webp               "access plus 1 month"
+    ExpiresByType image/jpeg               "access plus 1 month"
+    ExpiresByType image/png                "access plus 1 month"
+    ExpiresByType image/svg+xml            "access plus 1 month"
+    ExpiresByType font/woff2               "access plus 1 year"
+</IfModule>
+
+<FilesMatch "^(index\.html|sw\.js)$">
+    <IfModule mod_headers.c>
+        Header set Cache-Control "no-cache, must-revalidate"
+    </IfModule>
+</FilesMatch>
+
+
+# ── ٧. ترويسات أمان ────────────────────────────────────────
+# ⚠️  نظيرها في Django يغطّي نطاق الخادم وحده — هذا نطاق مختلف
+#     يخدمه Apache، فلا تصله إعدادات prod.py.
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "same-origin"
+    Header always set X-Frame-Options "DENY"
+    # سنة واحدة — مطابقة لـ SECURE_HSTS_SECONDS في prod.py
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>
+
+
+# ── ٨. الضغط ───────────────────────────────────────────────
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/plain
+    AddOutputFilterByType DEFLATE application/javascript application/json
+    AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>

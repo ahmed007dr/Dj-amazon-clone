@@ -1,5 +1,5 @@
-/* ⚠️  لون تحذيري صريح وموضع ثابت: الشريط الهادئ يُعتاد عليه في
-   دقيقتين فيفقد وظيفته كلها. */
+/* ⚠️  An explicit warning colour and a fixed position: a quiet bar is grown
+   used to within two minutes, so it loses its function entirely. */
 .preview-banner {
   display: flex;
   flex-wrap: wrap;

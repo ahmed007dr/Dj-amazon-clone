@@ -23,7 +23,7 @@
 
 .summary__row dd {
   font-weight: 600;
-  /* الأرقام لاتينية — تبقى مقروءة في الاتجاهين */
+  /* The numerals are Latin — they stay readable in both directions */
   font-variant-numeric: tabular-nums;
 }
 
@@ -47,7 +47,7 @@
   font-size: 0.8125rem;
 }
 
-/* ثابت أثناء التمرير على الديسكتوب — يبقى زر الشراء مرئيًا */
+/* Sticky while scrolling on desktop — the checkout button stays visible */
 @media (min-width: 992px) {
   .summary {
     position: sticky;

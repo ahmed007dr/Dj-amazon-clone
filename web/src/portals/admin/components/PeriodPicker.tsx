@@ -3,13 +3,14 @@ import { useTranslation } from 'react-i18next';
 import './PeriodPicker.css';
 
 /**
- * اختيار الفترة.
+ * Choosing the period.
  *
- * ⚠️  **الشهر الحالي افتراضًا لا «كل الوقت».**
+ * ⚠️  **The current month by default, not "all time".**
  *
- *     «كل الوقت» يخلط شهرًا رابحًا بآخر خاسرًا في رقم واحد لا
- *     يدل على شيء، ويثقل الاستعلام بلا فائدة. والاختصارات أسفلها
- *     تغطي ما يُطلَب فعلًا: هذا الشهر · الماضي · هذه السنة.
+ *     "All time" mixes a profitable month with a loss-making one into a single
+ *     figure that indicates nothing, and loads the query for no benefit. And
+ *     the shortcuts beneath it cover what is actually asked for: this month ·
+ *     last · this year.
  */
 
 function iso(value: Date): string {
@@ -19,8 +20,8 @@ function iso(value: Date): string {
 function monthRange(offset: number): { start: string; end: string } {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-  // ⚠️  اليوم صفر من الشهر التالي = آخر يوم في الشهر المطلوب.
-  //     كتابة ٣٠ أو ٣١ يدويًا تكسر فبراير وكل شهر من ٣٠ يومًا.
+  // ⚠️  Day zero of the following month = the last day of the requested month.
+  //     Writing 30 or 31 by hand breaks February and every 30-day month.
   const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
   return { start: iso(start), end: iso(end) };
 }
@@ -71,9 +72,9 @@ export function PeriodPicker({
           <input
             type="date"
             value={value.start ?? ''}
-            // ⚠️  `max` يمنع اختيار بداية بعد النهاية من الواجهة؛
-            //     والخادم يرفضها أيضًا — المدى المقلوب يُنتج تقريرًا
-            //     بأصفار يبدو حقيقيًا.
+            // ⚠️  `max` prevents choosing a start after the end from the frontend;
+            //     and the server refuses it too — an inverted range produces a report
+            //     of zeros that looks genuine.
             max={value.end}
             onChange={(event) => onChange({ ...value, start: event.target.value })}
           />

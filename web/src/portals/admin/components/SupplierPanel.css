@@ -86,7 +86,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ⚠️  «ما علينا» أبرز رقم في اللوح — أول سؤال يُفتح لأجله. */
+/* ⚠️  "What we owe" is the most prominent figure in the panel — the first question it is opened for. */
 .supplier-panel__figures .is-primary strong {
   font-size: 1.5rem;
   color: var(--color-primary);
@@ -134,10 +134,11 @@
   color: var(--color-text-muted);
 }
 
-/* ── كشف الحركات ─────────────────────────────────────────── */
-/* ⚠️  ألوان الاتجاه تُعرَّف **هنا** لا في ملف لوح B2B.
-   الفئتان كانتا معرَّفتين هناك وحده، وvite يفصل حزمة كل شاشة —
-   فتظهر أرقام الكشف بلا لون في شاشة الموردين ويضيع الاتجاه. */
+/* ── The movement statement ──────────────────────────────── */
+/* ⚠️  The direction colours are defined **here**, not in the B2B panel's file.
+   The two classes were defined there alone, and vite splits each screen's
+   bundle — so the statement's figures appeared with no colour on the suppliers
+   screen and the direction was lost. */
 .supplier-ledger {
   display: flex;
   flex-direction: column;

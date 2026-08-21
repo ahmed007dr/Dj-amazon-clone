@@ -27,10 +27,10 @@ import './AdminPaymentsPage.css';
 const KEY = ['admin', 'payment-providers'] as const;
 
 /**
- * بوابات الدفع.
+ * Payment gateways.
  *
- * ⚠️  التشغيل والإيقاف **أثره فوري بلا إعادة نشر** — وهذا جوهر
- *     ADR-15: البوابات بيانات والمحوّلات كود.
+ * ⚠️  Enabling and disabling **take effect immediately with no redeployment** —
+ *     and that is the heart of ADR-15: the gateways are data and the adapters are code.
  */
 export function AdminPaymentsPage() {
   const { t } = useTranslation();
@@ -61,7 +61,7 @@ export function AdminPaymentsPage() {
       void queryClient.invalidateQueries({ queryKey: KEY });
     },
     onError: (cause) => {
-      // ⚠️  ٤٠٩ = آخر بوابة مفعّلة. الرسالة من الخادم محدّدة ومفيدة.
+      // ⚠️  409 = the last enabled gateway. The server's message is specific and useful.
       notify(isApiError(cause) ? cause.displayMessage : t('state.errorTitle'), 'danger');
     },
   });
@@ -131,9 +131,9 @@ export function AdminPaymentsPage() {
             {...(index > 0
               ? {
                   onMoveUp: () => {
-                    // ⚠️  الترتيب يُرسَل **كاملًا** لا موضعًا واحدًا:
-                    //     الخادم يعيد ترقيم الأولويات من القائمة، وإرسال
-                    //     تبديل جزئي يترك فجوات تتراكم حتى تتساوى بوابتان.
+                    // ⚠️  The ordering is sent **in full**, not as a single position:
+                    //     the server renumbers the priorities from the list, and sending
+                    //     a partial swap leaves gaps that accumulate until two gateways tie.
                     const order = (providers.data ?? []).map((row) => row.id);
                     const above = order[index - 1];
                     const current = order[index];
@@ -198,13 +198,13 @@ function GatewayCard({
   localized: (source: object, field: string) => string;
   onEdit: () => void;
   onDelete: () => void;
-  /** غائب على الأولى — لا شيء فوقها لترتفع إليه */
+  /** Absent on the first — there is nothing above it to move up to */
   onMoveUp?: () => void;
 }) {
   const { t } = useTranslation();
 
-  // ⚠️  البوابة الخارجية بلا مفاتيح لا تُفعَّل — الخادم يرفض،
-  //     وإخفاء الزر يمنع محاولة محكوم عليها بالفشل.
+  // ⚠️  An external gateway with no keys is not enabled — the server refuses,
+  //     and hiding the button prevents an attempt doomed to fail.
   const blocked = !provider.is_active && !provider.is_configured && provider.credential_keys.length === 0;
 
   return (
@@ -222,8 +222,8 @@ function GatewayCard({
             <Badge tone="neutral">{t('admin.disabled')}</Badge>
           )}
 
-          {/* ⚠️  الأولوية ظاهرة: هي التي تحدد أي بوابة تُجرَّب أولًا
-              حين تصلح أكثر من واحدة — والقرار يوجّه المال. */}
+          {/* ⚠️  The priority is visible: it is what determines which gateway is tried
+              first when more than one is suitable — and the decision steers the money. */}
           <span className="gateway__priority muted">
             {t('admin.priority')}: {provider.priority}
           </span>
@@ -296,9 +296,9 @@ function GatewayCard({
           {t('common.edit')}
         </Button>
 
-        {/* ⚠️  الحذف يظهر للموقوفة وحدها: الخادم يرفض حذف بوابة ذات
-            معاملات، والمفعّلة تُوقَف أولًا — وزر يُرفض عند الضغط
-            تجربة سيئة. */}
+        {/* ⚠️  Deletion appears for disabled ones alone: the server refuses to delete a
+            gateway with transactions, and an enabled one is disabled first — and
+            a button refused when pressed is a bad experience. */}
         {!provider.is_active ? (
           <Button size="sm" variant="ghost" onClick={onDelete}>
             {t('common.delete')}

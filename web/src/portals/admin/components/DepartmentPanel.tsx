@@ -21,12 +21,12 @@ import './AcademicPanels.css';
 const EMPTY = { faculty: '', code: '', name_ar: '', name_en: '', is_active: true };
 
 /**
- * الأقسام.
+ * Departments.
  *
- * ⚠️  **القسم اختياري في ملف الطالب** — ولذلك لا يمنع غيابُه شيئًا.
+ * ⚠️  **The department is optional on a student's profile** — so its absence blocks nothing.
  *
- *     كليات كثيرة بلا تقسيم داخلي؛ إلزامه كان يجبر الأدمن على
- *     اختراع قسم وهمي لكل كلية.
+ *     Many faculties have no internal divisions; making it mandatory forced the
+ *     admin to invent a dummy department for every faculty.
  */
 export function DepartmentPanel() {
   const { t } = useTranslation();

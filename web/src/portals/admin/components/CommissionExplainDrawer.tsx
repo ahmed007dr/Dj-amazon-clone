@@ -6,7 +6,7 @@ import { Spinner } from '@/shared/ui/Spinner';
 
 import './CommissionExplainDrawer.css';
 
-/** ترتيب مقصود: من الإيراد إلى الربح إلى الشريحة إلى المبلغ. */
+/** A deliberate order: from revenue to profit to the tier to the amount. */
 const ORDER = [
   'employee',
   'period',
@@ -28,17 +28,18 @@ const ORDER = [
 ];
 
 /**
- * تفسير العمولة.
+ * The commission explanation.
  *
- * ⚠️  **العمولة رقم يُصرَف — ولا يُصرَف رقم لا يُفسَّر.**
+ * ⚠️  **A commission is a figure that gets paid — and a figure that cannot be explained does not get paid.**
  *
- *     «لماذا عمولتي ٤٢٠ لا ٦٠٠؟» سؤال يأتي من كل مندوب في أول
- *     شهر. بلا هذا اللوح يفتح المحاسب الشيفرة أو يخمّن، وكلاهما
- *     يُنتج إجابة لا تُثبَت.
+ *     "Why is my commission 420 and not 600?" is a question every rep asks in
+ *     the first month. Without this panel the accountant opens the source or
+ *     guesses, and both produce an answer that cannot be proved.
  *
- * ⚠️  و**السطور بترتيب الاشتقاق لا الأبجدية**: المبيعات ثم
- *     المرتجعات ثم الصافي ثم التكلفة ثم الربح — كل سطر يُشتق
- *     ممّا فوقه، والقارئ يتتبّع الحساب بدل أن يقفز فيه.
+ * ⚠️  And **the lines follow the derivation order, not the alphabet**: sales,
+ *     then returns, then net, then cost, then profit — each line derived from
+ *     the one above it, so the reader follows the calculation instead of
+ *     jumping around in it.
  */
 export function CommissionExplainDrawer({
   record,

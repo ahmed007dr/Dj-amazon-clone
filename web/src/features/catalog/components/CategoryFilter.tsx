@@ -7,13 +7,13 @@ import { useCategories } from '../hooks';
 import './CategoryFilter.css';
 
 /**
- * فلتر الفئات.
+ * The category filter.
  *
- * ⚠️  الفلترة **من الخادم** لا من العميل.
+ * ⚠️  The filtering happens **on the server**, not on the client.
  *
- *     تحميل كل المنتجات ثم ترشيحها في المتصفح يعمل على عشرين منتجًا
- *     ويتوقّف عن العمل على ألفين — والفرق لا يظهر في بيئة التطوير
- *     أبدًا.
+ *     Downloading every product and then filtering in the browser works on
+ *     twenty products and stops working on two thousand — and the difference
+ *     never shows up in a development environment.
  */
 export function CategoryFilter({
   value,

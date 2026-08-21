@@ -8,12 +8,12 @@ import type { ProductImage } from '../types';
 import './ProductGallery.css';
 
 /**
- * معرض صور المنتج.
+ * The product image gallery.
  *
- * ⚠️  نسبة ثابتة للإطار تحجز المساحة قبل تحميل الصورة.
+ * ⚠️  A fixed frame ratio reserves the space before the image loads.
  *
- *     بدونها يقفز التخطيط عند وصول كل صورة، فينقر المستخدم على
- *     عنصر ثم يجد إصبعه فوق عنصر آخر.
+ *     Without it the layout jumps as each image arrives, so the user taps one
+ *     element and finds their finger over another.
  */
 export function ProductGallery({ images, alt }: { images: ProductImage[]; alt: string }) {
   const localized = useLocalized();
@@ -36,7 +36,7 @@ export function ProductGallery({ images, alt }: { images: ProductImage[]; alt: s
         <img
           src={mediaUrl(current.image)}
           alt={localized(current, 'alt_text') || alt}
-          // ⚠️  الصورة الرئيسية ليست كسولة — هي أول ما يراه الزائر
+          // ⚠️  The primary image is not lazy — it is the first thing the visitor sees
           loading="eager"
           decoding="async"
         />

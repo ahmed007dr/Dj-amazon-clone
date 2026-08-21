@@ -43,8 +43,8 @@
   font-size: 0.8125rem;
 }
 
-/* ⚠️  الأزرار تلتفّ ولا تُضغط: زرّان في عمود ضيّق على تابلت
-   يقصّان نصّهما ويصيران غير مقروءين. */
+/* ⚠️  The buttons wrap rather than being squeezed: two buttons in a narrow
+   column on a tablet crop their text and become unreadable. */
 .admin-accounts__actions {
   display: flex;
   flex-wrap: wrap;

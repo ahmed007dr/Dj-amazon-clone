@@ -67,7 +67,7 @@
   outline: none;
 }
 
-/* ⚠️  المتوقَّع باهت: موجود للمراجعة بعد الإدخال لا للنسخ منه. */
+/* ⚠️  The expected figure is faint: it is there for review after entry, not to be copied from. */
 .count-sheet__expected {
   color: var(--color-text-muted);
 }

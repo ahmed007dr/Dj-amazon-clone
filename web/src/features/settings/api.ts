@@ -3,12 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { http } from '@/shared/http';
 
 /**
- * إعدادات مرجعية متفرّقة كانت تُدار من لوحة Django وحدها:
- * مواقع التخزين · تصنيفات المصروفات · سياسات الوصول.
+ * Assorted reference settings that used to be managed from the Django panel alone:
+ * stock locations · expense categories · access policies.
  *
- * ⚠️  **ثلاثة نطاقات مختلفة في ملف واحد** — والجمع هنا في طبقة
- *     الواجهة لا في الخادم: كلٌّ يبقى في نطاقه هناك، وما يجمعها
- *     أنها تُضبط في نفس الجلسة عند التجهيز.
+ * ⚠️  **Three different domains in one file** — and the grouping is in the
+ *     frontend layer, not on the server: each stays in its own domain there,
+ *     and what unites them is that they are configured in the same session at setup.
  */
 
 export interface StockLocation {
@@ -20,7 +20,7 @@ export interface StockLocation {
   governorate: string;
   phone: string;
   is_default: boolean;
-  /** ⚠️  الحجر غير قابل للبيع — والتالف لا يُعرض في المتجر. */
+  /** ⚠️  Quarantine is not sellable — and damaged goods are not shown in the store. */
   is_sellable: boolean;
   is_active: boolean;
 }
@@ -74,7 +74,7 @@ function useSettingsMutation<TArgs, TResult>(
   });
 }
 
-// ── مواقع التخزين ──────────────────────────────────────────
+// ── Stock locations ───────────────────────────────────────
 
 export function useStockLocations() {
   return useQuery({
@@ -84,8 +84,8 @@ export function useStockLocations() {
 }
 
 /**
- * ⚠️  إبطال شجرة المخزون معها: نماذج الحركات تختار الموقع من هذه
- *     القائمة، وموقع جديد يجب أن يظهر فيها فورًا.
+ * ⚠️  Invalidate the inventory tree with it: the movement forms choose the
+ *     location from this list, and a new location must appear in it immediately.
  */
 export function useSaveLocation() {
   return useSettingsMutation(
@@ -104,7 +104,7 @@ export function useDeleteLocation() {
   );
 }
 
-// ── تصنيفات المصروفات ──────────────────────────────────────
+// ── Expense categories ────────────────────────────────────
 
 export function useExpenseCategories() {
   return useQuery({
@@ -130,7 +130,7 @@ export function useDeleteExpenseCategory() {
   );
 }
 
-// ── سياسات الوصول ──────────────────────────────────────────
+// ── Access policies ───────────────────────────────────────
 
 export function useAccessPolicies() {
   return useQuery({
@@ -140,11 +140,11 @@ export function useAccessPolicies() {
 }
 
 /**
- * ⚠️  إبطال خيارات نموذج المنتج معها.
+ * ⚠️  Invalidate the product form options with it.
  *
- *     السياسة الجديدة تُختار من داخل نموذج المنتج («مَن يرى هذا
- *     المنتج؟») — وبلا الإبطال ينشئها الأدمن ثم لا يجدها حيث
- *     يحتاجها بالضبط.
+ *     A new policy is chosen from inside the product form ("who sees this
+ *     product?") — and without the invalidation the admin creates it and then
+ *     cannot find it exactly where they need it.
  */
 export function useSavePolicy() {
   return useSettingsMutation(
@@ -164,14 +164,14 @@ export function useDeletePolicy() {
 }
 
 /**
- * مصفوفة «من يرى ماذا».
+ * The "who sees what" matrix.
  *
- * ⚠️  **تُحسب من محرك التقييم نفسه — لا من قراءة الحقول.**
+ * ⚠️  **Computed from the evaluation engine itself — not from reading the fields.**
  *
- *     استنتاج النتيجة في الواجهة من `allowed_account_types` وحده
- *     يتجاهل `requires_verification` و`required_permission`،
- *     فتُظهر المصفوفة سماحًا حيث يمنع النظام فعلًا. والمصفوفة التي
- *     تكذب أسوأ من غيابها: يُبنى عليها قرار ضبط.
+ *     Deriving the outcome in the frontend from `allowed_account_types` alone
+ *     ignores `requires_verification` and `required_permission`, so the matrix
+ *     shows access permitted where the system actually blocks it. And a matrix
+ *     that lies is worse than no matrix: configuration decisions are built on it.
  */
 export interface AccessMatrixCell {
   unverified: boolean;
@@ -198,10 +198,11 @@ export interface PreviewStatus {
 }
 
 /**
- * ⚠️  وضع المعاينة **يجب أن يُعلَن**.
+ * ⚠️  Preview mode **must be announced**.
  *
- *     الأدمن الذي ينسى أنه يتصفّح بعيني طالب يقرأ كتالوجًا ناقصًا
- *     ويظن أن منتجاته اختفت — ثم يُبلّغ عن عطل لا وجود له.
+ *     An admin who forgets they are browsing through a student's eyes reads an
+ *     incomplete catalogue and assumes their products have disappeared — and
+ *     then reports a fault that does not exist.
  */
 export function usePreviewStatus() {
   return useQuery({

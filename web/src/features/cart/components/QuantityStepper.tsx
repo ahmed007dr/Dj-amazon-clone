@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next';
 import './QuantityStepper.css';
 
 /**
- * ⚠️  أزرار لا حقل رقمي وحده.
+ * ⚠️  Buttons rather than a number field alone.
  *
- *     `<input type="number">` على الهاتف يفتح لوحة أرقام ويحتاج
- *     ثلاث لمسات لزيادة واحدة. الأزرار تجعلها لمسة، والحقل يبقى
- *     للإدخال المباشر حين تكون الكمية كبيرة.
+ *     `<input type="number">` on a phone opens a numeric keypad and takes three
+ *     taps to add one. The buttons make it one tap, and the field remains for
+ *     direct entry when the quantity is large.
  */
 export function QuantityStepper({
   value,

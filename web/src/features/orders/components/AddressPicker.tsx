@@ -7,11 +7,12 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import './AddressPicker.css';
 
 /**
- * اختيار عنوان محفوظ.
+ * Choosing a saved address.
  *
- * ⚠️  اختيار العنوان يحدّد **المحافظة**، والمحافظة تحدّد رسوم
- *     الشحن. لذلك يُبلَّغ المستدعي بالمحافظة لا بالمعرّف وحده —
- *     وإلا احتاج بحثًا ثانيًا عن العنوان ليعرف أين يشحن.
+ * ⚠️  Choosing the address determines **the governorate**, and the governorate
+ *     determines the shipping fee. So the caller is told the governorate, not
+ *     the id alone — otherwise it would need a second lookup of the address to
+ *     learn where to ship.
  */
 export function AddressPicker({
   value,

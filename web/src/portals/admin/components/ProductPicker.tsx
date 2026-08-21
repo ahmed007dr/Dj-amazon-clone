@@ -10,23 +10,25 @@ import { Spinner } from '@/shared/ui/Spinner';
 import './ProductPicker.css';
 
 /**
- * اختيار منتج بالبحث.
+ * Choosing a product by search.
  *
- * ⚠️  **بحث لا قائمة منسدلة.**
+ * ⚠️  **A search, not a dropdown.**
  *
- *     `<select>` بكل المنتجات يعني تحميل الكتالوج كاملًا في كل فتح
- *     للنموذج، وتمريرًا في آلاف الخيارات لإيجاد صنف. والكتالوج
- *     ينمو، فالقائمة تسوء مع الوقت بينما البحث لا يتغيّر.
+ *     A `<select>` of every product means loading the whole catalogue every
+ *     time the form opens, and scrolling through thousands of options to find
+ *     one item. And the catalogue grows, so the list gets worse over time while
+ *     the search does not change.
  *
- * ⚠️  و**الرمز والباركود يطابقان تمامًا** — يمرّان إلى الخادم كما هما.
+ * ⚠️  And **the code and the barcode match exactly** — they pass to the server as they are.
  *
- *     أمين المخزن يمسك الماسح أمام العبوة، فيصل الرقم كاملًا ويجب
- *     أن يعطي الصنف الواحد لا قائمة يختار منها.
+ *     The warehouse keeper holds the scanner up to the box, so the complete
+ *     number arrives and must give the single item rather than a list to choose from.
  *
- * ⚠️  والمختار **يبقى ظاهرًا** بعد الاختيار لا يُستبدَل بمربع فارغ.
+ * ⚠️  And the selection **stays visible** after being chosen rather than being
+ *     replaced by an empty box.
  *
- *     نموذج تسوية بلا ذكر الصنف المختار يجعل الأدمن يكتب الكمية
- *     وهو غير واثق أنه اختار الصف الصحيح.
+ *     An adjustment form that does not name the chosen item makes the admin
+ *     type the quantity unsure they picked the right row.
  */
 export function ProductPicker({
   value,
@@ -46,7 +48,7 @@ export function ProductPicker({
   const query = useQuery({
     queryKey: ['admin', 'products', 'picker', debounced],
     queryFn: () => listAdminProducts({ search: debounced, is_active: 'true' }),
-    // ⚠️  حرفان على الأقل: حرف واحد يعيد نصف الكتالوج بلا فائدة.
+    // ⚠️  At least two characters: one character returns half the catalogue for nothing.
     enabled: debounced.trim().length >= 2,
     staleTime: 60 * 1000,
   });

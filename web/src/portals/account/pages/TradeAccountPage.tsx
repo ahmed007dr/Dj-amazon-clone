@@ -18,18 +18,18 @@ import './TradeAccountPage.css';
 type Tab = 'invoices' | 'statement' | 'details';
 
 /**
- * حساب العميل التجاري.
+ * The business customer's account.
  *
- * ⚠️  **الملخّص أولًا ثم التفاصيل.**
+ * ⚠️  **The summary first, then the details.**
  *
- *     صاحب الصيدلية يفتح هذه الشاشة ليعرف رقمين: كم عليه، وكم
- *     يستطيع أن يشتري. دفنهما تحت جدول حركات يجعله يبحث عمّا
- *     جاء من أجله.
+ *     A pharmacy owner opens this screen to learn two figures: how much they
+ *     owe, and how much they can buy. Burying them under a movements table
+ *     makes them hunt for what they came for.
  *
- * ⚠️  والمتأخر يُعرَض في الأعلى بلا إخفاء.
+ * ⚠️  And overdue amounts are shown at the top, unhidden.
  *
- *     العميل الذي يُرفض طلبه بلا أن يرى سببه يتصل بالدعم؛ والذي
- *     يرى فاتورته المتأخرة يسدّدها.
+ *     A customer whose order is refused without seeing why calls support; one
+ *     who sees their overdue invoice pays it.
  */
 export function TradeAccountPage() {
   const { t } = useTranslation();
@@ -41,7 +41,7 @@ export function TradeAccountPage() {
 
   if (account.isPending) return <Spinner />;
 
-  // ⚠️  ٤٠٤ هنا ليست عطلًا: حساب تجاري لم يُفعَّل ملفه بعد.
+  // ⚠️  A 404 here is not a fault: a business account whose profile is not yet activated.
   if (isApiError(account.error) && account.error.isNotFound) {
     return (
       <>
@@ -99,9 +99,10 @@ export function TradeAccountPage() {
         >
           {t('b2b.statement')}
         </button>
-        {/* ⚠️  «بياناتي» تبويب لا شاشة منفصلة: يُفتح لتجديد ترخيص
-            انتهى، والتنبيه بانتهائه يظهر فوق هذه التبويبات
-            مباشرةً — فالمسافة بين التنبيه وعلاجه خطوة واحدة. */}
+        {/* ⚠️  "My details" is a tab rather than a separate screen: it is opened to
+            renew an expired licence, and the expiry warning appears directly
+            above these tabs — so the distance between the warning and its
+            remedy is one step. */}
         <button
           type="button"
           role="tab"

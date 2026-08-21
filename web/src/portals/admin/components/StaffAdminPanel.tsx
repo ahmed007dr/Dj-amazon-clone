@@ -27,18 +27,20 @@ const ROLE_KINDS = [
 ] as const;
 
 /**
- * الأدوار الوظيفية.
+ * Job roles.
  *
- * ⚠️  **الصلاحيات على الدور لا على الشخص.**
+ * ⚠️  **Permissions sit on the role, not on the person.**
  *
- *     منحها فردًا يجعل كل موظف جديد يحتاج ضبطًا يدويًا، وأول منسيّ
- *     يبقى بلا صلاحية أو بأكثر مما يجب. والدور حزمة تُسنَد مرة.
+ *     Granting them to an individual makes every new employee need manual
+ *     configuration, and the first one forgotten is left with too few
+ *     permissions or too many. A role is a bundle assigned once.
  *
- * ⚠️  و**الصلاحيات تُمنَح من هنا** لا من لوحة Django.
+ * ⚠️  And **the permissions are granted from here**, not from the Django panel.
  *
- *     كانت تحتاج لوحة Django، أي أن ضبط الأدوار يحتاج من يعرف
- *     أسماء الصلاحيات التقنية. ومع إخفاء ما لا يملكه المستخدم صار
- *     ذلك مستحيلًا: لا سبيل لإعادة فتح ما أُخفي إلا من سطر الأوامر.
+ *     They used to require the Django panel, meaning configuring roles needed
+ *     someone who knew the technical permission names. And once what the user
+ *     does not hold started being hidden, that became impossible: there was no
+ *     way to reopen what had been hidden except from the command line.
  */
 export function RolesPanel() {
   const { t } = useTranslation();
@@ -147,8 +149,8 @@ export function RolesPanel() {
             </div>
             <span className="muted">
               {t(`roleKind.${role.kind}`, { defaultValue: role.kind })} ·{' '}
-              {/* ⚠️  صفر صلاحيات يعني دورًا لا يفتح شيئًا — والموظف
-                  المُسنَد إليه يرى شاشة فارغة ولا يعرف السبب. */}
+              {/* ⚠️  Zero permissions means a role that opens nothing — and the employee
+                  assigned to it sees an empty screen with no idea why. */}
               {role.permission_count === 0
                 ? t('staff.noPermissions')
                 : t('staff.permissionCount', { count: role.permission_count })}
@@ -167,10 +169,11 @@ export function RolesPanel() {
 }
 
 /**
- * تعديل ملف موظف — الدور والمدير والحالة.
+ * Editing an employee profile — the role, the manager and the status.
  *
- * ⚠️  **الرقم الوظيفي والبريد لا يُعدَّلان هنا**: الأول معرّف ثابت
- *     في التقارير، والثاني هوية الحساب وتغييره يمرّ بمسار تأكيد.
+ * ⚠️  **The employee number and the email are not edited here**: the first is a
+ *     fixed identifier in the reports, and the second is the account's identity
+ *     whose change goes through a confirmation path.
  */
 export function EmployeeEditForm({
   employee,
@@ -240,8 +243,9 @@ export function EmployeeEditForm({
         />
         <span>
           {t('reference.isActive')}
-          {/* ⚠️  إيقاف الموظف لا يُنهي إسناد عملائه: يبقون منسوبين
-              إليه حتى يُنقلوا صراحةً — والإنهاء زر مستقل. */}
+          {/* ⚠️  Deactivating an employee does not end their customer assignments:
+              they stay attributed to them until explicitly transferred — and
+              ending is a separate button. */}
           <em>{t('staff.deactivateNote')}</em>
         </span>
       </label>

@@ -4,17 +4,18 @@ import type { PagedResponse } from '@/features/orders/adminApi';
 import { http } from '@/shared/http';
 
 /**
- * الولاء والإحالة.
+ * Loyalty and referrals.
  *
- * ⚠️  **`enabled: false` ردٌّ عادي لا خطأ.**
+ * ⚠️  **`enabled: false` is a normal response, not an error.**
  *
- *     النظام قد يكون موقوفًا كليًا أو موجَّهًا لفئة لا تشمل هذا
- *     الحساب. معاملته كخطأ تجعل الواجهة تعرض رسالة عطل لعميل لا
- *     عطل عنده — والصحيح أن تُخفي القسم بهدوء.
+ *     The system may be disabled entirely, or targeted at a segment that does
+ *     not include this account. Treating it as an error makes the frontend show
+ *     a fault message to a customer with no fault — the right behaviour is to
+ *     hide the section quietly.
  */
 
 // ═══════════════════════════════════════════════════════════
-//  العميل
+//  Customer
 // ═══════════════════════════════════════════════════════════
 
 export interface LoyaltySummary {
@@ -120,10 +121,11 @@ export function useMyReferral() {
 }
 
 /**
- * ⚠️  التسعير يمرّ بالخادم لا بحساب في الواجهة.
+ * ⚠️  Pricing goes through the server, not a calculation in the frontend.
  *
- *     حسابه هنا يجعل ما يراه العميل يخالف ما يُخصم منه عند
- *     الالتزام — وهي أسوأ مفاجأة ممكنة في نظام نقاط.
+ *     Computing it here makes what the customer sees differ from what is
+ *     deducted from them on commitment — the worst possible surprise in a
+ *     points system.
  */
 export function useRedemptionQuote() {
   return useMutation({
@@ -154,7 +156,7 @@ export function useApplyReferral() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  الأدمن
+//  Admin
 // ═══════════════════════════════════════════════════════════
 
 export interface TierLevel {
@@ -238,10 +240,11 @@ export function useLoyaltyOverview() {
 }
 
 /**
- * ⚠️  خيارات الاستهداف من الخادم لا من قائمة مكتوبة هنا.
+ * ⚠️  The targeting options come from the server, not a list written here.
  *
- *     تكرارها في الواجهة يجعل إضافة نوع حساب تحتاج تعديلين؛
- *     ونسيان أحدهما ينتج استهدافًا لا يطابق أحدًا بلا رسالة خطأ.
+ *     Duplicating them in the frontend makes adding an account type need two
+ *     edits; and forgetting one produces targeting that matches nobody with no
+ *     error message.
  */
 export function useTargetingOptions() {
   return useQuery({
@@ -293,10 +296,10 @@ export interface CustomerLookupRow {
 }
 
 /**
- * ⚠️  الحد الأدنى حرفان — والخادم يفرضه أيضًا.
+ * ⚠️  The minimum is two characters — and the server enforces it too.
  *
- *     حرف واحد يطابق كل العملاء تقريبًا: قائمة لا بحث، ونداء
- *     يجلب صفحة كاملة مع كل ضغطة مفتاح.
+ *     One character matches almost every customer: a list, not a search, and a
+ *     call fetching a full page with every keystroke.
  */
 export function useCustomerLookup(search: string) {
   const term = search.trim();
@@ -349,7 +352,7 @@ export function useDeleteReferralProgram() {
   );
 }
 
-/** ⚠️  آمنة التكرار: لا تمسّ إلا دفعات تجاوز تاريخها اليوم. */
+/** ⚠️  Safe to repeat: it touches only batches whose date has passed today. */
 export function useExpirePoints() {
   return useLoyaltyMutation(() =>
     http.post<{ batches: number; points: number }>('/loyalty/admin/expire/', {}),

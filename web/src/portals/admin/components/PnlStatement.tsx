@@ -5,18 +5,20 @@ import type { ProfitAndLoss } from '@/features/finance/api';
 import './PnlStatement.css';
 
 /**
- * قائمة الأرباح والخسائر.
+ * The profit and loss statement.
  *
- * ⚠️  **تُعرَض كمعادلة متدرّجة لا كبطاقات مبعثرة.**
+ * ⚠️  **Presented as a stepped equation rather than scattered cards.**
  *
- *     بطاقات «إيراد» و«تكلفة» و«ربح» متجاورة تُقرأ كأرقام مستقلة،
- *     فلا يرى القارئ **كيف** وصل الربح إلى ما هو عليه. التدرّج
- *     بخطوط الطرح يجعل السؤال «أين ذهب المال؟» يُجاب بالنظر.
+ *     "Revenue", "cost" and "profit" cards side by side read as independent
+ *     figures, so the reader cannot see **how** the profit reached what it is.
+ *     The stepping, with subtraction lines, makes "where did the money go?"
+ *     answerable at a glance.
  *
- * ⚠️  والمطروح يُعرَض بإشارة سالبة صريحة.
+ * ⚠️  And what is subtracted is shown with an explicit negative sign.
  *
- *     رقم موجب في سطر «التكلفة» يُقرأ خطأً كإضافة إلى الربح —
- *     والفرق بين قراءتين هو كل الفائدة من القائمة.
+ *     A positive number on the "cost" line is misread as an addition to the
+ *     profit — and the difference between those two readings is the entire
+ *     value of the statement.
  */
 export function PnlStatement({ report }: { report: ProfitAndLoss }) {
   const { t } = useTranslation();
@@ -65,9 +67,9 @@ export function PnlStatement({ report }: { report: ProfitAndLoss }) {
       </tbody>
 
       <tfoot>
-        {/* ⚠️  الضريبة المحصَّلة **خارج المعادلة** — تُعرَض للعلم.
-            هي أمانة للدولة لا إيراد، وإدراجها في السطور أعلاه
-            كان يضخّم الربح بنسبتها كاملة. */}
+        {/* ⚠️  Tax collected is **outside the equation** — displayed for information.
+            It is held on the state's behalf rather than being revenue, and
+            including it in the lines above inflated the profit by its full rate. */}
         <tr>
           <th scope="row">{t('finance.taxCollected')}</th>
           <td dir="ltr">{report.tax_collected}</td>

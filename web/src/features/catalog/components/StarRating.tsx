@@ -3,9 +3,9 @@ import { useTranslation } from 'react-i18next';
 import './StarRating.css';
 
 /**
- * ⚠️  النجوم زخرفة بصرية — القيمة نصًّا لقارئ الشاشة.
+ * ⚠️  The stars are a visual decoration — the value goes to the screen reader as text.
  *
- *     خمسة رموز `★` بلا نص تُقرأ «نجمة نجمة نجمة…» بلا معنى.
+ *     Five `★` glyphs with no text are read as "star star star…", meaninglessly.
  */
 export function StarRating({ value, count }: { value: number | string; count?: number }) {
   const { t } = useTranslation();

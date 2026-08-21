@@ -41,19 +41,19 @@ const EMPTY = {
 };
 
 /**
- * الحزم الدراسية.
+ * Study bundles.
  *
- * ⚠️  **سنة الحزمة داخل سنوات كليتها — والخادم يرفض ما عداه.**
+ * ⚠️  **A bundle's year falls within its faculty's years — and the server refuses anything else.**
  *
- *     حزمة السنة الخامسة في كلية بأربع سنوات لا يصلها طالب أبدًا؛
- *     تُنشأ صامتة ثم يُسأل «لماذا لا يراها أحد؟» بعد أسابيع.
- *     الحقل هنا يقيّد الأقصى بعدد سنوات الكلية المختارة، والخادم
- *     يفحص مرة أخرى — الواجهة تُرشد ولا تحرس.
+ *     A fifth-year bundle in a four-year faculty never reaches a student; it is
+ *     created silently and then, weeks later, someone asks "why does nobody see
+ *     it?". The field here caps the maximum at the chosen faculty's year count,
+ *     and the server checks again — the frontend guides and does not guard.
  *
- * ⚠️  و**البنود تُحرَّر في اللوح نفسه** لا في شاشة ثانية.
+ * ⚠️  And **the items are edited in the same panel**, not on a second screen.
  *
- *     الحزمة بلا بنودها ليست حزمة، وفصلهما يجعل نصف الحزم تُنشأ
- *     فارغة ثم تُنسى.
+ *     A bundle without its items is not a bundle, and separating them makes
+ *     half the bundles get created empty and then forgotten.
  */
 export function BundlePanel() {
   const { t } = useTranslation();
@@ -109,7 +109,7 @@ export function BundlePanel() {
       key: 'items',
       header: t('academic.items'),
       align: 'end',
-      // ⚠️  الحزمة الفارغة تُعلَّم: تُعرض للطالب بلا شيء يُشترى.
+      // ⚠️  An empty bundle is flagged: it is shown to the student with nothing to buy.
       render: (row) =>
         row.item_count > 0 ? (
           <span dir="ltr">{row.item_count}</span>

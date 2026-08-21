@@ -6,13 +6,14 @@ import { BrandLogo } from '@/shared/branding/BrandLogo';
 import './AdminLogo.css';
 
 /**
- * لوجو لوحة الأدمن.
+ * The admin panel logo.
  *
- * ⚠️  أصغر من لوجو المتجر ومعه لصيقة البوابة.
+ * ⚠️  Smaller than the store logo, and with the portal's label beside it.
  *
- *     الأدمن قد يفتح المتجر ولوحته في تبويبين؛ ولوجو متطابق يجعله
- *     يحرّر منتجًا وهو يظن أنه يتصفّح، أو يبحث عن زر لا وجود له.
- *     اللصيقة تحسم أي تبويب هو في نصف ثانية.
+ *     The admin may have the store and their panel open in two tabs; and an
+ *     identical logo makes them edit a product believing they are browsing, or
+ *     hunt for a button that does not exist. The label settles which tab they
+ *     are on in half a second.
  */
 export function AdminLogo() {
   const { t } = useTranslation();

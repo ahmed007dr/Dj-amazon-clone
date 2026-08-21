@@ -33,15 +33,17 @@ const TONE: Record<string, 'info' | 'warning' | 'success' | 'neutral'> = {
 };
 
 /**
- * الجرد.
+ * Stock counting.
  *
- * ⚠️  **فتح الجلسة يأخذ لقطة الأرصدة فورًا.**
+ * ⚠️  **Opening the session takes the balance snapshot immediately.**
  *
- *     جلسة بلا لقطة تبقى فارغة، فيظنّها العدّاد جاهزة ويبدأ العدّ
- *     على ورق — واللقطة تُؤخذ لاحقًا برصيد تغيّر.
+ *     A session with no snapshot stays empty, so the counter assumes it is
+ *     ready and starts counting on paper — and the snapshot is taken later
+ *     against a balance that has changed.
  *
- * ⚠️  و**جلسة واحدة مفتوحة لكل موقع** يفرضها الخادم: جلستان تعنيان
- *     عدّادين، وآخر من يعتمد يمحو عمل الأول.
+ * ⚠️  And **one open session per location**, enforced by the server: two
+ *     sessions mean two counters, and whoever approves last erases the first
+ *     one's work.
  */
 export function StockCountsTab() {
   const { t, i18n } = useTranslation();
@@ -85,8 +87,8 @@ export function StockCountsTab() {
       key: 'variances',
       header: t('inventory.variances'),
       align: 'end',
-      // ⚠️  عدد الفروق هو ما يُقرأ أولًا: جلسة بصفر فروق لا تحتاج
-      //     مراجعة، وجلسة بأربعين تحتاج وقفة قبل الاعتماد.
+      // ⚠️  The discrepancy count is what gets read first: a session with zero
+      //     discrepancies needs no review, and one with forty needs a pause before approval.
       render: (row) => (
         <strong className={row.variance_count > 0 ? 'count-variance' : ''}>
           {row.variance_count}
@@ -198,8 +200,8 @@ export function StockCountsTab() {
                 >
                   {t('common.cancel')}
                 </Button>
-                {/* ⚠️  الاعتماد لا رجعة فيه: الفروق تصير حركات
-                    مسجَّلة، والتصحيح بجرد جديد لا بتراجع. */}
+                {/* ⚠️  Approval is irreversible: the discrepancies become recorded
+                    movements, and correction goes through a new count, not an undo. */}
                 <Button
                   variant="danger"
                   loading={apply.isPending}

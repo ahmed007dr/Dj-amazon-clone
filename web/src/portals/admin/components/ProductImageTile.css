@@ -10,15 +10,16 @@
 .image-tile__img {
   display: block;
   inline-size: 100%;
-  /* ⚠️  نسبة ثابتة: صور بارتفاعات مختلفة تجعل الشبكة تقفز عند كل
-     تحميل، ويصعب على الأدمن الحكم على تناسقها في صفحة المنتج. */
+  /* ⚠️  A fixed ratio: images of differing heights make the grid jump on every
+     load, and make it hard for the admin to judge how consistent they look on
+     the product page. */
   aspect-ratio: 1;
   object-fit: cover;
   background: var(--color-bg);
 }
 
-/* ⚠️  `inset-inline-start` لا `left` — يقفز إلى الحافة الصحيحة
-   مع تبديل اللغة بلا قاعدة ثانية. */
+/* ⚠️  `inset-inline-start`, not `left` — it jumps to the correct edge
+   when the language switches, with no second rule. */
 .image-tile__flag {
   position: absolute;
   inset-block-start: var(--space-2);

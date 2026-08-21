@@ -16,7 +16,7 @@
   min-block-size: var(--touch-target);
   padding-inline: var(--space-3);
 
-  /* ⚠️  منطقي — يحاذي لليمين في العربية ولليسار في الإنجليزية */
+  /* ⚠️  Logical — it aligns right in Arabic and left in English */
   text-align: start;
 
   font-size: 0.9375rem;

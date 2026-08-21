@@ -2,7 +2,7 @@ import { http } from '@/shared/http';
 
 import type { AddressInput, CustomerAddress } from './types';
 
-/** ⚠️  قائمة بلا ترقيم — عناوين المستخدم قليلة بطبيعتها. */
+/** ⚠️  An unpaginated list — a user's addresses are few by nature. */
 export const listAddresses = () => http.get<CustomerAddress[]>('/customers/addresses/');
 
 export const createAddress = (body: Partial<AddressInput>) =>
@@ -12,11 +12,11 @@ export const setDefaultAddress = (id: string) =>
   http.post<CustomerAddress>(`/customers/addresses/${id}/set-default/`);
 
 /**
- * ⚠️  التعديل والحذف كانا غائبين عن الواجهة رغم وجودهما في الخادم.
+ * ⚠️  Editing and deleting were absent from the frontend despite existing on the server.
  *
- *     عنوان بخطأ في رقم الهاتف كان يُصحَّح بإضافة عنوان جديد وترك
- *     القديم — فتتراكم عناوين ميتة يختار العميل من بينها عند
- *     الإتمام، ويشحن الطلب إلى أحدها.
+ *     An address with a wrong phone number was "corrected" by adding a new one
+ *     and leaving the old — so dead addresses pile up for the customer to choose
+ *     between at checkout, and the order ships to one of them.
  */
 export const updateAddress = (id: string, body: Partial<AddressInput>) =>
   http.patch<CustomerAddress>(`/customers/addresses/${id}/`, body);
@@ -25,7 +25,7 @@ export const deleteAddress = (id: string) =>
   http.delete<void>(`/customers/addresses/${id}/`);
 
 // ═══════════════════════════════════════════════════════════
-//  ملف العميل التجاري
+//  The business customer profile
 // ═══════════════════════════════════════════════════════════
 
 export interface CustomerProfile {
@@ -46,15 +46,15 @@ export interface CustomerProfile {
 }
 
 /**
- * ملف العميل — **غير ملف الحساب**.
+ * The customer profile — **not the account profile**.
  *
- * ⚠️  `auth/me` يحمل الهوية (بريد · اسم · هاتف)؛ وهذا يحمل الوجه
- *     التجاري: رقم العميل الذي يذكره الدعم، والرقم الضريبي الذي
- *     يظهر على الفاتورة، وموافقة التسويق.
+ * ⚠️  `auth/me` carries the identity (email · name · phone); this carries the
+ *     commercial face: the customer number support quotes, the tax number that
+ *     appears on the invoice, and the marketing consent.
  *
- * ⚠️  و**رقم العميل كان محجوبًا عن صاحبه**: يطلبه الدعم في كل
- *     مكالمة ولا شاشة تعرضه — فيقرأ العميل رقم طلب بدلًا منه
- *     وتضيع الدقيقة الأولى من كل اتصال.
+ * ⚠️  And **the customer number was hidden from its own owner**: support asks
+ *     for it on every call and no screen displayed it — so the customer reads
+ *     out an order number instead, and the first minute of every call is lost.
  */
 export const getMyCustomerProfile = () => http.get<CustomerProfile>('/customers/me/');
 

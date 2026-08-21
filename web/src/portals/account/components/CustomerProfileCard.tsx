@@ -14,18 +14,18 @@ import { useToast } from '@/shared/ui/useToast';
 import './CustomerProfileCard.css';
 
 /**
- * الوجه التجاري للحساب.
+ * The account's commercial face.
  *
- * ⚠️  **رقم العميل كان محجوبًا عن صاحبه.**
+ * ⚠️  **The customer number was hidden from its own owner.**
  *
- *     الدعم يطلبه في كل مكالمة ولا شاشة تعرضه، فيقرأ العميل رقم
- *     طلبٍ بدلًا منه وتضيع الدقيقة الأولى من كل اتصال. هو أول ما
- *     يظهر هنا وقابل للتحديد بالنقر.
+ *     Support asks for it on every call and no screen displayed it, so the
+ *     customer reads out an order number instead and the first minute of every
+ *     call is lost. It is the first thing shown here, and it is click-selectable.
  *
- * ⚠️  و**البيانات الضريبية تُدخَل مرة وتُستعمل في كل فاتورة**.
+ * ⚠️  And **the tax details are entered once and used on every invoice**.
  *
- *     الرقم الضريبي والسجل التجاري يظهران على المستند؛ وحصرهما في
- *     شاشة الأدمن يجعل كل تصحيح يمرّ بمكالمة.
+ *     The tax number and the commercial register appear on the document; and
+ *     confining them to the admin screen makes every correction a phone call.
  */
 export function CustomerProfileCard() {
   const { t } = useTranslation();
@@ -75,7 +75,7 @@ export function CustomerProfileCard() {
       <dl className="customer-card__facts">
         <div>
           <dt>{t('account.customerNumber')}</dt>
-          {/* ⚠️  قابل للتحديد بالنقر: يُملى هاتفيًا على الدعم. */}
+          {/* ⚠️  Click-selectable: it is dictated over the phone to support. */}
           <dd>
             <code dir="ltr">{current.customer_number}</code>
           </dd>
@@ -97,10 +97,11 @@ export function CustomerProfileCard() {
           update.mutate(values);
         }}
       >
-        {/* ⚠️  **الاسم المعروض غير اسم الحساب.**
-            اسم الحساب هوية شخصية (أحمد محمد)؛ وهذا ما يظهر على
-            الفاتورة والطلب — «صيدلية النور» لا اسم صاحبها. وكان
-            الحقلان محجوبين فيُطبَع الاسم الشخصي على كل مستند. */}
+        {/* ⚠️  **The display name is not the account name.**
+            The account name is a personal identity (Ahmed Mohamed); this is
+            what appears on the invoice and the order — "Al-Nour Pharmacy", not
+            its owner's name. Both fields were hidden, so the personal name was
+            printed on every document. */}
         <label>
           {t('account.displayNameAr')}
           <input

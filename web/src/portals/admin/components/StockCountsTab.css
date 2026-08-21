@@ -29,7 +29,7 @@
   border-radius: var(--radius-sm);
 }
 
-/* ⚠️  عدد الفروق هو ما يُقرأ أولًا في القائمة. */
+/* ⚠️  The discrepancy count is what gets read first in the list. */
 .count-variance {
   color: var(--color-warning);
 }

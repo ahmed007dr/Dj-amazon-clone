@@ -23,6 +23,7 @@
 | [shared/03-ROADMAP.md](shared/03-ROADMAP.md) | **متتبّع المراحل** — الحالة والمهام وبوابات الجودة |
 | [shared/04-DECISIONS.md](shared/04-DECISIONS.md) | سجل القرارات المعمارية (ADR) · قواعد العمل المعلّقة |
 | [shared/05-DEVELOPMENT.md](shared/05-DEVELOPMENT.md) | **بيئة التطوير** · Git · جودة الكود · الاختبارات · تعريف الإنجاز |
+| [shared/06-DEPLOYMENT.md](shared/06-DEPLOYMENT.md) | **النشر على cPanel** · med-box.net · Passenger · cron · ثلاثة أعطال صامتة |
 
 ### ⚙️ الباك إند
 

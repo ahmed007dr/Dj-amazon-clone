@@ -1,14 +1,14 @@
 import { http } from '@/shared/http';
 
 /**
- * صور المنتج.
+ * Product images.
  *
- * ⚠️  **الرفع `FormData` لا JSON.**
+ * ⚠️  **Uploading is `FormData`, not JSON.**
  *
- *     تحويل الملف إلى base64 داخل JSON يضخّمه الثلث ويحمّله في
- *     ذاكرة المتصفح مرتين — والعميل يوقّت ذلك على هاتف لا على مكتب.
- *     `http` يترك `Content-Type` للمتصفح حين يرى `FormData`، لأن
- *     الحدّ (`boundary`) لا يعرفه إلا هو.
+ *     Converting the file to base64 inside JSON inflates it by a third and
+ *     loads it into browser memory twice — and the customer times that on a
+ *     phone, not on a desktop. `http` leaves `Content-Type` to the browser when
+ *     it sees `FormData`, because only the browser knows the `boundary`.
  */
 export interface ProductImage {
   id: string;
@@ -31,8 +31,8 @@ export const uploadProductImage = (
 ) => {
   const form = new FormData();
   form.append('image', file);
-  // ⚠️  النص البديل باللغتين معًا (ADR-34) — الحقل الفارغ يُرسَل
-  //     كسلسلة فارغة لا يُحذف، وإلا رفض المُسلسِل الحقل الناقص.
+  // ⚠️  The alt text in both languages (ADR-34) — an empty field is sent
+  //     as an empty string rather than omitted, or the serializer rejects the missing field.
   form.append('alt_text_ar', alt.ar);
   form.append('alt_text_en', alt.en);
 

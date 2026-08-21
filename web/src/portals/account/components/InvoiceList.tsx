@@ -15,13 +15,13 @@ const TONE: Record<string, 'success' | 'danger' | 'info' | 'neutral'> = {
 };
 
 /**
- * فواتير العميل.
+ * The customer's invoices.
  *
- * ⚠️  **`is_overdue` المحسوب لا `status` المخزَّنة.**
+ * ⚠️  **The computed `is_overdue`, not the stored `status`.**
  *
- *     الحالة تُحدَّث بمهمة دورية؛ وأي تعطّل فيها يجعل فاتورة
- *     تجاوزت استحقاقها بأسبوع تظهر «صادرة» بهدوء. الخادم يحسب
- *     التأخر لحظيًا، والواجهة تعرض ما حسبه.
+ *     The status is updated by a periodic task; and any failure in it makes an
+ *     invoice a week past due show quietly as "issued". The server computes
+ *     lateness on the fly, and the frontend displays what it computed.
  */
 export function InvoiceList({ invoices }: { invoices: Invoice[] }) {
   const { t, i18n } = useTranslation();

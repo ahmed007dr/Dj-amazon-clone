@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 import './SearchBox.css';
 
 /**
- * ⚠️  `type="search"` لا `type="text"`.
+ * ⚠️  `type="search"`, not `type="text"`.
  *
- *     يعطي زر مسح أصليًا على الهاتف، ولوحة مفاتيح بزر «بحث» بدل
- *     «إدخال» — وكلاهما فرق ملموس على شاشة صغيرة.
+ *     It gives a native clear button on a phone, and a keyboard with a "search"
+ *     key instead of "enter" — both a tangible difference on a small screen.
  */
 export function SearchBox({
   value,

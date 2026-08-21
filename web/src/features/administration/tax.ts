@@ -1,14 +1,14 @@
 import { http } from '@/shared/http';
 
 /**
- * الضريبة.
+ * Tax.
  *
- * ⚠️  قاعدة العمل المُعتمدة: النسبة **متغيّرة**، وقد **لا توجد
- *     ضريبة أصلًا** — لبعض المنتجات أو لكلها.
+ * ⚠️  The approved business rule: the rate is **variable**, and there may be
+ *     **no tax at all** — for some products or for all of them.
  *
- *     فئة نسبتها صفر = منتج معفى · `enabled=false` = إيقاف شامل ·
- *     `valid_from/to` = تغيير النسبة بقرار حكومي مع بقاء الفواتير
- *     القديمة بنسبتها.
+ *     A zero-rate class = an exempt product · `enabled=false` = a complete
+ *     shutdown · `valid_from/to` = changing the rate by government decree while
+ *     old invoices keep their rate.
  */
 export interface TaxClass {
   id: string;
@@ -21,7 +21,7 @@ export interface TaxClass {
   valid_from: string;
   valid_to: string | null;
   is_currently_valid: boolean;
-  /** ⚠️  يجعل أثر التعديل مرئيًا **قبل** وقوعه. */
+  /** ⚠️  It makes the impact of an edit visible **before** it happens. */
   product_count: number;
 }
 

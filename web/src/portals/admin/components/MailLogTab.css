@@ -33,7 +33,7 @@
   margin: 0;
 }
 
-/* ⚠️  يلتفّ ولا يتمرّر أفقيًا — نصوص البريد طويلة وغير متوقّعة */
+/* ⚠️  It wraps rather than scrolling horizontally — mail texts are long and unpredictable */
 .log__body {
   white-space: pre-wrap;
   word-break: break-word;

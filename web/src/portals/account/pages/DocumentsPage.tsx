@@ -51,14 +51,14 @@ export function DocumentsPage() {
 
     setError(null);
     upload.mutate(file);
-    // ⚠️  تفريغ الحقل يسمح برفع نفس الملف ثانيةً بعد فشل —
-    //     المتصفح لا يطلق `change` لقيمة لم تتغيّر.
+    // ⚠️  Clearing the field allows the same file to be uploaded again after a
+    //     failure — the browser does not fire `change` for an unchanged value.
     event.target.value = '';
   }
 
   async function openDocument(id: string) {
-    // ⚠️  الرابط يُطلب عند الفتح لا يُخزَّن: صلاحيته دقائق، والمخزَّن
-    //     ينتهي قبل أن يضغطه المستخدم.
+    // ⚠️  The URL is requested on open rather than stored: it is valid for minutes,
+    //     and a stored one expires before the user presses it.
     const { url } = await getSignedUrl(id);
     window.open(url, '_blank', 'noopener');
   }
@@ -144,8 +144,8 @@ export function DocumentsPage() {
                   {t('account.viewDocument')}
                 </Button>
 
-                {/* ⚠️  الوثيقة المعتمدة لا تُحذف — حذفها يُسقط
-                    التوثيق الذي بُني عليها */}
+                {/* ⚠️  An approved document is not deleted — deleting it drops
+                    the verification that was built on it */}
                 {document.status !== 'APPROVED' ? (
                   <Button
                     variant="ghost"

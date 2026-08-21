@@ -22,7 +22,7 @@
 .cart-badge__count {
   position: absolute;
   inset-block-start: 0.25rem;
-  /* منطقي — ينتقل إلى الزاوية الصحيحة عند تبديل اللغة */
+  /* Logical — it moves to the correct corner when the language switches */
   inset-inline-end: 0.15rem;
 
   min-inline-size: 1.15rem;

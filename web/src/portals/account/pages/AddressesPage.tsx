@@ -54,8 +54,8 @@ export function AddressesPage() {
 
       {adding || editing ? (
         <section className="surface addresses__form">
-          {/* ⚠️  المفتاح يتغيّر مع العنوان: بلاه يحتفظ النموذج
-              بقيَم العنوان السابق عند فتح تعديل آخر. */}
+          {/* ⚠️  The key changes with the address: without it the form keeps
+              the previous address's values when another edit is opened. */}
           <AddressForm
             key={editing?.id ?? 'new'}
             {...(editing ? { address: editing } : {})}
@@ -105,8 +105,8 @@ export function AddressesPage() {
                 {t('common.edit')}
               </Button>
 
-              {/* ⚠️  «اجعله الافتراضي» يختفي على الافتراضي نفسه —
-                  زر بلا أثر يجعل المستخدم يضغطه ويشكّ في الشاشة. */}
+              {/* ⚠️  "Make it the default" disappears on the default itself —
+                  a button with no effect makes the user press it and doubt the screen. */}
               {!address.is_default ? (
                 <Button
                   size="sm"

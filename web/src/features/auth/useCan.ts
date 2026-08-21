@@ -3,23 +3,24 @@ import { useCallback } from 'react';
 import { useAuth } from './useAuth';
 
 /**
- * «هل يملك المستخدم هذا؟»
+ * "Does the user hold this?"
  *
- * ⚠️  **للعرض لا للحراسة.**
+ * ⚠️  **For display, not for guarding.**
  *
- *     الخادم يرفض بصرف النظر عمّا تُظهره الشاشة. إخفاء زرّ ليس
- *     أمانًا — لكن إظهار زرّ يفشل عند الضغط تجربة سيئة، وإظهار
- *     خمسة عشر رابطًا لا يملكها المستخدم يجعله يظن النظام معطّلًا.
+ *     The server refuses regardless of what the screen shows. Hiding a button
+ *     is not security — but showing a button that fails when pressed is a bad
+ *     experience, and showing fifteen links the user does not hold makes them
+ *     think the system is broken.
  *
- * ⚠️  و**المالك يملك كل شيء دائمًا**.
+ * ⚠️  And **the owner always holds everything**.
  *
- *     `is_owner` تُغني عن قائمة صلاحياته. وبدون هذا الاستثناء
- *     يُقفَل النظام على صاحبه عند أول ضبط خاطئ.
+ *     `is_owner` makes their permission list unnecessary. And without this
+ *     exception the system locks its own owner out at the first wrong configuration.
  *
- * ⚠️  والغياب يعني **لا** لا «ربما».
+ * ⚠️  And absence means **no**, not "maybe".
  *
- *     قبل وصول `/auth/me` تكون القائمة فارغة؛ إظهار كل شيء حتى
- *     تصل يجعل الروابط ترتجف عند كل إقلاع.
+ *     Before `/auth/me` arrives the list is empty; showing everything until it
+ *     does makes the links flicker on every startup.
  */
 export function useCan(): (permission?: string | null) => boolean {
   const { user } = useAuth();
@@ -29,7 +30,7 @@ export function useCan(): (permission?: string | null) => boolean {
       if (user === null) return false;
       if (user.is_owner) return true;
 
-      // ⚠️  `null` = بلا شرط: شاشة يفتحها كل من وصل إليها.
+      // ⚠️  `null` = no condition: a screen anyone who reaches it may open.
       if (permission === undefined || permission === null) return true;
 
       return (user.permissions ?? []).includes(permission);
@@ -39,12 +40,12 @@ export function useCan(): (permission?: string | null) => boolean {
 }
 
 /**
- * الشروط البنيوية — ليست صلاحيات Django.
+ * The structural conditions — these are not Django permissions.
  *
- * ⚠️  بعض البوابات على الخادم تسأل «هل له ملف؟» لا «هل يملك؟»:
- *     نقطة البيع تسأل عن نوع الحساب، وبوابة الموظفين عن ملف
- *     موظف نشط. خلطها بالصلاحيات كان يجعل الإخفاء يخالف الخادم
- *     في الاتجاهين معًا.
+ * ⚠️  Some gates on the server ask "do they have a profile?" rather than "do
+ *     they hold this?": point of sale asks about the account type, and the
+ *     staff portal about an active employee profile. Mixing them with
+ *     permissions made the hiding contradict the server in both directions.
  */
 export function useIs(): (requirement: 'owner' | 'admin' | 'employee') => boolean {
   const { user } = useAuth();

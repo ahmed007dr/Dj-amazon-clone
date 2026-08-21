@@ -8,9 +8,9 @@
   border-radius: var(--radius);
 }
 
-/* ⚠️  النجوم أزرار اختيار حقيقية: مخفية بصريًا لا `display:none`
-       — الأخير يُخرجها من ترتيب التركيز فلا يصلها مستخدم لوحة
-       المفاتيح، والتقييم هو الحقل الإلزامي الوحيد. */
+/* ⚠️  The stars are real radio buttons: visually hidden rather than `display:none`
+       — the latter takes them out of the focus order, so a keyboard user never
+       reaches them, and the rating is the only mandatory field. */
 .review-form__stars {
   display: flex;
   flex-direction: row-reverse;

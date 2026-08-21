@@ -2,9 +2,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ⚠️  الإبراز بالوزن واللون معًا لا باللون وحده.
-   اللون ينقل «انتبه» لمن يراه؛ والوزن ينقلها لمن لا يميّزه —
-   وهذه بالضبط الحالة التي يجب ألا تفوت أحدًا. */
+/* ⚠️  Emphasis by weight and colour together rather than by colour alone.
+   The colour conveys "pay attention" to whoever sees it; the weight conveys it
+   to whoever cannot distinguish it — and this is precisely the case that must
+   escape nobody. */
 .pos-variance.is-notable {
   font-weight: 700;
   color: var(--color-warning);
@@ -39,8 +40,8 @@
   font-weight: 600;
 }
 
-/* ⚠️  التفسير يأخذ سطره كاملًا: نصّ حرّ في عمود ضيّق يُقصّ،
-   وهو بالضبط ما تبحث عنه المراجعة. */
+/* ⚠️  The explanation takes a full line of its own: free text in a narrow
+   column gets truncated, and it is exactly what the review is looking for. */
 .session-detail__note {
   flex-direction: column !important;
   align-items: start !important;

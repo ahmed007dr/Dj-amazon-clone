@@ -11,13 +11,13 @@ interface Row {
 }
 
 /**
- * قائمة مرتّبة بشريط نسبي.
+ * A ranked list with a proportional bar.
  *
- * ⚠️  **الشريط نسبةً إلى الأعلى لا إلى المجموع.**
+ * ⚠️  **The bar is proportional to the top item, not to the total.**
  *
- *     النسبة إلى المجموع تجعل كل الأشرطة ضئيلة حين تكون البنود
- *     كثيرة، فلا يُقرأ الفارق بين الأول والثاني — وهو ما تُفتح
- *     القائمة من أجله.
+ *     Proportion to the total makes every bar tiny when there are many items,
+ *     so the gap between first and second cannot be read — and that is what the
+ *     list is opened for.
  */
 export function RankedList({ title, rows }: { title: string; rows: Row[] }) {
   const { t } = useTranslation();

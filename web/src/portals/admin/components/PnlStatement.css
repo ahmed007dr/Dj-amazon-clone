@@ -16,8 +16,9 @@
 
 .pnl td {
   text-align: end;
-  /* ⚠️  أرقام جدولية: بلا عرض ثابت للرقم تتذبذب خانات الأعمدة
-     فيصعب مقارنة سطر بآخر بالنظر — وهي كل فائدة القائمة. */
+  /* ⚠️  Tabular figures: without a fixed digit width the columns' digits jitter,
+     so comparing one line with another by eye becomes hard — and that is the
+     entire value of the statement. */
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -25,7 +26,7 @@
 .pnl__minus th,
 .pnl__minus td {
   color: var(--color-text-muted);
-  /* المسافة البادئة تُظهر أن السطر مطروح من الذي فوقه */
+  /* The indent shows that the line is subtracted from the one above it */
   padding-inline-start: var(--space-6);
 }
 
@@ -42,8 +43,8 @@
   border-block-start: 2px solid var(--color-text);
 }
 
-/* ⚠️  الخسارة باللون **والإشارة** معًا: الرقم السالب يبقى مقروءًا
-   لمن لا يميّز الألوان. */
+/* ⚠️  A loss by colour **and sign** together: the negative number stays
+   readable to anyone who cannot distinguish colours. */
 .pnl__total.is-loss td {
   color: var(--color-danger);
 }

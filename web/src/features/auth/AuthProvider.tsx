@@ -12,13 +12,14 @@ import { readRefreshToken, writeRefreshToken } from './storage';
 import type { LoginPayload, User } from './types';
 
 /**
- * مزوّد المصادقة.
+ * The authentication provider.
  *
- * ⚠️  يربط طبقة النقل بمنطق الحساب.
+ * ⚠️  It wires the transport layer to the account logic.
  *
- *     `shared/http` يعرف «كيف يُجدَّد التوكن؟» كدالة مُحقَنة، ولا
- *     يعرف شيئًا عن المستخدم ولا نقاط المصادقة. عكس ذلك يجعل طبقة
- *     النقل تعرف نموذج الحساب، فتصير أي إضافة حقل تعديلًا في مكانين.
+ *     `shared/http` knows "how is the token refreshed?" as an injected
+ *     function, and knows nothing about the user or the authentication
+ *     endpoints. The reverse would make the transport layer know the account
+ *     model, so adding a field would become an edit in two places.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -26,8 +27,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isRestoring, setIsRestoring] = useState(true);
 
-  // ⚠️  مرجع لا حالة: يُقرأ داخل معالج التجديد الذي يُسجَّل مرة
-  //     واحدة. القراءة من الحالة هناك تلتقط قيمة قديمة إلى الأبد.
+  // ⚠️  A ref, not state: it is read inside the refresh handler, which is
+  //     registered once. Reading from state there captures a stale value forever.
   const refreshToken = useRef<string | null>(readRefreshToken());
 
   const applyTokens = useCallback((access: string, refresh?: string | null) => {
@@ -44,14 +45,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshToken.current = null;
     writeRefreshToken(null);
     setUser(null);
-    // ⚠️  إفراغ الكاش عند الخروج إلزامي.
+    // ⚠️  Clearing the cache on logout is mandatory.
     //
-    //     بقاء طلبات المستخدم السابق في الكاش يعني أن من يدخل بعده
-    //     على نفس الجهاز يراها للحظة قبل أن تُستبدل.
+    //     Leaving the previous user's requests in the cache means whoever logs in
+    //     after them on the same device sees them for a moment before they are replaced.
     queryClient.clear();
   }, [queryClient]);
 
-  // ── تجديد الجلسة — يُحقَن في طبقة النقل ─────────────────
+  // ── Session refresh — injected into the transport layer ──
   useEffect(() => {
     registerRefreshHandler(async () => {
       const token = refreshToken.current;
@@ -59,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const tokens = await api.refreshTokens(token);
-        // التدوير مُفعَّل: القديم يُدرَج في القائمة السوداء فورًا
+        // Rotation is enabled: the old one is blacklisted immediately
         applyTokens(tokens.access, tokens.refresh ?? null);
         return true;
       } catch {
@@ -69,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [applyTokens, clearSession]);
 
-  // ── استعادة الجلسة عند الإقلاع ──────────────────────────
+  // ── Restoring the session at startup ────────────────────
   useEffect(() => {
     const stored = refreshToken.current;
 
@@ -88,9 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const me = await api.getMe();
         if (!cancelled) setUser(me);
       } catch {
-        // ⚠️  توكن منتهٍ أو مُبطَل (إيقاف حساب · إلغاء جلسة) —
-        //     التنظيف صامت: المستخدم يرى صفحة الزائر لا رسالة خطأ
-        //     عن شيء لم يفعله.
+        // ⚠️  An expired or revoked token (a suspended account · a cancelled session) —
+        //     the cleanup is silent: the user sees the visitor page, not an error
+        //     message about something they did not do.
         if (!cancelled) clearSession();
       } finally {
         if (!cancelled) setIsRestoring(false);
@@ -108,13 +109,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       applyTokens(response.access, response.refresh);
       setUser(response.user);
 
-      // ⚠️  دمج سلة الزائر **فور** الدخول.
+      // ⚠️  Merge the guest cart **immediately** on login.
       //
-      //     الزائر ملأ سلته ثم سجّل ليشتري؛ فقدانها هنا يحدث في
-      //     أسوأ لحظة ممكنة — بعد أن أثبت نيّته وقبل أن يدفع.
+      //     The visitor filled their cart and then registered to buy; losing it here
+      //     happens at the worst possible moment — after they proved their intent and before they paid.
       //
-      //     والفشل لا يُوقف الدخول: حساب لا يُفتح لأن دمج سلة فشل
-      //     خسارة أكبر من سلة ضائعة.
+      //     And a failure does not block the login: an account that will not open
+      //     because a cart merge failed is a bigger loss than a lost cart.
       try {
         const merged = await mergeGuestCart(getGuestCartSession());
         queryClient.setQueriesData({ queryKey: CART_KEY }, merged);
@@ -130,26 +131,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     const token = refreshToken.current;
 
-    // ⚠️  التنظيف المحلي يقع **مهما فشل نداء الخروج**.
+    // ⚠️  The local cleanup happens **however the logout call fails**.
     //
-    //     شبكة منقطعة تجعل النداء يفشل؛ إبقاء المستخدم داخلًا لأن
-    //     الخادم لم يردّ يترك جلسة مفتوحة على جهاز أراد صاحبه إغلاقها.
+    //     A dropped connection makes the call fail; keeping the user logged in
+    //     because the server did not answer leaves an open session on a device its owner wanted closed.
     try {
       if (token) await api.logout(token);
     } catch {
-      // متوقَّع عند انقطاع الشبكة أو توكن مُبطَل مسبقًا
+      // Expected on a dropped connection or an already-revoked token
     } finally {
       clearSession();
     }
   }, [clearSession]);
 
   const refreshUser = useCallback(async () => {
-    // ⚠️  الصمت عند الفشل مقصود: هذه إعادة قراءة تحسينية، وفشلها
-    //     لا يجوز أن يُخرج المستخدم من جلسة عاملة.
+    // ⚠️  The silence on failure is deliberate: this is an opportunistic re-read,
+    //     and its failure must not log the user out of a working session.
     try {
       setUser(await api.getMe());
     } catch {
-      /* تبقى النسخة الحالية */
+      /* the current copy remains */
     }
   }, []);
 

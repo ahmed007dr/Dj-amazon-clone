@@ -9,18 +9,18 @@ import { useToast } from '@/shared/ui/useToast';
 import './CountSheet.css';
 
 /**
- * ورقة العدّ.
+ * The count sheet.
  *
- * ⚠️  **المتوقَّع مخفيّ أثناء العدّ.**
+ * ⚠️  **The expected figure is hidden during the count.**
  *
- *     عرضه بجوار حقل الإدخال يجعل العدّاد يكتبه بدل أن يعدّ — وهي
- *     الظاهرة التي تُفرغ الجرد من معناه بالكامل. يظهر بعد إدخال
- *     الرقم، ومعه الفرق.
+ *     Showing it beside the input field makes the counter write it down instead
+ *     of counting — the phenomenon that empties a stock count of all meaning.
+ *     It appears after the number is entered, and the discrepancy with it.
  *
- * ⚠️  والفرق **يُحسب على الخادم** ويُعرَض هنا فقط.
+ * ⚠️  And the discrepancy is **computed on the server** and only displayed here.
  *
- *     حسابه في الواجهة يجعل رقمين محتملين: ما تعرضه الشاشة وما
- *     يُطبَّق عند الاعتماد.
+ *     Computing it in the frontend creates two possible figures: what the
+ *     screen shows and what gets applied on approval.
  */
 export function CountSheet({ count }: { count: StockCountDetail }) {
   const { t } = useTranslation();
@@ -30,10 +30,10 @@ export function CountSheet({ count }: { count: StockCountDetail }) {
   const record = useRecordCounted();
   const editable = count.status === 'IN_PROGRESS';
 
-  // ⚠️  ما أدخله المستخدم في هذه الجلسة — لا ما جاء من الخادم.
+  // ⚠️  What the user entered in this session — not what came from the server.
   //
-  //     اللقطة تبدأ بالمعدود = المتوقَّع، فكل سطر يبدو «معدودًا».
-  //     التتبّع هنا يفرّق بين ما لُمس فعلًا وما لم يُلمَس بعد.
+  //     The snapshot starts with counted = expected, so every line looks "counted".
+  //     Tracking here distinguishes what was actually touched from what has not been.
   const [touched, setTouched] = useState<Record<number, boolean>>({});
   const [drafts, setDrafts] = useState<Record<number, string>>({});
 
@@ -98,9 +98,9 @@ export function CountSheet({ count }: { count: StockCountDetail }) {
                             [line.id]: event.target.value,
                           }))
                         }
-                        // ⚠️  الحفظ عند مغادرة الحقل لا عند كل ضغطة:
-                        //     نداء لكل رقم يُدخَل يعني عشرات الطلبات
-                        //     لسطر واحد على شبكة مخزن ضعيفة.
+                        // ⚠️  Saving on blur rather than on every keystroke:
+                        //     a call per digit entered means dozens of requests
+                        //     for one line on a weak warehouse connection.
                         onBlur={(event) => commit(line.id, event.target.value)}
                         aria-label={t('inventory.counted')}
                       />
@@ -109,8 +109,8 @@ export function CountSheet({ count }: { count: StockCountDetail }) {
                     )}
                   </td>
 
-                  {/* ⚠️  المتوقَّع لا يظهر قبل الإدخال — انظر تعليق
-                      المكوّن: عرضه يجعل العدّاد ينسخه. */}
+                  {/* ⚠️  The expected figure does not appear before entry — see the
+                      component's comment: showing it makes the counter copy it. */}
                   <td dir="ltr" className="count-sheet__expected">
                     {seen ? line.expected_quantity : '••'}
                   </td>

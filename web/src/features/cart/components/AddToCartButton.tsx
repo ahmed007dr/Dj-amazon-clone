@@ -9,13 +9,13 @@ import { useAddToCart } from '../hooks';
 import './AddToCart.css';
 
 /**
- * زر الإضافة إلى السلة.
+ * The add-to-cart button.
  *
- * ⚠️  رسالة الرفض تُعرض **مكان الزر** لا في إشعار عابر.
+ * ⚠️  The refusal message is shown **in the button's place**, not in a transient toast.
  *
- *     «هذا المنتج يتطلب حسابًا مهنيًا موثّقًا» أو «المتاح ٣ فقط»
- *     معلومة يحتاج العميل قراءتها والتصرّف بناءً عليها. الإشعار
- *     العابر يختفي قبل أن يفهمها.
+ *     "This product requires a verified professional account" or "only 3
+ *     available" is information the customer needs to read and act on. A
+ *     transient toast disappears before they have understood it.
  */
 export function AddToCartButton({
   productId,
@@ -44,8 +44,8 @@ export function AddToCartButton({
       {
         onSuccess: () => {
           setAdded(true);
-          // ⚠️  التأكيد يختفي بعد ثانيتين: بقاؤه يجعل الزر يبدو
-          //     معطّلًا لمن يريد إضافة قطعة ثانية.
+          // ⚠️  The confirmation disappears after two seconds: leaving it makes the
+          //     button look disabled to anyone wanting to add a second unit.
           setTimeout(() => {
             setAdded(false);
           }, 2000);

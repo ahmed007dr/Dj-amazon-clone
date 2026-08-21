@@ -1,0 +1,72 @@
+# ═══════════════════════════════════════════════════════════
+#  Runtime dependencies — what production installs
+#
+#  ⚠️  **Do not generate this file with `pip freeze`.**
+#
+#      That command writes everything in the environment, including transitive
+#      dependencies and leftovers of old packages, reintroducing the pollution
+#      cleaned up in phase 0.1 (PyQt5 · allauth · taggit …).
+#
+#      Add a new package here by hand, in its own section.
+#
+#  ⚠️  **Nothing here may be a development tool.**
+#
+#      A linter, a test runner or a fake-data generator installed on a shared
+#      host is not merely wasted space: `django-debug-toolbar` and `Faker` are
+#      the two halves of a real leak — the first exposes settings and SQL, and
+#      the second backs `devtools/seed_dev`, which creates accounts with a
+#      published password. They belong in `dev.txt`, which production never reads.
+#
+#  Installation:
+#      pip install -r requirements/base.txt
+# ═══════════════════════════════════════════════════════════
+
+# ── Framework ──────────────────────────────────────────────
+Django==5.2
+
+# ── Configuration and environment ──────────────────────────
+django-environ==0.11.2
+
+# ── REST interfaces ────────────────────────────────────────
+djangorestframework==3.16.0
+djangorestframework-simplejwt==5.5.0
+django-filter==25.1
+drf-yasg==1.21.10
+django-cors-headers==4.7.0
+
+# ── External payment gateways ──────────────────────────────
+# ⚠️  Every gateway call has a mandatory timeout — see payments/gateways/transport.py
+#     A call without one pins a web worker forever once the gateway stops responding.
+requests==2.32.3
+
+# ── Encryption ─────────────────────────────────────────────
+# ⚠️  Gateway keys are stored encrypted — see core/encryption.py
+#     They used to be plaintext in the database: one leaked backup was enough
+#     to move real money.
+cryptography==50.0.0
+
+# ── Identifiers ────────────────────────────────────────────
+uuid-utils==0.10.0
+
+# ── Database ───────────────────────────────────────────────
+# PostgreSQL is the supported engine — SQLite does not implement select_for_update
+psycopg2-binary==2.9.9
+
+# ── Cache ──────────────────────────────────────────────────
+redis==5.0.1
+
+# ── Media ──────────────────────────────────────────────────
+Pillow==11.2.1
+
+# ── Translation ────────────────────────────────────────────
+# ⚠️  A build tool that production nonetheless needs — so it stays here, not in `dev.txt`.
+#
+#     `.mo` files are gitignored (`.gitignore:118`); only `locale/ar/LC_MESSAGES/django.po`
+#     is committed. So the compiled catalogue does not arrive with the upload — it is
+#     produced on the server. Django's own `compilemessages` calls GNU gettext's
+#     `msgfmt`, which shared hosting rarely provides, and this is the substitute:
+#
+#         pybabel compile -d locale -D django
+#
+#     Without it every translated string silently falls back to its msgid.
+babel==2.18.0

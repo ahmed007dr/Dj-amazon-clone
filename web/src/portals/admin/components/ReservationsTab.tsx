@@ -17,16 +17,18 @@ const TONE: Record<string, 'info' | 'success' | 'neutral' | 'danger'> = {
 };
 
 /**
- * الحجوزات.
+ * Reservations.
  *
- * ⚠️  **هذه الشاشة تجيب سؤالًا واحدًا: «أين الفرق؟»**
+ * ⚠️  **This screen answers one question: "where is the difference?"**
  *
- *     «الرصيد ١٠٠ والمتاح ٦٠» يجعل أمين المخزن يظن أن النظام
- *     يُخفي بضاعة أو أن الجرد خاطئ. الأربعون في سلال مفتوحة
- *     وطلبات لم تُشحن — وبلا هذه القائمة لا سبيل لرؤيتها.
+ *     "The balance is 100 and available is 60" makes the warehouse keeper think
+ *     the system is hiding goods or the stock count is wrong. The forty are in
+ *     open carts and unshipped orders — and without this list there is no way
+ *     to see them.
  *
- * ⚠️  و**القائمة تبدأ بالنشط**: المنتهي والمستهلَك تاريخ لا يخصم
- *     من المتاح، وعرضه أولًا يُغرق ما يُبحث عنه.
+ * ⚠️  And **the list starts with the active ones**: the expired and the
+ *     fulfilled are history that is not deducted from available, and showing
+ *     them first drowns what is being looked for.
  */
 export function ReservationsTab() {
   const { t } = useTranslation();
@@ -51,8 +53,8 @@ export function ReservationsTab() {
     {
       key: 'reference',
       header: t('inventory.heldBy'),
-      // ⚠️  المرجع هو الجواب: «سلة» أو «طلب رقم كذا» — بدونه
-      //     يعرف الأدمن أن هناك حجزًا ولا يعرف كيف يفكّه.
+      // ⚠️  The reference is the answer: "a cart" or "order number such-and-such" —
+      //     without it the admin knows there is a reservation and not how to release it.
       render: (row) => (
         <div className="reservation-ref">
           <span>

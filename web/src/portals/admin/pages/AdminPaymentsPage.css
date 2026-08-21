@@ -9,7 +9,7 @@
   gap: var(--space-3);
   align-content: start;
   padding: var(--space-4);
-  /* شريط الحالة على حافة البداية — ينتقل مع اتجاه اللغة */
+  /* The status bar on the start edge — it moves with the language's direction */
   border-inline-start: 3px solid var(--color-border);
 }
 
@@ -91,9 +91,9 @@
   font-size: 0.8125rem;
 }
 
-/* ⚠️  إجراءات الإدارة في تذييل مفصول: التفعيل والإيقاف قرار يومي،
-       والحذف وإعادة الترتيب قرار بنيوي — خلطهما في صف واحد يجعل
-       الضغطة الخطأ سهلة. */
+/* ⚠️  The management actions in a separated footer: enabling and disabling is a
+       daily decision, and deleting and reordering a structural one — mixing
+       them into one row makes the wrong press easy. */
 .gateway__manage {
   display: flex;
   flex-wrap: wrap;

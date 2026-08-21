@@ -1,11 +1,11 @@
 /**
- * واجهة الطلبات للأدمن.
+ * The orders API for the admin.
  *
- * ⚠️  ترقيم **بالصفحات** لا بالمؤشر هنا وحده.
+ * ⚠️  **Page** pagination rather than cursor, here alone.
  *
- *     الخادم يكشف `count` لشاشات الأدمن فقط (ADR-32): «صفحة ٥ من
- *     ٤٢» معلومة تشغيلية يحتاجها من يعالج الطلبات، وكشفها للعامة
- *     يعطي المنافس حجم النشاط.
+ *     The server exposes `count` for admin screens only (ADR-32): "page 5 of
+ *     42" is operational information whoever processes orders needs, and
+ *     exposing it publicly gives a competitor the size of the business.
  */
 
 import { http } from '@/shared/http';
@@ -46,10 +46,11 @@ export const listAdminOrders = (params: AdminOrderQuery) =>
 export const getAdminOrder = (id: string) => http.get<AdminOrder>(`/orders/admin/${id}/`);
 
 /**
- * ⚠️  الانتقال غير المسموح يُرفض بـ `409` من **آلة الحالة في الخادم**.
+ * ⚠️  A disallowed transition is refused with `409` by **the state machine on the server**.
  *
- *     الواجهة تعرض الانتقالات الممكنة لتحسين التجربة، ولا تكرّر
- *     القواعد: قائمة موازية تتباعد عن الحقيقية فيظهر زر يفشل.
+ *     The frontend shows the possible transitions to improve the experience and
+ *     does not duplicate the rules: a parallel list drifts from the real one, so
+ *     a button appears and fails.
  */
 export const transitionOrder = (id: string, status: OrderStatus, note = '') =>
   http.post<AdminOrder>(`/orders/admin/${id}/transition/`, { to_status: status, note });

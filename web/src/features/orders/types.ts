@@ -1,4 +1,4 @@
-/** عقود الطلبات — تطابق `orders/serializers.py`. */
+/** Order contracts — matching `orders/serializers.py`. */
 
 export type OrderStatus =
   | 'PENDING'
@@ -11,11 +11,11 @@ export type OrderStatus =
   | 'REFUNDED';
 
 /**
- * ⚠️  حالة الدفع **منفصلة** عن حالة الطلب.
+ * ⚠️  The payment status is **separate** from the order status.
  *
- *     طلب مؤكد قد يكون غير مدفوع (دفع عند الاستلام)، وطلب ملغى قد
- *     يكون مدفوعًا وينتظر الاسترداد. دمجهما في حقل واحد يجعل نصف
- *     الحالات الحقيقية غير قابلة للتمثيل.
+ *     A confirmed order may be unpaid (cash on delivery), and a cancelled order
+ *     may be paid and awaiting a refund. Merging them into one field makes half
+ *     the real states impossible to represent.
  */
 export type PaymentStatus =
   | 'UNPAID'
@@ -27,7 +27,7 @@ export type PaymentStatus =
 
 export interface OrderListItem {
   id: string;
-  /** للعرض والدعم — **ليس** معرّف الرابط. */
+  /** For display and support — **not** the URL identifier. */
   number: string;
   status: OrderStatus;
   payment_status: PaymentStatus;
@@ -40,7 +40,7 @@ export interface OrderListItem {
 
 export interface OrderLine {
   id: string;
-  /** ⚠️  لقطة وقت الشراء — لا تتغيّر بتغيّر المنتج اليوم. (ADR-30) */
+  /** ⚠️  A snapshot at the time of purchase — it does not change as the product changes today. (ADR-30) */
   product_sku: string;
   product_name_ar: string;
   product_name_en: string;
@@ -49,15 +49,15 @@ export interface OrderLine {
   discount_amount: string;
   tax_rate: string;
   tax_amount: string;
-  /** الصافي قبل الضريبة. */
+  /** The net before tax. */
   net: string;
   /**
-   * ⚠️  اسم الحقل `total` لا `line_total`.
+   * ⚠️  The field is named `total`, not `line_total`.
    *
-   *     كان معرَّفًا هنا باسم لا يرسله الخادم، فكانت صفحتا تفاصيل
-   *     الطلب (المتجر والأدمن) تطبعان `undefined` مكان كل مبلغ
-   *     سطر — بلا خطأ في الطرفية لأن TypeScript كان يصدّق العقد
-   *     المكتوب هنا لا ما يصل فعلًا.
+   *     It was declared here under a name the server does not send, so both
+   *     order detail pages (store and admin) printed `undefined` in place of
+   *     every line amount — with no error in the console, because TypeScript
+   *     believed the contract written here rather than what actually arrives.
    */
   total: string;
 }
@@ -91,7 +91,7 @@ export interface OrderDetail extends OrderListItem {
   cancellation_reason: string;
   lines: OrderLine[];
   status_history: OrderStatusEvent[];
-  /** ⚠️  يُحسب من آلة الحالة في الخادم — لا قائمة موازية هنا. */
+  /** ⚠️  Computed from the state machine on the server — no parallel list here. */
   can_cancel: boolean;
 }
 

@@ -14,13 +14,14 @@ import { CustomerProfileCard } from '@/portals/account/components/CustomerProfil
 import './ProfilePage.css';
 
 /**
- * الملف الشخصي.
+ * The personal profile.
  *
- * ⚠️  **البريد غير قابل للتعديل هنا.**
+ * ⚠️  **The email is not editable here.**
  *
- *     تغييره يمرّ بتأكيد من العنوانين معًا (`/auth/email/change/`)
- *     — القديم ليعرف أن حسابه يُنقل، والجديد ليثبت ملكيته. حقل
- *     نصي بسيط هنا يعني اختطاف حساب بتعديل حقل واحد.
+ *     Changing it goes through confirmation from both addresses
+ *     (`/auth/email/change/`) — the old one so it knows its account is being
+ *     moved, and the new one to prove ownership. A simple text field here means
+ *     an account hijacked by editing one field.
  */
 export function ProfilePage() {
   const { t } = useTranslation();
@@ -130,10 +131,10 @@ export function ProfilePage() {
         </Button>
       </form>
 
-      {/* ⚠️  بطاقة مستقلة لا حقول في النموذج نفسه: هذه بيانات
-          ملف العميل (`customers/me`) لا بيانات الحساب
-          (`auth/me`) — ونموذج واحد بمسارَي حفظ يُنتج نصف حفظ
-          حين يفشل أحدهما. */}
+      {/* ⚠️  A separate card rather than fields in the same form: this is
+          customer profile data (`customers/me`), not account data
+          (`auth/me`) — and one form with two save paths produces a half
+          save when one of them fails. */}
       <CustomerProfileCard />
     </>
   );

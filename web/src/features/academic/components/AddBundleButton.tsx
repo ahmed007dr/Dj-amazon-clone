@@ -11,18 +11,20 @@ import { Button } from '@/shared/ui/Button';
 import './AddBundleButton.css';
 
 /**
- * إضافة حزمة إلى السلة.
+ * Adding a bundle to the cart.
  *
- * ⚠️  **الحزمة قائمة إرشادية لا منتج مركّب.**
+ * ⚠️  **A bundle is a guidance list, not a composite product.**
  *
- *     بيعها كوحدة واحدة يجبر طالبًا يملك السماعة على شرائها ثانيةً.
- *     الخادم يضيف أصنافها كأسطر مستقلة فيحذف منها ما يشاء.
+ *     Selling it as a single unit forces a student who already owns the
+ *     stethoscope to buy it again. The server adds its items as independent
+ *     lines, so they can remove whatever they like.
  *
- * ⚠️  والإضافة قد تكون **جزئية**.
+ * ⚠️  And the addition may be **partial**.
  *
- *     صنف نفد مخزونه يُتخطّى مع سببه. التوجيه الصامت إلى السلة
- *     يجعل الطالب يظن أن كل شيء دخل — ويكتشف نقص بالطو المعمل في
- *     المحاضرة الأولى. ولذلك نعرض المتخطّى ثم نتركه هو يذهب للسلة.
+ *     An item that is out of stock is skipped with its reason. A silent
+ *     redirect to the cart makes the student assume everything went in — and
+ *     discover the missing lab coat in their first lecture. So we show what was
+ *     skipped and then leave them to go to the cart themselves.
  */
 export function AddBundleButton({ bundleId }: { bundleId: string }) {
   const { t } = useTranslation();
@@ -40,7 +42,7 @@ export function AddBundleButton({ bundleId }: { bundleId: string }) {
       { bundle: bundleId, essentialsOnly },
       {
         onSuccess: (response) => {
-          // اكتملت بلا تخطٍّ — لا شيء يستحق التوقّف عنده
+          // Completed with nothing skipped — nothing worth stopping for
           if (response.bundle_result.is_complete) {
             void navigate('/cart');
             return;

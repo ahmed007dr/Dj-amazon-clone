@@ -28,17 +28,18 @@ type Tab = 'overview' | 'sales' | 'inventory' | 'customers' | 'performance';
 const TABS: Tab[] = ['overview', 'sales', 'inventory', 'customers', 'performance'];
 
 /**
- * التقارير.
+ * Reports.
  *
- * ⚠️  **كل رقم هنا مشتق من مصدره لحظة الطلب.**
+ * ⚠️  **Every figure here is derived from its source at request time.**
  *
- *     لا جدول تقارير مخزَّن: نسخة مُجمَّعة تنشئ رقمًا ثالثًا يجب
- *     أن يوازي مصدرين، وأول انحراف لا يملك أحد حسمه.
+ *     There is no stored reports table: an aggregated copy creates a third
+ *     number that must match two sources, and at the first divergence nobody
+ *     can settle it.
  *
- * ⚠️  والتبويبات **تجلب عند فتحها فقط**.
+ * ⚠️  And the tabs **fetch only when opened**.
  *
- *     جلب الخمسة معًا يعني خمسة استعلامات تجميع ثقيلة عند كل فتح
- *     للشاشة — وأربعة منها لا تُقرأ.
+ *     Fetching all five together means five heavy aggregation queries every
+ *     time the screen opens — four of which are never read.
  */
 export function AdminReportsPage() {
   const { t, i18n } = useTranslation();
@@ -48,7 +49,7 @@ export function AdminReportsPage() {
   const [period, setPeriod] = useState<{ start?: string; end?: string }>({});
 
   const overview = useOverview(period);
-  // ⚠️  `enabled` عبر مفتاح ثابت: الاستعلام لا يُطلَق قبل فتح تبويبه.
+  // ⚠️  `enabled` through a stable key: the query does not fire before its tab opens.
   const sales = useSalesReport(tab === 'sales' ? period : { start: '', end: '' });
   const inventory = useInventoryReport(90);
   const customers = useCustomersReport(period);
@@ -89,8 +90,8 @@ export function AdminReportsPage() {
           <Spinner />
         ) : overview.data ? (
           <>
-            {/* ⚠️  التحذير فوق الأرقام لا تحتها: قراءة الرقم قبل
-                التحذير تعني أن القرار اتُّخذ. */}
+            {/* ⚠️  The warning above the figures, not below them: reading the figure
+                before the warning means the decision has been taken. */}
             {!overview.data.profit_is_reliable ? (
               <Alert tone="warning">{t('reports.profitUnreliable')}</Alert>
             ) : null}
@@ -112,8 +113,8 @@ export function AdminReportsPage() {
 
             <h2 className="reports-heading">{t('reports.inventoryNow')}</h2>
             <div className="reports-grid">
-              {/* ⚠️  «بالتكلفة» في التسمية نفسها — التقييم بسعر
-                  البيع خطأ محاسبي، والتسمية تمنع قراءته خطأً. */}
+              {/* ⚠️  "At cost" in the label itself — valuing at the selling
+                  price is an accounting error, and the label prevents it being misread. */}
               <StatCard
                 label={t('reports.stockValue')}
                 value={overview.data.inventory.stock_value_at_cost}
@@ -203,8 +204,8 @@ export function AdminReportsPage() {
                     <span className="truncate">{localized(row, 'name')}</span>
                     <code>{row.batch}</code>
                     <span dir="ltr">{formatDate(row.expires_at, i18n.language)}</span>
-                    {/* ⚠️  المنتهي يُقال صراحةً لا يُترك رقمًا سالبًا
-                        يُقرأ «قريب». */}
+                    {/* ⚠️  The expired is stated explicitly rather than left as a
+                        negative number read as "approaching". */}
                     <strong className={row.is_expired ? 'is-expired-flag' : ''}>
                       {row.is_expired
                         ? t('reports.expired')

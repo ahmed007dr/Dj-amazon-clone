@@ -35,13 +35,14 @@ const TONES = {
 } as const;
 
 /**
- * معاملات الدفع — قراءةً وتحصيلًا واستردادًا.
+ * Payment transactions — reading, capturing and refunding.
  *
- * ⚠️  **التحصيل والاسترداد عمليتان ماليتان لا تعديل حالة.**
+ * ⚠️  **Capturing and refunding are financial operations, not a status edit.**
  *
- *     كلاهما ينادي البوابة فعلًا. ولذلك لا يوجد هنا زر «تغيير
- *     الحالة»: تحريكها يدويًا لا يغيّر شيئًا لدى البوابة، ويخلق
- *     تناقضًا بين دفترنا ودفترها لا طريقة لحسمه لاحقًا.
+ *     Both genuinely call the gateway. Which is why there is no "change status"
+ *     button here: moving it by hand changes nothing at the gateway, and
+ *     creates a contradiction between our ledger and theirs with no way to
+ *     settle it later.
  */
 export function TransactionsPanel() {
   const { t, i18n } = useTranslation();
@@ -49,11 +50,11 @@ export function TransactionsPanel() {
 
   const [status, setStatus] = useState('');
   const [provider, setProvider] = useState('');
-  // ⚠️  **البحث بالمرجع هو مسار الدعم كله.**
+  // ⚠️  **Searching by reference is the entire support path.**
   //
-  //     العميل يقول «طلبي رقم كذا لم يُدفع»؛ وبلا هذا الحقل يمرّر
-  //     الموظف في صفحات المعاملات حتى يجده — أو لا يجده فيفترض
-  //     أن الدفع لم يصل.
+  //     The customer says "my order number such-and-such was not paid"; and
+  //     without this field the employee scrolls through pages of transactions
+  //     until they find it — or fails to and assumes the payment never arrived.
   const [reference, setReference] = useState('');
   const [page, setPage] = useState(1);
   const [refunding, setRefunding] = useState<PaymentTransaction | null>(null);
@@ -130,8 +131,8 @@ export function TransactionsPanel() {
       header: t('payments.refunded'),
       align: 'end',
       secondary: true,
-      // ⚠️  المسترد يظهر دائمًا ولو كان صفرًا في معاملة محصَّلة:
-      //     غيابه يجعل «مسترد جزئيًا» غير مرئي إلا بفتح التفاصيل.
+      // ⚠️  The refunded amount is always shown, even at zero on a captured transaction:
+      //     its absence makes "partially refunded" invisible except by opening the details.
       render: (row) =>
         Number(row.refunded_amount) > 0 ? formatMoney(row.refunded_amount, i18n.language) : '—',
     },
@@ -141,8 +142,8 @@ export function TransactionsPanel() {
       align: 'end',
       render: (row) => (
         <span className="tx-actions">
-          {/* ⚠️  التحصيل للمُصرَّح وحده — والدفع عند الاستلام هو
-              الحالة الحقيقية: يُحصَّل عند التسليم لا قبله. */}
+          {/* ⚠️  Capture is for authorised ones alone — and cash on delivery is
+              the real case: it is captured on delivery, not before. */}
           {row.status === 'AUTHORIZED' ? (
             <Button
               size="sm"
@@ -165,9 +166,9 @@ export function TransactionsPanel() {
             </Button>
           ) : null}
 
-          {/* ⚠️  «التفاصيل» للفاشلة أولًا: الجدول يقول «فشلت»
-              والتفصيل يقول لماذا — و«انقطاع عن البوابة» وحده
-              يستحق إعادة المحاولة، أما «رصيد غير كافٍ» فلا. */}
+          {/* ⚠️  "Details" for the failed ones first: the table says "failed"
+              and the detail says why — and only "gateway unreachable"
+              is worth retrying, whereas "insufficient funds" is not. */}
           <Button size="sm" variant="ghost" onClick={() => setInspecting(row.id)}>
             {t('payments.details')}
           </Button>
@@ -276,9 +277,9 @@ export function TransactionsPanel() {
               })}
             </p>
 
-            {/* ⚠️  فارغ = كامل المتبقي. الافتراضي المملوء مسبقًا كان
-                يجعل الاسترداد الجزئي يحتاج مسح الحقل أولًا — وهي
-                خطوة تُنسى فيُردّ المبلغ كاملًا. */}
+            {/* ⚠️  Empty = the full remainder. A pre-filled default made a partial
+                refund require clearing the field first — a step that gets
+                forgotten, so the full amount is refunded. */}
             <Field
               label={t('payments.refundAmount')}
               value={amount}
@@ -323,9 +324,9 @@ export function TransactionsPanel() {
               </div>
             ))}
 
-            {/* ⚠️  سبب الفشل يأخذ سطره: هو ما يقرّر أتُعاد المحاولة
-                أم يُتصل بالعميل — والرمز بجوار الرسالة لأن الدعم
-                يبحث بالرمز لدى البوابة. */}
+            {/* ⚠️  The failure reason takes its own line: it is what decides whether
+                to retry or to call the customer — and the code sits beside the
+                message because support searches by the code at the gateway. */}
             {detail.data.failure_message || detail.data.failure_code ? (
               <div className="tx-detail__failure">
                 <dt>{t('payments.failureReason')}</dt>

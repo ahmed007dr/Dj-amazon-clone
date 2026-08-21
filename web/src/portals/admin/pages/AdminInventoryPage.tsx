@@ -37,10 +37,11 @@ import { formatDate, formatDateTime } from '@/shared/utils/format';
 import './AdminInventoryPage.css';
 
 /**
- * ⚠️  نوع الحركة يحمل **اتجاهها** لا اسمها وحده.
+ * ⚠️  The movement type carries **its direction**, not just its name.
  *
- *     الوارد والصادر والفاقد ثلاثة معانٍ مختلفة تمامًا لأمين
- *     المخزن، وقراءتها من لون واحد تجعل سطر تلف يبدو كسطر استلام.
+ *     Inbound, outbound and loss are three entirely different meanings to the
+ *     warehouse keeper, and reading them from one colour makes a damage line
+ *     look like a receipt line.
  */
 const MOVEMENT_TONES: Record<string, 'success' | 'neutral' | 'warning' | 'danger'> = {
   RECEIPT: 'success',
@@ -61,10 +62,11 @@ const MOVEMENT_TONES: Record<string, 'success' | 'neutral' | 'warning' | 'danger
 const MOVEMENT_ACTIONS: MovementAction[] = ['receive', 'adjust', 'transfer', 'damage'];
 
 /**
- * ⚠️  التبويبات مرتّبة بما يُفتح أولًا لا بترتيب البناء.
+ * ⚠️  The tabs are ordered by what gets opened first, not by build order.
  *
- *     أمين المخزن يفتح الشاشة على التنبيهات: ما نفد وما قارب
- *     الانتهاء. أما الجرد فيُفتح مرة كل شهر — وموضعه في الآخر.
+ *     The warehouse keeper opens the screen on the alerts: what has run out and
+ *     what is close to expiring. The stock count, by contrast, is opened once a
+ *     month — and its place is last.
  */
 type Tab = 'alerts' | 'stock' | 'batches' | 'movements' | 'counts' | 'reservations';
 
@@ -77,13 +79,13 @@ const ALERT_TONES = {
 } as const;
 
 /**
- * المخزون.
+ * Inventory.
  *
- * ⚠️  التبويب الافتراضي **التنبيهات لا الأرصدة**.
+ * ⚠️  The default tab is **the alerts, not the balances**.
  *
- *     قائمة الأرصدة الكاملة لا تُقرأ — ألف صف بلا أولوية. أما
- *     التنبيهات فهي بالضبط ما يحتاج تصرّفًا اليوم: نافد · حرج ·
- *     يوشك على انتهاء الصلاحية.
+ *     The full balances list does not get read — a thousand rows with no
+ *     priority. The alerts, by contrast, are exactly what needs acting on
+ *     today: out of stock · critical · about to expire.
  */
 export function AdminInventoryPage() {
   const { t, i18n } = useTranslation();
@@ -103,7 +105,7 @@ export function AdminInventoryPage() {
   const [movementType, setMovementType] = useState('');
   const [page, setPage] = useState(1);
 
-  // اللوح المفتوح — أي عملية يجري تنفيذها الآن
+  // The open panel — which operation is being performed right now
   const [action, setAction] = useState<MovementAction | null>(null);
 
   const debouncedSearch = useDebounced(search);
@@ -143,9 +145,9 @@ export function AdminInventoryPage() {
         page,
       }),
     enabled: tab === 'movements',
-    // ⚠️  السجل إضافة فقط — ما قُرئ لا يتغيّر، وإعادة الجلب المتكررة
-    //     بلا فائدة. الصفحة الأولى وحدها تنمو، والإبطال بعد كل حركة
-    //     يتكفّل بها.
+    // ⚠️  The log is append-only — what has been read does not change, and repeated
+    //     refetching serves no purpose. Only the first page grows, and the
+    //     invalidation after every movement takes care of it.
     staleTime: 60 * 1000,
   });
 
@@ -242,13 +244,13 @@ export function AdminInventoryPage() {
       key: 'thresholds',
       header: t('inventory.thresholds'),
       align: 'end',
-      // ⚠️  **الحدود تُعدَّل في مكانها — والكميات لا.**
+      // ⚠️  **The thresholds are edited in place — and the quantities are not.**
       //
-      //     نقطة إعادة الطلب رقم يُضبط بالتجربة موسمًا بعد موسم،
-      //     ودفنه خلف شاشة تعديل يجعله يبقى على قيمته الأولى
-      //     للأبد فتصير التنبيهات ضجيجًا يُتجاهَل. أما الكميات
-      //     فلها مساراتها المسجَّلة (استلام · تسوية · تحويل)،
-      //     والخادم يرفض تعديلها من هنا أصلًا.
+      //     The reorder point is a number tuned by experiment season after season,
+      //     and burying it behind an edit screen makes it stay on its first
+      //     value forever, so the alerts become noise that gets ignored. The
+      //     quantities, by contrast, have their recorded paths (receipt · adjustment ·
+      //     transfer), and the server refuses to edit them from here at all.
       render: (row) => (
         <span className="stock-thresholds">
           <input
@@ -322,8 +324,8 @@ export function AdminInventoryPage() {
       key: 'quantity',
       header: t('inventory.quantity'),
       align: 'end',
-      // ⚠️  الإشارة تُعرض كما هي: `−٥٠` تُقرأ خروجًا فورًا، و`٥٠`
-      //     المجرّدة تحتاج قراءة عمود النوع لفهمها.
+      // ⚠️  The sign is displayed as it is: `−50` reads as an outflow immediately, and `50`
+      //     bare needs the type column read to be understood.
       render: (row) => (
         <strong className={row.quantity < 0 ? 'inventory-out' : 'inventory-in'}>
           {row.quantity > 0 ? `+${row.quantity}` : row.quantity}
@@ -341,8 +343,8 @@ export function AdminInventoryPage() {
       key: 'by',
       header: t('inventory.performedBy'),
       secondary: true,
-      // ⚠️  الحركة الآلية بلا منفّذ — «النظام» لا فراغ، وإلا بدا
-      //     الحقل ناقصًا لا مقصودًا.
+      // ⚠️  An automatic movement has no operator — "the system" rather than blank,
+      //     or the field looks missing rather than deliberate.
       render: (row) => row.performed_by_email ?? t('inventory.systemActor'),
     },
   ];
@@ -384,8 +386,8 @@ export function AdminInventoryPage() {
           { value: 'batches', label: t('inventory.batches') },
           { value: 'movements', label: t('inventory.movements') },
           { value: 'counts', label: t('inventory.counts') },
-          // ⚠️  الحجوزات بجوار الأرصدة: هي تفسير الفرق بين الرصيد
-          //     والمتاح، ومن يفتح الأرصدة هو من يسأل عنه.
+          // ⚠️  Reservations beside the balances: they are the explanation of the gap
+          //     between the balance and available, and whoever opens the balances is who asks about it.
           { value: 'reservations', label: t('inventory.reservations') },
         ]}
         value={tab}
@@ -500,9 +502,9 @@ export function AdminInventoryPage() {
           ) : null}
         </>
       ) : tab === 'batches' ? (
-        // ⚠️  مكوّن مستقل لا فرع هنا: التبويب له فلاتره وترقيمه
-        //     الخاصان، وحشرهما في حالة الصفحة يجعل تغيير فلتر
-        //     الدفعات يُصفّر صفحة الحركات.
+        // ⚠️  A separate component rather than a branch here: the tab has its own
+        //     filters and its own pagination, and cramming them into the page's
+        //     state makes changing the batches filter reset the movements page.
         <BatchesTab />
       ) : tab === 'counts' ? (
         <StockCountsTab />
@@ -543,9 +545,9 @@ export function AdminInventoryPage() {
         onClose={() => setAction(null)}
         {...(action ? { title: t(`inventory.action_${action}`) } : {})}
       >
-        {/* ⚠️  اللوح يُركَّب عند الفتح فقط ومفتاحه نوع العملية.
-            إبقاؤه مركّبًا كان يجعل «تسوية» تفتح بكمية وسبب كتبهما
-            الأدمن في «تلف» قبل قليل. */}
+        {/* ⚠️  The panel is mounted only on opening, and its key is the operation type.
+            Leaving it mounted made "adjustment" open with a quantity and a
+            reason the admin had typed into "damage" moments earlier. */}
         {action ? (
           <StockMovementForm
             key={action}

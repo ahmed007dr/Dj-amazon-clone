@@ -12,12 +12,12 @@ import type { ProductListItem } from '../types';
 import './ProductCard.css';
 
 /**
- * بطاقة منتج.
+ * A product card.
  *
- * ⚠️  الاسم يُختار من `name_ar`/`name_en` **في الذاكرة**.
+ * ⚠️  The name is chosen from `name_ar`/`name_en` **in memory**.
  *
- *     الخادم أرسل الاثنين (ADR-34)، ولذلك تبديل اللغة يعيد رسم
- *     البطاقة فورًا بلا نداء شبكة وبلا هيكل تحميل.
+ *     The server sent both (ADR-34), so switching the language redraws the card
+ *     immediately with no network call and no loading skeleton.
  */
 export function ProductCard({ product }: { product: ProductListItem }) {
   const { t, i18n } = useTranslation();
@@ -25,8 +25,8 @@ export function ProductCard({ product }: { product: ProductListItem }) {
 
   const name = localized(product, 'name');
 
-  // ⚠️  الخادم يرسل كائن الصورة كاملًا لا مسارها — والنص البديل منه
-  //     أدقّ من اسم المنتج، فهو يصف الصورة لا الصنف.
+  // ⚠️  The server sends the complete image object rather than its path — and the alt text comes from it
+  //     more precise than the product name, because it describes the image, not the item.
   const image = mediaUrl(product.primary_image?.image);
   const imageAlt = product.primary_image
     ? localized(product.primary_image, 'alt_text') || name

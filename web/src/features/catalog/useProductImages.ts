@@ -16,19 +16,19 @@ export function useProductImages(productId: string, enabled = true) {
     queryKey: key(productId),
     queryFn: () => listProductImages(productId),
     enabled,
-    // ⚠️  بلا `staleTime`: الرفع يغيّر القائمة، والأدمن ينتظر أن
-    //     يرى صورته فورًا لا بعد دقيقة.
+    // ⚠️  No `staleTime`: uploading changes the list, and the admin expects to
+    //     see their image immediately, not a minute later.
     staleTime: 0,
   });
 }
 
 /**
- * ⚠️  **كل طفرة تكتب القائمة العائدة مباشرةً في الكاش.**
+ * ⚠️  **Every mutation writes the returned list straight into the cache.**
  *
- *     الترقية التلقائية للصورة الرئيسية بعد الحذف، وإعادة الترتيب
- *     الجماعية — كلاهما يغيّر صفوفًا لم تلمسها الطفرة. الاكتفاء
- *     بتعديل الصف المعني محليًا يترك الشاشة تعرض حالة لم تعد
- *     موجودة على الخادم.
+ *     The automatic promotion of the primary image after a deletion, and the
+ *     bulk reordering — both change rows the mutation never touched. Editing
+ *     only the affected row locally leaves the screen showing a state that no
+ *     longer exists on the server.
  */
 function useImagesMutation<TArgs>(
   productId: string,

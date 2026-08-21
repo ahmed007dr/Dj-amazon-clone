@@ -18,19 +18,20 @@ type Tab = 'universities' | 'faculties' | 'departments' | 'bundles' | 'students'
 const TABS: Tab[] = ['universities', 'faculties', 'departments', 'bundles', 'students'];
 
 /**
- * اللوحة الأكاديمية.
+ * The academic panel.
  *
- * ⚠️  **الترتيب هو ترتيب البناء لا ترتيب الأهمية.**
+ * ⚠️  **The order is the build order, not the order of importance.**
  *
- *     جامعة ← كلية ← قسم ← حزمة: كل خطوة تحتاج ما قبلها، ولوح
- *     الحزم بلا كلية واحدة يعرض قائمة فارغة لا يفهم الأدمن سببها.
- *     التبويبات بهذا الترتيب تقود من لا يعرف من أين يبدأ.
+ *     University ← faculty ← department ← bundle: every step needs the one
+ *     before it, and the bundles panel with not one faculty shows an empty list
+ *     the admin cannot account for. The tabs in this order guide whoever does
+ *     not know where to start.
  *
- * ⚠️  و**الشجرة شرط لتسجيل أي طالب**.
+ * ⚠️  And **the tree is a precondition for registering any student**.
  *
- *     الطالب يختار جامعته وكليته قبل إنشاء حسابه. متجر بلا هذه
- *     الشاشة لا يستقبل طالبًا واحدًا إلا بإدخال يدوي في قاعدة
- *     البيانات — وهو ما كانت عليه الحال قبلها.
+ *     A student picks their university and faculty before creating their
+ *     account. A store without this screen accepts not a single student except
+ *     through manual entry in the database — which is how things stood before it.
  */
 export function AdminAcademicPage() {
   const { t } = useTranslation();

@@ -34,13 +34,13 @@ const ACCOUNT_TYPES = [
 ] as const;
 
 /**
- * نموذج موحّد للإعدادات المرجعية الثلاثة.
+ * A unified form for the three reference settings.
  *
- * ⚠️  **الرمز (`code`) لا يُعدَّل بعد الإنشاء.**
+ * ⚠️  **The code (`code`) is not edited after creation.**
  *
- *     تشير إليه بيانات مخزّنة وسكربتات بذر وتقارير. تغييره يترك
- *     كل ما يشير إليه معلّقًا بلا هدف — والتصحيح عنصرٌ جديد لا
- *     رمزٌ جديد.
+ *     Stored data, seed scripts and reports point at it. Changing it leaves
+ *     everything pointing at it dangling with no target — and the correction is
+ *     a new item, not a new code.
  */
 export function SettingsForm({
   kind,
@@ -98,7 +98,7 @@ export function SettingsForm({
     setFieldErrors({});
 
     const shared = { name_ar: form.name_ar, name_en: form.name_en, is_active: form.is_active };
-    // الرمز يُرسَل عند الإنشاء وحده — انظر تحذير الرأس
+    // The code is sent on creation alone — see the warning at the top
     const withCode = row ? shared : { ...shared, code: form.code };
 
     const body =
@@ -266,8 +266,8 @@ export function SettingsForm({
             {...errorFor('level')}
           />
 
-          {/* ⚠️  الأنواع المسموحة **قائمة فارغة = كل الأنواع** بحسب
-              المستوى. هذا يُقال صراحةً وإلا فُهم الفراغ منعًا كاملًا. */}
+          {/* ⚠️  The permitted types: **an empty list = every type**, according to
+              the level. This is stated explicitly, or emptiness is read as a complete block. */}
           <fieldset className="settings-form__types">
             <legend>{t('settings.allowedTypes')}</legend>
             <p className="settings-form__hint">{t('settings.allowedTypesHint')}</p>
@@ -291,9 +291,9 @@ export function SettingsForm({
             onChange={set('requires_verification')}
           />
 
-          {/* ⚠️  رسالة المنع تُعرض للمستخدم بدل «غير موجود» حين
-              يكون كشف الوجود مقبولًا — وتركها فارغة يجعله يرى
-              صفحة فارغة بلا تفسير. */}
+          {/* ⚠️  The denial message is shown to the user instead of "not found"
+              when disclosing existence is acceptable — and leaving it empty
+              makes them see an empty page with no explanation. */}
           <Field
             label={t('settings.denialMessage')}
             value={form.denial_message_ar}

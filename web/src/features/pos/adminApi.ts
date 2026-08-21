@@ -6,14 +6,15 @@ import type { PagedResponse } from '@/features/orders/adminApi';
 import type { Register, Session } from './api';
 
 /**
- * ورديات نقطة البيع — من بوابة الأدمن.
+ * Point-of-sale shifts — from the admin portal.
  *
- * ⚠️  **الأدمن يرى `expected_cash` و`variance` دائمًا؛ الكاشير لا.**
+ * ⚠️  **The admin always sees `expected_cash` and `variance`; the cashier does not.**
  *
- *     الفارق ليس تشدّدًا في الصلاحيات بل جوهر التسوية: عرض
- *     المتوقَّع للكاشير قبل أن يعدّ يجعله يعدّ حتى يطابقه، فيصير
- *     الفرق صفرًا دائمًا ولا تكشف التسوية شيئًا. الأدمن يقرأ بعد
- *     وقوع العدّ، فلا يفسده.
+ *     The difference is not permissions strictness but the essence of the
+ *     reconciliation: showing the expected figure to the cashier before they
+ *     count makes them count until it matches, so the discrepancy is always
+ *     zero and the reconciliation reveals nothing. The admin reads after the
+ *     count has happened, so they do not corrupt it.
  */
 
 export interface AdminSessionFilters {
@@ -23,8 +24,8 @@ export interface AdminSessionFilters {
 }
 
 export const listAdminSessions = (params: AdminSessionFilters) =>
-  // ⚠️  `{ ...params }` لا `params`: الواجهة المصرَّحة الحقول بلا
-  //     توقيع فهرسة، فلا تُقبل مباشرةً كخريطة استعلام.
+  // ⚠️  `{ ...params }`, not `params`: the explicitly typed interface has no
+  //     index signature, so it is not accepted directly as a query map.
   http.get<PagedResponse<Session>>('/pos/admin/sessions/', { params: { ...params } });
 
 export const listAdminRegisters = () => http.get<Register[]>('/pos/admin/registers/');
@@ -44,13 +45,14 @@ export function useAdminRegisters() {
 }
 
 /**
- * وردية واحدة بتفصيلها.
+ * A single shift in detail.
  *
- * ⚠️  **القائمة تُختصر والتفصيل يُطلَب.**
+ * ⚠️  **The list is condensed and the detail is requested.**
  *
- *     صفّ الوردية في الجدول يعرض الفرق ولا يعرض تركيبه: كم بيعة
- *     نقدًا وكم بالبطاقة وكم أُخرِج من الدرج ولماذا. جلب ذلك لكل
- *     صفّ يعني عشرات النداءات لصفحة تُقرأ منها وردية واحدة.
+ *     The shift's row in the table shows the discrepancy and not its
+ *     composition: how many sales in cash, how many by card, and how much left
+ *     the drawer and why. Fetching that for every row means dozens of calls for
+ *     a page from which one shift gets read.
  */
 export function useAdminSession(id: string | null) {
   return useQuery({
@@ -61,14 +63,14 @@ export function useAdminSession(id: string | null) {
 }
 
 /**
- * إدارة الكاونترات.
+ * Managing registers.
  *
- * ⚠️  **الكاونتر يُوقَف ولا يُحذف** — والخادم لا يعرض `DELETE`
- *     أصلًا: كل وردية وكل بيعة تشير إليه، وحذفه يقطع تاريخ الفرع
- *     عن مصدره.
+ * ⚠️  **A register is disabled and never deleted** — and the server exposes no
+ *     `DELETE` at all: every shift and every sale points at it, and deleting it
+ *     severs the branch's history from its source.
  *
- * ⚠️  والخادم يردّ ٤٠٩ على الإيقاف أو النقل ووردية مفتوحة عليه؛
- *     الشاشة تُظهر رسالته كما هي بدل أن تخترع تفسيرًا.
+ * ⚠️  And the server answers 409 to disabling or moving it while a shift is open
+ *     on it; the screen shows its message as it is rather than inventing an explanation.
  */
 export function useSaveRegister() {
   const queryClient = useQueryClient();
@@ -79,8 +81,8 @@ export function useSaveRegister() {
         ? http.patch<Register>(`/pos/admin/registers/${id}/`, body)
         : http.post<Register>('/pos/admin/registers/', body),
     onSuccess: () => {
-      // ⚠️  إبطال بوابة الكاشير معها: الكاونتر الموقوف يجب أن
-      //     يختفي من قائمة الفتح فورًا لا بعد إعادة تحميل.
+      // ⚠️  Invalidate the cashier portal along with it: a disabled register must
+      //     disappear from the open-shift list immediately, not after a reload.
       void queryClient.invalidateQueries({ queryKey: ['admin', 'pos-registers'] });
       void queryClient.invalidateQueries({ queryKey: ['pos', 'registers'] });
     },

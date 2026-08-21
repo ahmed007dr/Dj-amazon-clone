@@ -16,10 +16,11 @@ import { useToast } from '@/shared/ui/useToast';
 import './BrandAssetsPanel.css';
 
 /**
- * ⚠️  خلفية المعاينة تختلف باختلاف الأصل.
+ * ⚠️  The preview background differs by asset.
  *
- *     لوجو الوضع الداكن أبيضُ غالبًا: عرضه على خلفية فاتحة يجعله
- *     يبدو مفقودًا، فيرفعه الأدمن مرة ثانية ظنًّا أن الرفع فشل.
+ *     The dark-mode logo is usually white: showing it on a light background
+ *     makes it look missing, so the admin uploads it a second time believing
+ *     the upload failed.
  */
 const DARK_PREVIEW: AssetField[] = ['logo_dark'];
 
@@ -100,8 +101,8 @@ function AssetTile({
 
       <div className={`asset-tile__preview ${dark ? 'is-dark' : ''}`}>
         {value ? (
-          // ⚠️  النص البديل اسم الأصل لا اسم الموقع: قارئ الشاشة
-          //     هنا يخدم أدمن يتحقق من رفعه لا زائرًا يقرأ الهوية.
+          // ⚠️  The alt text is the asset's name, not the site's: the screen reader
+          //     here serves an admin verifying their upload, not a visitor reading the identity.
           <img src={mediaUrl(value)} alt={label} />
         ) : (
           <span className="asset-tile__empty">{t('branding.assetEmpty')}</span>
@@ -111,8 +112,8 @@ function AssetTile({
       <p className="asset-tile__hint">{hint}</p>
 
       <div className="asset-tile__actions">
-        {/* ⚠️  مُدخل الملف مخفي وزر يقوده — المُدخل الخام لا يقبل
-            تنسيقًا ويظهر بلغة المتصفح لا بلغة الواجهة. */}
+        {/* ⚠️  The file input is hidden and a button drives it — the raw input accepts
+            no styling and appears in the browser's language rather than the interface's. */}
         <input
           ref={inputRef}
           id={`asset-${field}`}
@@ -123,7 +124,7 @@ function AssetTile({
           onChange={(event) => {
             const file = event.target.files?.[0];
             if (file) onPick(file);
-            // التفريغ يسمح بإعادة اختيار **نفس** الملف بعد تصحيحه
+            // Clearing allows re-selecting **the same** file after correcting it
             event.target.value = '';
           }}
         />

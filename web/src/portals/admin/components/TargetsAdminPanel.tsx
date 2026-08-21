@@ -23,11 +23,12 @@ const TARGET_TYPES = ['SALES', 'NET_SALES', 'PROFIT', 'ORDERS', 'CUSTOMERS'] as 
 const BASES = ['SALES', 'NET_SALES', 'PROFIT'] as const;
 
 /**
- * تعديل هدف واحد.
+ * Editing a single target.
  *
- * ⚠️  **المفعَّل لا يُعدَّل**: يُقاس عليه الأداء منذ لحظة تفعيله،
- *     وتغيير قيمته بعدها يعيد كتابة معيار كان المندوب يعمل عليه.
- *     الخادم يحرسه، والواجهة تُخفي المسار عنه أصلًا.
+ * ⚠️  **An active one is not edited**: performance is measured against it from
+ *     the moment it is activated, and changing its value afterwards rewrites a
+ *     standard the rep was already working to. The server guards it, and the
+ *     frontend hides the route to it entirely.
  */
 export function TargetEditForm({
   target,
@@ -120,15 +121,17 @@ export function TargetEditForm({
 }
 
 /**
- * أهداف الفريق دفعة واحدة.
+ * A team's targets in one batch.
  *
- * ⚠️  **الموجود يُتخطّى لا يُكتب فوقه.**
+ * ⚠️  **Existing ones are skipped, not overwritten.**
  *
- *     إعادة التشغيل بعد إضافة موظف جديد تُنشئ هدفه وحده؛ والكتابة
- *     فوق الموجود تمحو أهدافًا عُدِّلت يدويًا بعد الدفعة الأولى.
+ *     Re-running after adding a new employee creates their target alone; and
+ *     overwriting the existing ones erases targets edited by hand after the
+ *     first batch.
  *
- * ⚠️  و**قيمة واحدة للجميع ليست خيارًا افتراضيًا صامتًا**: تُملأ
- *     صراحةً ثم تُعدَّل لمن يختلف، فيبقى الرقم قرارًا لا سهوًا.
+ * ⚠️  And **one value for everyone is not a silent default**: it is filled in
+ *     explicitly and then adjusted for whoever differs, so the figure stays a
+ *     decision rather than an oversight.
  */
 export function BulkTargetsForm({
   year,
@@ -239,13 +242,13 @@ export function BulkTargetsForm({
 }
 
 /**
- * قواعد العمولة.
+ * Commission rules.
  *
- * ⚠️  **بيانات لا كود**: «٣٪ فوق ١٠٠٪ تحقيق» قرار إداري يتغيّر كل
- *     موسم، وتثبيته في الكود يجعل تعديله نشرًا.
+ * ⚠️  **Data, not code**: "3% above 100% achievement" is a management decision
+ *     that changes every season, and fixing it in code makes editing it a deployment.
  *
- * ⚠️  والشرائح تُضاف بعد إنشاء القاعدة — الخادم يملكها في جدول
- *     منفصل، والقاعدة بلا شرائح لا تحسب شيئًا.
+ * ⚠️  And the tiers are added after the rule is created — the server holds them
+ *     in a separate table, and a rule with no tiers computes nothing.
  */
 export function SchemesPanel() {
   const { t } = useTranslation();
@@ -303,8 +306,8 @@ export function SchemesPanel() {
             />
           </div>
 
-          {/* ⚠️  الأساس يحدد **ما تُحسب عليه النسبة**: عمولة على
-              المبيعات تُصرف حتى لو بِيع بخسارة، وعلى الربح لا. */}
+          {/* ⚠️  The base determines **what the rate is computed on**: a commission
+              on sales gets paid even if the sale was at a loss, and one on profit does not. */}
           <label className="pricing-form__select">
             <span>{t('targets.base')}</span>
             <select

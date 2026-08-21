@@ -5,18 +5,18 @@ import { Badge } from '@/shared/ui/Badge';
 import type { Availability } from '../types';
 
 /**
- * حالة التوفر.
+ * The availability status.
  *
- * ⚠️  الرقم يُعرض **حين يرسله الخادم فقط**.
+ * ⚠️  The number is shown **only when the server sends it**.
  *
- *     الخادم يكشف العدد تحت عتبة معيّنة («متبقٍ ٣») ويحجبه فوقها
- *     («متوفر») — لأن «متبقٍ ٨٤٧» يعطي المنافس حجم المخزون.
- *     الواجهة لا تعيد بناء الرقم ولا تخمّنه.
+ *     The server reveals the count below a given threshold ("3 left") and
+ *     withholds it above ("in stock") — because "847 left" gives a competitor
+ *     your stock volume. The frontend neither reconstructs the number nor guesses it.
  */
 export function StockBadge({ availability }: { availability: Availability | undefined }) {
   const { t } = useTranslation();
 
-  // لا تُعرض شارة قبل وصول البيانات — «غير متوفر» خاطئة أسوأ من الصمت
+  // No badge is shown before the data arrives — a wrong "out of stock" is worse than silence
   if (!availability) return null;
 
   if (!availability.is_available) {

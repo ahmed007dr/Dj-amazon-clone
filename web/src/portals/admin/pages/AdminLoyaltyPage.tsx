@@ -59,13 +59,14 @@ const REFERRAL_TONE: Record<string, 'success' | 'info' | 'danger'> = {
 };
 
 /**
- * لوحة الولاء والإحالة.
+ * The loyalty and referral panel.
  *
- * ⚠️  **الالتزام أول رقم على الشاشة.**
+ * ⚠️  **The liability is the first figure on the screen.**
  *
- *     عدد النقاط وحده رقم تسويقي يسرّ صاحب النشاط؛ وقيمتها
- *     بالجنيه هي ما يظهر في ميزانيته حين تُصرَف. وضعها ثانيةً
- *     يجعل قرار «ضاعِف النقاط» يُتخذ بلا رؤية تكلفته.
+ *     The number of points alone is a marketing figure that pleases the
+ *     business owner; and its value in pounds is what appears on their balance
+ *     sheet when it is redeemed. Putting it second makes the "double the
+ *     points" decision get taken without seeing its cost.
  */
 export function AdminLoyaltyPage() {
   const { t } = useTranslation();
@@ -112,8 +113,8 @@ export function AdminLoyaltyPage() {
       key: 'points',
       header: t('loyalty.points'),
       align: 'end',
-      // ⚠️  الإشارة تُعرَض صراحةً: «٥٠» بلا إشارة لا يقول أكسبٌ
-      //     هو أم سحب، والدفتر بلا اتجاه لا يُقرأ.
+      // ⚠️  The sign is displayed explicitly: "50" with no sign does not say whether
+      //     it is an earning or a withdrawal, and a ledger with no direction cannot be read.
       render: (row) => (
         <strong dir="ltr" className={row.signed_points > 0 ? 'points-up' : 'points-down'}>
           {row.signed_points > 0 ? `+${row.signed_points}` : row.signed_points}
@@ -220,9 +221,9 @@ export function AdminLoyaltyPage() {
               </Button>
             ) : null}
 
-            {/* ⚠️  إسقاط المنتهية زرّ لا مجرّد مهمة ليلية.
-                من يُقفل الشهر يحتاج أن يرى الالتزام بعد الإسقاط
-                لا قبله — وانتظار منتصف الليل ليس خيارًا وقتها. */}
+            {/* ⚠️  Expiring the due points is a button, not merely a nightly job.
+                Whoever closes the month needs to see the liability after the
+                expiry rather than before — and waiting for midnight is not an option then. */}
             <Button
               size="sm"
               variant="ghost"
@@ -322,9 +323,9 @@ export function AdminLoyaltyPage() {
                 value={kindFilter}
                 onChange={(event) => {
                   setKindFilter(event.target.value);
-                  // ⚠️  العودة للصفحة الأولى مع كل ترشيح: البقاء
-                  //     على صفحة ٧ بعد ترشيح يعطي جدولًا فارغًا
-                  //     يُقرأ «لا نتائج» وهي نتائج موجودة.
+                  // ⚠️  Returning to the first page with every filter change: staying
+                  //     on page 7 after filtering gives an empty table that reads
+                  //     as "no results" when there are results.
                   setPage(1);
                 }}
               >

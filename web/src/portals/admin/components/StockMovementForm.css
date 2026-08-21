@@ -64,8 +64,9 @@
   font-style: normal;
 }
 
-/* ⚠️  الاتجاه زرّان لا إشارة تُكتب: السالب المكتوب يدويًا يُنسى،
-       فتُسجَّل زيادة مكان نقص — وهو خطأ لا يُكتشف إلا عند الجرد. */
+/* ⚠️  The direction is two buttons rather than a typed sign: a hand-written
+       minus gets forgotten, so an increase is recorded in place of a decrease —
+       a mistake discovered only at the stock count. */
 .stock-form__direction {
   display: flex;
   flex-wrap: wrap;

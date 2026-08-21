@@ -13,15 +13,17 @@ import { formatDateTime } from '@/shared/utils/format';
 import './SessionList.css';
 
 /**
- * أجهزتي المتصلة.
+ * My connected devices.
  *
- * ⚠️  الشاشة كانت **تعرض ولا تُنهي** — وهذا أسوأ من عدم العرض:
- *     المستخدم يرى جهازًا لا يعرفه ولا يملك ما يفعله حياله.
+ * ⚠️  The screen used to **display and not end** — and that is worse than not
+ *     displaying: the user sees a device they do not recognise and has nothing
+ *     they can do about it.
  *
- * ⚠️  والجلسة الحالية **لا زر لها**.
+ * ⚠️  And the current session **has no button**.
  *
- *     إنهاؤها يخرج المستخدم من الشاشة التي يقف عليها الآن — وهو
- *     أثر مفاجئ لزر يبدو كبقية أخواته. الخروج له مكانه في القائمة.
+ *     Ending it logs the user out of the very screen they are standing on — a
+ *     surprising effect for a button that looks like all its siblings. Logging
+ *     out has its own place in the menu.
  */
 export function SessionList() {
   const { t, i18n } = useTranslation();
@@ -60,8 +62,8 @@ export function SessionList() {
               ) : null}
             </strong>
 
-            {/* ⚠️  عنوان IP معروض عمدًا: هو ما يجعل المستخدم يميّز
-                جهازه من غيره — «هاتف» وحدها لا تكفي. */}
+            {/* ⚠️  The IP address is shown deliberately: it is what lets the user tell
+                their own device from another — "phone" alone is not enough. */}
             <span className="session__meta muted">
               {session.ip_address ?? '—'} · {formatDateTime(session.last_activity, i18n.language)}
             </span>

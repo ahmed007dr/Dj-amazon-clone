@@ -64,7 +64,7 @@
   border-radius: var(--radius-sm);
 }
 
-/* ⚠️  حدّ على حافة البداية لا خلفية: الخلفية تُضعف تباين النص. */
+/* ⚠️  A border on the start edge rather than a background: a background weakens the text's contrast. */
 .reports-expiry li.is-expired {
   border-inline-start: 3px solid var(--color-danger);
 }

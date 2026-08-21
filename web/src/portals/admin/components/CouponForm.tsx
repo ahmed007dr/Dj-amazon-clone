@@ -20,18 +20,19 @@ const ACCOUNT_TYPES = [
   'SUPPLIER',
 ] as const;
 
-/** الحقول التي تفقد معناها مع الشحن المجاني. */
+/** The fields that lose their meaning with free shipping. */
 const VALUE_KINDS = ['PERCENTAGE', 'FIXED'];
 
 /**
- * كوبون خصم.
+ * A discount coupon.
  *
- * ⚠️  **الحدود ثلاثة ومنفصلة**: إجمالي الاستخدام · لكل عميل ·
- *     الحد الأدنى للطلب. دمجها يمنع «١٠٠٠ استخدام إجمالًا، مرة
- *     واحدة لكل عميل» — وهي أشيع صيغة حملة.
+ * ⚠️  **The limits are three and separate**: total uses · per customer · the
+ *     order minimum. Merging them prevents "1000 uses in total, once per
+ *     customer" — the most common campaign shape.
  *
- * ⚠️  و**سقف الخصم للنسبة وحدها**: «٥٠٪» على طلب بعشرة آلاف يعني
- *     خمسة آلاف من جيب المتجر. السقف هو ما يمنع ذلك.
+ * ⚠️  And **the discount cap is for percentages alone**: "50%" on a
+ *     ten-thousand order means five thousand out of the store's pocket. The cap
+ *     is what prevents that.
  */
 export function CouponForm({
   coupon,
@@ -85,7 +86,7 @@ export function CouponForm({
       name_ar: form.name_ar,
       name_en: form.name_en,
       kind: form.kind,
-      // ⚠️  الشحن المجاني لا قيمة له — يُرسَل صفرًا لا فارغًا.
+      // ⚠️  Free shipping has no value — it is sent as zero rather than empty.
       value: needsValue ? form.value : '0',
       max_discount_amount:
         needsValue && form.kind === 'PERCENTAGE' && form.max_discount_amount
@@ -94,7 +95,7 @@ export function CouponForm({
       min_order_amount: form.min_order_amount || '0',
       account_types: form.account_types,
       first_order_only: form.first_order_only,
-      // ⚠️  فارغ = بلا حد. الصفر يعني كوبونًا لا يُستخدم أبدًا.
+      // ⚠️  Empty = no limit. Zero means a coupon that is never used.
       usage_limit: form.usage_limit === '' ? null : Number(form.usage_limit),
       usage_limit_per_user: Number(form.usage_limit_per_user) || 1,
       is_active: form.is_active,
@@ -173,8 +174,8 @@ export function CouponForm({
             {...errorFor('value')}
           />
 
-          {/* ⚠️  السقف للنسبة وحدها: «٥٠٪» على طلب بعشرة آلاف يعني
-              خمسة آلاف من جيب المتجر. */}
+          {/* ⚠️  The cap is for percentages alone: "50%" on a ten-thousand order
+              means five thousand out of the store's pocket. */}
           {form.kind === 'PERCENTAGE' ? (
             <Field
               label={t('pricing.maxDiscount')}
@@ -226,8 +227,8 @@ export function CouponForm({
 
       <h4 className="pricing-form__legend">{t('pricing.limits')}</h4>
 
-      {/* ⚠️  حدّان منفصلان: «١٠٠٠ إجمالًا، مرة لكل عميل» أشيع صيغة
-          حملة — ودمجهما في حقل واحد يمنعها. */}
+      {/* ⚠️  Two separate limits: "1000 in total, once per customer" is the most
+          common campaign shape — and merging them into one field prevents it. */}
       <div className="pricing-form__row">
         <Field
           label={t('pricing.usageLimit')}

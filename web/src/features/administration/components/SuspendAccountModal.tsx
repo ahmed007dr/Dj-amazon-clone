@@ -13,13 +13,15 @@ import { activateAccount, suspendAccount, type AdminAccount } from '../api';
 import './SuspendAccountModal.css';
 
 /**
- * إيقاف أو تفعيل حساب.
+ * Suspend or reactivate an account.
  *
- * ⚠️  **الأثر فوري** — الجلسات تُبطَل والتوكنات تُلغى الآن، لا عند
- *     انتهاء صلاحيتها. قوله في الشاشة يجعل الأدمن يعرف ما يفعله.
+ * ⚠️  **The effect is immediate** — the sessions are revoked and the tokens
+ *     cancelled now, not when they expire. Saying so on the screen lets the
+ *     admin know what they are doing.
  *
- * ⚠️  والفرق بين «موقوف» و«محظور» ليس تجميليًا: الأول مؤقت يُرفع،
- *     والثاني نهائي. خلطهما يجعل كل إيقاف يبدو نهائيًا.
+ * ⚠️  And the difference between "suspended" and "banned" is not cosmetic: the
+ *     first is temporary and liftable, the second final. Conflating them makes
+ *     every suspension look final.
  */
 export function SuspendAccountModal({
   account,

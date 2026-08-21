@@ -10,12 +10,13 @@ import type { ProductListItem } from '../types';
 import { ProductCard } from './ProductCard';
 
 /**
- * شبكة المنتجات بحالاتها الأربع.
+ * The product grid in its four states.
  *
- * ⚠️  تحميل · خطأ · فارغ · محتوى — أربعتها مُصمَّمة.
+ * ⚠️  Loading · error · empty · content — all four are designed.
  *
- *     الشاشة البيضاء تترك المستخدم بين ثلاثة احتمالات (ينتظر؟
- *     أخطأ؟ تعطّل؟) وثلاثة تصرّفات مختلفة، والصمت لا يرجّح أيًّا منها.
+ *     A blank screen leaves the user between three possibilities (waiting? a
+ *     mistake? broken?) and three different responses, and silence favours none
+ *     of them.
  */
 export function ProductGrid({
   products,
@@ -33,7 +34,7 @@ export function ProductGrid({
   if (isLoading) return <SkeletonGrid count={8} />;
 
   if (error) {
-    // ⚠️  انقطاع الشبكة رسالة مختلفة عن عطل الخادم — الإجراء مختلف
+    // ⚠️  A dropped connection is a different message from a server fault — the action differs
     const offline = isApiError(error) && error.isOffline;
 
     return (

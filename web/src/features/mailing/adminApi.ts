@@ -3,13 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { http } from '@/shared/http';
 
 /**
- * البريد — الحسابات والمسؤوليات والقوالب والسجل.
+ * Mail — the accounts, the responsibilities, the templates and the log.
  *
- * ⚠️  **لا حقل هنا يحمل كلمة مرور في اتجاه القراءة.**
+ * ⚠️  **No field here carries a password in the read direction.**
  *
- *     `password` يُكتب ولا يُقرأ، والخادم يعيد `has_password` وحده.
- *     أي حقل يعيد السرّ — ولو «مقنّعًا جزئيًا» — يضعه في سجل المتصفح
- *     وكاش الوكيل وأي أداة تصحيح مفتوحة.
+ *     `password` is written and never read, and the server returns
+ *     `has_password` alone. Any field returning the secret — even "partially
+ *     masked" — puts it in the browser history, the proxy cache and any open
+ *     debugging tool.
  */
 
 export type MailDirection = 'OUT' | 'IN' | 'BOTH';
@@ -38,20 +39,20 @@ export interface EmailAccount {
   imap_security: MailSecurity;
   imap_username: string;
   imap_folder: string;
-  /** ⚠️  لا تُسنَد إليه رسائل الأمان — القوائم السوداء تصيبه أولًا. */
+  /** ⚠️  Security messages are never assigned to it — blacklists hit it first. */
   is_marketing: boolean;
   is_default: boolean;
   is_active: boolean;
   priority: number;
   max_per_hour: number;
-  /** حالة السرّ لا قيمته. */
+  /** The secret's status, not its value. */
   has_password: boolean;
   has_imap_password: boolean;
   last_success_at: string | null;
   last_error_at: string | null;
   last_error: string;
   consecutive_failures: number;
-  /** مؤشّر لا مفتاح: لا إيقاف تلقائي (ADR-77). */
+  /** An indicator, not a switch: no automatic disabling (ADR-77). */
   is_failing: boolean;
 }
 
@@ -76,7 +77,7 @@ export interface MailRoute {
   is_active: boolean;
 }
 
-/** من أين جاء الحساب — لا النتيجة وحدها. */
+/** Where the account came from — not the result alone. */
 export type RoutingSource = 'template' | 'purpose' | 'default' | 'priority' | 'env';
 
 export interface RoutingRow {
@@ -92,7 +93,7 @@ export interface RoutingRow {
 export interface MailTemplate {
   key: string;
   purpose: MailPurpose;
-  /** قائمة السماح: المحرّر لا يملك غيرها. */
+  /** The allowlist: the editor has nothing beyond it. */
   variables: string[];
   subject_ar: string;
   subject_en: string;
@@ -152,11 +153,11 @@ export interface InboundMessage {
   to_email: string;
   subject: string;
   body_text: string;
-  /** ⚠️  الـ HTML مخزَّن ولا يُرسَل — عرضه XSS على جلسة أدمن. */
+  /** ⚠️  The HTML is stored and never sent — displaying it is XSS on an admin session. */
   has_html: boolean;
   received_at: string;
   size_bytes: number;
-  /** رسالة آلية: الردّ عليها ممنوع — حماية من حلقات البريد. */
+  /** An automated message: replying to it is forbidden — protection against mail loops. */
   is_auto: boolean;
   status: InboundState;
   assigned_to: string | null;
@@ -171,7 +172,7 @@ export interface Paged<T> {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  المفاتيح
+//  Keys
 // ═══════════════════════════════════════════════════════════
 
 const ACCOUNTS = ['admin', 'mail', 'accounts'] as const;
@@ -182,11 +183,12 @@ const OUTBOX = ['admin', 'mail', 'outbox'] as const;
 const INBOX = ['admin', 'mail', 'inbox'] as const;
 
 /**
- * ⚠️  كل تعديل يُبطل **الخريطة** معه.
+ * ⚠️  Every edit invalidates **the map** along with it.
  *
- *     تغيير حساب أو مسؤولية يقلب الجواب على «من أي حساب يخرج هذا
- *     القالب؟». وبلا إبطالها يبقى المشغّل ينظر إلى خريطة قديمة
- *     تقول إن إسناده لم يُطبَّق — فيعيده مرة أخرى.
+ *     Changing an account or a responsibility flips the answer to "which
+ *     account does this template go out from?". And without invalidating it the
+ *     operator keeps looking at a stale map saying their assignment did not
+ *     apply — so they do it again.
  */
 function useMailMutation<TArgs, TResult>(
   run: (args: TArgs) => Promise<TResult>,
@@ -205,7 +207,7 @@ function useMailMutation<TArgs, TResult>(
   });
 }
 
-// ── الحسابات ───────────────────────────────────────────────
+// ── Accounts ──────────────────────────────────────────────
 
 export function useMailAccounts() {
   return useQuery({
@@ -236,7 +238,7 @@ export interface CheckResult {
   error: string;
 }
 
-/** مصافحة SMTP بلا إرسال — الزرّ الذي يمنع اكتشاف الخطأ بعد أول عميل. */
+/** An SMTP handshake with no send — the button that stops the fault being discovered by the first customer. */
 export function useVerifyMailAccount() {
   return useMailMutation(
     (id: string) => http.post<CheckResult>(`/mailing/admin/accounts/${id}/verify/`, {}),
@@ -252,7 +254,7 @@ export function useSendTestMail() {
   );
 }
 
-// ── المسؤوليات ─────────────────────────────────────────────
+// ── Responsibilities ──────────────────────────────────────
 
 export function useMailRoutes() {
   return useQuery({
@@ -284,7 +286,7 @@ export function useDeleteMailRoute() {
   ]);
 }
 
-// ── القوالب ────────────────────────────────────────────────
+// ── Templates ─────────────────────────────────────────────
 
 export function useMailTemplates() {
   return useQuery({
@@ -301,7 +303,7 @@ export function useSaveMailTemplate() {
   );
 }
 
-/** ⚠️  الحذف هو «الرجوع إلى الافتراضي» — لا فقدان للنص الأصلي. */
+/** ⚠️  Deleting is "revert to default" — the original text is never lost. */
 export function useResetMailTemplate() {
   return useMailMutation(
     (key: string) => http.delete<MailTemplate>(`/mailing/admin/templates/${key}/`),
@@ -319,7 +321,7 @@ export function usePreviewMailTemplate() {
   });
 }
 
-// ── السجل والوارد ──────────────────────────────────────────
+// ── The log and the inbox ─────────────────────────────────
 
 export function useOutbox(status: string) {
   return useQuery({

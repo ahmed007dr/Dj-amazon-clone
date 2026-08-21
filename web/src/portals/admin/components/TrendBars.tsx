@@ -5,13 +5,13 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import './TrendBars.css';
 
 /**
- * اتجاه يومي بأعمدة.
+ * A daily trend in bars.
  *
- * ⚠️  **الأيام الفارغة غائبة — والفرق مقصود.**
+ * ⚠️  **Empty days are absent — and the difference is deliberate.**
  *
- *     الخادم يعيد الأيام التي وقع فيها بيع فقط. رسم يوم صفر
- *     يحتاج ملء الفجوات، وهو ما يُخفي أن اليوم **لم يُسجَّل فيه
- *     شيء** خلف عمود بارتفاع صفر يُقرأ كأنه بيانات.
+ *     The server returns only the days a sale occurred on. Drawing a zero day
+ *     requires filling the gaps, which hides the fact that the day **had
+ *     nothing recorded** behind a zero-height bar that reads as data.
  */
 export function TrendBars({ rows }: { rows: { label: string; value: number }[] }) {
   const { t } = useTranslation();

@@ -1,11 +1,11 @@
 /**
- * وثائق التحقق.
+ * Verification documents.
  *
- * ⚠️  **الملف يُرفع ولا يُقرأ مساره أبدًا.**
+ * ⚠️  **The file is uploaded and its path is never read.**
  *
- *     الخادم يرفض إرجاع المسار المباشر ويصدر بدله رابطًا موقّعًا
- *     بصلاحية زمنية يحمل معرّف صاحبه — فمشاركته لا تمنح الوصول.
- *     بطاقة رقم قومي على مسار قابل للتخمين تسريب لا يُستدرَك.
+ *     The server refuses to return the direct path and issues instead a signed,
+ *     time-limited URL carrying its owner's id — so sharing it grants no
+ *     access. A national ID card on a guessable path is a leak that cannot be undone.
  */
 
 import { http } from '@/shared/http';
@@ -42,10 +42,10 @@ export const DOCUMENT_TYPES: DocumentType[] = [
 export const listDocuments = () => http.get<CustomerDocument[]>('/customers/documents/');
 
 /**
- * ⚠️  `FormData` لا JSON — الملف ثنائي.
+ * ⚠️  `FormData`, not JSON — the file is binary.
  *
- *     عميل الـ HTTP يكتشف `FormData` ويحذف `Content-Type` ليضبطه
- *     المتصفح بحدّ الفصل الصحيح؛ ضبطه يدويًا يكسر الرفع.
+ *     The HTTP client detects `FormData` and removes `Content-Type` so the
+ *     browser sets it with the correct boundary; setting it by hand breaks the upload.
  */
 export function uploadDocument(documentType: DocumentType, file: File) {
   const body = new FormData();

@@ -38,7 +38,7 @@
 }
 
 .option__meta {
-  /* يُدفع إلى حافة النهاية بلا margin اتجاهي */
+  /* Pushed to the end edge with no directional margin */
   margin-inline-start: auto;
   font-size: 0.875rem;
   font-weight: 600;

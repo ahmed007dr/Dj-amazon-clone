@@ -9,14 +9,15 @@ import { usePaymentMethods } from '../hooks';
 import './OptionList.css';
 
 /**
- * اختيار طريقة الدفع.
+ * Choosing the payment method.
  *
- * ⚠️  القائمة تأتي من `/payments/methods/` وتُحسب من البوابات
- *     **المفعّلة الآن**. (ADR-15)
+ * ⚠️  The list comes from `/payments/methods/` and is computed from the gateways
+ *     **enabled right now**. (ADR-15)
  *
- *     الأدمن يوقف بوابة فتختفي من هنا في الطلب التالي بلا نشر.
- *     قائمة ثابتة في الواجهة تعرض بوابة موقوفة، فيختارها العميل
- *     ويفشل دفعه بعد أن أدخل بياناته.
+ *     The admin disables a gateway and it disappears from here on the next
+ *     request, with no deployment. A fixed list in the frontend shows a
+ *     disabled gateway, so the customer chooses it and their payment fails
+ *     after they have entered their details.
  */
 export function PaymentPicker({
   amount,
@@ -35,7 +36,7 @@ export function PaymentPicker({
   if (error) return <StateMessage icon="⚠" title={t('state.errorTitle')} />;
 
   if (methods.length === 0) {
-    // ⚠️  حالة حقيقية: كل البوابات موقوفة أو المبلغ خارج حدودها
+    // ⚠️  A real state: every gateway is disabled, or the amount is outside their limits
     return <StateMessage icon="⌀" title={t('checkout.noPayment')} body={t('checkout.noPaymentHint')} />;
   }
 

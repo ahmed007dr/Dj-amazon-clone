@@ -16,17 +16,18 @@ import { useToast } from '@/shared/ui/useToast';
 import './ReviewForm.css';
 
 /**
- * كتابة تقييم أو تعديله.
+ * Writing or editing a review.
  *
- * ⚠️  **النجوم مُدخل لا زخرفة**: أزرار اختيار حقيقية بلوحة المفاتيح.
+ * ⚠️  **The stars are an input, not decoration**: real radio buttons reachable by keyboard.
  *
- *     النجمة صورةً تُنقَر لا يصلها مستخدم لوحة المفاتيح ولا قارئ
- *     الشاشة — والتقييم هو الحقل **الوحيد الإلزامي** في النموذج.
+ *     A star as a clickable image is reached by neither a keyboard user nor a
+ *     screen reader — and the rating is the **only mandatory** field in the form.
  *
- * ⚠️  و**التقييم يبدأ معلّقًا دائمًا** — يقال صراحةً بعد الإرسال.
+ * ⚠️  And **a review always starts pending** — stated explicitly after submission.
  *
- *     المستخدم يبحث عن تقييمه في الصفحة فلا يجده (القائمة تعرض
- *     المعتمد وحده) فيعيد كتابته، فيصطدم بـ«لديك تقييم بالفعل».
+ *     The user looks for their review on the page and cannot find it (the list
+ *     shows only what is approved), so they rewrite it and run into "you
+ *     already have a review".
  */
 export function ReviewForm({
   productId,
@@ -99,8 +100,8 @@ export function ReviewForm({
           <em aria-hidden> *</em>
         </legend>
 
-        {/* ⚠️  من الأعلى إلى الأدنى في DOM ليصحّ الاتجاه بصريًا في
-            RTL دون قلب معنى «خمس نجوم». */}
+        {/* ⚠️  Highest to lowest in the DOM so the direction reads correctly in
+            RTL without inverting the meaning of "five stars". */}
         {[5, 4, 3, 2, 1].map((value) => (
           <label key={value} className={value <= rating ? 'is-on' : ''}>
             <input
@@ -141,8 +142,8 @@ export function ReviewForm({
         ) : null}
       </label>
 
-      {/* ⚠️  تعديل تقييم منشور يعيده إلى المراجعة — يُقال قبل الحفظ
-          لا بعده، وإلا فوجئ المستخدم باختفاء تقييمه من الصفحة. */}
+      {/* ⚠️  Editing a published review returns it to moderation — said before the
+          save rather than after, or the user is surprised by their review vanishing from the page. */}
       <Alert tone="info">
         {existing ? t('reviews.editReturnsToReview') : t('reviews.pendingNotice')}
       </Alert>

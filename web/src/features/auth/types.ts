@@ -1,4 +1,4 @@
-/** عقود المصادقة — تطابق `accounts/serializers.py`. */
+/** Authentication contracts — matching `accounts/serializers.py`. */
 
 export type AccountType =
   | 'GUEST'
@@ -31,14 +31,14 @@ export interface User {
   date_joined: string;
 
   /**
-   * ⚠️  **ما يملكه المستخدم — بصيغة `app_label.codename`.**
+   * ⚠️  **What the user holds — in `app_label.codename` form.**
    *
-   *     فارغة للمالك: صلاحياته «كل شيء» و`is_owner` تكفي، وإرسال
-   *     آلاف السلاسل في كل إقلاع بلا فائدة.
+   *     Empty for the owner: their permissions are "everything" and `is_owner`
+   *     suffices, and sending thousands of strings on every startup serves no purpose.
    */
   permissions: string[];
 
-  /** المالك — يمرّ من كل بوابة، وهو سبيل التراجع الوحيد. */
+  /** The owner — they pass every gate, and they are the only way back. */
   is_owner: boolean;
   has_admin_profile: boolean;
   has_employee_profile: boolean;
@@ -46,10 +46,11 @@ export interface User {
 
 export interface LoginPayload {
   /**
-   * ⚠️  `identifier` لا `email` — الخادم يقبل البريد **أو الهاتف**.
+   * ⚠️  `identifier`, not `email` — the server accepts an email **or a phone number**.
    *
-   *     تسميته `email` في الواجهة تجعل حقلًا يقبل رقم هاتف يبدو
-   *     خطأ إدخال، وتغلق بابًا مفتوحًا في الخادم بلا سبب.
+   *     Calling it `email` in the frontend makes a field that accepts a phone
+   *     number look like a data-entry mistake, and closes a door the server
+   *     leaves open for no reason.
    */
   identifier: string;
   password: string;
@@ -64,17 +65,18 @@ export interface LoginResponse extends TokenPair {
   user: User;
 }
 
-/** ⚠️  التدوير مُفعَّل، فالخادم يعيد توكن تحديث جديدًا مع كل تجديد. */
+/** ⚠️  Rotation is enabled, so the server returns a new refresh token with every renewal. */
 export interface RefreshResponse {
   access: string;
   refresh?: string;
 }
 
 /**
- * ⚠️  أنواع الحسابات المسموح **بالتسجيل الذاتي** بها فقط.
+ * ⚠️  The account types permitted for **self-registration** only.
  *
- *     الخادم يقصرها على هذه الثلاثة: لا أحد يسجّل نفسه موظفًا ولا
- *     أدمن ولا صيدلية. الحسابات التجارية والداخلية يُنشئها الأدمن.
+ *     The server confines it to these three: nobody registers themselves as an
+ *     employee, an admin or a pharmacy. Business and internal accounts are
+ *     created by the admin.
  */
 export const SELF_SIGNUP_TYPES = ['STUDENT', 'DOCTOR', 'PHARMACIST'] as const;
 export type SelfSignupType = (typeof SELF_SIGNUP_TYPES)[number];

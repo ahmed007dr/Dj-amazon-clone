@@ -27,11 +27,11 @@ const PAYMENT_TONES: Record<PaymentStatus, Tone> = {
 };
 
 /**
- * ⚠️  شارتان لا واحدة.
+ * ⚠️  Two badges, not one.
  *
- *     حالة الطلب وحالة الدفع مستقلتان: «مؤكد · غير مدفوع» حالة
- *     يومية في الدفع عند الاستلام. دمجهما في شارة واحدة يجعل نصف
- *     الحالات الحقيقية غير قابلة للعرض.
+ *     The order status and the payment status are independent: "confirmed ·
+ *     unpaid" is a daily state with cash on delivery. Merging them into one
+ *     badge makes half the real states impossible to display.
  */
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {
   const { t } = useTranslation();

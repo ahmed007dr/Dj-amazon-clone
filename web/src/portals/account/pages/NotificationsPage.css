@@ -14,9 +14,10 @@
   padding: var(--space-3) var(--space-4);
 }
 
-/* ⚠️  شريط جانبي منطقي لا خلفية ملوّنة.
-   الخلفية الملوّنة تخفت في الوضع الداكن حتى تختفي، والشريط يبقى
-   ظاهرًا في اللوحتين — وينتقل إلى الحافة الصحيحة عند تبديل اللغة. */
+/* ⚠️  A logical side bar rather than a coloured background.
+   A coloured background fades in dark mode until it disappears, and the bar
+   stays visible in both palettes — and moves to the correct edge when the
+   language switches. */
 .notification.is-unread {
   border-inline-start: 3px solid var(--color-primary);
 }

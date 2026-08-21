@@ -33,9 +33,9 @@
   font-weight: 700;
 }
 
-/* ⚠️  رقعة الشطرنج تُظهر الشفافية: لوجو بخلفية بيضاء مصمتة يبدو
-       مطابقًا للشفاف على خلفية بيضاء — والفرق يظهر أول مرة على
-       الوضع الداكن بعد النشر. */
+/* ⚠️  The chequerboard reveals transparency: a logo on a solid white
+       background looks identical to a transparent one on a white background —
+       and the difference shows up for the first time in dark mode after deployment. */
 .asset-tile__preview {
   display: grid;
   place-items: center;
@@ -53,7 +53,7 @@
   background-position: 0 0, 0 8px, 8px -8px, -8px 0;
 }
 
-/* لوجو الوضع الداكن أبيض غالبًا — عرضه على فاتح يجعله يبدو مفقودًا */
+/* The dark-mode logo is usually white — showing it on a light background makes it look missing */
 .asset-tile__preview.is-dark {
   background-color: #1b1f23;
   background-image: none;
@@ -84,8 +84,8 @@
   gap: var(--space-2);
 }
 
-/* ⚠️  مخفي بصريًا لا `display: none` — الأخير يُخرجه من ترتيب
-       التركيز فلا يصله مستخدم لوحة المفاتيح إطلاقًا. */
+/* ⚠️  Visually hidden rather than `display: none` — the latter takes it out of
+       the focus order, so a keyboard user never reaches it at all. */
 .asset-tile__input {
   position: absolute;
   inline-size: 1px;

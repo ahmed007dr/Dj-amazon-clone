@@ -4,9 +4,9 @@
   gap: var(--space-3);
 }
 
-/* ⚠️  عنوان المجموعة يفصل بصريًا لا بحدٍّ ثقيل: النموذج طويل
-       ومجموعاته ثلاث، والخط الفاصل في كل واحدة يجعله يبدو
-       ثلاثة نماذج لا نموذجًا واحدًا. */
+/* ⚠️  The group heading separates visually rather than with a heavy border:
+       the form is long and has three groups, and a dividing line in each makes
+       it look like three forms rather than one. */
 .product-form__legend {
   margin: var(--space-4) 0 0;
   padding-block-end: var(--space-2);
@@ -22,7 +22,7 @@
   margin-block-start: 0;
 }
 
-/* حقلان في السطر على الشاشات الواسعة، وواحد على الهاتف */
+/* Two fields per row on wide screens, and one on a phone */
 .product-form__row {
   display: grid;
   grid-template-columns: 1fr;
@@ -76,8 +76,8 @@
   color: var(--color-danger);
 }
 
-/* ⚠️  هدف اللمس هو السطر كله لا المربع وحده — مربع ١٦px على
-       الهاتف هدف يخطئه الإصبع مرتين من ثلاث. */
+/* ⚠️  The touch target is the whole row rather than the box alone — a 16px box
+       on a phone is a target the finger misses two times in three. */
 .product-form__check {
   display: flex;
   align-items: flex-start;
@@ -117,8 +117,8 @@
   border-block-start: 1px solid var(--color-border);
 }
 
-/* ⚠️  أثر السياسة مكتوب لا مخبوء في اسمها — «مهنيون موثّقون»
-       وحدها لا تقول إن الطبيب غير الموثّق ممنوع. */
+/* ⚠️  The policy's effect is written out rather than buried in its name —
+       "verified professionals" alone does not say that an unverified doctor is blocked. */
 .product-form__policy-effect {
   margin: calc(var(--space-2) * -1) 0 0;
   padding: var(--space-2) var(--space-3);

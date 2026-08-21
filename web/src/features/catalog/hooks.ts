@@ -1,11 +1,11 @@
 /**
- * حالة الخادم — عبر طبقة جلب لا متجر عام.
+ * Server state — through a fetching layer, not a global store.
  *
- * ⚠️  بيانات الخادم **لا تُنسخ** في متجر عام.
+ * ⚠️  Server data is **never copied** into a global store.
  *
- *     النسخة الثانية تتقادم فورًا، ثم يبدأ الكود في مزامنة يدوية
- *     بين المصدرين — وهي أكثر مصادر أخطاء الواجهة شيوعًا. الكاش
- *     والإبطال يقعان هنا.
+ *     The second copy goes stale immediately, and then the code starts manually
+ *     synchronising the two sources — the most common source of frontend
+ *     defects. Caching and invalidation happen here.
  */
 
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -25,10 +25,10 @@ import {
 } from './api';
 import type { CategoryBrief, ProductQuery, Review } from './types';
 
-/** المؤشر الخام من رابط الصفحة التالية. */
+/** The raw cursor from the next-page URL. */
 function cursorFrom(next: string | null): string | undefined {
   if (!next) return undefined;
-  // الخادم يعيد الرابط كاملًا؛ نحتاج المعامل وحده لنمرّره لعميلنا
+  // The server returns the full URL; we need the parameter alone to pass to our own client
   return new URL(next).searchParams.get('cursor') ?? undefined;
 }
 
@@ -39,8 +39,8 @@ export function useProducts(query: Omit<ProductQuery, 'cursor'>) {
       listProducts({ ...query, ...(pageParam ? { cursor: pageParam } : {}) }, signal),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => cursorFrom(last.next),
-    // ⚠️  المنتجات تتغيّر بمعدّل الدقائق لا الثواني. إعادة الجلب
-    //     عند كل تركيز نافذة تُثقل الخادم بلا فائدة للمستخدم.
+    // ⚠️  Products change on the scale of minutes, not seconds. Refetching on
+    //     every window focus loads the server with no benefit to the user.
     staleTime: 2 * 60 * 1000,
   });
 }
@@ -58,20 +58,21 @@ export function useCategories() {
   return useQuery({
     queryKey: ['catalog', 'categories'],
     queryFn: listCategories,
-    // شجرة الفئات تتغيّر نادرًا جدًا
+    // The category tree changes very rarely
     staleTime: 30 * 60 * 1000,
     select: (data): CategoryBrief[] => (Array.isArray(data) ? data : data.results),
   });
 }
 
 /**
- * توفر منتج واحد.
+ * A single product's availability.
  *
- * ⚠️  مهلة قصيرة (٣٠ ثانية) بخلاف بقية بيانات الكتالوج.
+ * ⚠️  A short stale time (30 seconds), unlike the rest of the catalogue data.
  *
- *     السعر والاسم يتغيّران بفعل الأدمن؛ أما المخزون فيتغيّر بفعل
- *     **مشترين آخرين** في نفس اللحظة. عرض «متوفر» لصنف نفد قبل
- *     دقيقتين يُنتج سلة تُرفض عند إتمام الشراء.
+ *     The price and the name change through the admin's actions; stock changes
+ *     through **other buyers'** actions at that very moment. Showing "in stock"
+ *     for an item that ran out two minutes ago produces a cart that is refused
+ *     at checkout.
  */
 export function useAvailability(productIds: string[]) {
   const key = [...productIds].sort().join(',');
@@ -96,12 +97,12 @@ export function useProductReviews(slug: string | undefined) {
 
 
 // ═══════════════════════════════════════════════════════════
-//  الماركات والفئات — صفحات المتجر العامة
+//  Brands and categories — the public store pages
 // ═══════════════════════════════════════════════════════════
 //
-// ⚠️  مهلة طويلة عمدًا: الماركات والمصنّعون والفئات بيانات مرجعية
-//     تتغيّر بمعدّل الأشهر لا الدقائق. إعادة جلبها مع كل تنقّل
-//     تُثقل الخادم بلا أن يرى المستخدم فرقًا واحدًا.
+// ⚠️  A deliberately long stale time: brands, manufacturers and categories are
+//     reference data that changes by the month, not the minute. Refetching them
+//     on every navigation loads the server without the user seeing any difference.
 
 const REFERENCE_STALE_TIME = 30 * 60 * 1000;
 
@@ -140,10 +141,10 @@ export function useCategory(slug: string | undefined) {
 }
 
 /**
- * تقييم المنتج المجمَّع.
+ * The product's aggregated rating.
  *
- * ⚠️  `retry: false` — المنتج بلا مراجعات يردّ ٤٠٤ أو أصفارًا، وهي
- *     حالة عادية لا عطل يستحق ثلاث محاولات.
+ * ⚠️  `retry: false` — a product with no reviews answers 404 or zeros, and that
+ *     is a normal state, not a fault deserving three attempts.
  */
 export function useProductRating(slug: string | undefined) {
   return useQuery({
@@ -156,11 +157,11 @@ export function useProductRating(slug: string | undefined) {
 }
 
 /**
- * بحث بالباركود — للكاشير.
+ * Barcode lookup — for the cashier.
  *
- * ⚠️  لا يعمل إلا بباركود مكتمل (٦ خانات فأكثر): الماسح يرسل
- *     الرقم دفعةً واحدة، والكتابة اليدوية الجزئية كانت تُطلق
- *     نداءً بكل خانة وتردّ ٤٠٤ في كل مرة.
+ * ⚠️  It only runs on a complete barcode (6 digits or more): the scanner sends
+ *     the number in one go, and partial manual typing used to fire a call per
+ *     digit and get a 404 every time.
  */
 export function useProductByBarcode(barcode: string) {
   const value = barcode.trim();

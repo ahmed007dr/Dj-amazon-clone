@@ -10,11 +10,11 @@ import { useAuth } from '../useAuth';
 import './AccountMenu.css';
 
 /**
- * قائمة الحساب — دخول أو هوية المستخدم.
+ * The account menu — sign in, or the user's identity.
  *
- * ⚠️  مكوّن واحد لكل البوابات لأن سلوكه **واحد فعلًا**: من أنت،
- *     وكيف تخرج. الهيدر والفوتر واللوجو تختلف بين البوابات لأن
- *     محتواها يختلف؛ هذه لا تختلف.
+ * ⚠️  One component for every portal, because its behaviour genuinely **is** the
+ *     same: who you are, and how you sign out. The header, the footer and the
+ *     logo differ between portals because their content differs; this does not.
  */
 export function AccountMenu() {
   const { t } = useTranslation();
@@ -24,8 +24,8 @@ export function AccountMenu() {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
 
-  // ⚠️  لا شيء أثناء الاستعادة: إظهار «تسجيل الدخول» للحظة ثم
-  //     استبداله بالاسم وميضٌ يوحي بأن الجلسة انقطعت.
+  // ⚠️  Nothing during the restore: showing "sign in" for a moment and then
+  //     replacing it with the name is a flicker suggesting the session dropped.
   if (isRestoring) return <span className="account-menu__placeholder" aria-hidden />;
 
   if (!user) {
@@ -78,8 +78,8 @@ export function AccountMenu() {
               <span className="account-menu__email muted truncate">{user.email}</span>
             </div>
 
-            {/* ⚠️  الحساب الموقوف يعرف أنه موقوف — الصمت يجعله يظن
-                أن النظام معطّل ويكرّر المحاولة */}
+            {/* ⚠️  A suspended account is told it is suspended — silence makes them
+                assume the system is broken and try again */}
             {isSuspended(user) ? (
               <p className="account-menu__suspended">{t('auth.accountSuspended')}</p>
             ) : null}
@@ -92,7 +92,7 @@ export function AccountMenu() {
                 {t('nav.orders')}
               </Link>
 
-              {/* الأقسام التي لا يملكها المستخدم لا تظهر أصلًا */}
+              {/* Sections the user does not own do not appear at all */}
               {isStaff(user) ? (
                 <Link to="/employee" role="menuitem" onClick={() => { setOpen(false); }}>
                   {t('portal.employee')}

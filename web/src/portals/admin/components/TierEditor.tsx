@@ -19,18 +19,20 @@ const EMPTY = {
 };
 
 /**
- * محرّر فئات البرنامج.
+ * The programme tier editor.
  *
- * ⚠️  **الفئة عتبة إنفاق ومضاعِف — لا لقب.**
+ * ⚠️  **A tier is a spend threshold and a multiplier — not a title.**
  *
- *     عرض الاسم وحده يجعلها زخرفة؛ والعتبة والمضاعِف بجواره هما
- *     ما يجعل الأدمن يرى الكلفة: مضاعِف ٢ على فئة عتبتها منخفضة
- *     يضاعف الالتزام على أغلب العملاء بلا أن يلاحظ.
+ *     Showing the name alone makes it decoration; and the threshold and the
+ *     multiplier beside it are what let the admin see the cost: a multiplier of
+ *     2 on a tier with a low threshold doubles the liability across most
+ *     customers without them noticing.
  *
- * ⚠️  و**الحذف يُسأل عنه**.
+ * ⚠️  And **deletion is confirmed**.
  *
- *     الفئة المحذوفة تُنزل كل من بلغها إلى الفئة الأدنى فورًا،
- *     ومضاعِفه ينخفض في الطلب التالي. ليست عملية تُستعاد بضغطة.
+ *     A deleted tier immediately drops everyone who reached it to the tier
+ *     below, and their multiplier falls on the next order. It is not an
+ *     operation restored with a click.
  */
 export function TierEditor({ programId, tiers }: { programId: string; tiers: TierLevel[] }) {
   const { t } = useTranslation();
@@ -81,8 +83,8 @@ export function TierEditor({ programId, tiers }: { programId: string; tiers: Tie
       </header>
 
       {tiers.length === 0 && draft === null ? (
-        // ⚠️  «بلا فئات» حالة صالحة لا نقص: البرنامج يعمل بمعدّل
-        //     واحد للجميع، والفئات تحسين اختياري.
+        // ⚠️  "No tiers" is a valid state rather than something missing: the programme
+        //     works at one rate for everyone, and tiers are an optional refinement.
         <p className="muted">{t('loyalty.noTiers')}</p>
       ) : null}
 
@@ -155,8 +157,8 @@ export function TierEditor({ programId, tiers }: { programId: string; tiers: Tie
               />
             </label>
 
-            {/* ⚠️  الاسمان مطلوبان معًا (ADR-34): اسم بلغة واحدة
-                يظهر فارغًا لنصف المستخدمين. */}
+            {/* ⚠️  Both names are required together (ADR-34): a name in one
+                language shows up empty for half the users. */}
             <label>
               {t('loyalty.nameAr')}
               <input

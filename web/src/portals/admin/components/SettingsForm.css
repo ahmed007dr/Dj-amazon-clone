@@ -76,8 +76,8 @@
   border-block-start: 1px solid var(--color-border);
 }
 
-/* ⚠️  الأنواع المسموحة صناديق اختيار لا قائمة متعددة: الأخيرة
-       تحتاج Ctrl+نقر على الحاسوب ولا تعمل باللمس أصلًا. */
+/* ⚠️  The permitted types are checkboxes rather than a multi-select: the
+       latter needs Ctrl+click on a computer and does not work by touch at all. */
 .settings-form__types {
   display: flex;
   flex-wrap: wrap;

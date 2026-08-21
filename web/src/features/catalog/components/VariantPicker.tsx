@@ -7,13 +7,13 @@ import type { ProductVariant } from '../types';
 import './VariantPicker.css';
 
 /**
- * اختيار نسخة المنتج.
+ * Choosing the product variant.
  *
- * ⚠️  **المخزون يُتتبَّع على النسخة لا على المنتج.**
+ * ⚠️  **Stock is tracked on the variant, not on the product.**
  *
- *     قفاز مقاس M ينفد بينما L متوفر. عرض المنتج «متوفرًا» بلا
- *     اختيار نسخة يعني عميلًا يضيف مقاسًا نافدًا ثم يُرفض طلبه
- *     في آخر خطوة.
+ *     A size M glove runs out while L is in stock. Showing the product as "in
+ *     stock" with no variant chosen means a customer adds a size that is out of
+ *     stock and has their order refused at the last step.
  */
 export function VariantPicker({
   variants,

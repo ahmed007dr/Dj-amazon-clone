@@ -14,7 +14,7 @@
   min-block-size: var(--touch-target);
   padding-inline: var(--space-3);
 
-  /* الأكواد لاتينية دائمًا */
+  /* The codes are always Latin */
   direction: ltr;
   text-align: start;
   letter-spacing: 0.05em;

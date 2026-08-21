@@ -33,11 +33,12 @@ const PURPOSES: MailPurpose[] = [
 ];
 
 /**
- * ⚠️  المصدر يُلوَّن ويُسمّى.
+ * ⚠️  The source is coloured and named.
  *
- *     «مُسنَد» و«ساقط إلى الافتراضي» يعطيان نفس الحساب اليوم
- *     ويختلفان غدًا: تغيير الافتراضي يحرّك كل ما لم يُسنَد صراحةً.
- *     شاشة تعرض النتيجة وحدها تُخفي هذا الفرق حتى يقع.
+ *     "Assigned" and "fell back to the default" give the same account today and
+ *     differ tomorrow: changing the default moves everything not explicitly
+ *     assigned. A screen showing the result alone hides that difference until
+ *     it happens.
  */
 const SOURCE_TONE: Record<RoutingSource, 'success' | 'info' | 'neutral' | 'warning'> = {
   template: 'success',
@@ -80,8 +81,8 @@ export function MailRoutingTab() {
       {
         onSuccess: () => notify(t('mail.routeSaved'), 'success'),
         onError: (cause) =>
-          // ⚠️  الرسالة من الخادم لا رسالة عامة: هنا يقع رفض إسناد
-          //     رسائل الأمان إلى حساب تسويقي، وسببه هو المعلومة.
+          // ⚠️  The server's message rather than a generic one: this is where refusing to
+          //     assign security messages to a marketing account happens, and its reason is the information.
           notify(isApiError(cause) ? cause.displayMessage : t('state.errorTitle'), 'danger'),
       },
     );

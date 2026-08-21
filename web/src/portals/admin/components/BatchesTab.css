@@ -15,8 +15,8 @@
   color: var(--color-text-muted);
 }
 
-/* ⚠️  المنتهية بالوزن واللون معًا: بضاعة قد تُباع، ولا يصحّ أن
-   تفوت من لا يميّز الألوان. */
+/* ⚠️  The expired by weight and colour together: goods that might be sold, and
+   they must not escape anyone who cannot distinguish colours. */
 .batch-expired {
   font-size: 0.75rem;
   font-weight: 700;

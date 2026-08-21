@@ -29,10 +29,10 @@ const STATE_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> =
 };
 
 /**
- * السجل والوارد.
+ * The log and the inbox.
  *
- * ⚠️  «هل خرجت الرسالة؟» أول سؤال في كل شكوى — والجواب هنا لا في
- *     سجل خادم يقرأه مطوّر.
+ * ⚠️  "Did the message go out?" is the first question in every complaint — and
+ *     the answer is here, not in a server log read by a developer.
  */
 export function MailLogTab() {
   const { t } = useTranslation();
@@ -196,9 +196,9 @@ export function MailLogTab() {
               {reading.from_name || reading.from_email} · {reading.from_email}
             </p>
 
-            {/* ⚠️  النص الصريح وحده. الـ HTML مخزَّن ولا يصل الشاشة:
-                رسالة من مجهول تحمل `script` تُعرَض في جلسة أدمن هي
-                XSS على أعلى صلاحية في النظام. */}
+            {/* ⚠️  Plain text alone. The HTML is stored and never reaches the screen:
+                a message from a stranger carrying a `script` rendered in an
+                admin session is XSS at the highest privilege in the system. */}
             <pre className="log__body">{reading.body_text}</pre>
 
             {reading.has_html ? <Alert tone="info">{t('mail.htmlHidden')}</Alert> : null}
@@ -215,9 +215,9 @@ export function MailLogTab() {
             ) : null}
 
             {reading.is_auto ? (
-              /* ⚠️  حماية من حلقات البريد: ردّان آليان متقابلان
-                 يولّدان آلاف الرسائل وينتهيان بالدومين في القوائم
-                 السوداء. المنع مفروض في الخادم أيضًا. */
+              /* ⚠️  Protection against mail loops: two auto-replies facing each
+                 other generate thousands of messages and end with the domain
+                 blacklisted. The block is enforced on the server too. */
               <Alert tone="warning">{t('mail.noReplyToAuto')}</Alert>
             ) : (
               <div className="log__reply">

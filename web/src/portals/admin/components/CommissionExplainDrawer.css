@@ -24,8 +24,8 @@
   font-weight: 600;
 }
 
-/* ⚠️  المبلغ النهائي يُبرَز: هو الرقم الذي يُصرَف، وبقية السطور
-   طريقه إليه. */
+/* ⚠️  The final amount is highlighted: it is the figure that gets paid, and the
+   rest of the lines are the route to it. */
 .commission-explain .is-total {
   padding-block: var(--space-3);
   margin-block-start: var(--space-2);

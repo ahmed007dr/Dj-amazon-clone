@@ -20,17 +20,18 @@ import { ProductImageTile } from './ProductImageTile';
 
 import './ProductImagesPanel.css';
 
-/** يطابق `MAX_IMAGES_PER_PRODUCT` على الخادم. */
+/** Matches `MAX_IMAGES_PER_PRODUCT` on the server. */
 const MAX_IMAGES = 8;
 
 /**
- * إدارة صور منتج واحد.
+ * Managing one product's images.
  *
- * ⚠️  **النص البديل يُملأ قبل الاختيار لا بعده.**
+ * ⚠️  **The alt text is filled in before selection, not after.**
  *
- *     جعله خطوة تالية للرفع يعني أنه يُترك فارغًا دائمًا — والصورة
- *     بلا نص بديل غير مقروءة لمستخدم قارئ الشاشة، ولا يراها محرك
- *     البحث. وضعه فوق زر الاختيار يجعله جزءًا من الفعل الواحد.
+ *     Making it a step after the upload means it is always left empty — and an
+ *     image with no alt text is unreadable to a screen reader user and unseen
+ *     by a search engine. Placing it above the select button makes it part of a
+ *     single act.
  */
 export function ProductImagesPanel({ productId }: { productId: string }) {
   const { t } = useTranslation();
@@ -57,10 +58,10 @@ export function ProductImagesPanel({ productId }: { productId: string }) {
       { file, ar: altAr, en: altEn },
       {
         onSuccess: () => {
-          // ⚠️  تفريغ النص البديل بعد النجاح فقط.
+          // ⚠️  The alt text is cleared only after success.
           //
-          //     تفريغه عند الإرسال يجعل الأدمن يعيد كتابته من
-          //     الصفر بعد كل رفض — وهو أكثر ما يحدث مع ملف كبير.
+          //     Clearing it on submit makes the admin retype it from
+          //     scratch after every rejection — which is what happens most with a large file.
           setAltAr('');
           setAltEn('');
           notify(t('images.uploaded'), 'success');
@@ -73,7 +74,7 @@ export function ProductImagesPanel({ productId }: { productId: string }) {
   const handleMove = (index: number, direction: -1 | 1) => {
     const next = [...images];
     const target = index + direction;
-    // الحارس هنا لا في الزر وحده: الترتيب قد يتغير بين الرسم والنقر
+    // The guard is here rather than on the button alone: the order may change between render and click
     if (target < 0 || target >= next.length) return;
 
     [next[index], next[target]] = [next[target]!, next[index]!];

@@ -27,10 +27,11 @@
 }
 
 /*
-  ⚠️  المعاينة تستخدم متغيّراتها الخاصة (`--p-*`) لا رموز الثيم.
+  ⚠️  The preview uses its own variables (`--p-*`), not the theme tokens.
 
-      استخدام `--color-*` هنا يجعل التعديل يقلب لوحة الأدمن نفسها
-      أثناء التحرير — فيصير كل خطأ لون خطأً في الأداة التي يصححه بها.
+      Using `--color-*` here makes the edit flip the admin panel itself while
+      editing — so every colour mistake becomes a mistake in the tool being used
+      to correct it.
 */
 .branding-preview {
   display: grid;
@@ -94,7 +95,7 @@
   }
 }
 
-/* ── ترويسة: مبدّل الملفات والتفعيل ─────────────── */
+/* ── Header: the profile switcher and activation ── */
 .branding-header {
   display: flex;
   flex-wrap: wrap;
@@ -112,9 +113,10 @@
   border-radius: var(--radius-sm);
 }
 
-/* ⚠️  زر الحفظ بجوار مبدّل الوضع لا في ترويسة الصفحة: الترويسة
-       صارت تحمل التفعيل، وزرّان متجاوران بأثرين مختلفين جدًا
-       (حفظ لون · قلب هوية الموقع) خطأٌ ينتظر وقوعه. */
+/* ⚠️  The save button sits beside the mode switcher rather than in the page
+       header: the header now carries activation, and two adjacent buttons with
+       very different effects (saving a colour · flipping the site's identity)
+       is a mistake waiting to happen. */
 .branding-modes {
   display: flex;
   flex-wrap: wrap;

@@ -1,12 +1,12 @@
 /**
- * واجهة السلة.
+ * The cart API.
  *
- * ⚠️  **كل** نداء يعيد لقطة السلة كاملة بعد إعادة تحقق.
+ * ⚠️  **Every** call returns the complete cart snapshot after re-validation.
  *
- *     السلة تعيش أيامًا: المنتج قد يُوقَف والسعر يتغيّر والمخزون
- *     ينفد. الخادم يعيد التحقق في كل استجابة، فالواجهة لا تحتاج
- *     تحديثًا تفاؤليًا ولا حسابًا محليًا للإجماليات — وكلاهما كان
- *     سيختلف عن الحقيقة عند أول تغيّر.
+ *     A cart lives for days: the product may be discontinued, the price may
+ *     change, the stock may run out. The server re-validates on every response,
+ *     so the frontend needs neither an optimistic update nor a local total —
+ *     both of which would have diverged from the truth at the first change.
  */
 
 import { http } from '@/shared/http';
@@ -31,23 +31,24 @@ export const applyCoupon = (code: string) => http.post<CartSnapshot>('/cart/coup
 export const removeCoupon = () => http.delete<CartSnapshot>('/cart/coupon/');
 
 /**
- * ⚠️  تعيد `{ bundle_result, cart }` لا لقطة سلة.
+ * ⚠️  It returns `{ bundle_result, cart }`, not a cart snapshot.
  *
- *     كتابة الاستجابة كاملةً في كاش السلة تُفسده: الشاشة تقرأ
- *     `lines` فتجدها غير موجودة وتنهار — وهو ما كان يقع فعلًا قبل
- *     أن يكشفه أول نداء حقيقي.
+ *     Writing the whole response into the cart cache corrupts it: the screen
+ *     reads `lines`, finds it missing and collapses — which is exactly what
+ *     happened before the first real call revealed it.
  */
 export const addBundle = (bundle: string, essentialsOnly = false) =>
   http.post<AddBundleResponse>('/cart/bundle/', { bundle, essentials_only: essentialsOnly });
 
 /**
- * دمج سلة الزائر بعد الدخول — يُستدعى مرة واحدة عقب نجاح المصادقة.
+ * Merging the guest cart after login — called once following a successful authentication.
  *
- * ⚠️  المفتاح في **الجسم** لا في الترويسة.
+ * ⚠️  The key is in the **body**, not in the header.
  *
- *     بقية نقاط السلة تقرؤه من `X-Cart-Session`، وهذه وحدها من
- *     الجسم لأنها تعمل باسم المستخدم المسجَّل: الترويسة تحدّد «أي
- *     سلة أخاطب؟» والجسم يحدّد «أي سلة أدمج؟» — وهما مختلفان هنا.
+ *     The other cart endpoints read it from `X-Cart-Session`, and this one
+ *     alone from the body, because it acts in the registered user's name: the
+ *     header decides "which cart am I addressing?" and the body decides "which
+ *     cart am I merging?" — and here they are different.
  */
 export const mergeGuestCart = (sessionKey: string) =>
   http.post<CartSnapshot>('/cart/merge/', { session_key: sessionKey });

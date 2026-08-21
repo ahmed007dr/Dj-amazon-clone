@@ -52,7 +52,7 @@
   font-size: 0.875rem;
 }
 
-/* ⚠️  السهم منطقي لا اتجاهي: ينقلب مع اللغة تلقائيًا */
+/* ⚠️  The arrow is logical rather than directional: it flips with the language automatically */
 .routing__arrow {
   color: var(--color-text-muted);
 }

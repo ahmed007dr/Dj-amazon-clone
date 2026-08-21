@@ -11,14 +11,15 @@ import { useAuth } from '../useAuth';
 import './LoginForm.css';
 
 /**
- * نموذج تسجيل الدخول.
+ * The login form.
  *
- * ⚠️  رسالة فشل الدخول **لا تفرّق** بين بريد غير موجود وكلمة مرور
- *     خاطئة.
+ * ⚠️  The login failure message **does not distinguish** a nonexistent email
+ *     from a wrong password.
  *
- *     التفريق يحوّل الشاشة إلى أداة تعداد حسابات: يجرّب المهاجم
- *     بريدًا ويعرف من الرسالة وحدها إن كان مسجَّلًا. الخادم يوحّد
- *     الرسالة، والواجهة لا تُعيد بناء الفرق من رموز الخطأ.
+ *     Distinguishing them turns the screen into an account enumeration tool: an
+ *     attacker tries an email and learns from the message alone whether it is
+ *     registered. The server keeps the message uniform, and the frontend does
+ *     not reconstruct the difference from the error codes.
  */
 export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
   const { t } = useTranslation();
@@ -48,8 +49,8 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
       if (cause.isOffline) {
         setError(t('state.offlineBody'));
       } else if (cause.isRateLimited) {
-        // ⚠️  رسالة مختلفة عن فشل الدخول: المستخدم لم يخطئ البيانات
-        //     بل تجاوز الحد، والتصرّف المطلوب هو الانتظار لا التصحيح.
+        // ⚠️  A different message from a login failure: the user did not get their
+        //     details wrong, they exceeded the limit — the action needed is to wait, not to correct.
         setError(cause.displayMessage);
       } else {
         setError(cause.displayMessage || t('auth.loginFailed'));
@@ -69,13 +70,13 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
 
       <Field
         label={t('auth.identifier')}
-        // ⚠️  `text` لا `email` — الحقل يقبل رقم هاتف أيضًا، و`email`
-        //     يجعل المتصفح يرفض «01001234567» بتحقق لا يخصّه
+        // ⚠️  `text`, not `email` — the field also accepts a phone number, and `email`
+        //     makes the browser reject "01001234567" with a validation that does not apply
         type="text"
         inputMode="email"
         name="identifier"
         value={identifier}
-        // يخبر مدير كلمات المرور بما يملأ — بدونه يملأ الحقل الخطأ
+        // Tells the password manager what to fill — without it, it fills the wrong field
         autoComplete="username"
         required
         hint={t('auth.identifierHint')}

@@ -32,13 +32,13 @@ const TONE: Record<string, 'info' | 'success' | 'warning' | 'neutral'> = {
 };
 
 /**
- * أوامر شراء مورّد — الإنشاء والمتابعة والاستلام والإرجاع.
+ * A supplier's purchase orders — creation, tracking, receiving and returning.
  *
- * ⚠️  **الاستلام والإرجاع على السطر لا على الأمر.**
+ * ⚠️  **Receiving and returning are on the line, not on the order.**
  *
- *     المورّد يرسل بعض الأصناف ويؤخّر بعضها، ويُعاد صنف واحد من
- *     بين عشرة. زرّان على مستوى الأمر يجبران على استلام كل شيء
- *     أو لا شيء — وهو ما لا يقع في مخزن حقيقي.
+ *     The supplier sends some items and delays others, and one item out of ten
+ *     gets returned. Two buttons at the order level force receiving everything
+ *     or nothing — which is not what happens in a real warehouse.
  */
 export function PurchaseOrdersTab({ supplier }: { supplier: Supplier }) {
   const { t } = useTranslation();
@@ -118,8 +118,8 @@ export function PurchaseOrdersTab({ supplier }: { supplier: Supplier }) {
               <li key={line.id}>
                 <span className="truncate">{localized(line, 'product_name')}</span>
 
-                {/* ⚠️  «٤ من ١٠» لا «٤»: الرقم وحده لا يقول أوصلت
-                    الشحنة كلها أم بعضها. */}
+                {/* ⚠️  "4 of 10", not "4": the number alone does not say whether
+                    the whole shipment arrived or only part of it. */}
                 <span className="po-card__qty" dir="ltr">
                   {line.quantity_received} / {line.quantity_ordered}
                   {line.quantity_returned > 0 ? (
@@ -129,8 +129,8 @@ export function PurchaseOrdersTab({ supplier }: { supplier: Supplier }) {
 
                 <span className="po-card__cost" dir="ltr">
                   {line.unit_cost}
-                  {/* ⚠️  الفارق عن سعر العرض يُعرَض حين يوجد: هو ما
-                      يُقيَّم به المشتري، وإخفاؤه يجعل التفاوض بلا أثر. */}
+                  {/* ⚠️  The difference from the offer price is shown when it exists: it is what
+                      the buyer is judged on, and hiding it makes the negotiation pointless. */}
                   {line.cost_variance && Number(line.cost_variance) !== 0 ? (
                     <em
                       className={
@@ -158,8 +158,8 @@ export function PurchaseOrdersTab({ supplier }: { supplier: Supplier }) {
                     ) : null
                   ) : null}
 
-                  {/* ⚠️  الإرجاع متاح ما دام في اليد شيء — ولو
-                      اكتمل الاستلام: التلف يُكتشف بعد الفتح. */}
+                  {/* ⚠️  Returning stays available while anything is in hand — even
+                      after receiving completes: damage is discovered after opening. */}
                   {line.quantity_on_hand > 0 ? (
                     <Button
                       size="sm"
@@ -213,8 +213,8 @@ export function PurchaseOrdersTab({ supplier }: { supplier: Supplier }) {
             <input
               type="number"
               min="1"
-              // ⚠️  السقف يختلف بالفعل: المتبقي للاستلام، وما في
-              //     اليد للإرجاع. سقف واحد يسمح بما يرفضه الخادم.
+              // ⚠️  The ceiling genuinely differs: what remains for receiving, and what is
+              //     in hand for returning. One ceiling permits what the server refuses.
               max={
                 acting.mode === 'receive'
                   ? acting.line.outstanding
@@ -233,10 +233,10 @@ export function PurchaseOrdersTab({ supplier }: { supplier: Supplier }) {
 
           {acting.mode === 'receive' ? (
             <>
-              {/* ⚠️  رقم الدفعة والصلاحية هنا لا في شاشة أخرى:
-                  الدفعة تُنشأ لحظة الاستلام، وإدخالها لاحقًا
-                  يعني بضاعة دخلت بلا تاريخ صلاحية — فتخرج بـFEFO
-                  في الترتيب الخطأ. */}
+              {/* ⚠️  The batch number and the expiry are here rather than on another
+                  screen: the batch is created at the moment of receiving, and
+                  entering it later means goods that entered with no expiry date
+                  — so they go out under FEFO in the wrong order. */}
               <label>
                 {t('suppliers.batchNumber')}
                 <input

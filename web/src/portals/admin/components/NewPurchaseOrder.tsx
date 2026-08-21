@@ -24,17 +24,19 @@ interface Line {
 }
 
 /**
- * إنشاء أمر شراء.
+ * Creating a purchase order.
  *
- * ⚠️  **الأصناف تُختار من عروض هذا المورّد وحدها.**
+ * ⚠️  **The items are chosen from this supplier's offers alone.**
  *
- *     قائمة كل المنتجات تجعل المشتري يطلب صنفًا لا يبيعه هذا
- *     المورّد — ويكتشفه الخادم برفض بعد بناء الأمر كاملًا.
+ *     A list of every product makes the buyer order an item this supplier does
+ *     not sell — and the server discovers it with a refusal after the whole
+ *     order has been built.
  *
- * ⚠️  والسعر **مملوء من العرض وقابل للتعديل**.
+ * ⚠️  And the price is **filled in from the offer and editable**.
  *
- *     الشراء يُتفاوَض فيه. والفارق يُحفَظ ويُسجَّل في التدقيق، ولا
- *     يمسّ العرض نفسه — فالأمر القادم يبدأ من السعر الأصلي.
+ *     Purchasing is negotiated. And the difference is stored and recorded in
+ *     the audit log, and does not touch the offer itself — so the next order
+ *     starts from the original price.
  */
 export function NewPurchaseOrder({
   supplier,
@@ -64,8 +66,8 @@ export function NewPurchaseOrder({
       ...current,
       {
         offer,
-        // ⚠️  الكمية تبدأ من الحد الأدنى للطلب لا من ١: البدء
-        //     بواحد يجعل الخادم يرفض كل سطر حتى يُصحَّح يدويًا.
+        // ⚠️  The quantity starts at the minimum order rather than at 1: starting
+        //     at one makes the server refuse every line until it is corrected by hand.
         quantity: offer.minimum_order_quantity,
         unitCost: offer.unit_cost,
       },
@@ -152,8 +154,8 @@ export function NewPurchaseOrder({
                 value={line.unitCost}
                 onChange={(event) => update(line.offer.id, { unitCost: event.target.value })}
               />
-              {/* ⚠️  سعر العرض معروض تحت الحقل: بدونه لا يعرف
-                  المشتري أنه غيّره ولا بكم. */}
+              {/* ⚠️  The offer price is shown beneath the field: without it the
+                  buyer does not know they changed it, nor by how much. */}
               {line.unitCost !== line.offer.unit_cost ? (
                 <span className="new-po__was">
                   {t('suppliers.wasPriced', { price: line.offer.unit_cost })}

@@ -46,8 +46,8 @@
   border-radius: var(--radius-sm);
 }
 
-/* ⚠️  المعطّل يُقرأ «ليس لك» لا «عطل»: خلفية مختلفة لا مجرّد
-   بهتان يُشبه حقلًا فارغًا. */
+/* ⚠️  A disabled one reads as "not yours", not "broken": a different
+   background rather than a mere fade that resembles an empty field. */
 .register-form input:disabled {
   color: var(--color-text-muted);
   background: color-mix(in srgb, var(--color-text-muted) 8%, transparent);

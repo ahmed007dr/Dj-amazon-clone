@@ -6,13 +6,13 @@ import { Badge } from '@/shared/ui/Badge';
 import './ProductImageTile.css';
 
 /**
- * صورة واحدة وأزرارها.
+ * A single image and its buttons.
  *
- * ⚠️  **الترتيب بأزرار لا بالسحب.**
+ * ⚠️  **Reordering by buttons, not by dragging.**
  *
- *     السحب والإفلات لا يعمل بلوحة المفاتيح ولا مع قارئ الشاشة،
- *     ويتعثّر على شاشة لمس. زرّا «تقديم/تأخير» يعملان في الحالات
- *     الثلاث، ويحملان اتجاههما من `dir` بلا كود اتجاهي.
+ *     Drag and drop works with neither a keyboard nor a screen reader, and
+ *     stumbles on a touch screen. "Move forward/back" buttons work in all three
+ *     cases, and take their direction from `dir` with no directional code.
  */
 export function ProductImageTile({
   image,
@@ -33,7 +33,7 @@ export function ProductImageTile({
 }) {
   const { t, i18n } = useTranslation();
 
-  // ⚠️  النص البديل بلغة العرض الحالية — يتبدّل مع اللغة بلا نداء.
+  // ⚠️  The alt text in the current display language — it switches with the language with no call.
   const alt = i18n.language.startsWith('ar') ? image.alt_text_ar : image.alt_text_en;
 
   return (

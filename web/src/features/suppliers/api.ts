@@ -4,12 +4,13 @@ import type { PagedResponse } from '@/features/orders/adminApi';
 import { http } from '@/shared/http';
 
 /**
- * الموردون والمشتريات.
+ * Suppliers and purchasing.
  *
- * ⚠️  **أسعار الشراء هامش المتجر مكشوفًا.**
+ * ⚠️  **Purchase prices are the store's margin laid bare.**
  *
- *     كل نقطة هنا خلف `CanManagePurchasing` على الخادم — لا صلاحية
- *     أدمن عامة. تسريبها يجعل أي عميل يعرف بكم اشترينا ما نبيعه له.
+ *     Every endpoint here sits behind `CanManagePurchasing` on the server — not
+ *     a general admin permission. Leaking them lets any customer learn what we
+ *     paid for what we sell them.
  */
 
 export interface Supplier {
@@ -28,7 +29,7 @@ export interface Supplier {
   is_active: boolean;
   note: string;
   offer_count: number;
-  /** ⚠️  ما **علينا** له — الاتجاه معكوس عن دفتر العميل. */
+  /** ⚠️  What **we owe** them — the direction is inverted relative to the customer ledger. */
   payable: string;
   total_purchases: string;
   has_overdue: boolean;
@@ -45,13 +46,13 @@ export interface PurchaseOrderLine {
   quantity_ordered: number;
   quantity_received: number;
   quantity_returned: number;
-  /** المستلَم بعد خصم المرتجع — سقف ما يُمكن إرجاعه. */
+  /** Received minus returned — the ceiling on what can be returned. */
   quantity_on_hand: number;
   outstanding: number;
   unit_cost: string;
-  /** سعر العرض وقت الإنشاء — للمقارنة. */
+  /** The offer price at creation time — for comparison. */
   list_cost: string | null;
-  /** موجب = دفعنا أكثر من العرض. */
+  /** Positive = we paid more than the offer. */
   cost_variance: string | null;
   total: string;
 }
@@ -122,7 +123,7 @@ export interface SupplierFilters {
   page?: number;
 }
 
-// ── قراءة ──────────────────────────────────────────────────
+// ── Reading ───────────────────────────────────────────────
 
 export function useSuppliers(filters: SupplierFilters) {
   return useQuery({
@@ -161,11 +162,12 @@ export function usePurchaseOrders(supplier: string | null, status: string) {
 }
 
 /**
- * كشف حركات المورّد — **كل التاريخ مرقَّمًا**.
+ * The supplier's movement statement — **the entire history, paginated**.
  *
- * ⚠️  ليس كشف الحساب: ذاك مقيَّد بفترة ويعطي رصيدًا افتتاحيًا
- *     وختاميًا وتجميعات. وهذا يعطي كل حركة على حدة بلا نافذة —
- *     سؤالان مختلفان لا نسختان من سؤال.
+ * ⚠️  This is not the account statement: that one is bounded by a period and
+ *     gives an opening and closing balance and aggregates. This gives every
+ *     movement individually with no window — two different questions, not two
+ *     versions of one.
  */
 export function useSupplierLedger(supplier: string | null, page = 1) {
   return useQuery({
@@ -179,11 +181,11 @@ export function useSupplierLedger(supplier: string | null, page = 1) {
 }
 
 /**
- * كل من يعرض هذا المنتج — **مرتّبين بالسعر**.
+ * Everyone offering this product — **ordered by price**.
  *
- * ⚠️  هذه نقطة المقارنة قبل الشراء: أمر شراء يُكتب بلا رؤية
- *     البدائل يدفع سعر أول مورّد يخطر على البال. والمفضّل مُعلَّم
- *     لكنه لا يُخفي الأرخص.
+ * ⚠️  This is the comparison point before buying: a purchase order written
+ *     without seeing the alternatives pays the price of the first supplier that
+ *     comes to mind. And the preferred one is marked but does not hide the cheapest.
  */
 export function useProductOffers(product: string | null) {
   return useQuery({
@@ -217,12 +219,13 @@ export interface ReorderSuggestion {
 }
 
 /**
- * ما يجب شراؤه — أصناف تحت نقطة إعادة الطلب.
+ * What needs buying — items below their reorder point.
  *
- * ⚠️  **الصنف بلا مورّد يُدرَج ويُعلَّم لا يُحذف** (قرار الخادم).
+ * ⚠️  **An item with no supplier is listed and flagged, not dropped** (the server's decision).
  *
- *     استبعاده يُخفي أهم نقص في المخزن من شاشة الشراء — والسبب
- *     أنه بلا مورّد، وهو بالضبط ما يجب أن يُعالَج.
+ *     Excluding it hides the most important shortage in the warehouse from the
+ *     purchasing screen — and the reason is that it has no supplier, which is
+ *     exactly what needs dealing with.
  */
 export function useReorderSuggestions(location?: string) {
   return useQuery({
@@ -255,14 +258,14 @@ export function useSupplierOffers(supplier: string | null) {
   });
 }
 
-// ── كتابة ──────────────────────────────────────────────────
+// ── Writing ───────────────────────────────────────────────
 
 /**
- * ⚠️  إبطال شجرة `suppliers` كاملة بعد أي كتابة.
+ * ⚠️  Invalidate the whole `suppliers` tree after any write.
  *
- *     الاستلام يغيّر الأمر والمخزون؛ والمرتجع يغيّر الأمر والرصيد
- *     وكشف الحساب معًا. إبطال واحدة يترك رقمًا قديمًا بجوار الذي
- *     غيّره.
+ *     Receiving changes the order and the stock; and a return changes the
+ *     order, the balance and the statement together. Invalidating one leaves a
+ *     stale figure beside the one that changed it.
  */
 function useSupplierMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();

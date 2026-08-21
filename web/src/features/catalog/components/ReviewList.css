@@ -38,8 +38,8 @@
   font-size: 0.8125rem;
 }
 
-/* ⚠️  التاريخ وزر «مفيدة» في سطر واحد: الزر تحت النص وحده يبدو
-       إجراءً على الصفحة لا على هذه المراجعة. */
+/* ⚠️  The date and the "helpful" button on one line: the button below the text
+       alone looks like an action on the page rather than on this review. */
 .review__foot {
   display: flex;
   flex-wrap: wrap;
@@ -48,7 +48,7 @@
   margin-block-start: var(--space-2);
 }
 
-/* تقييمي — مميّز بحافة لا بخلفية صاخبة */
+/* My review — distinguished by a border, not by a loud background */
 .review-mine {
   display: flex;
   flex-direction: column;
@@ -74,8 +74,8 @@
   color: var(--color-text);
 }
 
-/* ⚠️  المتوسط الحيّ فوق القائمة: يُقرأ قبل أي نصّ، ويتحرّك فور
-   إرسال المراجعة بدل أن ينتظر تقادم كاش صفحة المنتج. */
+/* ⚠️  The live average above the list: it is read before any text, and it moves
+   the moment a review is submitted instead of waiting for the product page cache to expire. */
 .review-summary {
   padding-block-end: var(--space-3);
   margin-block-end: var(--space-3);

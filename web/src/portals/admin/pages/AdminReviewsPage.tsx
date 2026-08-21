@@ -22,16 +22,16 @@ import { formatDate } from '@/shared/utils/format';
 import './AdminReviewsPage.css';
 
 /**
- * مراجعة التقييمات.
+ * Review moderation.
  *
- * ⚠️  **بطاقات لا جدول.**
+ * ⚠️  **Cards, not a table.**
  *
- *     القرار هنا يُتخذ على **نص** يُقرأ كاملًا: «هل هذا لائق
- *     ومفيد؟». الجدول يقصّ النص إلى سطر فيصير الاعتماد ضغطًا بلا
- *     قراءة — وهو بالضبط ما تُوجد المراجعة لمنعه.
+ *     The decision here is taken on **text** read in full: "is this decent and
+ *     useful?". A table truncates the text to one line, so approving becomes a
+ *     press with no reading — which is exactly what moderation exists to prevent.
  *
- * ⚠️  والافتراضي **المعلّقة**: هي وحدها ما ينتظر تصرّفًا. والمعتمدة
- *     تُقرأ للمراجعة لا للعمل.
+ * ⚠️  And the default is **pending**: they alone await an action. The approved
+ *     ones are read for review, not for work.
  */
 export function AdminReviewsPage() {
   const { t, i18n } = useTranslation();
@@ -109,8 +109,8 @@ export function AdminReviewsPage() {
               <StarRating value={review.rating} />
               <strong>{review.user_email}</strong>
               {review.is_verified_purchase ? (
-                // ⚠️  «مشترٍ موثّق» يغيّر ثقل القرار: مراجعة من
-                //     اشترى فعلًا تُقرأ بعناية أكبر قبل رفضها.
+                // ⚠️  "Verified buyer" changes the weight of the decision: a review from
+                //     someone who actually bought is read more carefully before being rejected.
                 <Badge tone="success">{t('catalog.verifiedPurchase')}</Badge>
               ) : null}
               <span className="moderation__date muted">
@@ -124,7 +124,7 @@ export function AdminReviewsPage() {
             </p>
 
             {review.title ? <p className="moderation__title">{review.title}</p> : null}
-            {/* النص كاملًا بلا قصّ — هو موضوع القرار */}
+            {/* The full text with no truncation — it is the subject of the decision */}
             {review.body ? <p className="moderation__body">{review.body}</p> : null}
 
             {review.status === 'REJECTED' && review.moderation_reason ? (
@@ -180,8 +180,9 @@ export function AdminReviewsPage() {
           </>
         }
       >
-        {/* ⚠️  السبب إلزامي — الخادم يفرضه. الرفض بلا سبب لا يُشرح
-            للعميل، فيعيد كتابة نفس النص ظنًّا أن شيئًا تعطّل. */}
+        {/* ⚠️  The reason is mandatory — the server enforces it. A rejection with no
+            reason cannot be explained to the customer, so they rewrite the same
+            text assuming something broke. */}
         <p>{t('reviews.rejectReasonHint')}</p>
         <textarea
           className="moderation__reason-input"

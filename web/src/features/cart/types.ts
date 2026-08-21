@@ -1,11 +1,11 @@
 /**
- * عقود السلة — تطابق `cart/serializers.py`.
+ * Cart contracts — matching `cart/serializers.py`.
  *
- * ⚠️  كل المبالغ **نصوص**. (ADR-31)
+ * ⚠️  Every amount is a **string**. (ADR-31)
  *
- *     `JSON.parse` يحوّل الأرقام إلى `double` فتُفقد الدقة، و
- *     `450.00` تصير `450`. التحويل إلى رقم مسموح **للعرض فقط**؛
- *     أي حساب مالي يقع في الخادم.
+ *     `JSON.parse` converts numbers to `double`, so precision is lost and
+ *     `450.00` becomes `450`. Converting to a number is permitted **for display
+ *     only**; every financial calculation happens on the server.
  */
 
 export interface PricedLine {
@@ -34,10 +34,10 @@ export interface CartLine {
 }
 
 /**
- * ⚠️  المشكلة تُعرض للعميل ليصحّحها — لا تُخفى.
+ * ⚠️  The problem is shown to the customer to correct — never hidden.
  *
- *     سلة تمنع إتمام الشراء بلا تفسير تُفقد المبيعة، وسطر يُحذف
- *     بصمت يُفقد الثقة.
+ *     A cart that blocks checkout with no explanation loses the sale, and a
+ *     line silently removed loses trust.
  */
 export interface LineIssue {
   line_id: string;
@@ -78,7 +78,7 @@ export interface CartSnapshot {
   totals: CartTotals;
   issues: LineIssue[];
   coupon: CouponResult | null;
-  /** ⚠️  البوابة الوحيدة إلى إتمام الشراء — الواجهة تعرضها ولا تقرّرها. */
+  /** ⚠️  The only gate to checkout — the frontend displays it and never decides it. */
   is_checkoutable: boolean;
 }
 
@@ -88,14 +88,15 @@ export interface CartQuery {
 }
 
 /**
- * نتيجة إضافة حزمة.
+ * The result of adding a bundle.
  *
- * ⚠️  **الاستجابة ليست لقطة سلة** بخلاف بقية نقاط السلة — إنها
- *     `{ bundle_result, cart }`.
+ * ⚠️  **The response is not a cart snapshot**, unlike the other cart endpoints —
+ *     it is `{ bundle_result, cart }`.
  *
- *     ولهذا سبب وجيه: الحزمة قد تُضاف **جزئيًا**. صنف نفد مخزونه
- *     يُتخطّى مع سببه، والطالب يحتاج أن يعرف أن بالطو المعمل لم
- *     يدخل سلته — لا أن يكتشفه في المحاضرة الأولى.
+ *     And there is a good reason: a bundle may be added **partially**. An item
+ *     that is out of stock is skipped with its reason, and the student needs to
+ *     know the lab coat did not go into their cart — rather than discovering it
+ *     in their first lecture.
  */
 export interface BundleAddedItem {
   sku: string;

@@ -20,22 +20,22 @@ type Tab = 'sessions' | 'activity' | 'status';
 const TABS: Tab[] = ['sessions', 'activity', 'status'];
 
 /**
- * تاريخ الحساب.
+ * The account's history.
  *
- * ⚠️  **ثلاثة أسئلة مفصولة لا قائمة واحدة.**
+ * ⚠️  **Three separated questions, not one list.**
  *
- *       الجلسات      «متى ظهر ومن أي جهاز؟»
- *       النشاط       «ماذا فعل؟»
- *       تاريخ الحالة «من أوقفه ولماذا؟»
+ *       sessions       "when did they appear, and from which device?"
+ *       activity       "what did they do?"
+ *       status history "who suspended them, and why?"
  *
- *     دمجها يخلط دخولًا عاديًا بإيقاف إداري، فيضيع ما يُبحث عنه
- *     وسط ما لا يُبحث عنه. والسؤال الثالث هو الذي يُسأل بعد شهور
- *     ولا يُجاب إلا من سجل.
+ *     Merging them mixes an ordinary login with an administrative suspension,
+ *     so what is being looked for is lost among what is not. And the third
+ *     question is the one asked months later and answerable only from a log.
  *
- * ⚠️  و**لا يُجلب شيء قبل فتح اللوح**.
+ * ⚠️  And **nothing is fetched before the panel opens**.
  *
- *     ثلاثة استعلامات لكل صفّ في جدول الحسابات تعني عشرات النداءات
- *     عند فتح الشاشة — وأغلبها لصفوف لن يُنقر عليها.
+ *     Three queries per row in the accounts table means dozens of calls when
+ *     the screen opens — most of them for rows that will never be clicked.
  */
 export function AccountHistoryDrawer({
   account,
@@ -100,8 +100,8 @@ export function AccountHistoryDrawer({
                   </div>
 
                   <div className="account-history__side">
-                    {/* ⚠️  الجلسة المفتوحة تُعلَّم: «متصل الآن من هذا
-                        الجهاز» جواب مختلف عن «دخل يوم كذا». */}
+                    {/* ⚠️  An open session is flagged: "online now from this
+                        device" is a different answer from "logged in on such a day". */}
                     {row.is_open ? (
                       <Badge tone="success">{t('admin.sessionOpen')}</Badge>
                     ) : null}
@@ -150,8 +150,8 @@ export function AccountHistoryDrawer({
                       {t(`accountStatus.${row.from_status}`, { defaultValue: row.from_status })} →{' '}
                       {t(`accountStatus.${row.to_status}`, { defaultValue: row.to_status })}
                     </strong>
-                    {/* ⚠️  السبب هو المحتوى لا التزيين: بدونه لا
-                        يُجاب «لماذا أُوقف هذا الحساب؟». */}
+                    {/* ⚠️  The reason is the content, not decoration: without it
+                        "why was this account suspended?" cannot be answered. */}
                     <span>{row.reason || t('admin.noReason')}</span>
                   </div>
 

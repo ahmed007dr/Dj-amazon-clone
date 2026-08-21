@@ -1,8 +1,9 @@
 /*
-  ⚠️  شبكة تتحوّل لا جدول مضغوط.
+  ⚠️  A grid that reflows, not a compressed table.
 
-      الجدول على ٣٦٠px إما يتمرّر أفقيًا أو يضغط الاسم إلى حرفين.
-      البطاقة تُبقي التسلسل المعلوماتي واضحًا: صورة · اسم · تحكّم.
+      A table at 360px either scrolls horizontally or squeezes the name down to
+      two characters. The card keeps the information hierarchy clear: image ·
+      name · controls.
 */
 .cart-line {
   display: grid;

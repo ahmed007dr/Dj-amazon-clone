@@ -7,7 +7,7 @@
 .stars__glyphs {
   color: var(--color-accent);
   letter-spacing: 0.05em;
-  /* النجوم تُقرأ يسارًا في الاتجاهين — قلبها يعكس ترتيب الامتلاء */
+  /* The stars read left-to-right in both directions — flipping them reverses the fill order */
   direction: ltr;
 }
 

@@ -13,14 +13,14 @@ import { useCreateAddress, useUpdateAddress } from '../hooks';
 import './AddressForm.css';
 
 /**
- * إضافة عنوان أو تعديله.
+ * Adding or editing an address.
  *
- * ⚠️  المحافظة **قائمة مغلقة لا حقل نصي حر**.
+ * ⚠️  The governorate is **a closed list, not a free-text field**.
  *
- *     رسوم الشحن تُحسب بمطابقة اسم المحافظة حرفيًا مع مناطق
- *     الشحن. «الجيزه» أو «الجيزة ' مسافة» تسقط إلى المنطقة
- *     الافتراضية (٩٠ ج.م) بدل منطقتها الصحيحة (٣٠) — والعميل
- *     يدفع الفرق بلا أن يعرف.
+ *     Shipping fees are computed by matching the governorate name literally
+ *     against the shipping zones. "Giza" misspelled, or "Giza " with a trailing
+ *     space, falls back to the default zone (90 EGP) instead of its correct one
+ *     (30) — and the customer pays the difference without knowing.
  */
 export function AddressForm({
   address,

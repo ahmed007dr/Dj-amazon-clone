@@ -4,13 +4,14 @@ import type { PagedResponse } from '@/features/orders/adminApi';
 import { http } from '@/shared/http';
 
 /**
- * B2B — الحساب الآجل.
+ * B2B — the credit account.
  *
- * ⚠️  **نقاط العميل بلا معرّف إطلاقًا.**
+ * ⚠️  **The customer endpoints carry no id at all.**
  *
- *     `/b2b/account/` تعني «حسابي أنا» — الخادم يشتقّه من التوكن.
- *     تمرير معرّف هنا كان يفتح الباب لقراءة حساب صيدلية منافسة
- *     بتغيير رقم، وهو ضرر تجاري مباشر لا مجرد خرق خصوصية.
+ *     `/b2b/account/` means "my own account" — the server derives it from the
+ *     token. Passing an id here opened the door to reading a competing
+ *     pharmacy's account by changing a number, which is direct commercial
+ *     damage rather than a mere privacy breach.
  */
 
 export type CreditStatus = 'NONE' | 'ACTIVE' | 'SUSPENDED';
@@ -91,14 +92,14 @@ export interface BusinessProfile {
   credit_note: string;
 }
 
-// ── العميل التجاري ─────────────────────────────────────────
+// ── The business customer ─────────────────────────────────
 
 export function useMyAccount() {
   return useQuery({
     queryKey: ['b2b', 'account'],
     queryFn: () => http.get<AccountSummary>('/b2b/account/'),
-    // ⚠️  بلا إعادة محاولة على ٤٠٤: حساب بلا ملف تجاري حالة
-    //     دائمة حتى تتدخّل خدمة العملاء، وثلاث محاولات لا تغيّرها.
+    // ⚠️  No retry on 404: an account with no business profile is a permanent
+    //     state until customer service intervenes, and three attempts do not change it.
     retry: false,
   });
 }
@@ -130,7 +131,7 @@ export function useReorderSuggestions() {
   });
 }
 
-/** فحص مسبق — يمنع الرفض بعد بناء سلة كاملة. */
+/** A pre-check — it prevents a refusal after building a whole cart. */
 export function useCreditCheck() {
   return useMutation({
     mutationFn: (amount: string) =>
@@ -155,16 +156,17 @@ export interface CreditCheckoutResponse {
 }
 
 /**
- * إتمام الشراء **على الحساب**.
+ * Checkout **on account**.
  *
- * ⚠️  نقطة منفصلة عن `/orders/checkout/` — والفصل مقصود.
+ * ⚠️  A separate endpoint from `/orders/checkout/` — and the separation is deliberate.
  *
- *     مسار الآجل **لا يقبل `payment_method` إطلاقًا**: النقطة نفسها
- *     هي الطريقة. قبول الحقل كان يفتح بابًا لإرسال «بطاقة» إلى
- *     مسار الائتمان، فيُقيَّد على حساب العميل ما دُفع نقدًا.
+ *     The credit path **accepts no `payment_method` at all**: the endpoint
+ *     itself is the method. Accepting the field opened a door to sending "card"
+ *     down the credit path, so what was paid in cash got charged to the
+ *     customer's account.
  *
- * ⚠️  ويُبطَل الرصيد والسلة معًا بعد النجاح: الطلب خرج من السلة
- *     وقُيِّد على الحد الائتماني في آنٍ واحد.
+ * ⚠️  And the balance and the cart are both invalidated on success: the order
+ *     left the cart and was charged against the credit limit at the same moment.
  */
 export function useCreditCheckout() {
   const queryClient = useQueryClient();
@@ -180,7 +182,7 @@ export function useCreditCheckout() {
   });
 }
 
-// ── الأدمن ─────────────────────────────────────────────────
+// ── Admin ─────────────────────────────────────────────────
 
 export interface BusinessFilters {
   credit_status?: string;
@@ -201,13 +203,13 @@ export function useAdminBusinesses(filters: BusinessFilters) {
 }
 
 /**
- * ملف الحساب التجاري المفرد — **للتعديل لا للعرض فقط**.
+ * A single business account's profile — **for editing, not display alone**.
  *
- * ⚠️  رقم الترخيص وتاريخ انتهائه يُعدَّلان من هنا.
+ * ⚠️  The licence number and its expiry date are edited from here.
  *
- *     الترخيص المنتهي يمنع الآجل (`license_is_valid`)، فصيدلية
- *     جدّدت ترخيصها تبقى ممنوعة حتى يُحدَّث التاريخ — ولا سبيل
- *     لتحديثه كان موجودًا في أي شاشة.
+ *     An expired licence blocks credit (`license_is_valid`), so a pharmacy that
+ *     renewed its licence stays blocked until the date is updated — and no
+ *     screen offered any way to update it.
  */
 export function useAdminBusiness(id: string | null) {
   return useQuery({
@@ -223,7 +225,7 @@ export function useUpdateBusiness() {
   );
 }
 
-/** كشف حركات الحساب — أكثر تفصيلًا من كشف الحساب المُجمَّع. */
+/** The account movement statement — more detailed than the aggregated statement. */
 export function useAdminLedger(id: string | null, page = 1) {
   return useQuery({
     queryKey: ['b2b', 'admin', 'ledger', id, page],
@@ -236,10 +238,11 @@ export function useAdminLedger(id: string | null, page = 1) {
 }
 
 /**
- * ملفي التجاري — **يقرأه العميل ويعدّله**.
+ * My business profile — **read and edited by the customer**.
  *
- * ⚠️  الحدّ الائتماني وحالته **لا يُعدَّلان من هنا**: الخادم يتجاهل
- *     ما لا يملكه العميل. هذه الشاشة لبيانات المنشأة لا لمالها.
+ * ⚠️  The credit limit and its status are **not edited from here**: the server
+ *     ignores what the customer does not own. This screen is for the business's
+ *     details, not its money.
  */
 export function useMyBusinessProfile() {
   return useQuery({
@@ -267,10 +270,11 @@ export function useAdminStatement(id: string | null) {
 }
 
 /**
- * ⚠️  إبطال شجرة `b2b` كاملة بعد أي كتابة.
+ * ⚠️  Invalidate the whole `b2b` tree after any write.
  *
- *     منح الائتمان يغيّر القائمة وكشف الحساب ولوحة العميل معًا؛
- *     إبطال واحدة منها يترك رقمًا قديمًا بجوار الذي غيّره.
+ *     Granting credit changes the list, the statement and the customer
+ *     dashboard together; invalidating one of them leaves a stale figure beside
+ *     the one that changed.
  */
 function useCreditMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();

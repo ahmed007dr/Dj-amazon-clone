@@ -1,14 +1,16 @@
 /**
- * حالة السلة.
+ * Cart state.
  *
- * ⚠️  **لا تحديث تفاؤلي ولا حساب محلي للإجماليات.**
+ * ⚠️  **No optimistic update and no local total.**
  *
- *     يبدو التحديث التفاؤلي تحسينًا، لكن الخادم يعيد التسعير في
- *     كل استجابة: الضريبة والشحن وسقف الكوبون وأسعار الكميات كلها
- *     تتغيّر مع تغيّر الكمية. الرقم المحلي سيختلف عن الحقيقي، وسيرى
- *     العميل مبلغًا ثم مبلغًا آخر بعد جزء من الثانية.
+ *     An optimistic update looks like an improvement, but the server reprices
+ *     on every response: the tax, the shipping, the coupon cap and the quantity
+ *     prices all change as the quantity changes. A local figure will differ from
+ *     the real one, and the customer will see one amount and then another a
+ *     fraction of a second later.
  *
- *     الخادم يعيد اللقطة كاملة، والواجهة تكتبها في الكاش مباشرةً.
+ *     The server returns the complete snapshot, and the frontend writes it
+ *     straight into the cache.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,19 +24,19 @@ export function useCart(params: CartQuery = {}) {
   return useQuery({
     queryKey: [...CART_KEY, params],
     queryFn: () => api.getCart(params),
-    // ⚠️  السلة تتغيّر بفعل المستخدم لا بمرور الوقت — لكن مخزون
-    //     الأصناف فيها يتغيّر بفعل مشترين آخرين.
+    // ⚠️  The cart changes through the user's actions, not with time — but the
+    //     stock of the items in it changes through other buyers' actions.
     staleTime: 30 * 1000,
   });
 }
 
 /**
- * كل عمليات السلة تكتب اللقطة العائدة في الكاش.
+ * Every cart operation writes the returned snapshot into the cache.
  *
- * ⚠️  الكتابة المباشرة لا `invalidate`.
+ * ⚠️  A direct write rather than `invalidate`.
  *
- *     الإبطال يطلق نداءً ثانيًا لبيانات وصلت للتوّ — أي مضاعفة
- *     النداءات على أكثر شاشة تفاعلًا في المتجر.
+ *     Invalidating fires a second call for data that has just arrived — that
+ *     is, doubling the calls on the most interactive screen in the store.
  */
 function useCartMutation<TArgs>(mutationFn: (args: TArgs) => Promise<CartSnapshot>) {
   const queryClient = useQueryClient();
@@ -61,22 +63,22 @@ export const useRemoveLine = () => useCartMutation((lineId: string) => api.remov
 
 export const useApplyCoupon = () => useCartMutation((code: string) => api.applyCoupon(code));
 
-// ⚠️  `void` لا `undefined` كوسيط: `useMutation` يشترط تمرير وسيط
-//     حين يكون النوع `undefined`، فيصير `mutate()` بلا وسيط خطأ
-//     في وقت الترجمة على أبسط عملية في السلة.
+// ⚠️  `void`, not `undefined`, as the argument: `useMutation` requires an
+//     argument to be passed when the type is `undefined`, so `mutate()` with no
+//     argument becomes a compile-time error on the simplest cart operation.
 export const useRemoveCoupon = () => useCartMutation<void>(() => api.removeCoupon());
 
 export const useClearCart = () => useCartMutation<void>(() => api.clearCart());
 
 /**
- * إضافة حزمة.
+ * Adding a bundle.
  *
- * ⚠️  **لا تمرّ بـ `useCartMutation`** لأن استجابتها مختلفة الشكل:
- *     `{ bundle_result, cart }` لا لقطة سلة.
+ * ⚠️  **It does not go through `useCartMutation`**, because its response has a
+ *     different shape: `{ bundle_result, cart }`, not a cart snapshot.
  *
- *     كتابة الاستجابة كاملةً في الكاش تُفسده — الشاشة تقرأ `lines`
- *     فتجدها غير موجودة. هنا تُكتب `cart` وحدها، وتبقى
- *     `bundle_result` للمستدعي ليعرض ما تُخطّي ولماذا.
+ *     Writing the whole response into the cache corrupts it — the screen reads
+ *     `lines` and finds it missing. Here `cart` alone is written, and
+ *     `bundle_result` is left to the caller to show what was skipped and why.
  */
 export function useAddBundle() {
   const queryClient = useQueryClient();

@@ -14,17 +14,19 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import './AcademicPage.css';
 
 /**
- * الملف الأكاديمي.
+ * The academic profile.
  *
- * ⚠️  **هذه الشاشة هي ما يجعل بقية متجر الطلاب تعمل.**
+ * ⚠️  **This screen is what makes the rest of the student store work.**
  *
- *     الحزم تُختار بالكلية والسنة، وقائمة أسعار الطلاب تُطبَّق على
- *     من له ملف موثّق. طالب بلا ملف يرى «لا حزم» ويظن المتجر
- *     فارغًا — فتُعرَض هنا دعوة صريحة لا شاشة فارغة.
+ *     Bundles are selected by faculty and year, and the student price list
+ *     applies to anyone with a verified profile. A student with no profile sees
+ *     "no bundles" and assumes the store is empty — so an explicit invitation
+ *     is shown here rather than an empty screen.
  *
- * ⚠️  والتوثيق **ليس بيد الطالب**: يضبطه الأدمن بعد اعتماد
- *     الكارنيه المرفوع في «الوثائق». عرض الحالة مع الطريق إليها
- *     يمنع سؤال «لماذا لا أرى خصم الطلاب؟».
+ * ⚠️  And verification is **not in the student's hands**: the admin sets it
+ *     after approving the ID card uploaded under "documents". Showing the
+ *     status together with the route to it prevents the question "why do I not
+ *     see the student discount?".
  */
 export function AcademicPage() {
   const { t } = useTranslation();

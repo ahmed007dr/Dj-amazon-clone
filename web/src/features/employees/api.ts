@@ -5,13 +5,13 @@ import type { OrderListItem } from '@/features/orders/types';
 import { http } from '@/shared/http';
 
 /**
- * بوابة الموظفين.
+ * The staff portal.
  *
- * ⚠️  **نقاط المندوب بلا معرّف موظف — «أنا وعملائي».**
+ * ⚠️  **The rep's endpoints carry no employee id — "me and my customers".**
  *
- *     الخادم يشتقّ الملف من التوكن ويصفّي كل استعلام بإسناده.
- *     تمرير معرّف هنا كان يفتح الباب لقراءة عملاء زميل بتغيير
- *     رقم — وهي بيانات المنافسة الداخلية بين المندوبين.
+ *     The server derives the profile from the token and filters every query by
+ *     their assignment. Passing an id here opened the door to reading a
+ *     colleague's customers by changing a number — the data reps compete over internally.
  */
 
 export interface EmployeeProfile {
@@ -52,11 +52,12 @@ export interface Dashboard {
   customers_count: number;
   new_customers: number;
   /**
-   * ⚠️  **بلا هدف ولا عمولة — والغياب مقصود.**
+   * ⚠️  **No target and no commission — and the absence is deliberate.**
    *
-   *     `targets` و`commissions` فوق `employees` في طبقات الخادم.
-   *     حقل `target` هنا كان يعود `null` دائمًا فيُقرأ «لا هدف»
-   *     بدل «اسأل `/targets/me/`». اللوحة تُركَّب من ثلاث نقاط.
+   *     `targets` and `commissions` sit above `employees` in the server's
+   *     layers. A `target` field here always returned `null` and read as "no
+   *     target" rather than "ask `/targets/me/`". The dashboard is composed from
+   *     three endpoints.
    */
   history: MonthRow[];
 }
@@ -86,7 +87,7 @@ export interface Assignment {
   note: string;
 }
 
-// ── بوابة المندوب ──────────────────────────────────────────
+// ── The rep's portal ──────────────────────────────────────
 
 export function useMyEmployeeProfile() {
   return useQuery({
@@ -143,13 +144,13 @@ export function useCreateOrderForCustomer() {
       customer_note?: string;
     }) => http.post<{ id: string; number: string }>('/employees/orders/', body),
     onSuccess: () => {
-      // ⚠️  الطلب الجديد يغيّر لوحة الأداء وقائمة العملاء معًا.
+      // ⚠️  A new order changes the performance dashboard and the customer list together.
       void queryClient.invalidateQueries({ queryKey: ['employees'] });
     },
   });
 }
 
-// ── الأدمن ─────────────────────────────────────────────────
+// ── Admin ─────────────────────────────────────────────────
 
 export interface StaffFilters {
   role?: string;
@@ -199,7 +200,7 @@ export function useEmployeePerformance(id: string | null) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  الأدوار وتعديل الملفات
+//  Roles and profile editing
 // ═══════════════════════════════════════════════════════════
 
 export interface EmployeeRole {
@@ -210,8 +211,8 @@ export interface EmployeeRole {
   name_en: string;
   is_active: boolean;
   permission_count: number;
-  /** ⚠️  بصيغة `app_label.codename` لا معرّفات رقمية: الأرقام
-   *     تختلف بين التطوير والإنتاج فتمنح غير ما اختاره الأدمن. */
+  /** ⚠️  In `app_label.codename` form, not numeric ids: the numbers
+   *     differ between development and production, so they grant something other than what the admin chose. */
   permissions: string[];
 }
 
@@ -229,11 +230,11 @@ export interface PermissionGroup {
 }
 
 /**
- * دليل الصلاحيات — **مُنتقى لا خام**.
+ * The permission catalogue — **curated, not raw**.
  *
- * ⚠️  جدول Django يحمل مئتي صلاحية آلية بأسماء تقنية بينها
- *     `delete_user`. عرضه كما هو يجعل الشاشة غير قابلة للاستعمال
- *     ويجعل منح الخطير سهوًا بضغطة.
+ * ⚠️  Django's table holds two hundred automatic permissions under technical
+ *     names, `delete_user` among them. Showing it as-is makes the screen
+ *     unusable and makes granting the dangerous ones by oversight one click away.
  */
 export function usePermissionCatalogue(enabled = true) {
   return useQuery({
@@ -277,11 +278,12 @@ function useStaffMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>
 }
 
 /**
- * ⚠️  **الصلاحيات على الدور لا على الشخص.**
+ * ⚠️  **Permissions sit on the role, not on the person.**
  *
- *     منحها فردًا يجعل كل موظف جديد يحتاج ضبطًا يدويًا، وأول
- *     منسيّ يبقى بلا صلاحية أو بأكثر مما يجب. ولذلك تُنشأ الأدوار
- *     هنا وتُسنَد الصلاحيات إليها.
+ *     Granting them to an individual makes every new employee need manual
+ *     configuration, and the first one forgotten is left with too few
+ *     permissions or too many. So roles are created here and the permissions
+ *     assigned to them.
  */
 export function useCreateRole() {
   return useStaffMutation((body: Record<string, unknown>) =>
@@ -296,10 +298,10 @@ export function useUpdateEmployee() {
 }
 
 /**
- * إنهاء إسناد عميل.
+ * Ending a customer assignment.
  *
- * ⚠️  الإسناد كان يُنشأ ولا يُنهى: مندوب يترك العمل وعملاؤه معلّقون
- *     به — فلا يظهرون لأحد ولا يُسنَدون لغيره.
+ * ⚠️  Assignments were created and never ended: a rep leaves and their customers
+ *     stay attached to them — appearing to nobody and assignable to no one else.
  */
 export function useEndAssignment() {
   const queryClient = useQueryClient();
@@ -315,7 +317,7 @@ export function useEndAssignment() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  سجل الإسناد
+//  The assignment log
 // ═══════════════════════════════════════════════════════════
 
 export interface CustomerAssignment {
@@ -331,16 +333,16 @@ export interface CustomerAssignment {
 }
 
 /**
- * من أُسند إلى من — **وتاريخ ذلك**.
+ * Who was assigned to whom — **and when**.
  *
- * ⚠️  **العمولة تتبع الإسناد، فالتاريخ مالٌ لا سجل.**
+ * ⚠️  **Commission follows the assignment, so the history is money, not a record.**
  *
- *     «هذا العميل كان لي في مارس» دعوى تُحسم بهذا الجدول وحده.
- *     شاشة الموظفين تعرض العدد الحالي؛ والعدد لا يقول متى انتقل
- *     العميل ولا من كان قبله.
+ *     "This customer was mine in March" is a claim settled by this table alone.
+ *     The employees screen shows the current count; and a count says neither
+ *     when the customer moved nor who had them before.
  *
- * ⚠️  و**المنتهي مُدرَج**: قصر القائمة على النشط يجعل السؤال
- *     الوحيد الذي تُفتح لأجله بلا جواب.
+ * ⚠️  And **the ended ones are included**: restricting the list to the active
+ *     ones leaves the only question it is opened for unanswered.
  */
 export function useAssignments(params: {
   employee?: string;

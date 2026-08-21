@@ -18,17 +18,18 @@ import { useToast } from '@/shared/ui/useToast';
 import './CreditPanel.css';
 
 /**
- * إدارة ائتمان عميل.
+ * Managing a customer's credit.
  *
- * ⚠️  **الرصيد الحالي معروض قبل حقول المنح.**
+ * ⚠️  **The current balance is displayed before the granting fields.**
  *
- *     رفع الحد قرار يُتخذ على ضوء ما على العميل الآن وما تأخّر
- *     منه. نموذج فارغ بلا سياق يجعل القرار يُتخذ على الاسم فقط.
+ *     Raising the limit is a decision taken in the light of what the customer
+ *     owes now and how much of it is overdue. An empty form with no context
+ *     makes the decision get taken on the name alone.
  *
- * ⚠️  والإيقاف بخطوة تأكيد.
+ * ⚠️  And suspending has a confirmation step.
  *
- *     ضغطة واحدة تمنع صيدلية من الشراء فورًا — وقد تكون في وسط
- *     طلب. السبب إلزامي لأنه ما سيُقال لها حين تتصل.
+ *     One press stops a pharmacy buying immediately — and they may be mid-order.
+ *     The reason is mandatory because it is what will be said to them when they call.
  */
 export function CreditPanel({ business }: { business: BusinessProfile }) {
   const { t } = useTranslation();

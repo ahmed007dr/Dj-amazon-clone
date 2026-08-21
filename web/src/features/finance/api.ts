@@ -4,12 +4,13 @@ import { http } from '@/shared/http';
 import type { PagedResponse } from '@/features/orders/adminApi';
 
 /**
- * المالية — **بوابة الأدمن حصرًا** (قاعدة العمل ١٤).
+ * Finance — **the admin portal exclusively** (business rule 14).
  *
- * ⚠️  المبالغ **نصوص** لا أرقام (ADR-31).
+ * ⚠️  The amounts are **strings**, not numbers (ADR-31).
  *
- *     `JSON.parse` يحوّل الرقم إلى `double`، فتضيع الدقة في أول
- *     جمع — ورقم مالي خاطئ بقرش يكسر كل مطابقة محاسبية.
+ *     `JSON.parse` converts the number to a `double`, so precision is lost at
+ *     the first addition — and a financial figure wrong by a piastre breaks
+ *     every accounting reconciliation.
  */
 
 export interface Period {
@@ -42,7 +43,7 @@ export interface ProfitAndLoss {
   gross_margin: string;
   expenses: string;
   net_profit: string;
-  /** ⚠️  وحدات بيعت بتكلفة مجهولة — تجعل الربح أعلى من حقيقته. */
+  /** ⚠️  Units sold at an unknown cost — they make the profit higher than reality. */
   unknown_cost_units: number;
   is_reliable: boolean;
   pending_expenses: string;
@@ -140,11 +141,11 @@ export function useExpenses(filters: ExpenseFilters) {
 }
 
 /**
- * ⚠️  إبطال **كل** شجرة المالية بعد أي كتابة.
+ * ⚠️  Invalidate **the whole** finance tree after any write.
  *
- *     المصروف الجديد يغيّر قائمة المصروفات وقائمة الأرباح
- *     والتدفق النقدي معًا. إبطال القائمة وحدها يترك رقم الربح
- *     على الشاشة قديمًا بجوار المصروف الذي غيّره.
+ *     A new expense changes the expenses list, the profit statement and the
+ *     cash flow together. Invalidating the list alone leaves the profit figure
+ *     stale on screen beside the expense that changed it.
  */
 function useFinanceMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();

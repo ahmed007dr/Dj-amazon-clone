@@ -1,13 +1,14 @@
-/** عقود النطاق الأكاديمي — تطابق `academic/serializers.py`. */
+/** Academic domain contracts — matching `academic/serializers.py`. */
 
 export type BundleKind = 'REQUIRED' | 'RECOMMENDED' | 'OPTIONAL';
 
 /**
- * ⚠️  **بلا سعر.**
+ * ⚠️  **No price.**
  *
- *     السعر يحسبه `pricing` لكل عميل حسب قائمته — وإدراجه في
- *     الحزمة يعني رقمًا يتقادم بصمت. الطالب يرى السعر عند إضافة
- *     الحزمة للسلة، محسوبًا بقائمة الطلاب.
+ *     `pricing` computes the price per customer from their list — and including
+ *     it in the bundle means a number going silently stale. The student sees
+ *     the price when adding the bundle to the cart, computed against the
+ *     student price list.
  */
 export interface BundleItem {
   id: string;
@@ -18,7 +19,7 @@ export interface BundleItem {
   product_name_en: string;
   variant: string | null;
   quantity: number;
-  /** الأساسي مطلوب؛ وغيره يمكن حذفه من السلة بعد الإضافة. */
+  /** The essential item is required; the rest can be removed from the cart after adding. */
   is_essential: boolean;
   note_ar: string;
   note_en: string;
@@ -66,17 +67,17 @@ export interface Faculty {
   slug: string;
   name_ar: string;
   name_en: string;
-  /** عدد سنوات الدراسة — يحدّ خيارات السنة الدراسية. */
+  /** The number of study years — it bounds the study-year options. */
   years_count: number;
   departments: Department[];
 }
 
 /**
- * الجامعة بكلياتها وأقسامها في استجابة واحدة.
+ * A university with its faculties and departments in one response.
  *
- * ⚠️  الشجرة كاملة عمدًا (`UniversitySerializer`) — نموذج الملف
- *     الأكاديمي يحتاجها كلها دفعةً، والتحميل التدريجي يعني ثلاثة
- *     نداءات متتابعة يرى الطالب بينها قوائم فارغة.
+ * ⚠️  The full tree deliberately (`UniversitySerializer`) — the academic profile
+ *     form needs all of it at once, and lazy loading means three consecutive
+ *     calls with the student staring at empty lists in between.
  */
 export interface University {
   id: string;
@@ -90,10 +91,10 @@ export interface University {
 }
 
 /**
- * حمولة إنشاء الملف الأكاديمي.
+ * The payload for creating the academic profile.
  *
- * ⚠️  `department` اختياري: كليات كثيرة بلا أقسام في السنوات
- *     الأولى، وإلزامه يمنع طالب السنة الأولى من إكمال ملفه.
+ * ⚠️  `department` is optional: many faculties have no departments in the early
+ *     years, and requiring it stops a first-year student completing their profile.
  */
 export interface StudentProfilePayload {
   university: string;

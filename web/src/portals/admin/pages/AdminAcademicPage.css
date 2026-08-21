@@ -1,6 +1,6 @@
-/* ⚠️  التبويبات تتمرّر أفقيًا على الهاتف ولا تلتفّ.
-   خمسة تبويبات ملتفّة على سطرين تدفع الجدول خارج الشاشة الأولى،
-   فيبدو أن لا بيانات. */
+/* ⚠️  The tabs scroll horizontally on a phone rather than wrapping.
+   Five tabs wrapping onto two lines push the table off the first screen, so it
+   looks as though there is no data. */
 .academic-tabs {
   display: flex;
   gap: var(--space-2);

@@ -6,18 +6,19 @@ import { formatDate } from '@/shared/utils/format';
 import './StatementTable.css';
 
 /**
- * كشف الحساب.
+ * The account statement.
  *
- * ⚠️  **الرصيد الجاري عمود لا حاشية.**
+ * ⚠️  **The running balance is a column, not a footnote.**
  *
- *     العميل يراجع الكشف ليجد أين اختلف رقمه عن رقمنا. بلا رصيد
- *     متراكم بعد كل حركة عليه أن يجمع بنفسه — وهو ما يجعل النزاع
- *     يطول بلا سبب.
+ *     The customer reviews the statement to find where their figure diverged
+ *     from ours. With no accumulated balance after each movement they have to
+ *     add it up themselves — which makes the dispute drag on for no reason.
  *
- * ⚠️  والمدين والدائن عمودان منفصلان لا عمود بإشارة.
+ * ⚠️  And debit and credit are two separate columns, not one column with a sign.
  *
- *     هكذا يقرأه المحاسب، وهكذا يطابقه بدفتره. عمود واحد بسالب
- *     وموجب يجبره على الترجمة في رأسه.
+ *     That is how an accountant reads it, and how they reconcile it against
+ *     their own ledger. A single column of negatives and positives forces them
+ *     to translate in their head.
  */
 export function StatementTable({ statement }: { statement: Statement }) {
   const { t, i18n } = useTranslation();

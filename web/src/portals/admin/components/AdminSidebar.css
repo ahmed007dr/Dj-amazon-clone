@@ -35,8 +35,8 @@
   text-decoration: none;
   border-radius: var(--radius);
 
-  /* ⚠️  شريط التحديد `inline-start` — ينتقل للحافة الصحيحة
-       تلقائيًا عند تبديل اللغة */
+  /* ⚠️  The selection bar uses `inline-start` — it moves to the correct edge
+       automatically when the language switches */
   border-inline-start: 3px solid transparent;
 }
 

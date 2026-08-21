@@ -1,4 +1,4 @@
-/* نموذج حساب البريد — عمود واحد على الهاتف، عمودان على الشاشات الأوسع */
+/* The mail account form — one column on a phone, two on wider screens */
 
 .mail-form {
   display: flex;
@@ -55,7 +55,7 @@
   line-height: 1.6;
 }
 
-/* ⚠️  هدف لمس ≥ ٤٤px — النموذج يُملأ على التابلت أحيانًا */
+/* ⚠️  A touch target ≥ 44px — the form is sometimes filled in on a tablet */
 .mail-form__check input {
   inline-size: 1.25rem;
   block-size: 1.25rem;

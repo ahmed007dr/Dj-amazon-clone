@@ -13,12 +13,13 @@ import { QuantityStepper } from './QuantityStepper';
 import './CartLineRow.css';
 
 /**
- * سطر في السلة.
+ * A line in the cart.
  *
- * ⚠️  الكمية صفر = حذف.
+ * ⚠️  A quantity of zero = removal.
  *
- *     الخادم يفسّرها كذلك، والواجهة لا تعترض: من ينقص الكمية إلى
- *     صفر يقصد الحذف، وإجباره على البحث عن زر ثانٍ عمل زائد.
+ *     The server interprets it that way and the frontend does not object:
+ *     someone reducing the quantity to zero means to remove it, and forcing
+ *     them to hunt for a second button is extra work.
  */
 export function CartLineRow({ line }: { line: CartLine }) {
   const { t, i18n } = useTranslation();
@@ -47,8 +48,8 @@ export function CartLineRow({ line }: { line: CartLine }) {
         </Link>
         <p className="cart-line__sku muted">{line.product_sku}</p>
 
-        {/* ⚠️  السعر قبل الخصم يظهر فقط حين يوجد خصم فعلي —
-            شطب سعر مساوٍ للسعر الحالي خداع بصري */}
+        {/* ⚠️  The pre-discount price appears only when there is a real discount —
+            striking through a price equal to the current one is a visual deception */}
         <p className="cart-line__unit">
           {line.pricing.has_discount ? (
             <s className="muted">{formatMoney(line.pricing.list_price, i18n.language)}</s>

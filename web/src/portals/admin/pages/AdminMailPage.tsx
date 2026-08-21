@@ -27,12 +27,13 @@ import './AdminMailPage.css';
 type Tab = 'accounts' | 'routing' | 'templates' | 'log';
 
 /**
- * البريد.
+ * Mail.
  *
- * ⚠️  أربعة ألسنة لأنها أربعة أسئلة مختلفة: **من أين** يخرج البريد ·
- *     **ماذا** يخرج من كل حساب · **بأي نص** · **وهل وصل**. جمعها في
- *     شاشة واحدة مسطّحة يجعل ضبط خادم SMTP وتحرير نصّ رسالة قرارين
- *     متجاورين، وهما لا يتخذهما الشخص نفسه ولا بنفس الحذر.
+ * ⚠️  Four tabs because they are four different questions: **where** the mail
+ *     goes out from · **what** goes out from each account · **in what text** ·
+ *     **and did it arrive**. Gathering them into one flat screen makes
+ *     configuring an SMTP server and editing a message's text two adjacent
+ *     decisions, and they are taken by neither the same person nor with the same care.
  */
 export function AdminMailPage() {
   const { t } = useTranslation();
@@ -83,9 +84,9 @@ export function AdminMailPage() {
         <>
           {accounts.isPending ? <Spinner /> : null}
 
-          {/* ⚠️  بلا حساب افتراضي مفعّل يسقط النظام إلى إعداد `.env`
-              أو إلى الطرفية — أي رسائل تُطبع في سجل الخادم بينما
-              الشاشة تقول إنها أُرسلت. */}
+          {/* ⚠️  With no enabled default account the system falls back to the `.env`
+              configuration or to the console — that is, messages printed into
+              the server log while the screen says they were sent. */}
           {!accounts.isPending && !hasDefault ? (
             <Alert tone="warning">{t('mail.noDefaultAccount')}</Alert>
           ) : null}
@@ -142,9 +143,10 @@ export function AdminMailPage() {
                 ) : null}
 
                 <div className="mail-card__actions">
-                  {/* ⚠️  أهم زرّ في الشاشة: ضبط SMTP بلا تحقق فوري
-                      يعني أن الخطأ يُكتشف عند أول عميل فقد كلمة
-                      مروره — أسوأ لحظة وأهم رسالة. */}
+                  {/* ⚠️  The most important button on the screen: configuring SMTP
+                      with no immediate verification means the fault is
+                      discovered by the first customer who has lost their
+                      password — the worst moment and the most important message. */}
                   <Button
                     variant="secondary"
                     size="sm"

@@ -5,16 +5,17 @@ import { usePreviewStatus } from '@/features/settings/api';
 import './PreviewBanner.css';
 
 /**
- * شريط وضع المعاينة.
+ * The preview mode bar.
  *
- * ⚠️  **الوضع الذي لا يُعلَن يُنسى — ثم يُبلَّغ عنه كعطل.**
+ * ⚠️  **A mode that is not announced gets forgotten — and then reported as a fault.**
  *
- *     الأدمن يعاين بعيني طالب ليتأكد من ظهور منتج، ثم يتصفّح
- *     بقية اللوحة وقد نسي. يرى كتالوجًا ناقصًا وأسعارًا مختلفة
- *     فيظن أن شيئًا انكسر — والسبب أنه هو من طلب ذلك.
+ *     The admin previews through a student's eyes to confirm a product appears,
+ *     and then browses the rest of the panel having forgotten. They see an
+ *     incomplete catalogue and different prices and assume something broke —
+ *     when the cause is what they themselves asked for.
  *
- * ⚠️  و**الشريط ثابت أعلى الشاشة** لا داخل صفحة واحدة: الوضع
- *     يسري على كل نداء لا على شاشة بعينها.
+ * ⚠️  And **the bar is fixed at the top of the screen** rather than inside one
+ *     page: the mode applies to every call, not to a particular screen.
  */
 export function PreviewBanner() {
   const { t } = useTranslation();

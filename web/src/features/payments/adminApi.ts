@@ -4,11 +4,11 @@ import type { PagedResponse } from '@/features/orders/adminApi';
 import { http } from '@/shared/http';
 
 /**
- * بوابات الدفع.
+ * Payment gateways.
  *
- * ⚠️  `is_active` هو **مفتاح التشغيل والإيقاف** — أثره فوري:
- *     البوابة الموقوفة تختفي من خيارات العميل في الطلب التالي
- *     بلا إعادة نشر. (ADR-15)
+ * ⚠️  `is_active` is **the on/off switch** — its effect is immediate: a disabled
+ *     gateway disappears from the customer's options on the next request with
+ *     no redeployment. (ADR-15)
  */
 export interface PaymentProvider {
   id: string;
@@ -16,7 +16,7 @@ export interface PaymentProvider {
   name_ar: string;
   name_en: string;
   adapter_key: string;
-  /** ⚠️  بوابة بمحوّل غير موجود تفشل عند أول دفعة — يُكشف هنا. */
+  /** ⚠️  A gateway with a nonexistent adapter fails on the first payment — it is surfaced here. */
   adapter_exists: boolean;
   supported_methods: string[];
   supported_currencies: string[];
@@ -27,7 +27,7 @@ export interface PaymentProvider {
   is_sandbox: boolean;
   is_active: boolean;
   is_configured: boolean;
-  /** أسماء المفاتيح المضبوطة — لا قيمها أبدًا. */
+  /** The names of the configured keys — never their values. */
   credential_keys: string[];
 }
 
@@ -42,10 +42,11 @@ export const listProviders = () =>
   http.get<PaymentProvider[]>('/payments/admin/providers/');
 
 /**
- * ⚠️  الإيقاف يُرفض بـ `409` إن كانت آخر بوابة مفعّلة.
+ * ⚠️  Disabling is refused with `409` if it is the last enabled gateway.
  *
- *     متجر بلا بوابة لا يستقبل طلبات، والاكتشاف يكون بشكوى عميل
- *     لا بتنبيه. والسبب يُسجَّل في التدقيق.
+ *     A store with no gateway accepts no orders, and the discovery comes
+ *     through a customer complaint rather than an alert. And the reason is
+ *     recorded in the audit log.
  */
 export const toggleProvider = (id: string, isActive: boolean, reason = '') =>
   http.post<PaymentProvider>(`/payments/admin/providers/${id}/toggle/`, {
@@ -57,10 +58,10 @@ export const listCredentials = (providerId: string) =>
   http.get<ProviderCredential[]>(`/payments/admin/providers/${providerId}/credentials/`);
 
 /**
- * ⚠️  القيمة **تُكتب ولا تُقرأ أبدًا** — حتى للأدمن.
+ * ⚠️  The value is **written and never read** — not even by the admin.
  *
- *     الاستجابة تحمل `masked_value` فقط. إرجاع المفتاح «للتأكد
- *     منه» يجعل تسريب جلسة أدمن واحدة تسريبًا لحساب البوابة كله.
+ *     The response carries `masked_value` only. Returning the key "to check it"
+ *     makes one leaked admin session a leak of the entire gateway account.
  */
 export const addCredential = (providerId: string, key: string, value: string, isSandbox: boolean) =>
   http.post<ProviderCredential>(`/payments/admin/providers/${providerId}/credentials/`, {
@@ -70,7 +71,7 @@ export const addCredential = (providerId: string, key: string, value: string, is
   });
 
 // ═══════════════════════════════════════════════════════════
-//  المعاملات
+//  Transactions
 // ═══════════════════════════════════════════════════════════
 
 export type TransactionStatus =
@@ -82,10 +83,10 @@ export type TransactionStatus =
   | 'REFUNDED';
 
 /**
- * ⚠️  `provider_response` **غير موجود هنا** ولن يكون.
+ * ⚠️  `provider_response` **is not here** and never will be.
  *
- *     قد يحمل بيانات بطاقة جزئية أو رموزًا داخلية من البوابة —
- *     والخادم يستبعده من كل استجابة.
+ *     It may carry partial card data or internal gateway codes — and the server
+ *     excludes it from every response.
  */
 export interface PaymentTransaction {
   id: string;
@@ -128,14 +129,14 @@ export const listTransactions = (params: {
   });
 
 /**
- * معاملة واحدة بتفصيلها.
+ * A single transaction in detail.
  *
- * ⚠️  **رسالة الفشل هي سبب وجود هذه النقطة.**
+ * ⚠️  **The failure message is why this endpoint exists.**
  *
- *     صفّ الجدول يقول «فشلت»؛ و`failure_code` و`failure_message`
- *     يقولان لماذا — «رصيد غير كافٍ» غير «بطاقة مرفوضة» غير
- *     «انقطاع عن البوابة»، والثالث وحده يستحق إعادة المحاولة.
- *     بلا التفصيل يتصل الدعم بالبوابة في كل حالة.
+ *     The table row says "failed"; and `failure_code` and `failure_message` say
+ *     why — "insufficient funds" is not "card declined" is not "gateway
+ *     unreachable", and only the third is worth retrying. Without the detail,
+ *     support calls the gateway in every case.
  */
 export function useTransaction(id: string | null) {
   return useQuery({
@@ -146,11 +147,11 @@ export function useTransaction(id: string | null) {
 }
 
 /**
- * ⚠️  إبطال المعاملات **والطلبات معًا**.
+ * ⚠️  Invalidate the transactions **and the orders together**.
  *
- *     التحصيل والاسترداد يغيّران حالة الدفع على الطلب عبر إشارة في
- *     الخادم؛ إبطال قائمة المعاملات وحدها يترك شاشة الطلب تعرض
- *     «غير مدفوع» بجوار معاملة حُصِّلت للتوّ.
+ *     A capture or a refund changes the order's payment status through a signal
+ *     on the server; invalidating the transactions list alone leaves the order
+ *     screen showing "unpaid" beside a transaction just captured.
  */
 function useTransactionMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();
@@ -165,10 +166,10 @@ function useTransactionMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TR
 }
 
 /**
- * تحصيل معاملة مُصرَّح بها.
+ * Capture an authorised transaction.
  *
- * ⚠️  للدفع عند الاستلام: يُستدعى عند تسليم الطلب **فعلًا**.
- *     تعليمها محصَّلة قبل ذلك يعني إيرادًا وهميًا في كل تقرير مالي.
+ * ⚠️  For cash on delivery: called when the order is **actually** delivered.
+ *     Marking it captured before that means phantom revenue in every financial report.
  */
 export function useCaptureTransaction() {
   return useTransactionMutation((id: string) =>
@@ -177,10 +178,10 @@ export function useCaptureTransaction() {
 }
 
 /**
- * ⚠️  السبب إلزامي، والمبلغ الفارغ يعني **كامل المتبقي**.
+ * ⚠️  The reason is mandatory, and an empty amount means **the full remainder**.
  *
- *     الخادم يرفض ما يتجاوز `refundable_amount` — واسترداد أكثر
- *     مما دُفع خطأ محاسبي لا يُصحَّح بسهولة.
+ *     The server refuses anything exceeding `refundable_amount` — and refunding
+ *     more than was paid is an accounting error that is not easily corrected.
  */
 export function useRefundTransaction() {
   return useTransactionMutation(
@@ -193,19 +194,19 @@ export function useRefundTransaction() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  إدارة البوابات — إنشاء وتعديل وترتيب
+//  Gateway management — creation, editing and ordering
 // ═══════════════════════════════════════════════════════════
 
 export interface AdapterOptions {
-  /** أسماء المحوّلات المسجّلة في الكود — الأدمن يختار منها */
+  /** The names of the adapters registered in the code — the admin chooses from them */
   adapters: string[];
   methods: { value: string; label_ar: string }[];
 }
 
 /**
- * ⚠️  المحوّل **كود لا بيانات**: إضافة بوابة تعني اختيار محوّل
- *     موجود، لا كتابة اسم. واسم غير مسجّل يُنتج بوابة تفشل عند
- *     أول عملية شراء.
+ * ⚠️  The adapter is **code, not data**: adding a gateway means choosing an
+ *     existing adapter, not typing a name. And an unregistered name produces a
+ *     gateway that fails on the first purchase.
  */
 export function useAdapterOptions(enabled = true) {
   return useQuery({
@@ -234,10 +235,10 @@ export function useSaveProvider() {
 }
 
 /**
- * ⚠️  الخادم يردّ ٤٠٩ للبوابة ذات المعاملات.
+ * ⚠️  The server answers 409 for a gateway with transactions.
  *
- *     حذفها يترك معاملات تاريخية بلا مرجع، فينكسر كل تقرير مالي
- *     سابق. والإيقاف هو البديل.
+ *     Deleting it leaves historical transactions with no reference, so every
+ *     past financial report breaks. Disabling is the alternative.
  */
 export function useDeleteProvider() {
   return useProviderMutation((id: string) =>
@@ -246,10 +247,11 @@ export function useDeleteProvider() {
 }
 
 /**
- * إعادة ترتيب الأولوية.
+ * Reordering the priority.
  *
- * ⚠️  الترتيب يحدد **أي بوابة تُجرَّب أولًا** حين تصلح أكثر من واحدة
- *     لنفس العملية — وهو القرار الذي يوجّه المال إلى بوابة بعينها.
+ * ⚠️  The order determines **which gateway is tried first** when more than one
+ *     suits the same operation — the decision that steers the money to a
+ *     particular gateway.
  */
 export function useReorderProviders() {
   return useProviderMutation((order: string[]) =>

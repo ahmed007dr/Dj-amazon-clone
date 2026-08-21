@@ -17,15 +17,16 @@ const KIND_TONE: Record<string, 'danger' | 'success' | 'info' | 'neutral'> = {
 };
 
 /**
- * كشف حركات المورّد — **كل التاريخ**.
+ * The supplier's movement statement — **the entire history**.
  *
- * ⚠️  ليس تكرارًا لتبويب «كشف الحساب»: ذاك مقيَّد بفترة ويعطي
- *     رصيدًا افتتاحيًا وختاميًا وتجميعات؛ وهذا يعرض كل حركة على
- *     حدة مرقَّمة. سؤال «كم عليه في الربع الأخير؟» غير سؤال
- *     «متى دفعنا له آخر مرة؟».
+ * ⚠️  It is not a duplicate of the "account statement" tab: that one is bounded
+ *     by a period and gives an opening and closing balance and aggregates; this
+ *     shows every movement individually, paginated. "How much do we owe them
+ *     this quarter?" is a different question from "when did we last pay them?".
  *
- * ⚠️  و**الاتجاه بلون وإشارة**: ما علينا يزيد وما دفعناه ينقص،
- *     وخلطهما هو كيف يُقرأ دَينٌ علينا كأنه لنا.
+ * ⚠️  And **the direction by colour and sign**: what we owe increases and what
+ *     we paid decreases, and confusing them is how a debt we owe gets read as
+ *     one owed to us.
  */
 export function SupplierLedgerTab({ supplier }: { supplier: string }) {
   const { t } = useTranslation();
@@ -52,9 +53,9 @@ export function SupplierLedgerTab({ supplier }: { supplier: string }) {
             </div>
 
             <div className="supplier-ledger__side">
-              {/* ⚠️  الاتجاه من `increases_debt` لا من نوع الحركة:
-                  الفاتورة تزيد ما علينا والدفعة تنقصه، والتسوية
-                  قد تفعل الاثنين حسب إشارتها. */}
+              {/* ⚠️  The direction comes from `increases_debt`, not from the movement
+                  type: an invoice increases what we owe and a payment reduces
+                  it, and an adjustment may do either depending on its sign. */}
               <strong
                 dir="ltr"
                 className={entry.increases_debt ? 'ledger-debit' : 'ledger-credit'}

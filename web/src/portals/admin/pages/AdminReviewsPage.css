@@ -7,8 +7,9 @@
   list-style: none;
 }
 
-/* ⚠️  بطاقة لا صف جدول: القرار يُتخذ على نص يُقرأ كاملًا، والجدول
-       يقصّه إلى سطر فيصير الاعتماد ضغطًا بلا قراءة. */
+/* ⚠️  A card rather than a table row: the decision is taken on text read in
+       full, and a table truncates it to one line so approving becomes a press
+       with no reading. */
 .moderation__item {
   display: flex;
   flex-direction: column;
@@ -44,7 +45,7 @@
 .moderation__body {
   margin: 0;
   color: var(--color-text);
-  /* النص كاملًا — بلا قصّ ولا ارتفاع أقصى */
+  /* The full text — with no truncation and no maximum height */
   white-space: pre-wrap;
 }
 

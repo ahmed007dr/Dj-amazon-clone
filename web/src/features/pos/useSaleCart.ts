@@ -8,18 +8,21 @@ export interface CartLine {
 }
 
 /**
- * سلة الكاونتر — **حالة محلية لا استعلام**.
+ * The counter basket — **local state, not a query**.
  *
- * ⚠️  لا تُحفظ على الخادم قبل الإتمام.
+ * ⚠️  It is not saved to the server before checkout.
  *
- *     سلة الكاونتر تعيش ثوانيَ ثم تُتمّ أو تُلغى. حفظها على الخادم
- *     عند كل ضغطة يعني نداءً لكل صنف بينما العميل واقف، وطابورًا
- *     من السلال المهجورة لكل عملية أُلغيت.
+ *     A counter basket lives for seconds and is then completed or cancelled.
+ *     Saving it to the server on every press means a call per item while the
+ *     customer stands there, and a queue of abandoned baskets for every
+ *     cancelled operation.
  *
- * ⚠️  والمسح الثاني لنفس الصنف **يزيد الكمية** لا يضيف سطرًا.
+ * ⚠️  And a second scan of the same item **increments the quantity** rather than
+ *     adding a line.
  *
- *     الكاشير يمسح ثلاث علب متطابقة بثلاث مسحات متتالية. ثلاثة
- *     أسطر بكمية واحدة تجعل الإيصال غير مقروء وتُصعّب حذف واحدة.
+ *     The cashier scans three identical boxes with three consecutive scans.
+ *     Three lines of quantity one make the receipt unreadable and make removing
+ *     one of them awkward.
  */
 export function useSaleCart() {
   const [lines, setLines] = useState<CartLine[]>([]);
@@ -37,8 +40,8 @@ export function useSaleCart() {
 
   const setQuantity = useCallback((productId: string, quantity: number) => {
     setLines((current) =>
-      // ⚠️  الكمية صفرًا تحذف السطر: هي ما يكتبه الكاشير حين يريد
-      //     إزالته، وتركها تعني سطرًا بكمية صفر يرفضه الخادم.
+      // ⚠️  A quantity of zero removes the line: it is what the cashier types when
+      //     they want it gone, and leaving it means a zero-quantity line the server refuses.
       quantity <= 0
         ? current.filter((line) => line.product.id !== productId)
         : current.map((line) =>

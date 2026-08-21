@@ -4,13 +4,13 @@ import type { PagedResponse } from '@/features/orders/adminApi';
 import { http } from '@/shared/http';
 
 /**
- * الأهداف والعمولات.
+ * Targets and commissions.
  *
- * ⚠️  **لوحة المندوب تُركَّب من ثلاث نقاط لا واحدة.**
+ * ⚠️  **The rep's dashboard is composed from three endpoints, not one.**
  *
- *     `employees` تحت `targets` و`commissions` في ترتيب الطبقات
- *     على الخادم، فلا نقطة واحدة تجمع الثلاثة. والتركيب هنا ثلاثة
- *     استعلامات متوازية صغيرة — أرخص من كسر حدود النطاقات.
+ *     `employees` sits below `targets` and `commissions` in the server's layer
+ *     order, so no single endpoint gathers all three. And composing here is
+ *     three small parallel queries — cheaper than breaking the domain boundaries.
  */
 
 export type TargetStatus = 'DRAFT' | 'ACTIVE' | 'CLOSED';
@@ -74,7 +74,7 @@ export interface CommissionRecord {
   approved_at: string | null;
 }
 
-/** ⚠️  `null` حين لا هدف — حالة عادية أول الشهر لا خطأ. */
+/** ⚠️  `null` when there is no target — a normal state at the start of the month, not an error. */
 export function useMyTarget() {
   return useQuery({
     queryKey: ['targets', 'me'],
@@ -92,11 +92,11 @@ export function useMyCommissions() {
 }
 
 /**
- * تفسير العمولة **للأدمن** — نقطة مختلفة عن تفسير المندوب.
+ * The commission explanation **for the admin** — a different endpoint from the rep's.
  *
- * ⚠️  مسار المندوب يقرأ عمولته هو وحدها (`/commissions/me/…`)؛
- *     ومسار الأدمن يقرأ أي سجل. استعمال الأول لصفّ في جدول
- *     الأدمن كان يردّ ٤٠٤ على كل موظف عدا الأدمن نفسه.
+ * ⚠️  The rep's path reads their own commission alone (`/commissions/me/…`);
+ *     the admin's path reads any record. Using the first for a row in the
+ *     admin's table answered 404 for every employee except the admin themselves.
  */
 export function useAdminCommissionExplain(id: string | null) {
   return useQuery({
@@ -114,7 +114,7 @@ export function useCommissionExplain(id: string | null) {
   });
 }
 
-// ── الأدمن ─────────────────────────────────────────────────
+// ── Admin ─────────────────────────────────────────────────
 
 export interface TargetFilters {
   year?: number;
@@ -143,10 +143,11 @@ export function useAdminCommissions(filters: TargetFilters) {
 }
 
 /**
- * ⚠️  إبطال الشجرتين معًا بعد أي كتابة.
+ * ⚠️  Invalidate both trees together after any write.
  *
- *     إقفال هدف يغيّر عمولته، وحساب عمولة يقرأ هدفها. إبطال
- *     واحدة يترك الشاشة تعرض رقمين من لحظتين مختلفتين.
+ *     Closing a target changes its commission, and computing a commission reads
+ *     its target. Invalidating one leaves the screen showing two figures from
+ *     two different moments.
  */
 function useTargetMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();
@@ -195,11 +196,12 @@ export function useCommissionDecision() {
 }
 
 /**
- * تعديل هدف قبل تفعيله.
+ * Editing a target before it is activated.
  *
- * ⚠️  الهدف المفعَّل يُقاس عليه الأداء منذ لحظة تفعيله؛ وتعديل
- *     قيمته بعدها يعيد كتابة معيار كان المندوب يعمل عليه. الخادم
- *     يحرس ذلك، والواجهة تُخفي الزر عن المفعَّل.
+ * ⚠️  An active target is what performance is measured against from the moment
+ *     it is activated; and editing its value afterwards rewrites a standard the
+ *     rep was already working to. The server guards that, and the frontend
+ *     hides the button on an active one.
  */
 export function useUpdateTarget() {
   return useTargetMutation(({ id, body }: { id: string; body: Record<string, unknown> }) =>
@@ -216,13 +218,13 @@ export interface BulkTargetRow {
 }
 
 /**
- * أهداف الفريق دفعة واحدة.
+ * A team's targets in one batch.
  *
- * ⚠️  **الموجود يُتخطّى لا يُكتب فوقه.**
+ * ⚠️  **Existing ones are skipped, not overwritten.**
  *
- *     إعادة تشغيل الدفعة بعد إضافة موظف جديد يجب أن تُنشئ هدفه
- *     وحده — والكتابة فوق الموجود تمحو أهدافًا عُدِّلت يدويًا بعد
- *     الدفعة الأولى.
+ *     Re-running the batch after adding a new employee must create their target
+ *     alone — and overwriting the existing ones erases targets edited by hand
+ *     after the first batch.
  */
 export function useBulkTargets() {
   return useTargetMutation(
@@ -231,7 +233,7 @@ export function useBulkTargets() {
   );
 }
 
-// ── قواعد العمولة ──────────────────────────────────────────
+// ── Commission rules ──────────────────────────────────────
 
 export interface CommissionTier {
   id: string;
@@ -244,7 +246,7 @@ export interface CommissionScheme {
   code: string;
   name_ar: string;
   name_en: string;
-  /** ما تُحسب عليه النسبة: المبيعات أو الربح */
+  /** What the rate is computed on: sales or profit */
   base: string;
   role: string | null;
   role_name: string | null;
@@ -262,8 +264,9 @@ export function useCommissionSchemes(enabled = true) {
 }
 
 /**
- * ⚠️  **قواعد العمولة بيانات لا كود**: «٣٪ فوق ١٠٠٪ تحقيق» قرار
- *     إداري يتغيّر كل موسم، وتثبيته في الكود يجعل تعديله نشرًا.
+ * ⚠️  **Commission rules are data, not code**: "3% above 100% achievement" is a
+ *     management decision that changes every season, and fixing it in code
+ *     makes editing it a deployment.
  */
 export function useCreateScheme() {
   const queryClient = useQueryClient();

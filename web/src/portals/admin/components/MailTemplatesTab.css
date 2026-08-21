@@ -78,7 +78,7 @@
   margin-block-end: var(--space-3);
 }
 
-/* ⚠️  النص يلتفّ ولا يتمرّر أفقيًا — القاعدة على كل الشاشات */
+/* ⚠️  The text wraps rather than scrolling horizontally — the rule applies on every screen */
 .templates__preview pre {
   white-space: pre-wrap;
   word-break: break-word;

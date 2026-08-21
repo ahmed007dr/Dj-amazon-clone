@@ -18,16 +18,17 @@ import './PricingForms.css';
 const CHANNELS = ['ONLINE', 'POS', 'EMPLOYEE'] as const;
 
 /**
- * إضافة بوابة دفع أو تعديلها.
+ * Adding or editing a payment gateway.
  *
- * ⚠️  **المحوّل يُختار من قائمة لا يُكتب.**
+ * ⚠️  **The adapter is chosen from a list, not typed.**
  *
- *     المحوّل كود مسجّل في الخادم؛ واسم غير مسجّل يُنتج بوابة تبدو
- *     سليمة في اللوحة وتفشل عند أول عملية شراء. القائمة تجعل
- *     الحالة الخاطئة غير قابلة للاختيار.
+ *     The adapter is code registered on the server; and an unregistered name
+ *     produces a gateway that looks fine in the panel and fails on the first
+ *     purchase. The list makes the wrong state impossible to choose.
  *
- * ⚠️  و**البوابة تُنشأ موقوفة دائمًا** — الخادم يرفض تفعيل بوابة
- *     خارجية بلا مفاتيح. التسلسل: أنشئها ← أضف مفاتيحها ← فعّلها.
+ * ⚠️  And **a gateway is always created disabled** — the server refuses to
+ *     enable an external gateway with no keys. The sequence: create it ← add
+ *     its keys ← enable it.
  */
 export function ProviderForm({
   provider,
@@ -84,7 +85,7 @@ export function ProviderForm({
       supported_channels: form.supported_channels,
       supported_currencies: [],
       min_amount: form.min_amount || '0',
-      // ⚠️  فارغ = بلا حد أعلى. الصفر يعني بوابة لا تقبل أي مبلغ.
+      // ⚠️  Empty = no upper limit. Zero means a gateway that accepts no amount at all.
       max_amount: form.max_amount || null,
       is_sandbox: form.is_sandbox,
     };
@@ -168,7 +169,7 @@ export function ProviderForm({
         ) : null}
       </label>
 
-      {/* ⚠️  فارغ = كل الطرق. يُقال صراحةً وإلا فُهم الفراغ منعًا. */}
+      {/* ⚠️  Empty = every method. Stated explicitly, or emptiness is read as a block. */}
       <fieldset className="pricing-form__types">
         <legend>{t('admin.methods')}</legend>
         <p className="pricing-form__hint">{t('admin.methodsHint')}</p>
@@ -227,8 +228,8 @@ export function ProviderForm({
         />
         <span>
           {t('admin.sandbox')}
-          {/* ⚠️  مضيف الإنتاج في وضع التجريب يحصّل مالًا حقيقيًا
-              في اختبار — والعكس يفشل كل دفعة حقيقية. */}
+          {/* ⚠️  A production host in test mode collects real money during a
+              test — and the reverse fails every real payment. */}
           <em>{t('admin.sandboxHint')}</em>
         </span>
       </label>

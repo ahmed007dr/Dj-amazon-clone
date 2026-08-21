@@ -4,8 +4,8 @@
   gap: var(--space-2);
 }
 
-/* ⚠️  مخفي بصريًا لا `display: none` — الأخير يُخرجه من ترتيب
-   التنقل بلوحة المفاتيح، فيصير الزر غير قابل للتفعيل بها. */
+/* ⚠️  Visually hidden rather than `display: none` — the latter takes it out of
+   the keyboard tab order, so the button becomes impossible to activate with it. */
 .image-picker__input {
   position: absolute;
   inline-size: 1px;

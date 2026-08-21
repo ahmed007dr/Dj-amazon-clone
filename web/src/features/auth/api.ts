@@ -1,10 +1,10 @@
 /**
- * واجهة المصادقة.
+ * The authentication API.
  *
- * ⚠️  نداءات التجديد تمرّ بـ `skipAuthRefresh`.
+ * ⚠️  The refresh calls go through `skipAuthRefresh`.
  *
- *     بدونها يدخل التجديد الفاشل في حلقة: ٤٠١ → تجديد → ٤٠١ → …
- *     حتى يستهلك المتصفح.
+ *     Without it a failed refresh enters a loop: 401 → refresh → 401 → …
+ *     until the browser gives out.
  */
 
 import { http } from '@/shared/http';
@@ -35,10 +35,10 @@ export const register = (payload: RegisterPayload) =>
   http.post<RegisterResponse>('/auth/register/', payload, { skipAuthRefresh: true });
 
 /**
- * ⚠️  تفعيل البريد يعيد **توكنات جلسة كاملة**.
+ * ⚠️  Email activation returns **full session tokens**.
  *
- *     من ضغط الرابط في بريده أثبت ملكيته — وإجباره على تسجيل دخول
- *     ثانٍ بعدها احتكاك بلا فائدة أمنية.
+ *     Whoever clicked the link in their mail has proved they own it — and
+ *     forcing a second login afterwards is friction with no security benefit.
  */
 export const verifyEmail = (token: string) =>
   http.post<LoginResponse>('/auth/verify-email/', { token }, { skipAuthRefresh: true });
@@ -62,7 +62,7 @@ export const changePassword = (currentPassword: string, newPassword: string) =>
 export const updateMe = (payload: Partial<User>) => http.patch<User>('/auth/me/', payload);
 
 // ═══════════════════════════════════════════════════════════
-//  الجلسات وتغيير البريد
+//  Sessions and email change
 // ═══════════════════════════════════════════════════════════
 
 export interface UserSession {
@@ -77,25 +77,27 @@ export interface UserSession {
 export const listSessions = () => http.get<UserSession[]>('/auth/sessions/');
 
 /**
- * إنهاء جلسة جهاز.
+ * End a device's session.
  *
- * ⚠️  الشاشة كانت **تعرض الأجهزة ولا تُنهي أيًّا منها**.
+ * ⚠️  The screen used to **list the devices and end none of them**.
  *
- *     وهذا أسوأ من عدم عرضها: المستخدم يرى جهازًا لا يعرفه ولا
- *     يملك ما يفعله حياله. والقائمة موجودة أصلًا لهذا الغرض.
+ *     And that is worse than not listing them: the user sees a device they do
+ *     not recognise and has nothing they can do about it. The list exists for
+ *     exactly this purpose.
  */
 export const revokeSession = (id: number) =>
   http.post<void>(`/auth/sessions/${id}/revoke/`);
 
 /**
- * ⚠️  تغيير البريد **بخطوتين**: طلب ثم تأكيد برابط يصل العنوان
- *     الجديد. الخطوة الواحدة تسمح بتحويل الحساب إلى بريد لا يملكه
- *     صاحبه — وهي أسرع طريقة لسرقة حساب من جلسة مفتوحة.
+ * ⚠️  Changing the email is **two steps**: a request, then a confirmation
+ *     through a link sent to the new address. A single step allows an account to
+ *     be moved to an email its owner does not control — the fastest way to steal
+ *     an account from an open session.
  */
 export const requestEmailChange = (newEmail: string, currentPassword: string) =>
   http.post<void>('/auth/email/change/', {
     new_email: newEmail,
-    // ⚠️  كلمة المرور مطلوبة: جهاز مفتوح بلا صاحبه يكفي لتغيير
-    //     البريد ثم الاستيلاء على الحساب عبر «نسيت كلمة المرور».
+    // ⚠️  The password is required: an unattended unlocked device is enough to change
+    //     the email and then take over the account through "forgot password".
     current_password: currentPassword,
   });

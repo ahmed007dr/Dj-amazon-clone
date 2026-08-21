@@ -20,8 +20,8 @@ export function useMySession() {
   return useQuery({
     queryKey: SESSION_KEY,
     queryFn: getMySession,
-    // ⚠️  بلا `staleTime`: فتح الوردية وإغلاقها يغيّران كل الشاشة،
-    //     وعرض وردية مغلقة كأنها مفتوحة يجعل الكاشير يبيع في فراغ.
+    // ⚠️  No `staleTime`: opening and closing the shift change the whole screen,
+    //     and showing a closed shift as open makes the cashier sell into a void.
     staleTime: 0,
   });
 }
@@ -58,17 +58,18 @@ export function useOpenSession() {
 }
 
 /**
- * إغلاق الوردية.
+ * Closing the shift.
  *
- * ⚠️  **لا يُبطل استعلام الوردية — وهذا مقصود.**
+ * ⚠️  **It does not invalidate the shift query — and that is deliberate.**
  *
- *     `/session/` تعيد `null` بعد الإغلاق، والقشرة تستبدل الشاشة
- *     ببوابة فتح وردية جديدة فور ذلك. الإبطال التلقائي كان يخطف
- *     شاشة التسوية في نفس اللحظة التي تظهر فيها — فيُغلق الكاشير
- *     ورديته **ولا يرى الفرق النقدي إطلاقًا**، وهو الرقم الوحيد
- *     الذي أُغلقت الوردية من أجله.
+ *     `/session/` returns `null` after closing, and the shell replaces the
+ *     screen with a new open-shift gate the moment it does. Automatic
+ *     invalidation snatched away the reconciliation screen at the very instant
+ *     it appeared — so the cashier closed their shift **and never saw the cash
+ *     discrepancy at all**, the one figure the shift was closed for.
  *
- *     الإبطال يصير فعلًا مقصودًا: `finish()` بعد قراءة التسوية.
+ *     Invalidation becomes a deliberate act: `finish()` after the
+ *     reconciliation has been read.
  */
 export function useCloseSession() {
   const queryClient = useQueryClient();
@@ -98,21 +99,21 @@ export function useProductSearch(term: string) {
   return useQuery({
     queryKey: ['pos', 'products', term],
     queryFn: () => searchProducts(term),
-    // ⚠️  إبقاء النتائج السابقة أثناء الكتابة.
+    // ⚠️  Keep the previous results while typing.
     //
-    //     وميض القائمة فارغةً بين كل حرفين يجعل الكاشير يظن أن
-    //     الصنف غير موجود فيمسح ويعيد — على شاشة يستخدمها بسرعة.
+    //     The list flashing empty between every two characters makes the cashier
+    //     think the item does not exist, so they clear and retype — on a screen they use at speed.
     placeholderData: keepPreviousData,
     staleTime: 30 * 1000,
   });
 }
 
 /**
- * ⚠️  التسعير **نداء خادم لا حساب في المتصفح**.
+ * ⚠️  Pricing is **a server call, not a calculation in the browser**.
  *
- *     الشرائح والخصومات والضريبة المتغيّرة (وقد تكون غائبة أصلًا)
- *     محاكاتها هنا تعني رقمين ينفصلان — أحدهما على الشاشة والآخر
- *     على الإيصال.
+ *     Simulating the tiers, the discounts and the variable tax (which may be
+ *     absent entirely) here means two figures that diverge — one on the screen
+ *     and the other on the receipt.
  */
 export function useQuote(lines: SaleLineInput[], discountPercent: string) {
   return useQuery({
@@ -120,8 +121,8 @@ export function useQuote(lines: SaleLineInput[], discountPercent: string) {
     queryFn: () => quoteSale({ lines, discount_percent: discountPercent }),
     enabled: lines.length > 0,
     placeholderData: keepPreviousData,
-    // ⚠️  بلا إعادة محاولة: الخصم فوق السقف يعيد ٤٠٣، وإعادتها
-    //     ثلاث مرات تؤخّر ظهور الرسالة بينما العميل ينتظر.
+    // ⚠️  No retry: a discount above the cap returns 403, and repeating it
+    //     three times delays the message while the customer waits.
     retry: false,
     staleTime: 0,
   });
@@ -138,7 +139,7 @@ export function useCheckout() {
       note?: string;
     }) => checkout(body),
     onSuccess: () => {
-      // ⚠️  البيعة تغيّر النقد في الدرج — والتسوية تُبنى عليه.
+      // ⚠️  A sale changes the cash in the drawer — and the reconciliation is built on it.
       void queryClient.invalidateQueries({ queryKey: ['pos', 'cash'] });
     },
   });

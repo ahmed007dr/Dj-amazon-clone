@@ -9,9 +9,9 @@
   font-size: 1.25rem;
 }
 
-/* ⚠️  عمود واحد على الهاتف: لوحا الاستبدال والإحالة يحملان حقول
-   إدخال، وضغطهما جنبًا إلى جنب على شاشة ضيقة يجعل الحقول أضيق من
-   أن تُلمس. */
+/* ⚠️  One column on a phone: the redemption and referral panels carry input
+   fields, and squeezing them side by side on a narrow screen makes the fields
+   too narrow to touch. */
 .loyalty-page__panels {
   display: grid;
   grid-template-columns: 1fr;
@@ -70,8 +70,8 @@
   color: var(--color-text-muted);
 }
 
-/* ⚠️  قصّ المرجع الطويل لا لفّه: رقم طلب يلتف على سطرين يدفع
-   المبلغ خارج الشاشة على الهاتف. */
+/* ⚠️  Truncate a long reference rather than wrapping it: an order number
+   wrapping onto two lines pushes the amount off the screen on a phone. */
 .loyalty-history__body small {
   overflow: hidden;
   text-overflow: ellipsis;

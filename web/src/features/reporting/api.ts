@@ -3,10 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { http } from '@/shared/http';
 
 /**
- * التقارير — **قراءة فقط**.
+ * Reports — **read-only**.
  *
- * ⚠️  لا `useMutation` واحدة هنا. التقرير يعكس ما وقع ولا يغيّره،
- *     وأي كتابة تخصّ نطاقها الأصلي لا هذه الشاشة.
+ * ⚠️  There is not one `useMutation` here. A report reflects what happened and
+ *     does not change it, and any write belongs to its own domain rather than
+ *     this screen.
  */
 
 export interface Period {
@@ -35,7 +36,7 @@ export interface Overview {
   gross_margin: string;
   expenses: string;
   net_profit: string;
-  /** ⚠️  تقرير فيه تكلفة مجهولة يُقرأ بحذر — ويقول ذلك صراحةً. */
+  /** ⚠️  A report containing unknown cost is read with caution — and it says so explicitly. */
   profit_is_reliable: boolean;
   inventory: InventorySummary;
 }
@@ -82,7 +83,7 @@ export interface CustomersReport {
   by_segment: { segment: string; customers: number; total: string }[];
 }
 
-/** خلية في شبكة ساعات الأسبوع — الشبكة تصل مكتملة (١٦٨ خلية). */
+/** A cell in the hours-of-the-week grid — the grid arrives complete (168 cells). */
 export interface PeakCell {
   weekday: number;
   hour: number;
@@ -102,7 +103,7 @@ export interface PeakRollup {
 export interface PeakHoursReport {
   start: string;
   end: string;
-  /** ⚠️  تُعرَض دائمًا: «الذروة ٥ م» بلا منطقة رقمٌ يُقرأ خطأً. */
+  /** ⚠️  Always displayed: "peak at 5pm" with no timezone is a figure that gets misread. */
   timezone: string;
   orders_count: number;
   cells: PeakCell[];
@@ -126,11 +127,12 @@ export interface PerformanceReport {
 }
 
 /**
- * ⚠️  `useReport` لا `report`.
+ * ⚠️  `useReport`, not `report`.
  *
- *     قاعدة الخطّافات تمنع استدعاء `useQuery` من دالة لا يبدأ
- *     اسمها بـ`use`: المُحلِّل لا يستطيع التحقق من ثبات ترتيب
- *     الخطّافات فيها، وهو ما يكسر React بصمت لو استُدعيت شرطيًا.
+ *     The rules of hooks forbid calling `useQuery` from a function whose name
+ *     does not start with `use`: the linter cannot verify that the hook order
+ *     stays stable inside it, and that breaks React silently if it is ever
+ *     called conditionally.
  */
 function useReport<T>(path: string, key: string, period: Period) {
   return useQuery({
@@ -143,11 +145,11 @@ export const useOverview = (period: Period) =>
   useReport<Overview>('/reports/overview/', 'overview', period);
 
 /**
- * ⚠️  `by` صريح لا افتراضي صامت.
+ * ⚠️  An explicit `by`, not a silent default.
  *
- *     «الأكثر طلبًا» بالقيمة و«الأكثر طلبًا» بالعدد جدولان مختلفان
- *     وكلاهما صحيح؛ ترك الاختيار للخادم يجعل الأدمن يقرأ ترتيبًا
- *     لا يعرف على أي أساس بُني.
+ *     "Most ordered" by value and "most ordered" by count are two different
+ *     tables and both are correct; leaving the choice to the server makes the
+ *     admin read an ordering without knowing what it was built on.
  */
 export type TopProductsBy = 'revenue' | 'quantity';
 
@@ -167,7 +169,7 @@ export const useCustomersReport = (period: Period) =>
 export const usePerformanceReport = (period: Period) =>
   useReport<PerformanceReport>('/reports/performance/', 'performance', period);
 
-/** ⚠️  المخزون بلا فترة: هو لقطة الآن لا مدى زمني. */
+/** ⚠️  Stock takes no period: it is a snapshot of now, not a time range. */
 export function useInventoryReport(expiryDays: number) {
   return useQuery({
     queryKey: ['reports', 'inventory', expiryDays],

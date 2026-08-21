@@ -17,11 +17,9 @@
 
 ## ⚠️ ملاحظة على إصدار Django
 
-`requirements.txt` مثبّت على **Django 4.2.16**، بينما البيئة العامة على الجهاز فيها **Django 5.2**.
+`requirements/base.txt` مثبّت على **Django 5.2**.
 
-**لهذا البيئة المعزولة (`.venv`) إلزامية** — بدونها يعمل المشروع على إصدار مختلف عن المثبَّت وتظهر أخطاء لا تفسير لها.
-
-> **قرار مؤجّل للمرحلة 0.5:** الترقية إلى Django 5.2. يُجرى مع إعادة الهيكلة لا قبلها.
+**البيئة المعزولة (`.venv`) إلزامية** — بدونها يعمل المشروع على إصدار مختلف عن المثبَّت وتظهر أخطاء لا تفسير لها.
 
 ---
 
@@ -36,7 +34,9 @@ python -m venv .venv
 # source .venv/bin/activate       # لينكس/ماك
 
 # ٢. الاعتماديات
-pip install -r requirements.txt
+# ⚠️  ملف الجذر requirements.txt لم يعد موجودًا: الملفان منفصلان بالغرض،
+#     والتطوير هو dev.txt (يستدعي base.txt داخله). الإنتاج يثبّت base.txt وحده.
+pip install -r requirements/dev.txt
 
 # ٣. متغيرات البيئة — ملفان: الأسرار، والمشترك مع الفرونت إند
 copy .env.example .env                          # ويندوز
@@ -512,7 +512,10 @@ src/
 ├── .gitignore
 ├── .venv/                  ⛔ محلي
 ├── manage.py
-├── requirements.txt
+├── passenger_wsgi.py       ← مدخل Passenger على cPanel
+├── requirements/
+│   ├── base.txt            ← الإنتاج
+│   └── dev.txt             ← التطوير و CI
 ├── pyproject.toml          (0.5)
 ├── .pre-commit-config.yaml (0.5)
 │

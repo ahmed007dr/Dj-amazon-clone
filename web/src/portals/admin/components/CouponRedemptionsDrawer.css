@@ -33,8 +33,8 @@
   border-radius: var(--radius-sm);
 }
 
-/* ⚠️  الملغى باهت ومشطوب: يبقى مقروءًا للتدقيق لكنه لا يُحسب
-   بصريًا ضمن أثر الحملة. */
+/* ⚠️  A cancelled one is faint and struck through: it stays readable for
+   auditing but does not count visually towards the campaign's impact. */
 .redemptions__list li.is-cancelled {
   opacity: 0.6;
 }

@@ -7,18 +7,18 @@ const COUNT_KEY = ['notifications', 'unread-count'] as const;
 const PREFERENCES_KEY = ['notifications', 'preferences'] as const;
 
 /**
- * عدّاد الجرس.
+ * The bell counter.
  *
- * ⚠️  تحديث دوري كل دقيقة لا فوري.
+ * ⚠️  Polling every minute rather than live updates.
  *
- *     لا يوجد WebSocket في هذه المرحلة، والبديل الوحيد للتحديث
- *     الدوري هو عدّاد يتجمّد حتى يعيد المستخدم تحميل الصفحة —
- *     فيصله إشعار شحن ولا يعرف. ودقيقة كافية: النقطة أن يعرف
- *     خلال دقائق لا خلال أجزاء من الثانية.
+ *     There is no WebSocket at this stage, and the only alternative to polling
+ *     is a counter frozen until the user reloads the page — so a shipping
+ *     notification arrives and they never know. And a minute is enough: the
+ *     point is that they learn within minutes, not within fractions of a second.
  *
- * ⚠️  ويتوقف حين تكون اللسان في الخلفية (`refetchIntervalInBackground`
- *     المتروك على الافتراضي) — لسان منسيّ ينادي الخادم كل دقيقة
- *     ليومٍ كامل حِمل بلا قارئ.
+ * ⚠️  And it stops while the tab is in the background
+ *     (`refetchIntervalInBackground` left on its default) — a forgotten tab
+ *     calling the server every minute for a whole day is load with no reader.
  */
 export function useUnreadCount(enabled = true) {
   return useQuery({
@@ -44,8 +44,8 @@ export function useMarkRead() {
 
   return useMutation({
     mutationFn: api.markRead,
-    // ⚠️  العدّاد يُبطَل مع القائمة: قراءة إشعار تنقص الرقم في
-    //     الجرس، وتركه كما هو يجعل المستخدم يفتح شاشة لا جديد فيها.
+    // ⚠️  The counter is invalidated along with the list: reading a notification
+    //     lowers the number on the bell, and leaving it makes the user open a screen with nothing new in it.
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: LIST_KEY });
       void queryClient.invalidateQueries({ queryKey: COUNT_KEY });

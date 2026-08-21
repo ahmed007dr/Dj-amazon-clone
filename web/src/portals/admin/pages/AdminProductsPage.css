@@ -1,5 +1,5 @@
-/* ⚠️  الأزرار تلتفّ ولا تُضغط: ثلاثة إجراءات في خلية ضيّقة على
-       شاشة متوسطة كانت تخرج من الجدول أفقيًا. */
+/* ⚠️  The buttons wrap rather than being squeezed: three actions in a narrow
+       cell on a medium screen used to run out of the table horizontally. */
 .admin-products__actions {
   display: inline-flex;
   flex-wrap: wrap;

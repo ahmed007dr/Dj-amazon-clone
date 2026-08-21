@@ -35,8 +35,8 @@
   font-size: 0.75rem;
 }
 
-/* ⚠️  الحقول غير القابلة للتعديل تُعرض بشكل مختلف تمامًا لا
-   كمدخلات معطّلة: المدخل المعطّل يُقرأ «عطل» لا «ليس لك». */
+/* ⚠️  Non-editable fields are displayed in an entirely different form rather
+   than as disabled inputs: a disabled input reads as "broken", not "not yours". */
 .business-profile__readonly {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));

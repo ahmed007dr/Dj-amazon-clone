@@ -4,8 +4,8 @@
   gap: var(--space-4);
 }
 
-/* ⚠️  تمرير أفقي لا التفاف: ثلاثة تبويبات ملتفّة داخل لوح ضيّق
-   تدفع المحتوى خارج النظر. */
+/* ⚠️  Horizontal scrolling rather than wrapping: three tabs wrapping inside a
+   narrow panel push the content out of sight. */
 .account-history__tabs {
   display: flex;
   gap: var(--space-2);

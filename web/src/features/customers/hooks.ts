@@ -18,15 +18,15 @@ export function useCreateAddress() {
 
   return useMutation({
     mutationFn: api.createAddress,
-    // ⚠️  إبطال لا كتابة مباشرة: إنشاء عنوان افتراضي يُلغي افتراضية
-    //     عنوان آخر في الخادم، فالقائمة كلها تغيّرت لا صفٌّ واحد.
+    // ⚠️  Invalidation rather than a direct write: creating a default address clears
+    //     another address's default flag on the server, so the whole list changed, not one row.
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ADDRESSES_KEY }),
   });
 }
 
 /**
- * ⚠️  نفس سبب الإبطال في الإنشاء: تعديل عنوان قد يجعله الافتراضي
- *     فيُلغي افتراضية غيره — والقائمة كلها تغيّرت لا صفٌّ واحد.
+ * ⚠️  The same reason as the invalidation on create: editing an address may make
+ *     it the default and so clear another's — and the whole list changed, not one row.
  */
 function useAddressMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();
@@ -45,8 +45,8 @@ export function useUpdateAddress() {
 }
 
 /**
- * ⚠️  الحذف **ناعم على الخادم**: الطلبات السابقة تشير إلى العنوان
- *     الذي شُحنت إليه، ومحوه يجعل كل فاتورة قديمة بلا وجهة.
+ * ⚠️  The deletion is **soft on the server**: previous orders point at the
+ *     address they shipped to, and erasing it leaves every old invoice with no destination.
  */
 export function useDeleteAddress() {
   return useAddressMutation(api.deleteAddress);

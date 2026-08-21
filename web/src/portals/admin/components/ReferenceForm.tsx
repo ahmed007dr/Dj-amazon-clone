@@ -20,18 +20,20 @@ import './ReferenceForm.css';
 type Row = AdminCategory | AdminBrand | AdminManufacturer;
 
 /**
- * إنشاء أو تعديل عنصر مرجعي.
+ * Creating or editing a reference item.
  *
- * ⚠️  **المعرّف النصي (`slug`) لا يُعرَض ولا يُعدَّل.**
+ * ⚠️  **The textual identifier (`slug`) is neither displayed nor edited.**
  *
- *     يُولَّد من الاسم عند الإنشاء ولا يتغيّر بعدها: هو ما تشير
- *     إليه روابط المتجر ومحركات البحث. عرضه حقلًا قابلًا للتحرير
- *     دعوةٌ لكسر كل رابط مُشارَك.
+ *     It is generated from the name at creation and never changes afterwards:
+ *     it is what the store's links and the search engines point at. Showing it
+ *     as an editable field is an invitation to break every shared link.
  *
- * ⚠️  و**الأب لا يشمل الفئة نفسها ولا فروعها** في قائمة الاختيار.
+ * ⚠️  And **the parent excludes the category itself and its own branches** in
+ *     the select list.
  *
- *     الخادم يرفضهما، لكن عرضهما يجعل الأدمن يختار ثم يُرفض. حذفهما
- *     من القائمة يجعل الحالة الخاطئة غير قابلة للاختيار أصلًا.
+ *     The server refuses both, but showing them makes the admin choose and then
+ *     be refused. Removing them from the list makes the wrong state impossible
+ *     to choose at all.
  */
 export function ReferenceForm({
   kind,
@@ -78,7 +80,7 @@ export function ReferenceForm({
     setForm((current) => ({ ...current, [key]: value }));
   };
 
-  // ⚠️  الفئة الحالية وفروعها مستبعدة — الشجرة لا تصير دورة.
+  // ⚠️  The current category and its branches are excluded — the tree does not become a cycle.
   const parentOptions = categories.filter((option) => {
     if (!asCategory) return true;
     if (option.id === asCategory.id) return false;
@@ -98,8 +100,8 @@ export function ReferenceForm({
       kind === 'categories'
         ? {
             ...shared,
-            // ⚠️  `null` لا `''`: السلسلة الفارغة تصل الخادم معرّفًا
-            //     غير صالح، والفئة الجذر أبوها **لا شيء**.
+            // ⚠️  `null`, not `''`: an empty string reaches the server as an invalid
+            //     id, and a root category's parent is **nothing**.
             parent: form.parent || null,
             show_in_menu: form.show_in_menu,
             display_order: Number(form.display_order) || 0,

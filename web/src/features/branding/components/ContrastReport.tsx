@@ -5,15 +5,16 @@ import type { ContrastEntry } from '../adminApi';
 import './ContrastReport.css';
 
 /**
- * تقرير التباين.
+ * The contrast report.
  *
- * ⚠️  **يُعرض الناجح والفاشل معًا** لا الفاشل وحده.
+ * ⚠️  **The passing and the failing are shown together**, not the failing alone.
  *
- *     إظهار الناجح يجعل الأدمن يرى أثر تعديله لحظةً بلحظة: النسبة
- *     تتحرّك مع كل تغيير لون، فيقترب من الحد بدل أن يخمّن.
+ *     Showing what passes lets the admin see the effect of their edit moment by
+ *     moment: the ratio moves with every colour change, so they close in on the
+ *     threshold instead of guessing.
  *
- * ⚠️  والحد ٤٫٥:١ ليس رأيًا جماليًا — نص رمادي فاتح على أبيض يبدو
- *     أنيقًا على شاشة المصمّم وغير مقروء على هاتف تحت الشمس.
+ * ⚠️  And the 4.5:1 threshold is not an aesthetic opinion — light grey text on
+ *     white looks elegant on a designer's monitor and is unreadable on a phone in sunlight.
  */
 export function ContrastReport({ entries }: { entries: ContrastEntry[] }) {
   const { t } = useTranslation();

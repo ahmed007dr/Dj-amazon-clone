@@ -9,7 +9,7 @@ export function useMyBundles(enabled = true) {
     queryKey: ['academic', 'my-bundles'],
     queryFn: api.getMyBundles,
     enabled,
-    // الحزم تتغيّر مع بداية الفصل الدراسي لا خلال اليوم
+    // Bundles change at the start of a term, not during the day
     staleTime: 10 * 60 * 1000,
   });
 }
@@ -24,10 +24,10 @@ export function useBundle(slug: string | undefined) {
 }
 
 /**
- * ⚠️  الخادم يعيد `null` بحالة `200` لغير الطلاب لا `404`.
+ * ⚠️  The server returns `null` with a `200` status for non-students, not a `404`.
  *
- *     ولذلك `data` قد تكون `null` بلا أن يكون هناك خطأ — والفحص
- *     يجب أن يكون على القيمة لا على `error`.
+ *     So `data` may be `null` with no error present — and the check must be on
+ *     the value, not on `error`.
  */
 export function useStudentProfile(enabled = true) {
   return useQuery({
@@ -39,11 +39,11 @@ export function useStudentProfile(enabled = true) {
 }
 
 /**
- * شجرة الجامعات.
+ * The university tree.
  *
- * ⚠️  `staleTime` ساعة كاملة — الجامعات والكليات لا تتغيّر خلال
- *     جلسة، والشجرة أثقل استجابة في الشاشة. إعادة جلبها عند كل
- *     تركيز نافذة هدر خالص على شبكة طالب.
+ * ⚠️  A `staleTime` of a full hour — universities and faculties do not change
+ *     during a session, and the tree is the heaviest response on the screen.
+ *     Refetching it on every window focus is pure waste on a student's connection.
  */
 export function useUniversities(enabled = true) {
   return useQuery({
@@ -55,10 +55,11 @@ export function useUniversities(enabled = true) {
 }
 
 /**
- * ⚠️  إبطال الحزم مع الملف.
+ * ⚠️  Invalidate the bundles along with the profile.
  *
- *     الحزم تُختار بالكلية والسنة، فتغيير أيٍّ منهما يجعل الحزم
- *     المعروضة حزم كلية أخرى — والطالب يشتري مستلزمات ليست له.
+ *     Bundles are selected by faculty and year, so changing either makes the
+ *     displayed bundles another faculty's — and the student buys supplies that
+ *     are not theirs.
  */
 function invalidateAcademic(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: PROFILE_KEY });

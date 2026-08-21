@@ -15,8 +15,8 @@
   display: grid;
   place-items: center;
 
-  /* ⚠️  نسبة ثابتة تحجز المساحة قبل تحميل الصورة — تمنع قفز
-       التخطيط الذي يجعل المستخدم ينقر على العنصر الخطأ. */
+  /* ⚠️  A fixed ratio reserves the space before the image loads — preventing the
+       layout shift that makes the user click the wrong element. */
   aspect-ratio: 4 / 3;
 
   background: color-mix(in srgb, var(--color-text) 4%, transparent);

@@ -14,7 +14,7 @@
   color: var(--color-text);
   text-decoration: none;
   border-radius: var(--radius);
-  /* شريط التحديد على حافة البداية — ينتقل مع تبديل اللغة */
+  /* The selection bar on the start edge — it moves when the language switches */
   border-inline-start: 3px solid transparent;
 }
 
@@ -30,8 +30,8 @@
   border-inline-start-color: var(--color-primary);
 }
 
-/* ⚠️  على الهاتف شريط يتمرّر أفقيًا لا قائمة رأسية تدفع المحتوى
-   تحت الطيّة */
+/* ⚠️  On a phone, a horizontally scrolling bar rather than a vertical menu that
+   pushes the content below the fold */
 @media (max-width: 991px) {
   .account-nav {
     flex-direction: row;

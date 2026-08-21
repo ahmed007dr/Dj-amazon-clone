@@ -15,14 +15,14 @@ import { Pagination } from '@/shared/ui/Pagination';
 import './AcademicPanels.css';
 
 /**
- * الطلاب — **عرض وترشيح فقط**.
+ * Students — **display and filtering only**.
  *
- * ⚠️  التوثيق يقع في شاشة الوثائق لا هنا: هو قرار على مستند
- *     مرفوع، لا على صفّ في جدول. وتكراره في مكانين يجعل قرارين
- *     لنفس الطالب.
+ * ⚠️  Verification happens on the documents screen, not here: it is a decision
+ *     about an uploaded document, not about a row in a table. And duplicating
+ *     it in two places makes two decisions for the same student.
  *
- * ⚠️  و«غير موثّق» أول ما يُرشَّح: هؤلاء من ينتظرون، وهم سبب فتح
- *     هذه الشاشة أصلًا.
+ * ⚠️  And "unverified" is the first filter: those are the ones waiting, and they
+ *     are why this screen is opened at all.
  */
 export function StudentPanel() {
   const { t } = useTranslation();
@@ -95,8 +95,8 @@ export function StudentPanel() {
             value={university}
             onChange={(event) => {
               setUniversity(event.target.value);
-              // ⚠️  الكلية تُصفَّر مع تغيير الجامعة: كلية من جامعة
-              //     أخرى تُنتج جدولًا فارغًا يُقرأ «لا طلاب».
+              // ⚠️  The faculty is cleared when the university changes: a faculty from
+              //     another university produces an empty table that reads as "no students".
               setFaculty('');
               reset();
             }}

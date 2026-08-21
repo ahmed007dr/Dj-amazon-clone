@@ -10,17 +10,17 @@ import { useCancelOrder } from '../hooks';
 import './CancelOrderButton.css';
 
 /**
- * إلغاء الطلب.
+ * Cancelling the order.
  *
- * ⚠️  **السبب مطلوب** — والخادم يشترطه بثلاثة محارف على الأقل.
+ * ⚠️  **A reason is required** — and the server demands at least three characters.
  *
- *     ليس بيروقراطية: الإلغاء يُفرج عن المخزون ويترك أثرًا في
- *     السجل، و«لماذا أُلغيت هذه الطلبات؟» سؤال يُسأل شهريًا. حقل
- *     فارغ يجعل الجواب مستحيلًا رجعيًا.
+ *     This is not bureaucracy: cancellation releases the stock and leaves a
+ *     trace in the log, and "why were these orders cancelled?" is a question
+ *     asked monthly. An empty field makes the answer retrospectively impossible.
  *
- * ⚠️  وزر الإلغاء يظهر حسب `can_cancel` **من الخادم** لا حسب قائمة
- *     حالات في الواجهة: الثانية تتباعد عن آلة الحالة الحقيقية،
- *     فيظهر زر يفشل عند الضغط.
+ * ⚠️  And the cancel button appears according to `can_cancel` **from the
+ *     server**, not according to a list of statuses in the frontend: the latter
+ *     drifts from the real state machine, so a button appears and fails when pressed.
  */
 export function CancelOrderButton({ orderId }: { orderId: string }) {
   const { t } = useTranslation();

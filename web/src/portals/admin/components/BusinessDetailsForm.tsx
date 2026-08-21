@@ -12,17 +12,18 @@ import './BusinessPanels.css';
 const KINDS = ['PHARMACY', 'WAREHOUSE', 'CLINIC', 'HOSPITAL', 'TRADER'];
 
 /**
- * بيانات المنشأة.
+ * The business's details.
  *
- * ⚠️  **تاريخ الترخيص يمنع الآجل — ولم يكن يُعدَّل من أي شاشة.**
+ * ⚠️  **The licence date blocks credit — and it was editable from no screen.**
  *
- *     `license_is_valid` تُفحص قبل كل بيع آجل؛ صيدلية جدّدت
- *     ترخيصها تبقى ممنوعة إلى الأبد ما لم يُحدَّث التاريخ، وكان
- *     تحديثه يحتاج قاعدة البيانات مباشرةً.
+ *     `license_is_valid` is checked before every credit sale; a pharmacy that
+ *     renewed its licence stays blocked forever unless the date is updated, and
+ *     updating it used to require the database directly.
  *
- * ⚠️  و**الحد الائتماني ليس هنا**: له لوحه ومساره الموثَّق
- *     (`AdminGrantCreditAPI`). خلطه ببيانات المنشأة كان يجعل رفع
- *     الحد يمرّ في حفظٍ عابر بلا سجل يقول من رفعه.
+ * ⚠️  And **the credit limit is not here**: it has its own panel and its own
+ *     documented path (`AdminGrantCreditAPI`). Mixing it into the business
+ *     details made raising the limit pass through a casual save with no record
+ *     saying who raised it.
  */
 export function BusinessDetailsForm({ business }: { business: BusinessProfile }) {
   const { t } = useTranslation();
@@ -50,9 +51,9 @@ export function BusinessDetailsForm({ business }: { business: BusinessProfile })
           {
             id: business.id,
             ...draft,
-            // ⚠️  الفراغ يُرسَل `null` لا سلسلة فارغة: الخادم يعامل
-            //     غياب التاريخ «ترخيصًا ساريًا» (نقص بيانات لا
-            //     مخالفة)، وسلسلة فارغة ترفضها حقول التاريخ.
+            // ⚠️  An empty value is sent as `null`, not an empty string: the server treats
+            //     a missing date as "a valid licence" (missing data rather than a
+            //     violation), and date fields refuse an empty string.
             license_expires_on: draft.license_expires_on || null,
           },
           {
@@ -66,8 +67,8 @@ export function BusinessDetailsForm({ business }: { business: BusinessProfile })
         );
       }}
     >
-      {/* ⚠️  الانتهاء يُقال قبل الحفظ لا بعده: الأدمن يفتح الشاشة
-          ليجدّد، فيجب أن يرى سبب المنع أمامه. */}
+      {/* ⚠️  The expiry is stated before the save rather than after: the admin opens
+          the screen to renew, so they must see the reason for the block in front of them. */}
       {expired ? <Alert tone="warning">{t('b2b.licenseExpiredNotice')}</Alert> : null}
 
       <label>

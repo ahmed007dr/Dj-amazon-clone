@@ -8,19 +8,20 @@ import type { CartTotals } from '../types';
 import './CartSummary.css';
 
 /**
- * ملخّص الإجماليات.
+ * The totals summary.
  *
- * ⚠️  **الأرقام كلها من الخادم** — لا جمع ولا طرح هنا.
+ * ⚠️  **Every figure comes from the server** — no addition and no subtraction here.
  *
- *     الضريبة تُحسب بالتقريب لكل سطر أو على الإجمالي حسب إعداد
- *     الأدمن، والشحن مجاني فوق حد يختلف بالمنطقة، وسقف الكوبون
- *     يقصّ الخصم. أي إعادة حساب في الواجهة تنتج رقمًا يختلف بقروش
- *     عن الفاتورة — وهي القروش التي تُفقد بها الثقة.
+ *     Tax is computed with rounding per line or on the total according to the
+ *     admin's setting, shipping is free above a threshold that differs by zone,
+ *     and the coupon cap clips the discount. Any recalculation in the frontend
+ *     produces a figure differing from the invoice by piastres — and those are
+ *     the piastres trust is lost over.
  *
- * ⚠️  الشحن يُعرض «يُحسب لاحقًا» قبل اختيار المحافظة.
+ * ⚠️  Shipping shows "calculated later" before the governorate is chosen.
  *
- *     عرض صفر يوحي بأنه مجاني، ثم يظهر مبلغ في آخر خطوة — وهو
- *     أشهر سبب لهجر السلة.
+ *     Showing zero suggests it is free, and then an amount appears at the last
+ *     step — the most common cause of cart abandonment.
  */
 export function CartSummary({
   totals,

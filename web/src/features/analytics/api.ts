@@ -1,13 +1,13 @@
 import { http } from '@/shared/http';
 
 /**
- * حركة الاستخدام — **قراءة فقط**.
+ * Usage traffic — **read-only**.
  *
- * ⚠️  ثلاثة أرقام لا رقم واحد في نبض اللحظة.
+ * ⚠️  Three numbers, not one, in the live pulse.
  *
- *     «١٢ متصفّحًا مجهولًا» و«٣ مسجَّلين» قراران مختلفان تمامًا في
- *     التشغيل، ومجموعهما «١٥» لا يقول أيًّا منهما. ولذلك الحقول
- *     الثلاثة تصل منفصلة ولا تُجمع في الواجهة.
+ *     "12 anonymous browsers" and "3 registered" are entirely different
+ *     operational decisions, and their sum, "15", says neither. So the three
+ *     fields arrive separately and are never added together in the frontend.
  */
 
 export interface LivePulse {
@@ -33,7 +33,7 @@ export interface TrafficSummary {
   by_device: DeviceRow[];
 }
 
-/** خلية واحدة في شبكة ٧×٢٤ — الشبكة مكتملة دائمًا من الخادم. */
+/** One cell in a 7×24 grid — the grid always arrives complete from the server. */
 export interface TrafficCell {
   weekday: number;
   hour: number;
@@ -44,7 +44,7 @@ export interface TrafficCell {
 export interface TrafficPeakHours {
   start: string;
   end: string;
-  /** المنطقة الزمنية التي حُسبت بها الساعات — تُعرَض كي لا يُقرأ الرقم خطأً. */
+  /** The timezone the hours were computed in — displayed so the figure is not misread. */
   timezone: string;
   cells: TrafficCell[];
   peak_cell: TrafficCell | null;

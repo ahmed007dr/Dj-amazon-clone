@@ -7,13 +7,13 @@ import type { ProductDetail } from '../types';
 import './ProductSpecs.css';
 
 /**
- * المواصفات الدوائية والتنظيمية.
+ * The pharmaceutical and regulatory specifications.
  *
- * ⚠️  **الحقول الفارغة لا تُعرض.**
+ * ⚠️  **Empty fields are not displayed.**
  *
- *     «المادة الفعّالة: —» على قفاز طبي ضجيج: الحقل موجود لأن
- *     الأدوية تحتاجه، لا لأن كل منتج يملكه. صفٌّ فارغ يجعل العين
- *     تتوقف عند لا شيء.
+ *     "Active ingredient: —" on a medical glove is noise: the field exists
+ *     because medicines need it, not because every product has one. An empty
+ *     row makes the eye stop at nothing.
  */
 export function ProductSpecs({ product }: { product: ProductDetail }) {
   const { t } = useTranslation();

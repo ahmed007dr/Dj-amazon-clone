@@ -4,13 +4,14 @@ import type { PagedResponse } from '@/features/orders/adminApi';
 import { http } from '@/shared/http';
 
 /**
- * التسعير والعروض.
+ * Pricing and offers.
  *
- * ⚠️  **كل نقطة هنا للأدمن** — ولا نظير عام لها.
+ * ⚠️  **Every endpoint here is for the admin** — and none has a public counterpart.
  *
- *     السعر يصل العميل محسوبًا داخل المنتج والسلة والطلب. وكشف
- *     قوائم الأسعار يعطي المنافس هيكل تسعيرك كاملًا، وكشف
- *     الكوبونات يجعل كل زائر يجرّب أعلى خصم متاح.
+ *     The price reaches the customer already computed inside the product, the
+ *     cart and the order. And exposing the price lists hands a competitor your
+ *     entire pricing structure, while exposing the coupons makes every visitor
+ *     try the highest available discount.
  */
 
 export interface PriceList {
@@ -26,7 +27,7 @@ export interface PriceList {
   valid_from: string;
   valid_to: string | null;
   is_currently_valid: boolean;
-  /** ⚠️  صفر يعني قائمة مفعّلة بلا أسعار — عملاؤها يرون التجزئة. */
+  /** ⚠️  Zero means an enabled list with no prices — its customers see retail. */
   rule_count: number;
 }
 
@@ -79,7 +80,7 @@ export interface Coupon {
   starts_at: string;
   ends_at: string | null;
   is_active: boolean;
-  /** ⚠️  ثلاثة أعلام لا واحد: الأدمن يحتاج «لماذا لا يعمل؟». */
+  /** ⚠️  Three flags, not one: the admin needs "why does it not work?". */
   is_running: boolean;
   is_expired: boolean;
   is_exhausted: boolean;
@@ -88,11 +89,11 @@ export interface Coupon {
 const KEY = ['admin', 'pricing'] as const;
 
 /**
- * ⚠️  إبطال **شجرة التسعير كلها والكتالوج معه**.
+ * ⚠️  Invalidate **the whole pricing tree and the catalogue with it**.
  *
- *     تغيير سعر أو تفعيل خصم يغيّر ما يراه العميل على بطاقة المنتج
- *     فورًا. إبطال قائمة القواعد وحدها يترك الأدمن يرى سعره الجديد
- *     في اللوحة والسعر القديم في المعاينة.
+ *     Changing a price or enabling a discount changes what the customer sees on
+ *     the product card immediately. Invalidating the rules list alone leaves
+ *     the admin seeing their new price in the panel and the old one in the preview.
  */
 function usePricingMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();
@@ -106,7 +107,7 @@ function usePricingMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResul
   });
 }
 
-// ── قوائم الأسعار ──────────────────────────────────────────
+// ── Price lists ───────────────────────────────────────────
 
 export function usePriceLists(enabled = true) {
   return useQuery({
@@ -128,7 +129,7 @@ export function useDeletePriceList() {
   return usePricingMutation((id: string) => http.delete<void>(`/pricing/admin/lists/${id}/`));
 }
 
-// ── قواعد التسعير ──────────────────────────────────────────
+// ── Pricing rules ─────────────────────────────────────────
 
 export function usePriceRules(params: { price_list?: string; search?: string; page?: number }) {
   return useQuery({
@@ -151,7 +152,7 @@ export function useDeletePriceRule() {
   return usePricingMutation((id: string) => http.delete<void>(`/pricing/admin/rules/${id}/`));
 }
 
-// ── الخصومات الترويجية ─────────────────────────────────────
+// ── Promotional discounts ─────────────────────────────────
 
 export function usePriceOverrides(params: { running?: string; page?: number }, enabled = true) {
   return useQuery({
@@ -178,7 +179,7 @@ export function useDeleteOverride() {
   );
 }
 
-// ── الكوبونات ──────────────────────────────────────────────
+// ── Coupons ───────────────────────────────────────────────
 
 export function useCoupons(
   params: { search?: string; status?: string; page?: number },
@@ -207,7 +208,7 @@ export function useDeleteCoupon() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  سجل صرف الكوبونات
+//  The coupon redemption log
 // ═══════════════════════════════════════════════════════════
 
 export interface CouponRedemption {
@@ -225,13 +226,13 @@ export interface CouponRedemption {
 }
 
 /**
- * من صرف الكوبون ومتى وبكم.
+ * Who redeemed the coupon, when, and for how much.
  *
- * ⚠️  **الملغى مُستبعَد افتراضيًا ويُطلَب صراحةً.**
+ * ⚠️  **Cancelled ones are excluded by default and requested explicitly.**
  *
- *     السجل يبقي استخدام طلبٍ أُلغي ويُعلّمه؛ ضمّه إلى العدّ
- *     الافتراضي يجعل «صُرف ٣٠٠ مرة» تشمل مئة طلب لم يخرج منها
- *     شيء — ويُبنى على الرقم قرار تمديد الحملة.
+ *     The log keeps the use of a cancelled order and marks it; including it in
+ *     the default count makes "redeemed 300 times" cover a hundred orders that
+ *     shipped nothing — and the decision to extend the campaign is built on that figure.
  */
 export function useCouponRedemptions(params: {
   coupon?: string;

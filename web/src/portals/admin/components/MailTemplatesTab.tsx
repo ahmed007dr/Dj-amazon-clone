@@ -19,14 +19,16 @@ import { useToast } from '@/shared/ui/useToast';
 import './MailTemplatesTab.css';
 
 /**
- * تحرير القوالب.
+ * Editing the templates.
  *
- * ⚠️  **قائمة المتغيّرات معروضة دائمًا** — لا في وثيقة ولا في تلميح
- *     يختفي. المحرّر الذي لا يرى ما يملك يكتب `{price}` بدل
- *     `{total}` ويكتشف الخطأ حين يصل النص خامًا إلى عميل.
+ * ⚠️  **The variables list is always displayed** — not in a document and not in
+ *     a tooltip that disappears. An editor who cannot see what they have writes
+ *     `{price}` instead of `{total}` and discovers the mistake when the raw
+ *     text reaches a customer.
  *
- * ⚠️  **والمعاينة قبل الحفظ** لا بعده: معاينة لا تسبق الحفظ لا تمنع
- *     شيئًا. وهي لا تلمس قاعدة البيانات — التجربة ليست التزامًا.
+ * ⚠️  **And the preview comes before the save**, not after: a preview that does
+ *     not precede the save prevents nothing. And it touches no database — an
+ *     experiment is not a commitment.
  */
 export function MailTemplatesTab() {
   const { t } = useTranslation();
@@ -157,8 +159,8 @@ export function MailTemplatesTab() {
               </Button>
 
               {editing.is_overridden ? (
-                /* ⚠️  الرجوع إلى الافتراضي ضغطة: تحرير فاسد وقت الضغط
-                   يجب ألا يحتاج إعادة كتابة النص الأصلي من الذاكرة. */
+                /* ⚠️  Reverting to the default is one click: a bad edit made under
+                   pressure must not require retyping the original from memory. */
                 <Button
                   variant="ghost"
                   loading={reset.isPending}
@@ -182,8 +184,8 @@ export function MailTemplatesTab() {
                   <section key={language}>
                     <h4>{t(`mail.preview_${language}`)}</h4>
                     {preview.data[language].unknown_variables.length > 0 ? (
-                      /* ⚠️  المجهول يُسمّى صراحةً بدل أن يمرّ في النص
-                         فيراه المحرّر «كلمة غريبة» ويتجاهلها. */
+                      /* ⚠️  An unknown one is named explicitly rather than passing through
+                         in the text, where the editor sees it as "a strange word" and ignores it. */
                       <Alert tone="danger">
                         {t('mail.unknownVariables')}:{' '}
                         {preview.data[language].unknown_variables.join(' · ')}

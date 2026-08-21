@@ -1,4 +1,4 @@
-/** عقود العملاء — تطابق `customers/serializers.py`. */
+/** Customer contracts — matching `customers/serializers.py`. */
 
 export interface CustomerAddress {
   id: string;

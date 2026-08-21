@@ -9,11 +9,11 @@ import { AccountNav } from './components/AccountNav';
 import './AccountShell.css';
 
 /**
- * قشرة بوابة الحساب — داخل قشرة المتجر لا بديلًا عنها.
+ * The account portal shell — inside the store shell rather than replacing it.
  *
- * ⚠️  العميل يتنقّل بين حسابه والمتجر باستمرار: هيدر مختلف يجعله
- *     يشعر أنه غادر الموقع، ويفقد السلة من عينه في اللحظة التي
- *     يريد فيها إكمال الشراء.
+ * ⚠️  The customer moves between their account and the store constantly: a
+ *     different header makes them feel they have left the site, and takes the
+ *     cart out of their sight at the very moment they want to complete a purchase.
  */
 export function AccountShell() {
   const { t } = useTranslation();
@@ -26,9 +26,9 @@ export function AccountShell() {
       </aside>
 
       <div className="account-shell__content">
-        {/* ⚠️  حالة التوثيق تُعرض في كل شاشات الحساب لا في صفحة واحدة:
-            المهني الذي ينتظر المراجعة يرى أسعار التجزئة ويظن أن
-            النظام معطّل. */}
+        {/* ⚠️  The verification status is shown on every account screen rather than on
+            one page: a professional awaiting review sees retail prices and
+            assumes the system is broken. */}
         {user?.verification_status === 'PENDING' ? (
           <Alert tone="info">{t('auth.awaitingVerification')}</Alert>
         ) : null}

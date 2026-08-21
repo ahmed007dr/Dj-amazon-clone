@@ -14,13 +14,14 @@ import { StatCard } from '@/shared/ui/StatCard';
 import './AdminDashboardPage.css';
 
 /**
- * لوحة المعلومات.
+ * The dashboard.
  *
- * ⚠️  **أرقام تستدعي تصرّفًا لا أرقام للعرض.**
+ * ⚠️  **Figures that call for an action, not figures for display.**
  *
- *     «إجمالي المنتجات ٢٣» لا يُغيّر شيئًا؛ أما «٧ طلبات تنتظر
- *     التأكيد» و«٣ تنبيهات مخزون» فكلاهما عمل يبدأ الآن. ولذلك كل
- *     بطاقة هنا رابط إلى مكان الفعل لا رقم صامت.
+ *     "Total products 23" changes nothing; whereas "7 orders awaiting
+ *     confirmation" and "3 stock alerts" are both work that starts now. Which
+ *     is why every card here is a link to where the action happens, not a
+ *     silent number.
  */
 export function AdminDashboardPage() {
   const { t } = useTranslation();
@@ -44,11 +45,12 @@ export function AdminDashboardPage() {
   });
 
   /**
-   * ⚠️  `analytics/live` لا `online-now`.
+   * ⚠️  `analytics/live`, not `online-now`.
    *
-   *     الثانية تُسلسِل كل متصل بملفه وآخر عملياته — عملٌ ثقيل
-   *     يتكرّر كل ثلاثين ثانية في كل لوحة مفتوحة لأجل رقم واحد.
-   *     الأولى ثلاثة أعداد وحدها، فمراقبة الضغط لا تصير هي الضغط.
+   *     The latter serialises every connected user with their profile and their
+   *     recent actions — heavy work repeated every thirty seconds in every open
+   *     panel for the sake of one number. The former is three counts alone, so
+   *     monitoring the load does not become the load.
    */
   const live = useQuery({
     queryKey: ['admin', 'live-pulse'],
@@ -74,8 +76,8 @@ export function AdminDashboardPage() {
     <>
       <PageHeader title={t('nav.dashboard')} description={t('admin.dashboardHint')} />
 
-      {/* ⚠️  متجر بلا بوابة مفعّلة لا يستقبل طلبات — والاكتشاف
-          يكون بشكوى عميل. هذا التحذير يسبق كل شيء. */}
+      {/* ⚠️  A store with no enabled gateway accepts no orders — and the discovery
+          comes through a customer complaint. This warning precedes everything. */}
       {providers.data && activeGateways === 0 ? (
         <Alert tone="danger">{t('admin.noActiveGateway')}</Alert>
       ) : null}
@@ -124,10 +126,11 @@ export function AdminDashboardPage() {
           />
         </Link>
 
-        {/* ⚠️  بطاقتان لا واحدة.
-            المسجَّل له اسم وملف يُفتح بنقرة؛ والمجهول عدد بلا هوية.
-            جمعهما في «١٥ متصلًا» يُنتج رقمًا لا يقابله إلا ثلاثة
-            صفوف في جدول المستخدمين — تناقضٌ ظاهر يفقد اللوحة ثقتها. */}
+        {/* ⚠️  Two cards, not one.
+            A registered user has a name and a profile that opens with a click;
+            an anonymous one is a count with no identity. Merging them into "15
+            online" produces a figure matched by only three rows in the users
+            table — a visible contradiction that costs the dashboard its credibility. */}
         <Link to="/admin/users" className="dashboard__link">
           <StatCard
             label={t('admin.onlineNow')}

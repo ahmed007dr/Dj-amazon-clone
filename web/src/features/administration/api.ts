@@ -32,14 +32,14 @@ export const getAccount = (id: string) =>
   http.get<AdminAccount>(`/administration/accounts/${id}/`);
 
 /**
- * إيقاف حساب — **بأثر فوري**.
+ * Suspend an account — **with immediate effect**.
  *
- * ⚠️  يبطل الجلسات والتوكنات ويُدرِج المستخدم في مجموعة تُفحص على
- *     كل طلب (ADR-16). ليس علمًا في قاعدة بيانات ينتظر انتهاء
- *     التوكن — الموقوف يخرج الآن.
+ * ⚠️  It revokes the sessions and tokens and adds the user to a set checked on
+ *     every request (ADR-16). It is not a flag in a database waiting for a
+ *     token to expire — the suspended user is out now.
  *
- * ⚠️  والسبب مطلوب: «لماذا أُوقف هذا الحساب؟» سؤال يُسأل بعد شهور،
- *     وحقل فارغ يجعل الجواب مستحيلًا.
+ * ⚠️  And a reason is required: "why was this account suspended?" is a question
+ *     asked months later, and an empty field makes the answer impossible.
  */
 export const suspendAccount = (id: string, reason: string, status = 'SUSPENDED') =>
   http.post<AdminAccount>(`/administration/accounts/${id}/suspend/`, { reason, status });
@@ -56,15 +56,15 @@ export interface OnlineUser {
 }
 
 /**
- * ⛔ كان النوع `OnlineUser[]` والخادم يردّ كائنًا يلفّها.
+ * ⛔ The type was `OnlineUser[]` while the server answers with an object wrapping it.
  *
- *    فكان `data.length` دائمًا `undefined`: بطاقة «المتصلون الآن»
- *    تعرض «—» أبدًا، وقائمة المتصلين لا تظهر إطلاقًا — بلا خطأ في
- *    الطرفية يدلّ على السبب.
+ *    So `data.length` was always `undefined`: the "online now" card showed "—"
+ *    forever, and the list of online users never appeared at all — with no
+ *    error in the console to point at the cause.
  */
 export interface OnlineNow {
   count: number;
-  /** المتصفّحون المجهولون — بلا هوية، من `analytics`. */
+  /** Anonymous browsers — with no identity, from `analytics`. */
   guests_count: number;
   total_online: number;
   window_minutes: number;
@@ -87,17 +87,17 @@ export const listAuditLog = (params: { action?: string; page?: number }) =>
   http.get<PagedResponse<AuditEntry>>('/administration/audit-log/', { params: { ...params } });
 
 // ═══════════════════════════════════════════════════════════
-//  تاريخ الحساب الواحد
+//  A single account's history
 // ═══════════════════════════════════════════════════════════
 //
-// ⚠️  **ثلاثة أسئلة مختلفة لا سؤال واحد:**
+// ⚠️  **Three different questions, not one:**
 //
-//       الجلسات      «متى ظهر ومن أي جهاز؟»
-//       النشاط       «ماذا فعل؟»
-//       تاريخ الحالة «من أوقفه ولماذا؟»
+//       sessions      "when did they appear, and from which device?"
+//       activity      "what did they do?"
+//       status history "who suspended them, and why?"
 //
-//     دمجها في قائمة واحدة يخلط دخولًا عاديًا بإيقاف إداري، فيضيع
-//     ما يُبحث عنه وسط ما لا يُبحث عنه.
+//     Merging them into one list mixes an ordinary login with an administrative
+//     suspension, so what is being looked for is lost among what is not.
 
 export interface AccountSession {
   id: string;
@@ -132,6 +132,6 @@ export const listAccountActivity = (id: string, page = 1) =>
     params: { page },
   });
 
-/** ⚠️  بلا ترقيم على الخادم — مصفوفة مباشرة لا `results`. */
+/** ⚠️  Unpaginated on the server — a plain array, not `results`. */
 export const listAccountStatusHistory = (id: string) =>
   http.get<AccountStatusChange[]>(`/administration/accounts/${id}/status-history/`);

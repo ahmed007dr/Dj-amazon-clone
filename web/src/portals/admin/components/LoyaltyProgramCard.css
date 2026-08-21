@@ -6,9 +6,10 @@
   border-radius: var(--radius);
 }
 
-/* ⚠️  الحالة تُقرأ من حافة ملوّنة لا من لون المفتاح وحده.
-   المفتاح صغير وقد يقع خارج مجال النظر على شاشة عريضة، والحافة
-   تُميّز البرنامج الموقوف من صفّ بطاقات بلمحة واحدة. */
+/* ⚠️  The status is read from a coloured edge rather than from the switch's
+   colour alone. The switch is small and may fall outside the field of view on
+   a wide screen, and the edge distinguishes a disabled programme in a row of
+   cards at a glance. */
 .loyalty-program.is-on {
   border-inline-start: 4px solid var(--color-success);
 }
@@ -36,15 +37,15 @@
   color: var(--color-text-muted);
 }
 
-/* ── المفتاح ─────────────────────────────────────────────── */
+/* ── The switch ──────────────────────────────────────────── */
 
 .loyalty-switch {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   cursor: pointer;
-  /* ⚠️  مساحة لمس كاملة: المفتاح يُضغط على تابلت في المتجر لا
-     بفأرة على مكتب. */
+  /* ⚠️  A full touch area: the switch is pressed on a tablet in the shop, not
+     with a mouse on a desk. */
   min-block-size: var(--touch-target);
 }
 
@@ -97,7 +98,7 @@
   font-weight: 600;
 }
 
-/* ── الحقائق ─────────────────────────────────────────────── */
+/* ── The facts ───────────────────────────────────────────── */
 
 .loyalty-program__facts {
   display: grid;
@@ -116,7 +117,7 @@
   font-weight: 600;
 }
 
-/* ── الاستهداف ───────────────────────────────────────────── */
+/* ── Targeting ───────────────────────────────────────────── */
 
 .loyalty-program__targeting h4 {
   margin: 0 0 var(--space-2);
@@ -135,7 +136,7 @@
   color: var(--color-warning);
 }
 
-/* ── النموذج ─────────────────────────────────────────────── */
+/* ── The form ────────────────────────────────────────────── */
 
 .loyalty-program__form {
   display: flex;

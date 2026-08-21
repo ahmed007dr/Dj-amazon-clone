@@ -46,16 +46,17 @@ const COLOR_FIELDS = [
 type ColorKey = (typeof COLOR_FIELDS)[number];
 
 /**
- * تحرير الهوية البصرية.
+ * Editing the visual identity.
  *
- * ⚠️  **المعاينة لا تلمس المفعّل.**
+ * ⚠️  **The preview does not touch what is active.**
  *
- *     التعديل يبقى محليًا ويُرسَل إلى `/preview/` لحساب التباين
- *     وحده. الحفظ وحده هو ما ينشر التغيير — و«جرّب ثم تراجع» على
- *     المفعّل يعني أن كل زائر خلال المحاولة رأى ألوانًا مكسورة.
+ *     The edit stays local and is sent to `/preview/` to compute the contrast
+ *     alone. Saving is the only thing that publishes the change — and "try it
+ *     and undo" on what is active means every visitor during the attempt saw
+ *     broken colours.
  *
- * ⚠️  والحفظ **يُرفض** إن سقط التباين تحت WCAG AA — الخادم يفرضه،
- *     والواجهة تُظهره قبل المحاولة.
+ * ⚠️  And the save is **refused** if the contrast falls below WCAG AA — the
+ *     server enforces it, and the frontend shows it before the attempt.
  */
 export function AdminBrandingPage() {
   const { t } = useTranslation();
@@ -66,8 +67,8 @@ export function AdminBrandingPage() {
   const [mode, setMode] = useState<'LIGHT' | 'DARK'>('LIGHT');
   const [draft, setDraft] = useState<Record<ColorKey, string> | null>(null);
 
-  // ⚠️  الملف المعروض قد لا يكون المفعّل: الهوية الموسمية تُجهَّز
-  //     كاملة ثم تُفعَّل بضغطة، وتجهيزها يحتاج تحريرها وهي مسوّدة.
+  // ⚠️  The displayed profile may not be the active one: a seasonal identity is
+  //     prepared in full and then activated with a click, and preparing it means editing it as a draft.
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const profiles = useBrandProfiles();
@@ -80,8 +81,8 @@ export function AdminBrandingPage() {
 
   const palette = profile?.palettes.find((item) => item.mode === mode);
 
-  // ⚠️  المسوّدة تُعاد تهيئتها عند تبديل الوضع: خلط ألوان الفاتح
-  //     بالداكن ينتج لوحة لم يقصدها أحد.
+  // ⚠️  The draft is reinitialised when the mode switches: mixing light colours
+  //     with dark ones produces a palette nobody intended.
   useEffect(() => {
     if (!palette) return;
     setDraft(
@@ -92,13 +93,13 @@ export function AdminBrandingPage() {
     );
   }, [palette?.id, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // التأجيل يمنع نداء معاينة لكل حركة في منتقي الألوان
+  // Debouncing prevents a preview call for every movement in the colour picker
   const debouncedDraft = useDebounced(draft, 400);
 
   const preview = useQuery({
     queryKey: [...KEY, 'preview', mode, debouncedDraft],
     queryFn: () => previewPalette({ ...debouncedDraft, mode }),
-    // المعاينة تخصّ تبويب الألوان وحده — لا نداء وهو مغلق
+    // The preview belongs to the colours tab alone — no call while it is closed
     enabled: Boolean(debouncedDraft) && tab === 'colors',
     staleTime: Infinity,
   });
@@ -111,7 +112,7 @@ export function AdminBrandingPage() {
     onSuccess: () => {
       notify(t('admin.brandingSaved'));
       void queryClient.invalidateQueries({ queryKey: KEY });
-      // الثيم العام يُعاد جلبه ليظهر التغيير فورًا في نفس الجلسة
+      // The public theme is refetched so the change appears immediately in the same session
       void queryClient.invalidateQueries({ queryKey: ['branding', 'theme'] });
     },
     onError: (cause) => {
@@ -141,8 +142,8 @@ export function AdminBrandingPage() {
         description={profile.code}
         actions={
           <div className="branding-header">
-            {/* ⚠️  مبدّل الملفات يظهر حين يوجد أكثر من واحد فقط:
-                قائمة بخيار وحيد ضجيج بصري لا اختيار. */}
+            {/* ⚠️  The profile switcher appears only when there is more than one:
+                a list with a single option is visual noise, not a choice. */}
             {allProfiles.length > 1 ? (
               <select
                 className="branding-header__switch"
@@ -161,9 +162,9 @@ export function AdminBrandingPage() {
             {profile.is_active ? (
               <Badge tone="success">{t('branding.activeProfile')}</Badge>
             ) : (
-              // ⚠️  التفعيل يمرّ بفحص تباين على **اللوحتين** في
-              //     الخادم — لوحة داكنة مكسورة تُرفض حتى لو كانت
-              //     الفاتحة سليمة، والرسالة تصل من هناك.
+              // ⚠️  Activation passes a contrast check on **both palettes** on the
+              //     server — a broken dark palette is refused even if the light one
+              //     is sound, and the message comes from there.
               <Button
                 variant="secondary"
                 loading={activate.isPending}
@@ -256,8 +257,8 @@ export function AdminBrandingPage() {
 
           <section className="surface branding-editor__box">
             <h2 className="branding-editor__title">{t('admin.preview')}</h2>
-            {/* ⚠️  معاينة معزولة بمتغيّرات محلية — لا تمسّ الصفحة
-                نفسها، فالأدمن يرى النتيجة بلا أن تنقلب لوحته */}
+            {/* ⚠️  An isolated preview using local variables — it does not touch
+                the page itself, so the admin sees the result without their panel flipping */}
             <div
               className="branding-preview"
               style={

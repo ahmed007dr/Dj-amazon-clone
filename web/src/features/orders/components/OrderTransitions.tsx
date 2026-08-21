@@ -10,12 +10,12 @@ import type { OrderStatus } from '../types';
 import './OrderTransitions.css';
 
 /**
- * ⚠️  **نسخة من آلة الحالة في الخادم** — للعرض فقط.
+ * ⚠️  **A copy of the state machine on the server** — for display only.
  *
- *     الخادم يرفض أي انتقال غير مسموح بـ `409` بصرف النظر عن هذه
- *     الخريطة؛ ووجودها هنا يمنع عرض زر يفشل عند الضغط. وحين
- *     تتباعد الاثنتان يبقى الخادم هو الحقيقة — والزر الزائد يُرفض
- *     برسالة واضحة لا بسلوك غامض.
+ *     The server refuses any disallowed transition with `409` regardless of
+ *     this map; its presence here prevents showing a button that fails when
+ *     pressed. And when the two drift apart the server remains the truth — the
+ *     extra button is refused with a clear message rather than obscure behaviour.
  */
 const NEXT_STATES: Record<OrderStatus, OrderStatus[]> = {
   PENDING: ['CONFIRMED', 'CANCELLED'],
@@ -54,8 +54,8 @@ export function OrderTransitions({
       notify(t('admin.statusChanged', { status: t(`orderStatus.${target}`) }));
     };
 
-    // ⚠️  «إكمال» نقطة نهاية منفصلة: تُطلق حدث `order_completed`
-    //     الذي تبني عليه المالية والولاء والعمولات لاحقًا.
+    // ⚠️  "Complete" is a separate endpoint: it emits the `order_completed` event
+    //     that finance, loyalty and commissions later build on.
     if (target === 'COMPLETED') {
       complete.mutate(orderId, { onSuccess, onError });
       return;

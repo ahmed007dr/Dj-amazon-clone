@@ -22,18 +22,20 @@ const KIND_ICON: Record<PointsKind, string> = {
 };
 
 /**
- * شاشة نقاطي.
+ * The my-points screen.
  *
- * ⚠️  **البرنامج الموقوف أو غير الشامل لا يعرض عطلًا.**
+ * ⚠️  **A disabled or non-covering programme does not show a fault.**
  *
- *     الأدمن قد يوقف النظام أو يوجّهه لفئة لا تشمل هذا الحساب.
- *     رسالة خطأ هنا تجعل عميلًا سليمًا يتصل بالدعم، والصحيح أن
- *     تُقال الحقيقة بهدوء: البرنامج غير متاح على حسابك.
+ *     The admin may disable the system or target it at a segment that does not
+ *     include this account. An error message here makes a perfectly fine
+ *     customer call support; the right thing is to say the truth quietly: the
+ *     programme is not available on your account.
  *
- * ⚠️  و**الكشف يُعرض ولو كان البرنامج موقوفًا**.
+ * ⚠️  And **the statement is shown even if the programme is disabled**.
  *
- *     نقاطٌ كُسبت وعُرضت للعميل لا تختفي من تاريخه بإيقاف
- *     البرنامج — واختفاؤها يُقرأ سرقةً لا إيقافًا.
+ *     Points that were earned and shown to the customer do not vanish from
+ *     their history because the programme was disabled — and their
+ *     disappearance reads as theft rather than a pause.
  */
 export function LoyaltyPage() {
   const { t } = useTranslation();
@@ -77,8 +79,8 @@ export function LoyaltyPage() {
           </div>
         </>
       ) : (
-        // ⚠️  البرنامج توقّف والرصيد باقٍ: يُقال ذلك صراحةً بدل
-        //     أن يُترك العميل يخمّن سبب اختفاء زر الاستبدال.
+        // ⚠️  The programme stopped and the balance remains: said explicitly rather
+        //     than leaving the customer to guess why the redeem button disappeared.
         <StateMessage
           icon="⏸️"
           title={t('loyalty.programStopped')}
@@ -116,8 +118,8 @@ export function LoyaltyPage() {
                     >
                       {entry.signed_points > 0 ? `+${entry.signed_points}` : entry.signed_points}
                     </strong>
-                    {/* ⚠️  تاريخ الانتهاء على السطر نفسه: نقاط
-                        تنتهي بعد أسبوع بلا تنبيه شكوى مضمونة. */}
+                    {/* ⚠️  The expiry date on the same line: points expiring in a
+                        week with no warning are a guaranteed complaint. */}
                     {entry.expires_on && entry.points_remaining > 0 ? (
                       <small dir="ltr">
                         {t('loyalty.expiresShort', { date: entry.expires_on })}

@@ -1,11 +1,11 @@
 /**
- * قراءة الصلاحيات في الواجهة.
+ * Reading permissions in the frontend.
  *
- * ⚠️  **لتحسين التجربة لا للأمان.**
+ * ⚠️  **For the experience, not for security.**
  *
- *     الخادم هو الحارس الحقيقي ويرفض بصرف النظر عمّا يظهر هنا.
- *     لكن إظهار زر يفشل عند الضغط تجربة سيئة، وإخفاؤه ليس أمنًا —
- *     الاثنان مطلوبان معًا.
+ *     The server is the real guard and refuses regardless of what appears here.
+ *     But showing a button that fails when pressed is a bad experience, and
+ *     hiding it is not security — both are needed together.
  */
 
 import type { AccountType, User } from './types';
@@ -31,11 +31,11 @@ export function isTrade(user: User | null): boolean {
 }
 
 /**
- * ⚠️  التوثيق **منفصل** عن الحالة.
+ * ⚠️  Verification is **separate** from status.
  *
- *     صيدلي موثّق قد يكون موقوفًا، وحساب نشط قد يكون قيد المراجعة.
- *     دمجهما في فحص واحد يخفي إحدى الحالتين عن المستخدم فلا يعرف
- *     ماذا يفعل.
+ *     A verified pharmacist may be suspended, and an active account may still
+ *     be under review. Merging them into one check hides one of the two states
+ *     from the user, so they do not know what to do.
  */
 export function isVerified(user: User | null): boolean {
   return user?.verification_status === 'VERIFIED';

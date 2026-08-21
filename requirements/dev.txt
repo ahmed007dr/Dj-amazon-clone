@@ -1,0 +1,40 @@
+# ═══════════════════════════════════════════════════════════
+#  Development and CI dependencies
+#
+#  ⚠️  **Production never reads this file.** See `base.txt` for why.
+#
+#  Installation (installs base.txt too — the `-r` line below):
+#      pip install -r requirements/dev.txt
+# ═══════════════════════════════════════════════════════════
+
+-r base.txt
+
+# ── Development tools ──────────────────────────────────────
+# ⚠️  `django-debug-toolbar` is installed by `config/settings/dev.py` alone, and
+#     `Faker` backs `devtools/` — which that same file is the only one to add to
+#     `INSTALLED_APPS`. Both are absent from `prod.py` on purpose, so a stray
+#     `DJANGO_SETTINGS_MODULE` cannot reach them; keeping them out of the
+#     production environment entirely means the import would fail even if it did.
+django-debug-toolbar==4.4.6
+Faker==20.1.0
+
+# ── Quality and testing ────────────────────────────────────
+ruff==0.6.9
+pytest==8.3.3
+pytest-django==4.9.0
+factory-boy==3.3.1
+import-linter==2.1
+pre-commit==4.0.1
+
+# ═══════════════════════════════════════════════════════════
+#  Removal log
+# ═══════════════════════════════════════════════════════════
+#  django-allauth · dj-rest-auth
+#      Both were broken: AUTHENTICATION_BACKENDS replaces them entirely.
+#      Replaced by custom authentication in phase 1.
+#
+#  django-taggit          tags will be reintroduced in catalog when needed
+#  django-bootstrap5      the template layer was removed (SPA decision)
+#  PyQt5 and friends      unrelated to a web project — pip freeze pollution
+#  django-context-cache   its middleware was referenced from dead settings
+# ═══════════════════════════════════════════════════════════

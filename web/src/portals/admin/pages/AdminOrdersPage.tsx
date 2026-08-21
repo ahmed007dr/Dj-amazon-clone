@@ -28,12 +28,12 @@ const STATUSES = [
 ];
 
 /**
- * طلبات الأدمن.
+ * Admin orders.
  *
- * ⚠️  التبويب الافتراضي **«قيد الانتظار» لا «الكل»**.
+ * ⚠️  The default tab is **"pending", not "all"**.
  *
- *     من يفتح هذه الشاشة يفتحها ليعالج طلبات تنتظره؛ وقائمة الكل
- *     تدفن العشرة الجديدة تحت ألف قديم.
+ *     Whoever opens this screen opens it to process orders waiting on them; and
+ *     an "all" list buries the ten new ones under a thousand old.
  */
 export function AdminOrdersPage() {
   const { t, i18n } = useTranslation();
@@ -104,8 +104,8 @@ export function AdminOrdersPage() {
         value={status}
         onChange={(next) => {
           setStatus(next);
-          // ⚠️  العودة للصفحة الأولى عند تغيير الفلتر: البقاء على
-          //     صفحة ٧ في نتيجة من صفحتين يعرض قائمة فارغة.
+          // ⚠️  Returning to the first page when the filter changes: staying on
+          //     page 7 in a two-page result shows an empty list.
           setPage(1);
         }}
       />

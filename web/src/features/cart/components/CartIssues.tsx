@@ -7,18 +7,19 @@ import type { LineIssue } from '../types';
 import './CartIssues.css';
 
 /**
- * مشاكل السلة.
+ * Cart problems.
  *
- * ⚠️  تُعرض **قبل** الأسطر لا بعدها.
+ * ⚠️  Shown **before** the lines, not after them.
  *
- *     العميل الذي لا يستطيع إتمام الشراء يحتاج أن يعرف السبب في
- *     أول شيء يراه. وضعها أسفل قائمة طويلة يعني أنه يضغط «إتمام»
- *     ويُرفض بلا أن يفهم.
+ *     A customer who cannot check out needs to know why in the first thing they
+ *     see. Putting it below a long list means they press "checkout" and are
+ *     refused with no understanding.
  *
- * ⚠️  والرسالة تأتي من الخادم مترجَمة — لا نُعيد بناءها من `code`.
+ * ⚠️  And the message arrives translated from the server — we do not rebuild it
+ *     from `code`.
  *
- *     إعادة البناء تعني قائمة رموز تُحدَّث في مستودعين، ورمزًا
- *     جديدًا واحدًا يظهر للعميل كنص إنجليزي خام.
+ *     Rebuilding means a list of codes maintained in two repositories, and one
+ *     new code appearing to the customer as raw English text.
  */
 export function CartIssues({ issues }: { issues: LineIssue[] }) {
   const { t } = useTranslation();

@@ -5,8 +5,8 @@
   padding: var(--space-5);
   margin-block-end: var(--space-4);
   border-radius: var(--radius);
-  /* ⚠️  حافة تحذيرية: هذه الشاشة تخلق نقاطًا وتمحوها بلا طلب
-     يقابلها، ولا يصحّ أن تبدو كجدول عادي. */
+  /* ⚠️  A warning edge: this screen creates and erases points with no order
+     against them, and it must not look like an ordinary table. */
   border-inline-start: 4px solid var(--color-warning);
 }
 

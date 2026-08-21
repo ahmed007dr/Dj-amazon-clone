@@ -1,8 +1,8 @@
 /**
- * واجهة الكتالوج.
+ * The catalogue API.
  *
- * ⚠️  مسارات نسبية فقط. `shared/http` يبني العنوان الكامل من
- *     `VITE_API_BASE_URL` — وقاعدة ESLint ترفض أي عنوان مطلق هنا.
+ * ⚠️  Relative paths only. `shared/http` builds the full URL from
+ *     `VITE_API_BASE_URL` — and an ESLint rule refuses any absolute URL here.
  */
 
 import { http } from '@/shared/http';
@@ -26,7 +26,7 @@ export const listProducts = (params: ProductQuery, signal?: AbortSignal) =>
     ...(signal ? { signal } : {}),
   });
 
-/** ⚠️  المعرّف `slug` لا UUID — الرابط يجب أن يكون قابلًا للقراءة والمشاركة. (ADR-27) */
+/** ⚠️  The identifier is the `slug`, not a UUID — the link must be readable and shareable. (ADR-27) */
 export const getProduct = (slug: string) =>
   http.get<ProductDetail>(`/catalog/products/${slug}/`);
 
@@ -34,10 +34,10 @@ export const listCategories = () =>
   http.get<CategoryBrief[] | CursorPage<CategoryBrief>>('/catalog/categories/');
 
 /**
- * توفر مجموعة منتجات — **استعلام واحد مجمّع**.
+ * Availability for a set of products — **a single aggregated query**.
  *
- * ⚠️  نداء لكل منتج يعيد الـ N+1 إلى قوائم الكتالوج من باب الواجهة
- *     بعد أن أُغلق في الخادم.
+ * ⚠️  A call per product brings N+1 back to the catalogue lists through the
+ *     frontend door, after it was closed on the server.
  */
 export const getAvailability = (productIds: string[]) =>
   http.get<Record<string, Availability>>('/inventory/availability/', {
@@ -48,20 +48,20 @@ export const listProductReviews = (slug: string) =>
   http.get<CursorPage<Review> | Review[]>(`/reviews/products/${slug}/`);
 
 /**
- * تقييم المنتج المجمَّع — **نقطة منفصلة عن قائمة المراجعات**.
+ * The product's aggregated rating — **an endpoint separate from the reviews list**.
  *
- * ⚠️  المتوسط والعدد يظهران في رأس الصفحة قبل أن يفتح أحد قائمة
- *     المراجعات؛ وجلب القائمة كاملة لحساب رقمين يعني تحميل عشرات
- *     النصوص لعرض نجمة.
+ * ⚠️  The average and the count appear in the page header before anyone opens
+ *     the reviews list; and fetching the whole list to compute two figures means
+ *     downloading dozens of texts to display a star.
  */
 export const getProductRating = (slug: string) =>
   http.get<{ average: string; count: number }>(`/reviews/products/${slug}/rating/`);
 
-// ── الماركات والمصنّعون والفئات ────────────────────────────
+// ── Brands, manufacturers and categories ──────────────────
 //
-// ⚠️  **بلا ترقيم على الخادم** (`pagination_class = None`): مصفوفة
-//     مباشرة لا `results`. توقّع الترقيم هنا كان يعطي `undefined`
-//     صامتًا وشبكة فارغة.
+// ⚠️  **Unpaginated on the server** (`pagination_class = None`): a plain
+//     array, not `results`. Expecting pagination here gave a silent
+//     `undefined` and an empty grid.
 
 export const listBrands = (featured?: boolean) =>
   http.get<Brand[]>('/catalog/brands/', {
@@ -76,11 +76,11 @@ export const getCategory = (slug: string) =>
   http.get<CategoryDetail>(`/catalog/categories/${slug}/`);
 
 /**
- * بحث بالباركود — **لماسح نقطة البيع**.
+ * Barcode lookup — **for the point-of-sale scanner**.
  *
- * ⚠️  نقطة منفصلة عن البحث النصّي: الماسح يرسل الرقم كاملًا ويجب
- *     أن يعطي الصنف الواحد فورًا لا قائمة يختار منها الكاشير
- *     بينما الطابور ينتظر.
+ * ⚠️  An endpoint separate from the text search: the scanner sends the complete
+ *     number and must give the single item immediately, not a list for the
+ *     cashier to choose from while the queue waits.
  */
 export const getProductByBarcode = (barcode: string) =>
   http.get<ProductDetail>(`/catalog/barcode/${barcode}/`);

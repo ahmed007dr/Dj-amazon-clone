@@ -9,8 +9,9 @@
   font-size: 0.875rem;
 }
 
-/* ⚠️  التمرير داخل الحاوية لا في الصفحة: الجدول أعرض من أي هاتف،
-   وتمرير الصفحة أفقيًا يكسر التنقّل والهيدر معه. */
+/* ⚠️  Scrolling inside the container rather than on the page: the table is
+   wider than any phone, and scrolling the page horizontally breaks the
+   navigation and the header with it. */
 .access-matrix__scroll {
   overflow-x: auto;
   border: 1px solid var(--color-border);
@@ -36,8 +37,8 @@
   background: var(--color-bg);
 }
 
-/* ⚠️  عمود السياسة ملتصق عند التمرير: بدونه يفقد القارئ اسم
-   الصف حين يصل إلى آخر الأنواع. */
+/* ⚠️  The policy column sticks while scrolling: without it the reader loses the
+   row's name by the time they reach the last account types. */
 .access-matrix tbody th {
   position: sticky;
   inset-inline-start: 0;

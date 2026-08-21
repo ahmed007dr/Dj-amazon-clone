@@ -1,5 +1,5 @@
-/* ⚠️  ملف واحد للوحَي الحساب التجاري (البيانات · الحركات):
-   نفس اللوح المنزلق ونفس المقاسات. */
+/* ⚠️  One file for the two business account panels (details · movements):
+   the same sliding panel and the same dimensions. */
 
 .business-form {
   display: flex;
@@ -91,8 +91,8 @@
   color: var(--color-text-muted);
 }
 
-/* ⚠️  الاتجاه بلونين متضادّين: القراءة السريعة للكشف تعتمد على
-   اللون قبل الرقم. */
+/* ⚠️  The direction in two contrasting colours: reading the statement quickly
+   depends on the colour before the number. */
 .ledger-debit {
   color: var(--color-danger);
 }

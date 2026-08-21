@@ -6,12 +6,12 @@ import { useCart } from '../hooks';
 import './CartBadge.css';
 
 /**
- * أيقونة السلة بعدّادها.
+ * The cart icon with its counter.
  *
- * ⚠️  العدّاد لا يُعرض وهو صفر.
+ * ⚠️  The counter is not shown while it is zero.
  *
- *     «٠» تُقرأ كعنصر واجهة معطّل، والغياب يقرأ كسلة فارغة —
- *     وهو المعنى الصحيح.
+ *     "0" reads as a disabled interface element, and its absence reads as an
+ *     empty cart — which is the correct meaning.
  */
 export function CartBadge() {
   const { t } = useTranslation();
@@ -29,7 +29,7 @@ export function CartBadge() {
           {count > 99 ? '99+' : count}
         </span>
       ) : null}
-      {/* العدد للقارئ الشاشي بلا اعتماد على الشارة البصرية */}
+      {/* The count for the screen reader, with no reliance on the visual badge */}
       <span className="visually-hidden">{t('cart.itemCount', { count })}</span>
     </Link>
   );

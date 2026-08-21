@@ -18,19 +18,20 @@ import { TierEditor } from '@/portals/admin/components/TierEditor';
 import './LoyaltyProgramCard.css';
 
 /**
- * بطاقة برنامج ولاء — **المفتاح والاستهداف**.
+ * A loyalty programme card — **the switch and the targeting**.
  *
- * ⚠️  **المفتاح في أعلى البطاقة لا داخل نموذج التعديل.**
+ * ⚠️  **The switch is at the top of the card, not inside the edit form.**
  *
- *     إيقاف البرنامج قرار يُتخذ فجأة (شكوى · مراجعة التزام ·
- *     خطأ في الضبط). دفنه خلف «تعديل ← حفظ» يجعل الأدمن يبحث عنه
- *     دقائق بينما النظام يستمر في منح النقاط.
+ *     Disabling the programme is a decision taken suddenly (a complaint · a
+ *     liability review · a configuration error). Burying it behind "edit ←
+ *     save" makes the admin hunt for it for minutes while the system keeps
+ *     awarding points.
  *
- * ⚠️  و**الاستهداف يقول من يشمله بالكلمات لا بالأكواد**.
+ * ⚠️  And **the targeting says who it covers in words, not in codes**.
  *
- *     `["PHARMACY","WAREHOUSE"]` في حقل نصي يجعل خطأ إملائيًا
- *     واحدًا يُنتج برنامجًا مفعَّلًا لا يكسب فيه أحد — وهو عطل
- *     صامت لا رسالة له. الاختيار من قائمة يمنعه من الأساس.
+ *     `["PHARMACY","WAREHOUSE"]` in a text field makes one typo produce an
+ *     enabled programme nobody earns from — a silent fault with no message.
+ *     Choosing from a list prevents it at the root.
  */
 export function LoyaltyProgramCard({ program }: { program: LoyaltyProgram }) {
   const { t } = useTranslation();
@@ -96,7 +97,7 @@ export function LoyaltyProgramCard({ program }: { program: LoyaltyProgram }) {
           <code dir="ltr">{program.code}</code>
         </div>
 
-        {/* ⚠️  المفتاح أول ما تراه العين وآخر ما تحتاج البحث عنه */}
+        {/* ⚠️  The switch is the first thing the eye sees and the last thing it needs to hunt for */}
         <label className="loyalty-switch">
           <input
             type="checkbox"
@@ -111,8 +112,8 @@ export function LoyaltyProgramCard({ program }: { program: LoyaltyProgram }) {
         </label>
       </header>
 
-      {/* ⚠️  الإيقاف **لا يمحو الأرصدة** — قوله صراحةً يمنع
-          السؤال الذي يأتي بعد أول إيقاف. */}
+      {/* ⚠️  Disabling **does not erase the balances** — saying so explicitly
+          prevents the question that follows the first disabling. */}
       {!program.is_active ? (
         <Alert tone="info">{t('loyalty.offNotice')}</Alert>
       ) : null}
@@ -162,9 +163,9 @@ export function LoyaltyProgramCard({ program }: { program: LoyaltyProgram }) {
           <p className="muted">{t('loyalty.everyone')}</p>
         )}
 
-        {/* ⚠️  الشرطان يُطبَّقان **معًا**: «صيدليات مميّزة» لا «كل
-            صيدلية أو كل مميّز». قولها هنا يمنع ضبطًا يظن الأدمن
-            أنه يوسّع بينما هو يضيّق. */}
+        {/* ⚠️  Both conditions apply **together**: "featured pharmacies", not "every
+            pharmacy or every featured customer". Saying so here prevents a
+            configuration the admin believes widens while it narrows. */}
         {program.account_types.length > 0 && program.customer_segments.length > 0 ? (
           <p className="loyalty-note">{t('loyalty.bothApply')}</p>
         ) : null}
@@ -178,9 +179,10 @@ export function LoyaltyProgramCard({ program }: { program: LoyaltyProgram }) {
             submit();
           }}
         >
-          {/* ⚠️  الاسم يُعدَّل من هنا لا من قاعدة البيانات: حملة
-              تُعاد تسميتها موسميًا («نقاط الصيف») ولا يُعقل أن
-              تحتاج نشرًا. والرمز ثابت لأنه مرجع الحركات. */}
+          {/* ⚠️  The name is edited from here rather than from the database: a campaign
+              gets renamed seasonally ("summer points") and it makes no sense
+              for that to need a deployment. And the code is fixed because it is
+              the movements' reference. */}
           <div className="loyalty-grid">
             <label>
               {t('loyalty.nameAr')}
@@ -376,8 +378,8 @@ export function LoyaltyProgramCard({ program }: { program: LoyaltyProgram }) {
             {t('loyalty.editRules')}
           </Button>
 
-          {/* ⚠️  مفتاحان لا واحد: إيقاف الصرف مع استمرار الكسب
-              موقف تشغيلي حقيقي عند مراجعة الالتزام. */}
+          {/* ⚠️  Two switches, not one: stopping redemption while earning
+              continues is a real operational position during a liability review. */}
           <Button
             size="sm"
             variant="ghost"
@@ -389,8 +391,9 @@ export function LoyaltyProgramCard({ program }: { program: LoyaltyProgram }) {
               : t('loyalty.resumeRedemption')}
           </Button>
 
-          {/* ⚠️  الحذف آخر الصف ويسأل أولًا؛ والخادم يرفضه أصلًا
-              لو مُنحت منه نقطة واحدة — والرسالة تقول «أوقفه». */}
+          {/* ⚠️  Deletion is last in the row and asks first; and the server refuses it
+              anyway once a single point has been awarded from it — and the
+              message says "disable it". */}
           <Button
             size="sm"
             variant="ghost"

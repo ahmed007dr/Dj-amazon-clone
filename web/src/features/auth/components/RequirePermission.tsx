@@ -5,17 +5,17 @@ import { useCan } from '@/features/auth/useCan';
 import { StateMessage } from '@/shared/ui/StateMessage';
 
 /**
- * حارس شاشة بصلاحية.
+ * A screen guard by permission.
  *
- * ⚠️  **الرابط يختفي والشاشة تشرح — لا تختفي هي أيضًا.**
+ * ⚠️  **The link disappears and the screen explains — it does not disappear too.**
  *
- *     من يصل بالمسار المباشر (رابط محفوظ · مُشارَك من زميل) يجب
- *     أن يقرأ «هذه الشاشة تحتاج صلاحية» لا «الصفحة غير موجودة».
- *     الثانية تجعله يبلّغ عن رابط مكسور، والأولى تجعله يطلب
- *     الصلاحية من مديره — وهو ما نريده بالضبط.
+ *     Whoever arrives by the direct path (a saved link · one shared by a
+ *     colleague) must read "this screen needs a permission", not "page not
+ *     found". The second makes them report a broken link, and the first makes
+ *     them ask their manager for the permission — which is exactly what we want.
  *
- * ⚠️  و**الرسالة تسمّي الشاشة**: «تحتاج صلاحية» بلا اسم لا تُنقَل
- *     إلى من يمنح.
+ * ⚠️  And **the message names the screen**: "you need a permission" with no name
+ *     cannot be relayed to whoever grants it.
  */
 export function RequirePermission({
   permission,
@@ -23,7 +23,7 @@ export function RequirePermission({
   children,
 }: {
   permission: string;
-  /** مفتاح ترجمة اسم الشاشة — يُذكر في الرسالة ليُطلَب بالاسم. */
+  /** The translation key for the screen's name — named in the message so it can be requested by name. */
   screen?: string;
   children: ReactNode;
 }) {

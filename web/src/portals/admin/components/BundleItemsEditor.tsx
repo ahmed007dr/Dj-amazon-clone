@@ -16,18 +16,18 @@ import { ProductPicker } from '@/portals/admin/components/ProductPicker';
 import './AcademicPanels.css';
 
 /**
- * بنود الحزمة.
+ * Bundle items.
  *
- * ⚠️  **«أساسي» يفصل ما لا غنى عنه عمّا يُستحسن.**
+ * ⚠️  **"Essential" separates what cannot be skipped from what is merely recommended.**
  *
- *     الطالب يشتري الأساسي وحده حين يضيق المال؛ وحزمة بلا هذا
- *     التمييز تُعرض «كلها أو لا شيء» فلا تُشترى.
+ *     A student buys the essentials alone when money is tight; and a bundle
+ *     with no such distinction is presented as "all or nothing", so it is not bought.
  *
- * ⚠️  و**المنتج يُختار من `ProductPicker` لا من حقل معرّف**.
+ * ⚠️  And **the product is chosen from `ProductPicker`, not from an id field**.
  *
- *     لصق UUID خطأً يضيف صنفًا لا علاقة له بالحزمة، ولا شيء في
- *     الشاشة يكشفه إلا فتحها من عين الطالب. والمنتقي نفسه المستعمل
- *     في التسويات والشراء — سلوك واحد لا ثلاثة.
+ *     Pasting a wrong UUID adds an item unrelated to the bundle, and nothing on
+ *     the screen reveals it except opening it through a student's eyes. And it
+ *     is the same picker used in adjustments and purchasing — one behaviour, not three.
  */
 export function BundleItemsEditor({ bundle }: { bundle: Bundle }) {
   const { t } = useTranslation();
@@ -47,8 +47,8 @@ export function BundleItemsEditor({ bundle }: { bundle: Bundle }) {
   const add = () => {
     if (picked === null) return;
 
-    // ⚠️  التكرار يُمنَع هنا بلطف بدل انتظار خطأ الخادم: الرسالة
-    //     «موجود سلفًا» أوضح من رفض بقيد فريد.
+    // ⚠️  Duplication is blocked here gently rather than waiting for a server error:
+    //     "already present" is clearer than a rejection on a unique constraint.
     if (chosen.has(picked.id)) {
       notify(t('academic.alreadyAdded'), 'info');
       return;
@@ -95,8 +95,8 @@ export function BundleItemsEditor({ bundle }: { bundle: Bundle }) {
                   min="1"
                   dir="ltr"
                   defaultValue={item.quantity}
-                  // ⚠️  الحفظ عند مغادرة الحقل لا عند كل ضغطة:
-                  //     نداء لكل رقم يعني عشرات الطلبات لبند واحد.
+                  // ⚠️  Saving on blur rather than on every keystroke:
+                  //     a call per digit means dozens of requests for one item.
                   onBlur={(event) => {
                     const quantity = Number(event.target.value);
                     if (quantity < 1 || quantity === item.quantity) return;
@@ -138,8 +138,8 @@ export function BundleItemsEditor({ bundle }: { bundle: Bundle }) {
           ))}
         </ul>
       ) : (
-        // ⚠️  حزمة بلا بنود تُعرض للطالب فارغة — قول ذلك هنا يمنع
-        //     نشرها قبل تعبئتها.
+        // ⚠️  A bundle with no items shows up empty to the student — saying so here prevents
+        //     publishing it before it is filled.
         <p className="academic-hint">{t('academic.noItems')}</p>
       )}
     </section>

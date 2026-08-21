@@ -29,18 +29,18 @@ const EMPTY = {
 };
 
 /**
- * الكليات.
+ * Faculties.
  *
- * ⚠️  **عدد السنوات ليس بيانًا وصفيًا — هو ما يحكم وصول الحزم.**
+ * ⚠️  **The year count is not descriptive data — it is what governs bundle reach.**
  *
- *     حزمة السنة الخامسة في كلية بأربع سنوات لا يراها طالب واحد.
- *     ولذلك يظهر العدد في الجدول لا داخل النموذج وحده.
+ *     A fifth-year bundle in a four-year faculty is seen by not one student.
+ *     Which is why the count appears in the table rather than inside the form alone.
  *
- * ⚠️  و**الترقية يدوية بزرّ صريح**.
+ * ⚠️  And **promotion is manual, through an explicit button**.
  *
- *     العام الدراسي يبدأ في مواعيد مختلفة بين الجامعات؛ ترقية
- *     تلقائية بتاريخ ثابت تُصعّد طلابًا لم يبدأ عامهم بعد، فيرون
- *     حزم سنة ليست سنتهم.
+ *     The academic year starts at different dates across universities;
+ *     automatic promotion on a fixed date advances students who have not
+ *     started their year, so they see bundles for a year that is not theirs.
  */
 export function FacultyPanel() {
   const { t } = useTranslation();
@@ -110,8 +110,9 @@ export function FacultyPanel() {
       align: 'end',
       render: (row) => (
         <div className="academic-actions">
-          {/* ⚠️  الترقية أولًا وبسؤال: تُصعّد كل طلاب الكلية سنةً،
-              ولا تُستعاد بضغطة. ومن بلغ التخرّج لا يُرقّى. */}
+          {/* ⚠️  Promotion first and with a confirmation: it advances every student in
+              the faculty by a year, and is not undone with a click. And anyone
+              who has reached graduation is not promoted. */}
           <Button
             size="sm"
             variant="ghost"
@@ -192,8 +193,8 @@ export function FacultyPanel() {
         </Button>
       </div>
 
-      {/* ⚠️  بلا جامعة لا كلية: قول السبب يمنع الأدمن من الظنّ أن
-          الزر معطّل. */}
+      {/* ⚠️  No faculty without a university: stating the reason stops the admin
+          assuming the button is broken. */}
       {(universities.data?.length ?? 0) === 0 && !universities.isPending ? (
         <p className="academic-hint">{t('academic.needUniversityFirst')}</p>
       ) : null}

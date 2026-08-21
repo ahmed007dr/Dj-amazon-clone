@@ -15,19 +15,20 @@ import type { StudentProfile } from '../types';
 import './StudentProfileForm.css';
 
 /**
- * الملف الأكاديمي — إنشاء وتعديل.
+ * The academic profile — creation and editing.
  *
- * ⚠️  **التسلسل متتالٍ لا أربع قوائم مستقلة.**
+ * ⚠️  **The hierarchy is sequential, not four independent lists.**
  *
- *     الخادم يرفض كلية لا تتبع الجامعة، وقسمًا لا يتبع الكلية،
- *     وسنةً تتجاوز سنوات الكلية (`StudentProfile.clean`). عرض
- *     القوائم كاملة يجعل الطالب يختار تركيبة مستحيلة ثم يقرأ خطأ
- *     خادم لا يفهم سببه — فتُشتق كل قائمة مما قبلها، ويُمسح ما
- *     بعدها عند التغيير.
+ *     The server refuses a faculty that does not belong to the university, a
+ *     department that does not belong to the faculty, and a year beyond the
+ *     faculty's years (`StudentProfile.clean`). Showing the lists in full makes
+ *     the student pick an impossible combination and then read a server error
+ *     they cannot account for — so each list is derived from the one before it,
+ *     and everything after it is cleared on change.
  *
- * ⚠️  والسنة تُشتق من `years_count` للكلية المختارة: كلية الصيدلة
- *     خمس سنوات، والطب ست. قائمة ثابتة من ١ إلى ٦ تعطي طالب صيدلة
- *     سنةً سادسة لا وجود لها، وحزمًا فارغة إلى الأبد.
+ * ⚠️  And the year is derived from the chosen faculty's `years_count`: pharmacy
+ *     is five years and medicine is six. A fixed list from 1 to 6 gives a
+ *     pharmacy student a sixth year that does not exist, and empty bundles forever.
  */
 export function StudentProfileForm({
   profile,
@@ -75,7 +76,7 @@ export function StudentProfileForm({
     return <StateMessage icon="🎓" title={t('academic.noUniversities')} />;
   }
 
-  /** ⚠️  تغيير الجامعة يُسقط الكلية والقسم والسنة — لا يبقيها معلّقة. */
+  /** ⚠️  Changing the university clears the faculty, department and year — it does not leave them dangling. */
   function pickUniversity(value: string) {
     setForm((current) => ({
       ...current,
@@ -98,7 +99,7 @@ export function StudentProfileForm({
     const payload = {
       university: form.university,
       faculty: form.faculty,
-      // ⚠️  `null` لا سلسلة فارغة: الخادم يقبل الغياب لا النص الفارغ
+      // ⚠️  `null`, not an empty string: the server accepts absence, not empty text
       department: form.department || null,
       academic_year: Number(form.academic_year),
       student_number: form.student_number,
@@ -183,8 +184,8 @@ export function StudentProfileForm({
         ) : null}
       </div>
 
-      {/* ⚠️  القسم يظهر فقط حين تملك الكلية أقسامًا — قائمة فارغة
-          تجعل الطالب يظن أن عليه اختيار شيء لا وجود له. */}
+      {/* ⚠️  The department appears only when the faculty has departments — an
+          empty list makes the student think they must choose something that does not exist. */}
       {faculty && faculty.departments.length > 0 ? (
         <div className="student-form__field">
           <label className="student-form__label" htmlFor="department">

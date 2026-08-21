@@ -37,15 +37,17 @@ import './AdminPricingPage.css';
 type Tab = 'lists' | 'overrides' | 'coupons';
 
 /**
- * التسعير والعروض.
+ * Pricing and offers.
  *
- * ⚠️  **قوائم منفصلة لا نسب خصم** (قاعدة العمل ٩): سعر الطالب سعرٌ
- *     قائم بذاته لا مشتقٌّ من سعر التجزئة. ولذلك لا يوجد في هذه
- *     الشاشة حقل «نسبة خصم الطلاب» — بل قائمة أسعار كاملة.
+ * ⚠️  **Separate lists, not discount percentages** (business rule 9): a
+ *     student's price is a price in its own right, not derived from the retail
+ *     price. Which is why this screen has no "student discount percentage"
+ *     field — but a complete price list.
  *
- * ⚠️  و**الخصم الترويجي ليس كوبونًا**: الأول يظهر في الكتالوج بلا
- *     كود، والثاني يُدخله العميل. خلطهما في تبويب واحد يجعل الأدمن
- *     يُنشئ الاثنين لنفس الحملة فيُطبَّق الخصم مرتين.
+ * ⚠️  And **a promotional discount is not a coupon**: the first appears in the
+ *     catalogue with no code, and the second is entered by the customer. Mixing
+ *     them into one tab makes the admin create both for the same campaign, so
+ *     the discount is applied twice.
  */
 export function AdminPricingPage() {
   const { t, i18n } = useTranslation();
@@ -96,7 +98,7 @@ export function AdminPricingPage() {
     setEditingCoupon(null);
   };
 
-  // ── الأعمدة ────────────────────────────────────────────
+  // ── Columns ─────────────────────────────────────────────
 
   const listColumns: Column<PriceList>[] = [
     {
@@ -119,8 +121,8 @@ export function AdminPricingPage() {
       key: 'rules',
       header: t('pricing.rules'),
       align: 'end',
-      // ⚠️  الصفر مُبرَز لا مدفون: قائمة مفعّلة بلا قواعد تعني
-      //     عملاءها يرون سعر التجزئة وهم يظنون أنهم على الجملة.
+      // ⚠️  Zero is highlighted rather than buried: an enabled list with no rules
+      //     means its customers see the retail price while believing they are on wholesale.
       render: (row) =>
         row.rule_count === 0 ? (
           <Badge tone="warning">{t('pricing.noRules')}</Badge>
@@ -185,7 +187,7 @@ export function AdminPricingPage() {
       key: 'tier',
       header: t('pricing.minQuantity'),
       align: 'end',
-      // ⚠️  «من ١٠ فأكثر» لا «١٠»: الرقم وحده يُقرأ كمية ثابتة.
+      // ⚠️  "From 10 upwards", not "10": the number alone reads as a fixed quantity.
       render: (row) => t('pricing.fromQuantity', { count: row.min_quantity }),
     },
     {
@@ -313,9 +315,9 @@ export function AdminPricingPage() {
     {
       key: 'status',
       header: t('admin.status'),
-      // ⚠️  ثلاثة أعلام لا علم واحد: «موقوف» لا تكفي حين يكون
-      //     السبب انتهاء المدة أو استنفاد الحد — والأدمن يبحث عن
-      //     خطأ غير موجود.
+      // ⚠️  Three flags, not one: "disabled" is not enough when the reason
+      //     is an expired period or an exhausted limit — and the admin hunts for
+      //     a fault that does not exist.
       render: (row) =>
         row.is_running ? (
           <Badge tone="success">{t('pricing.running')}</Badge>
@@ -337,15 +339,15 @@ export function AdminPricingPage() {
             {t('common.edit')}
           </Button>
 
-          {/* ⚠️  «الاستخدام» يظهر للمستخدَم وحده: كوبون بصفر صرف
-              يفتح لوحًا فارغًا لا يقول شيئًا. */}
+          {/* ⚠️  "Usage" appears for used ones alone: a coupon with zero redemptions
+              opens an empty panel that says nothing. */}
           {row.usage_count > 0 ? (
             <Button size="sm" variant="ghost" onClick={() => setUsageOf(row)}>
               {t('pricing.usage')}
             </Button>
           ) : null}
-          {/* ⚠️  المستخدَم لا يُحذف — الخادم يردّ ٤٠٩ برسالة تعدّ
-              الاستخدامات، وإخفاء الزر أوضح من رفض بعد الضغط. */}
+          {/* ⚠️  A used one is not deleted — the server answers 409 with a message
+              counting the uses, and hiding the button is clearer than a refusal after the press. */}
           {row.usage_count === 0 ? (
             <Button
               size="sm"
@@ -392,7 +394,7 @@ export function AdminPricingPage() {
         }}
       />
 
-      {/* ── قوائم الأسعار ─────────────────────────── */}
+      {/* ── Price lists ───────────────────────────── */}
       {tab === 'lists' && !selectedList ? (
         <DataTable
           columns={listColumns}
@@ -405,7 +407,7 @@ export function AdminPricingPage() {
         />
       ) : null}
 
-      {/* ── قواعد قائمة مفتوحة ────────────────────── */}
+      {/* ── An open list's rules ──────────────────── */}
       {tab === 'lists' && selectedList ? (
         <>
           <div className="pricing-crumb">
@@ -442,7 +444,7 @@ export function AdminPricingPage() {
         </>
       ) : null}
 
-      {/* ── الخصومات الترويجية ────────────────────── */}
+      {/* ── Promotional discounts ─────────────────── */}
       {tab === 'overrides' ? (
         <>
           <DataTable
@@ -464,7 +466,7 @@ export function AdminPricingPage() {
         </>
       ) : null}
 
-      {/* ── الكوبونات ─────────────────────────────── */}
+      {/* ── Coupons ───────────────────────────────── */}
       {tab === 'coupons' ? (
         <>
           <FilterBar

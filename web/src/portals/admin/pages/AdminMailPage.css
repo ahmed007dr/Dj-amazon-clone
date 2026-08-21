@@ -1,4 +1,4 @@
-/* بطاقات حسابات البريد — عمود على الهاتف، شبكة على الأوسع */
+/* Mail account cards — a column on a phone, a grid on wider screens */
 
 .mail-accounts {
   display: grid;
@@ -61,7 +61,7 @@
 
 .mail-card__facts dd {
   margin: 0;
-  /* ⚠️  عناوين البريد والخوادم طويلة ولا تنكسر تلقائيًا */
+  /* ⚠️  Email addresses and hostnames are long and do not break automatically */
   word-break: break-word;
 }
 

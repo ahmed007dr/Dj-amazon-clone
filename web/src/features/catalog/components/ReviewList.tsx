@@ -21,18 +21,19 @@ import { StarRating } from './StarRating';
 import './ReviewList.css';
 
 /**
- * تقييمات المنتج — قراءةً وكتابةً.
+ * Product reviews — reading and writing.
  *
- * ⚠️  «مشترٍ موثّق» شارة لا نص.
+ * ⚠️  "Verified buyer" is a badge, not text.
  *
- *     هي أهم إشارة ثقة في الصفحة: تقييم من اشترى فعلًا يزن أضعاف
- *     تقييم من مرّ. دفنها في نص رمادي يهدرها.
+ *     It is the most important trust signal on the page: a review from someone
+ *     who actually bought weighs many times more than one from a passer-by.
+ *     Burying it in grey text wastes it.
  *
- * ⚠️  و**تقييمي يظهر لي ولو كان معلّقًا** — من قائمة منفصلة.
+ * ⚠️  And **my own review is shown to me even while pending** — from a separate list.
  *
- *     القائمة العامة تعرض المعتمد وحده، فكان المستخدم يرسل تقييمه
- *     ثم لا يجده فيعيد كتابته، فيصطدم بـ«لديك تقييم بالفعل» بلا
- *     أن يفهم أين ذهب الأول.
+ *     The public list shows only what is approved, so the user submitted their
+ *     review, could not find it, rewrote it, and ran into "you already have a
+ *     review" with no idea where the first one went.
  */
 export function ReviewList({ slug, productId }: { slug: string; productId?: string }) {
   const { t, i18n } = useTranslation();
@@ -41,12 +42,12 @@ export function ReviewList({ slug, productId }: { slug: string; productId?: stri
 
   const { data: reviews, isPending } = useProductReviews(slug);
 
-  // ⚠️  **التقييم المجمَّع يُجلب مستقلًا عن تفاصيل المنتج.**
+  // ⚠️  **The aggregated rating is fetched independently of the product details.**
   //
-  //     صفحة المنتج تحمل `rating` مضمَّنًا بمهلة خمس دقائق؛ فمن
-  //     يكتب مراجعته الآن يرى متوسطًا لا يشمله حتى تنتهي المهلة،
-  //     ويظنّ أن مراجعته ضاعت. هذه النقطة خفيفة وتُبطَل مع كل
-  //     كتابة، فيتحرّك الرقم أمام صاحبه.
+  //     The product page carries `rating` embedded with a five-minute stale time;
+  //     so whoever writes their review now sees an average that excludes it until
+  //     that expires, and assumes their review was lost. This endpoint is light
+  //     and is invalidated on every write, so the figure moves in front of its author.
   const rating = useProductRating(slug);
   const mine = useMyReviews(Boolean(user));
   const helpful = useToggleHelpful();
@@ -67,15 +68,15 @@ export function ReviewList({ slug, productId }: { slug: string; productId?: stri
 
   return (
     <>
-      {/* ⚠️  المتوسط الحيّ فوق قائمة المراجعات: هو ما يبحث عنه
-          القارئ قبل أن يقرأ نصًّا واحدًا. */}
+      {/* ⚠️  The live average above the reviews list: it is what the reader
+          looks for before reading a single line of text. */}
       {rating.data && rating.data.count > 0 ? (
         <div className="review-summary">
           <StarRating value={Number(rating.data.average)} count={rating.data.count} />
         </div>
       ) : null}
 
-      {/* ── الكتابة ─────────────────────────────── */}
+      {/* ── Writing ─────────────────────────────── */}
       {!user ? (
         <Alert tone="info">
           <Link to="/login">{t('reviews.signInToWrite')}</Link>
@@ -109,7 +110,7 @@ export function ReviewList({ slug, productId }: { slug: string; productId?: stri
         ) : null
       ) : null}
 
-      {/* ── القائمة ─────────────────────────────── */}
+      {/* ── The list ────────────────────────────── */}
       {!reviews || reviews.length === 0 ? (
         <p className="muted">{t('catalog.noReviews')}</p>
       ) : (
@@ -132,8 +133,8 @@ export function ReviewList({ slug, productId }: { slug: string; productId?: stri
                   {formatDate(review.created_at, i18n.language)}
                 </span>
 
-                {/* ⚠️  لا زر على تقييمي: الخادم يردّ ٤٠٣ على التصويت
-                    لتقييم النفس، وإظهار زر يفشل عند الضغط تجربة سيئة. */}
+                {/* ⚠️  No button on my own review: the server answers 403 to voting
+                    on your own, and showing a button that fails when pressed is a bad experience. */}
                 {user && !review.is_mine ? (
                   <Button
                     size="sm"

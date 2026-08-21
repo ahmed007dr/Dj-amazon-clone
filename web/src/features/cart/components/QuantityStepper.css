@@ -30,7 +30,7 @@
   block-size: var(--touch-target);
   text-align: center;
 
-  /* الأرقام لاتينية دائمًا — تُقرأ يسارًا في الاتجاهين */
+  /* The numerals are always Latin — read left-to-right in both directions */
   direction: ltr;
 
   background: var(--color-surface);
@@ -38,7 +38,7 @@
   border-inline: 1px solid var(--color-border);
 }
 
-/* أسهم المتصفح تُضيّق الحقل بلا فائدة — الأزرار تغني عنها */
+/* The browser's spinners narrow the field for no benefit — the buttons replace them */
 .qty__input::-webkit-outer-spin-button,
 .qty__input::-webkit-inner-spin-button {
   appearance: none;

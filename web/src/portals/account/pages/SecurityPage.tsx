@@ -14,13 +14,13 @@ import { Field } from '@/shared/ui/Field';
 import './SecurityPage.css';
 
 /**
- * الأمان — تغيير كلمة المرور.
+ * Security — changing the password.
  *
- * ⚠️  تغييرها **يُنهي كل الجلسات** بما فيها هذه.
+ * ⚠️  Changing it **ends every session**, including this one.
  *
- *     قوله قبل الضغط لا بعده: المستخدم الذي يجد نفسه خارج الحساب
- *     فجأة يظن أن شيئًا كُسر، ويعيد المحاولة بكلمة مرور صار
- *     يشكّ فيها.
+ *     Said before the press rather than after: a user who suddenly finds
+ *     themselves logged out assumes something broke, and retries with a
+ *     password they have started to doubt.
  */
 export function SecurityPage() {
   const { t } = useTranslation();
@@ -47,7 +47,7 @@ export function SecurityPage() {
     try {
       await changePassword(current, next);
       setDone(true);
-      // الجلسات أُنهيت في الخادم — التنظيف المحلي يجعل الحالة متطابقة
+      // The sessions were ended on the server — the local cleanup keeps the state consistent
       await signOut();
     } catch (cause) {
       if (isApiError(cause)) {
@@ -80,7 +80,7 @@ export function SecurityPage() {
       <form className="surface security" onSubmit={(event) => void handleSubmit(event)} noValidate>
         {error ? <Alert tone="danger">{error}</Alert> : null}
 
-        {/* التحذير قبل الضغط لا بعده */}
+        {/* The warning before the press, not after */}
         <Alert tone="warning">{t('account.changePasswordWarning')}</Alert>
 
         <Field
@@ -126,13 +126,13 @@ export function SecurityPage() {
         </Button>
       </form>
 
-      {/* ── تغيير البريد ────────────────────────────── */}
+      {/* ── Changing the email ─────────────────────── */}
       <section className="security-section">
         <h2 className="security-section__title">{t('account.changeEmail')}</h2>
         <EmailChangeForm />
       </section>
 
-      {/* ── الأجهزة ─────────────────────────────────── */}
+      {/* ── Devices ────────────────────────────────── */}
       <section className="security-section">
         <h2 className="security-section__title">{t('account.devices')}</h2>
         <p className="muted">{t('account.devicesHint')}</p>

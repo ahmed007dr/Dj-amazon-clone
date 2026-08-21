@@ -21,15 +21,17 @@ import { formatRelative } from '@/shared/utils/format';
 import './NotificationsPage.css';
 
 /**
- * الإشعارات وتفضيلاتها.
+ * Notifications and their preferences.
  *
- * ⚠️  **بالعربية فقط** — والفرق عن البريد مقصود لا سهو.
+ * ⚠️  **Arabic only** — and the difference from email is deliberate, not an oversight.
  *
- *     البريد يُولَّد لحظة الإرسال فيُكتب باللغتين. أما الإشعار
- *     فنصّه **منسوخ لقطةً وقت الحدث** (`Notification.title`)،
- *     فترجمته الآن تعني إعادة توليده من بيانات تغيّرت — ونصًّا
- *     يخالف ما وصل بالبريد في حينه. توحيدهما يحتاج تخزين النص
- *     باللغتين وقت الإرسال، وهو تغيير نموذج لا تغيير واجهة.
+ *     Email is generated at the moment of sending, so it is written in both
+ *     languages. A notification's text, by contrast, is **copied as a snapshot
+ *     at the time of the event** (`Notification.title`), so translating it now
+ *     means regenerating it from data that has changed — and text that
+ *     contradicts what arrived by email at the time. Unifying them requires
+ *     storing the text in both languages at send time, which is a model change,
+ *     not a frontend one.
  */
 export function NotificationsPage() {
   const { t, i18n } = useTranslation();
@@ -116,9 +118,10 @@ export function NotificationsPage() {
                   <span className="muted">{preference.channel_label}</span>
                 </div>
 
-                {/* ⚠️  الإلزامي يُعرض معطّلًا لا مخفيًّا: إخفاؤه يجعل
-                    المستخدم يظن أنه أوقف كل شيء بينما تصله رسائل
-                    الأمان — فيبلّغ عن «إشعارات لم أطلبها». */}
+                {/* ⚠️  A mandatory one is shown disabled rather than hidden: hiding it
+                    makes the user think they turned everything off while
+                    security messages keep arriving — so they report
+                    "notifications I never asked for". */}
                 {preference.is_mandatory ? (
                   <Badge tone="neutral">{t('notifications.mandatory')}</Badge>
                 ) : (
@@ -174,9 +177,9 @@ function NotificationRow({
 
   return (
     <li className={`surface notification ${notification.is_read ? '' : 'is-unread'}`}>
-      {/* ⚠️  فتح الإشعار يعلّمه مقروءًا — لا زر منفصل.
-          الزر يعني خطوتين لفعل واحد، وقائمةً تبقى «غير مقروءة»
-          كلها بعد قراءتها كلها. */}
+      {/* ⚠️  Opening the notification marks it read — no separate button.
+          A button means two steps for one act, and a list that stays entirely
+          "unread" after being entirely read. */}
       {notification.action_url ? (
         <Link to={notification.action_url} className="notification__link" onClick={onRead}>
           {body}

@@ -6,20 +6,21 @@ import { Button } from '@/shared/ui/Button';
 
 import './ImagePicker.css';
 
-/** يطابق `ALLOWED_IMAGE_TYPES` على الخادم. */
+/** Matches `ALLOWED_IMAGE_TYPES` on the server. */
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp'];
 
-/** يطابق `MAX_IMAGE_SIZE` — ٥ ميجابايت. */
+/** Matches `MAX_IMAGE_SIZE` — 5 MB. */
 const MAX_BYTES = 5 * 1024 * 1024;
 
 /**
- * اختيار صورة ومعاينتها قبل الرفع.
+ * Choosing an image and previewing it before upload.
  *
- * ⚠️  **الفحص هنا لطف لا حماية.**
+ * ⚠️  **The check here is a courtesy, not a protection.**
  *
- *     الخادم يفحص توقيع الملف نفسه ويرفض ما لا يعرفه. الفحص في
- *     المتصفح موجود ليقول للأدمن «هذا الملف كبير» قبل أن يقضي
- *     دقيقتين في رفعه على شبكة بطيئة — لا ليُعتمد عليه.
+ *     The server checks the file's own signature and refuses what it does not
+ *     recognise. The check in the browser exists to tell the admin "this file
+ *     is large" before they spend two minutes uploading it on a slow connection
+ *     — not to be relied on.
  */
 export function ImagePicker({
   onPick,
@@ -47,9 +48,9 @@ export function ImagePicker({
     setError(null);
     onPick(file);
 
-    // ⚠️  تصفير القيمة يسمح باختيار **نفس** الملف مرتين.
-    //     المتصفح لا يطلق `change` حين لا تتغير القيمة، فيبدو
-    //     الزر معطلًا بعد فشل رفعٍ وإعادة المحاولة بنفس الملف.
+    // ⚠️  Resetting the value allows **the same** file to be chosen twice.
+    //     The browser does not fire `change` when the value is unchanged, so the
+    //     button looks disabled after a failed upload and a retry with the same file.
     if (inputRef.current) inputRef.current.value = '';
   };
 

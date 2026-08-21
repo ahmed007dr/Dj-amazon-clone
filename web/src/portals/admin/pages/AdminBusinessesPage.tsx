@@ -27,12 +27,13 @@ const TONE: Record<string, 'success' | 'danger' | 'neutral'> = {
 };
 
 /**
- * الحسابات التجارية وحدودها الائتمانية.
+ * Business accounts and their credit limits.
  *
- * ⚠️  **الترخيص المنتهي يُبرَز في القائمة لا في التفاصيل.**
+ * ⚠️  **An expired licence is highlighted in the list, not in the details.**
  *
- *     هو أول سبب يمنع الآجل، وأكثر ما يُكتشف بعد أن يُرفض طلب
- *     العميل ويتصل غاضبًا. إظهاره في الصف يجعل المتابعة استباقية.
+ *     It is the first reason credit is blocked, and the thing most often
+ *     discovered after the customer's order is refused and they call in anger.
+ *     Showing it in the row makes the follow-up proactive.
  */
 export function AdminBusinessesPage() {
   const { t, i18n } = useTranslation();
@@ -172,8 +173,8 @@ export function AdminBusinessesPage() {
         open={selected !== null}
         onClose={() => {
           setSelected(null);
-          // ⚠️  العودة إلى «الائتمان» مع كل إغلاق: فتح عميل جديد
-          //     على تبويب «الحركات» يعرض كشفًا قبل أن يُطلَب.
+          // ⚠️  Returning to "credit" on every close: opening a new customer
+          //     on the "movements" tab shows a statement before it was asked for.
           setPanel('credit');
         }}
         {...(selected ? { title: selected.legal_name } : {})}
@@ -195,9 +196,9 @@ export function AdminBusinessesPage() {
               ))}
             </div>
 
-            {/* ⚠️  `key` يعيد تركيب اللوح لكل عميل: بلا ذلك تبقى قيم
-                النموذج من العميل السابق ظاهرة للحظة — وهي حقول
-                تُمنح بها حدود ائتمانية. */}
+            {/* ⚠️  The `key` rebuilds the panel per customer: without it the form's
+                values from the previous customer stay visible for a moment —
+                and these are the fields credit limits are granted through. */}
             {panel === 'credit' ? <CreditPanel key={selected.id} business={selected} /> : null}
             {panel === 'details' ? (
               <BusinessDetailsForm key={selected.id} business={selected} />

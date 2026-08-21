@@ -39,8 +39,8 @@
   border-color: var(--color-primary);
 }
 
-/* ⚠️  زر الراديو مخفي بصريًا لا محذوفًا — التصفّح بلوحة المفاتيح
-   يعتمد عليه، و`display:none` يخرجه من ترتيب التاب */
+/* ⚠️  The radio button is visually hidden rather than removed — keyboard
+   navigation depends on it, and `display:none` takes it out of the tab order */
 .variant-chip:focus-within {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;

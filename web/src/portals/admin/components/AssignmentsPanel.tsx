@@ -15,17 +15,17 @@ const TONE: Record<string, 'success' | 'neutral' | 'info'> = {
 };
 
 /**
- * سجل الإسناد.
+ * The assignment log.
  *
- * ⚠️  **العمولة تتبع الإسناد — فهذا الجدول مالٌ لا سجل.**
+ * ⚠️  **Commission follows the assignment — so this table is money, not a record.**
  *
- *     «هذا العميل كان لي في مارس» دعوى تتكرّر كل شهر عند صرف
- *     العمولات، ولا تُحسم إلا بتاريخ الإسناد. شاشة الموظفين تعرض
- *     عدد عملاء كل مندوب اليوم، والعدد لا يقول متى انتقل العميل
- *     ولا من كان قبله.
+ *     "This customer was mine in March" is a claim that recurs every month when
+ *     commissions are paid, and it is settled only by the assignment date. The
+ *     employees screen shows each rep's customer count today, and a count says
+ *     neither when the customer moved nor who had them before.
  *
- * ⚠️  و**المنتهي مُدرَج افتراضيًا**: قصر القائمة على النشط يُلغي
- *     السؤال الوحيد الذي تُفتح لأجله.
+ * ⚠️  And **the ended ones are included by default**: restricting the list to
+ *     the active ones cancels the only question it is opened for.
  */
 export function AssignmentsPanel() {
   const { t } = useTranslation();
@@ -34,11 +34,11 @@ export function AssignmentsPanel() {
   const [employee, setEmployee] = useState('');
   const [page, setPage] = useState(1);
 
-  // ⚠️  **الترشيح بالمندوب هو الاستعمال الحقيقي للشاشة.**
+  // ⚠️  **Filtering by rep is the screen's real use.**
   //
-  //     السؤال يأتي دائمًا في صيغة «أرني عملاء فلان في مارس» لا
-  //     «أرني كل الإسنادات». وقائمة بلا ترشيح تعني تمريرًا في
-  //     آلاف الصفوف لإيجاد اسم واحد.
+  //     The question always comes in the form "show me so-and-so's customers in
+  //     March", not "show me every assignment". And an unfiltered list means
+  //     scrolling through thousands of rows to find one name.
   const employees = useAdminStaff({ active: 'true', page: 1 });
 
   const query = useAssignments({
@@ -76,8 +76,8 @@ export function AssignmentsPanel() {
       key: 'period',
       header: t('staff.assignedPeriod'),
       align: 'end',
-      // ⚠️  الفترة عمود واحد لا عمودان: القارئ يسأل «من متى إلى
-      //     متى» سؤالًا واحدًا، وفصلهما يجعله يقارن عمودين.
+      // ⚠️  The period is one column, not two: the reader asks "from when to
+      //     when" as a single question, and splitting it makes them compare two columns.
       render: (row) => (
         <span dir="ltr" className="assignment-period">
           {row.started_at.slice(0, 10)} → {row.ended_at ? row.ended_at.slice(0, 10) : '…'}

@@ -14,8 +14,8 @@
   color: var(--color-text-muted);
 }
 
-/* ⚠️  النفاد يُميَّز عن الانخفاض: «صفر» قرار عاجل و«تحت العتبة»
-   قرار مجدوَل — ولونٌ واحد يجعلهما سواء. */
+/* ⚠️  Out of stock is distinguished from low: "zero" is an urgent decision and
+   "below the threshold" a scheduled one — and one colour makes them equal. */
 .reorder-out {
   font-weight: 700;
   color: var(--color-danger);
@@ -47,8 +47,8 @@
   border-radius: var(--radius-sm);
 }
 
-/* ⚠️  الأول في القائمة هو الأرخص (الخادم يرتّب بالسعر) — حافة
-   خفيفة تقوله بلا شرح. */
+/* ⚠️  The first in the list is the cheapest (the server orders by price) — a
+   light edge says so with no explanation. */
 .reorder-offers li:first-child {
   border-inline-start: 3px solid var(--color-success);
 }

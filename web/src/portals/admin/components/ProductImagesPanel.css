@@ -13,9 +13,9 @@
   border-radius: var(--radius);
 }
 
-/* ⚠️  `auto-fill` بحد أدنى لا عدد أعمدة ثابت.
-   الشبكة تُستخدم داخل لوح منزلق عرضه يتغير بعرض الشاشة — عمودان
-   مفروضان يقصّان الصور على هاتف ويتركان فراغًا على شاشة كبيرة. */
+/* ⚠️  `auto-fill` with a minimum rather than a fixed column count.
+   The grid is used inside a sliding panel whose width changes with the screen —
+   two forced columns crop the images on a phone and leave a gap on a large screen. */
 .images-panel__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));

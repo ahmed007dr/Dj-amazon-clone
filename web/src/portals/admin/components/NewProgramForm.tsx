@@ -30,18 +30,19 @@ const REFERRAL_DEFAULTS = {
 };
 
 /**
- * إنشاء برنامج جديد.
+ * Creating a new programme.
  *
- * ⚠️  **البرنامج الجديد يُنشأ موقوفًا دائمًا.**
+ * ⚠️  **A new programme is always created disabled.**
  *
- *     إنشاؤه مفعَّلًا يعني أن أول طلب بعد الضغط يمنح نقاطًا
- *     بقواعد لم تُراجَع بعد — والالتزام الذي بدأ لا يُلغى بتصحيح
- *     الضبط. الأدمن يضبط ثم يشغّل، وهما خطوتان بقصد.
+ *     Creating it enabled means the first order after the press awards points
+ *     under rules nobody has reviewed — and a liability that has started is not
+ *     undone by fixing the configuration. The admin configures and then
+ *     switches on, and those are two steps by design.
  *
- * ⚠️  و**القيم الافتراضية محافظة**.
+ * ⚠️  And **the defaults are conservative**.
  *
- *     حقل فارغ يدفع إلى كتابة رقم عشوائي؛ ورقم افتراضي سخيّ يمرّ
- *     بلا مراجعة. المبدوء به معدّل متواضع يُرفَع بوعي.
+ *     An empty field pushes towards typing an arbitrary number; and a generous
+ *     default passes unreviewed. What is started from is a modest rate, raised deliberately.
  */
 export function NewProgramForm({
   kind,
@@ -93,8 +94,9 @@ export function NewProgramForm({
         }}
       >
         <div className="loyalty-grid">
-          {/* ⚠️  الرمز يُكتب مرة ولا يُعدَّل بعدها: هو مرجع الحركات
-              في الدفتر، وتغييره يقطع صلة حركة قديمة ببرنامجها. */}
+          {/* ⚠️  The code is written once and never edited afterwards: it is the
+              movements' reference in the ledger, and changing it severs an old
+              movement's link to its programme. */}
           <label>
             {t('loyalty.code')}
             <input

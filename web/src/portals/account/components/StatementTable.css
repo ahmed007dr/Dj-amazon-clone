@@ -23,7 +23,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ⚠️  الجدول يتمرّر داخل حاويته لا يدفع الصفحة أفقيًا. */
+/* ⚠️  The table scrolls inside its container rather than pushing the page horizontally. */
 .statement__scroll {
   overflow-x: auto;
   background: var(--color-surface);

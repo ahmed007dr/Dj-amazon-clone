@@ -12,17 +12,19 @@ import { formatDate } from '@/shared/utils/format';
 import './BatchesTab.css';
 
 /**
- * الدفعات.
+ * Batches.
  *
- * ⚠️  **الدفعة هي ما يجعل FEFO ممكنًا** — والشاشة تُقرأ بالصلاحية.
+ * ⚠️  **The batch is what makes FEFO possible** — and the screen is read by expiry.
  *
- *     أمين المخزن يفتحها ليعرف ما يخرج أولًا وما يوشك أن يُهدَر.
- *     ترتيبها بالاستلام أو بالاسم يجعل السؤال بلا جواب.
+ *     The warehouse keeper opens it to learn what goes out first and what is
+ *     about to be wasted. Ordering it by receipt or by name leaves the question
+ *     unanswered.
  *
- * ⚠️  و**المنتهية تُبرَز لا تُخفى**.
+ * ⚠️  And **the expired are highlighted, not hidden**.
  *
- *     دفعة انتهت وما زالت في المخزن هي الأخطر: بضاعة قد تُباع.
- *     إخفاؤها خلف فلتر «النشط» يجعلها تختفي عمّن يجب أن يراها.
+ *     A batch that has expired and is still in the warehouse is the most
+ *     dangerous: goods that might be sold. Hiding it behind an "active" filter
+ *     makes it vanish from whoever must see it.
  */
 export function BatchesTab() {
   const { t, i18n } = useTranslation();
@@ -73,7 +75,7 @@ export function BatchesTab() {
       key: 'quantity',
       header: t('inventory.remaining'),
       align: 'end',
-      // ⚠️  «٤٠ من ١٠٠» لا «٤٠»: المتبقي وحده لا يقول كم استُهلك.
+      // ⚠️  "40 of 100", not "40": the remainder alone does not say how much was consumed.
       render: (row) => (
         <span dir="ltr">
           {row.quantity_remaining} / {row.quantity_received}
@@ -94,8 +96,8 @@ export function BatchesTab() {
         row.expires_at ? (
           <div className="batch-cell">
             <span dir="ltr">{formatDate(row.expires_at, i18n.language)}</span>
-            {/* ⚠️  «منتهية» نصًّا لا رقمًا سالبًا: «−١٢ يومًا» تُقرأ
-                بتردّد، و«منتهية» لا تحتمل تأويلًا. */}
+            {/* ⚠️  "Expired" as text rather than a negative number: "−12 days" is
+                read with hesitation, and "expired" admits no interpretation. */}
             {row.is_expired ? (
               <span className="batch-expired">{t('inventory.expired')}</span>
             ) : row.days_to_expiry !== null && row.days_to_expiry <= 90 ? (
@@ -105,8 +107,8 @@ export function BatchesTab() {
             ) : null}
           </div>
         ) : (
-          // ⚠️  «بلا صلاحية» لا شرطة: صنف غير قابل للانتهاء (جهاز)
-          //     حالة مقصودة لا بيانات ناقصة.
+          // ⚠️  "No expiry" rather than a dash: an item that cannot expire (a device)
+          //     is an intended state, not missing data.
           <span className="batch-muted">{t('inventory.noExpiry')}</span>
         ),
     },

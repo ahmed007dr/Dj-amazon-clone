@@ -18,8 +18,9 @@
   border-radius: var(--radius);
 }
 
-/* ⚠️  حدّ ملوّن على حافة البداية لا خلفية كاملة: الخلفية الحمراء
-   تُضعف تباين النص فوقها، والحدّ يلفت بلا أن يُخفض المقروئية. */
+/* ⚠️  A coloured border on the start edge rather than a full background: a red
+   background weakens the contrast of the text over it, and a border draws the
+   eye without lowering legibility. */
 .invoice-list li.is-overdue {
   border-inline-start: 3px solid var(--color-danger);
 }

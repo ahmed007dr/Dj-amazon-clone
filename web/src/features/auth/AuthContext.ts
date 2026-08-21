@@ -4,19 +4,20 @@ import type { LoginPayload, User } from './types';
 
 export interface AuthContextValue {
   user: User | null;
-  /** ⚠️  `true` أثناء استعادة الجلسة عند الإقلاع — ليس عند الدخول. */
+  /** ⚠️  `true` while the session is being restored at startup — not during login. */
   isRestoring: boolean;
   isAuthenticated: boolean;
   signIn: (payload: LoginPayload) => Promise<User>;
   signOut: () => Promise<void>;
   /**
-   * إعادة قراءة المستخدم من الخادم.
+   * Re-read the user from the server.
    *
-   * ⚠️  **الصلاحيات تتغيّر والجلسة لا.**
+   * ⚠️  **Permissions change and the session does not.**
    *
-   *     من يعدّل دوره — أو يُعدَّل دوره وهو متصل — يبقى على
-   *     صلاحيات لحظة الدخول: يرى روابط سُحبت منه فتُرفض عند
-   *     الضغط، أو لا يرى ما مُنح له للتوّ فيظنّ المنح لم يُحفظ.
+   *     Someone who edits their role — or whose role is edited while they are
+   *     online — stays on the permissions they had at login: they see links
+   *     that have been taken away and are refused when they click, or they do
+   *     not see what has just been granted and assume the grant was not saved.
    */
   refreshUser: () => Promise<void>;
 }

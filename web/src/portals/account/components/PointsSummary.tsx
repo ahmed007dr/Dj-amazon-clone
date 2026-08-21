@@ -6,18 +6,18 @@ import { useLocalized } from '@/shared/i18n/useLocalized';
 import './PointsSummary.css';
 
 /**
- * ملخّص نقاط العميل.
+ * The customer's points summary.
  *
- * ⚠️  **الرصيد القابل للاستبدال هو الرقم الكبير لا الرصيد الكلي.**
+ * ⚠️  **The redeemable balance is the large figure, not the total balance.**
  *
- *     الكلي يشمل نقاطًا انتهت صلاحيتها ولم تُنظَّف بعد. إبرازه
- *     يجعل العميل يبني على رقم يُرفض عند أول محاولة — وهو أسوأ
- *     من رقم أصغر يراه صحيحًا.
+ *     The total includes points that have expired and not yet been cleaned up.
+ *     Highlighting it makes the customer build on a figure that is refused at
+ *     the first attempt — worse than a smaller figure they see as correct.
  *
- * ⚠️  و**قيمة النقاط بالجنيه تُعرض بجوارها**.
+ * ⚠️  And **the points' value in pounds is shown beside them**.
  *
- *     «٣٤٠ نقطة» لا تقول شيئًا لمن لا يحفظ معدّل التحويل؛ و«١٧ ج»
- *     تقوله في لمحة.
+ *     "340 points" says nothing to anyone who does not know the conversion
+ *     rate; "17 EGP" says it at a glance.
  */
 export function PointsSummary({ summary }: { summary: LoyaltySummary }) {
   const { t } = useTranslation();
@@ -35,8 +35,8 @@ export function PointsSummary({ summary }: { summary: LoyaltySummary }) {
         {summary.tier ? (
           <span className="points-summary__tier">
             {localized(summary.tier, 'name')}
-            {/* ⚠️  المضاعِف بجوار اسم الفئة: الفئة بلا أثر ظاهر
-                تبدو لقبًا زخرفيًا لا سببًا للشراء. */}
+            {/* ⚠️  The multiplier beside the tier name: a tier with no visible effect
+                looks like a decorative title rather than a reason to buy. */}
             {Number(summary.tier.multiplier) > 1 ? (
               <em dir="ltr">×{summary.tier.multiplier}</em>
             ) : null}
@@ -53,8 +53,9 @@ export function PointsSummary({ summary }: { summary: LoyaltySummary }) {
         {t('loyalty.worth')} <strong dir="ltr">{worth}</strong>
       </p>
 
-      {/* ⚠️  الفارق بين الكلي والقابل للاستبدال يُقال صراحةً حين
-          يوجد. صمته يجعل العميل يحسب رصيده من كشفه ويجدنا نخالفه. */}
+      {/* ⚠️  The gap between the total and the redeemable is stated explicitly when
+          it exists. Silence makes the customer work their balance out from
+          their statement and find us contradicting them. */}
       {balance > usable ? (
         <p className="points-summary__note">
           {t('loyalty.someExpired', { count: balance - usable })}

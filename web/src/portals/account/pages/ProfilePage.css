@@ -14,7 +14,7 @@
 
 .profile__email {
   font-weight: 600;
-  /* البريد لاتيني — يُقرأ يسارًا في الاتجاهين */
+  /* The email is Latin — read left-to-right in both directions */
   direction: ltr;
 }
 

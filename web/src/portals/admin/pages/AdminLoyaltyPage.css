@@ -28,9 +28,9 @@
   border-block-end-color: var(--color-primary);
 }
 
-/* ⚠️  عمود واحد حتى الشاشات المتوسطة.
-   بطاقة البرنامج تحمل نموذج ضبط كاملًا؛ عمودان على تابلت يضغطان
-   قوائم الاستهداف حتى تصير خانات الاختيار متلاصقة على اللمس. */
+/* ⚠️  One column up to medium screens.
+   The programme card carries a complete configuration form; two columns on a
+   tablet squeeze the targeting lists until the checkboxes are too close together to touch. */
 .loyalty-programs {
   display: grid;
   grid-template-columns: 1fr;

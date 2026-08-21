@@ -9,13 +9,14 @@ import type { CartSnapshot } from '../types';
 import './CouponBox.css';
 
 /**
- * إدخال الكوبون.
+ * Entering the coupon.
  *
- * ⚠️  **الرفض ليس خطأ.**
+ * ⚠️  **A refusal is not an error.**
  *
- *     الخادم يعيد `200` مع سبب الرفض في `coupon.reason` لأن تجربة
- *     أكواد سلوك متوقَّع. معاملته كخطأ شبكة تعرض «حدث خطأ ما»
- *     بدل «الكوبون منتهٍ» — والعميل يعيد المحاولة بلا فائدة.
+ *     The server returns `200` with the refusal reason in `coupon.reason`,
+ *     because trying codes is expected behaviour. Treating it as a network
+ *     error shows "something went wrong" instead of "the coupon has expired" —
+ *     and the customer retries for nothing.
  */
 export function CouponBox({ snapshot }: { snapshot: CartSnapshot }) {
   const { t } = useTranslation();
@@ -71,7 +72,7 @@ export function CouponBox({ snapshot }: { snapshot: CartSnapshot }) {
         </Button>
       </form>
 
-      {/* سبب الرفض من الخادم — مترجَم ومحدَّد */}
+      {/* The refusal reason from the server — translated and specific */}
       {result && !result.is_valid && result.message ? (
         <p className="coupon__error" role="alert">
           {result.message}

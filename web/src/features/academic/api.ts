@@ -22,18 +22,20 @@ export const getBundle = (slug: string) =>
   http.get<StudyBundle>(`/academic/bundles/${slug}/`);
 
 /**
- * ⚠️  يعيد `null` بحالة `200` لغير الطلاب — لا `404`.
+ * ⚠️  Returns `null` with a `200` status for non-students — not a `404`.
  *
- *     غياب الملف الأكاديمي حالة **عادية** لا خطأ: أغلب الحسابات
- *     ليست طلابية. معاملته كخطأ تُظهر رسالة عطل لمستخدم لم يخطئ.
+ *     A missing academic profile is a **normal** state, not an error: most
+ *     accounts are not student accounts. Treating it as an error shows a fault
+ *     message to a user who did nothing wrong.
  */
 export const getMyStudentProfile = () => http.get<StudentProfile | null>('/academic/me/');
 
 /**
- * شجرة الجامعات — **عامة بلا توكن**.
+ * The university tree — **public, with no token**.
  *
- * ⚠️  الخادم يفتحها لغير المسجَّل عمدًا: الطالب يختار جامعته قبل
- *     أن يملك حسابًا. ولذلك لا تُقيَّد هنا بـ `enabled` على الجلسة.
+ * ⚠️  The server opens it to unregistered visitors deliberately: a student picks
+ *     their university before they have an account. So it is not gated here with
+ *     an `enabled` flag on the session.
  */
 export const getUniversities = () => http.get<University[]>('/academic/universities/');
 
@@ -41,9 +43,10 @@ export const createStudentProfile = (payload: StudentProfilePayload) =>
   http.post<StudentProfile>('/academic/me/', payload);
 
 /**
- * ⚠️  `PATCH` جزئي: الطالب يرقّي سنته أو يصحّح قسمه دون إعادة
- *     إرسال الشجرة كلها — وإرسال حقل لم يتغيّر يُعيد فحص الاتساق
- *     على قيمة قديمة فيرفضها الخادم بلا سبب مفهوم للطالب.
+ * ⚠️  A partial `PATCH`: the student advances their year or corrects their
+ *     department without resending the whole hierarchy — and sending an
+ *     unchanged field re-runs the consistency check against a stale value, so
+ *     the server refuses it for no reason the student can understand.
  */
 export const updateStudentProfile = (payload: Partial<StudentProfilePayload>) =>
   http.patch<StudentProfile>('/academic/me/', payload);

@@ -8,17 +8,17 @@ import { useUnreadCount } from '../hooks';
 import './NotificationBell.css';
 
 /**
- * جرس الإشعارات.
+ * The notifications bell.
  *
- * ⚠️  **لا يظهر للزائر إطلاقًا.**
+ * ⚠️  **It never appears to a visitor.**
  *
- *     نقطة العدّاد تتطلب توكنًا؛ عرض الجرس لغير المسجَّل يعني
- *     `401` متكرّرًا كل دقيقة، وكل واحد منها يستدعي محاولة تجديد
- *     جلسة لا وجود لها.
+ *     The counter endpoint requires a token; showing the bell to an
+ *     unregistered user means a repeated `401` every minute, each one
+ *     triggering an attempt to refresh a session that does not exist.
  *
- * ⚠️  ورابط لا زر بقائمة منسدلة: القائمة المنسدلة تحتاج إدارة
- *     تركيز ومصيدة لوحة مفاتيح وإغلاقًا بالنقر خارجها — وكلها
- *     تُبنى مرة واحدة في الشاشة الكاملة بدل نسختين تتباعدان.
+ * ⚠️  And a link rather than a button with a dropdown: a dropdown needs focus
+ *     management, a keyboard trap and closing on an outside click — all of
+ *     which are built once on the full screen instead of in two copies that drift apart.
  */
 export function NotificationBell() {
   const { t } = useTranslation();
@@ -40,7 +40,7 @@ export function NotificationBell() {
         ✉
       </span>
 
-      {/* ⚠️  الصفر لا يُعرض — «٠» تُقرأ كعنصر معطّل لا كـ«لا جديد». */}
+      {/* ⚠️  Zero is not shown — "0" reads as a disabled element rather than "nothing new". */}
       {unread > 0 ? (
         <span className="notification-bell__count" aria-hidden>
           {unread > 99 ? '99+' : unread}

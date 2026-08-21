@@ -4,8 +4,8 @@ import type { PagedResponse } from '@/features/orders/adminApi';
 import { http } from '@/shared/http';
 
 /**
- * ⚠️  `available` **محسوب لا مُخزَّن**: الفعلي ناقص المحجوز والتالف
- *     والمنتهي. وهو الرقم الوحيد الذي يهم عند البيع.
+ * ⚠️  `available` is **computed, not stored**: physical minus reserved, damaged
+ *     and expired. And it is the only number that matters when selling.
  */
 export interface Stock {
   id: number;
@@ -73,10 +73,11 @@ export const listAlerts = (params: { type?: string; resolved?: string; page?: nu
 export const listLocations = () => http.get<StockLocation[]>('/inventory/locations/');
 
 /**
- * المواقع المخزنية — تُستهلك من أكثر من شاشة.
+ * Stock locations — consumed by more than one screen.
  *
- * ⚠️  `staleTime` طويل عمدًا: المواقع بنية تحتية تتغيّر مرة كل
- *     أشهر، وإعادة جلبها مع كل فتح لوح شراء نداء بلا فائدة.
+ * ⚠️  A deliberately long `staleTime`: locations are infrastructure that changes
+ *     once every few months, and refetching them every time a purchasing panel
+ *     opens is a call with no benefit.
  */
 export function useInventoryLocations() {
   return useQuery({
@@ -87,24 +88,25 @@ export function useInventoryLocations() {
 }
 
 /**
- * ⚠️  الصيانة تُشغّل الأعمال الدورية يدويًا: إفراج الحجوزات المنتهية ·
- *     حجر الدفعات المنتهية · فحص التنبيهات.
+ * ⚠️  Maintenance runs the periodic jobs by hand: releasing expired reservations ·
+ *     quarantining expired batches · checking the alerts.
  *
- *     وجود زر لها ليس بديلًا عن الجدولة — هو ما يجعل الأدمن قادرًا
- *     على تشغيلها فورًا حين يشكّ في رقم، بدل انتظار الدورة التالية.
+ *     Having a button for it is not a substitute for scheduling — it is what
+ *     lets the admin run it immediately when they doubt a figure, rather than
+ *     waiting for the next cycle.
  */
 export const runMaintenance = () =>
   http.post<Record<string, number>>('/inventory/maintenance/');
 
 // ═══════════════════════════════════════════════════════════
-//  سجل الحركات
+//  The movement log
 // ═══════════════════════════════════════════════════════════
 
 /**
- * ⚠️  يطابق `MovementType` على الخادم حرفيًا.
+ * ⚠️  It matches `MovementType` on the server literally.
  *
- *     كل تغيير في المخزون يترك حركة بلا استثناء — والسجل هو ما
- *     يجيب على «أين ذهبت الخمسون علبة؟».
+ *     Every change in stock leaves a movement without exception — and the log
+ *     is what answers "where did the fifty boxes go?".
  */
 export type MovementType =
   | 'RECEIPT'
@@ -131,7 +133,7 @@ export interface StockMovement {
   location_code: string;
   batch: string | null;
   movement_type: MovementType;
-  /** موجب للوارد وسالب للصادر — الإشارة جزء من المعنى */
+  /** Positive for inbound and negative for outbound — the sign is part of the meaning */
   quantity: number;
   balance_after: number;
   unit_cost: string | null;
@@ -151,7 +153,7 @@ export const listMovements = (params: {
 }) => http.get<PagedResponse<StockMovement>>('/inventory/movements/', { params: { ...params } });
 
 // ═══════════════════════════════════════════════════════════
-//  الأوامر
+//  Commands
 // ═══════════════════════════════════════════════════════════
 
 export interface ReceiveBody {
@@ -166,7 +168,7 @@ export interface ReceiveBody {
 export interface AdjustBody {
   product: string;
   location?: string | null;
-  /** موجب للزيادة · سالب للنقص — والصفر مرفوض */
+  /** Positive for an increase · negative for a decrease — and zero is refused */
   quantity: number;
   reason: string;
 }
@@ -186,11 +188,11 @@ export interface DamageBody {
 }
 
 /**
- * ⚠️  إبطال **شجرة المخزون كلها** بعد أي حركة.
+ * ⚠️  Invalidate **the whole inventory tree** after any movement.
  *
- *     الاستلام يغيّر الرصيد والدفعات والحركات، وقد يحسم تنبيهًا
- *     مفتوحًا. إبطال قائمة واحدة يترك الشاشة تعرض تنبيه «نافد»
- *     بجوار الكمية التي استُلمت للتوّ.
+ *     Receiving changes the balance, the batches and the movements, and may
+ *     resolve an open alert. Invalidating one list leaves the screen showing an
+ *     "out of stock" alert beside the quantity just received.
  */
 function useInventoryMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();
@@ -218,7 +220,7 @@ export function useMarkDamaged() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  الدفعات
+//  Batches
 // ═══════════════════════════════════════════════════════════
 
 export interface Batch {
@@ -242,10 +244,10 @@ export interface Batch {
 }
 
 /**
- * ⚠️  `status=expired` **يشمل ما انتهى وما زال في المخزن**.
+ * ⚠️  `status=expired` **includes what has expired and is still in the warehouse**.
  *
- *     وهو الأخطر: بضاعة قد تُباع. الشاشة تُبرزه بدل أن تخلطه
- *     بما «يقترب».
+ *     And that is the more dangerous case: goods that might be sold. The screen
+ *     highlights it rather than mixing it in with what is "approaching".
  */
 export function useBatches(params: {
   product?: string;
@@ -273,7 +275,7 @@ export function useMovements(params: {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  الجرد
+//  Stock counting
 // ═══════════════════════════════════════════════════════════
 
 export type CountStatus = 'DRAFT' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
@@ -288,7 +290,7 @@ export interface StockCountLine {
   variant_name: string | null;
   expected_quantity: number;
   counted_quantity: number;
-  /** ⚠️  محسوب على الخادم — موجب زيادة وسالب عجز. */
+  /** ⚠️  Computed on the server — positive is a surplus and negative a shortfall. */
   variance: number;
   note: string;
 }
@@ -369,7 +371,7 @@ export function useCancelCount() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  الحجوزات وحدود التنبيه
+//  Reservations and alert thresholds
 // ═══════════════════════════════════════════════════════════
 
 export interface StockReservation {
@@ -387,13 +389,14 @@ export interface StockReservation {
 }
 
 /**
- * الحجوزات القائمة.
+ * The current reservations.
  *
- * ⚠️  **الحجز يخصم من المتاح ولا يظهر في أي شاشة كانت.**
+ * ⚠️  **A reservation is deducted from available and appeared on no screen at all.**
  *
- *     «الرصيد ١٠٠ والمتاح ٦٠ — أين الأربعون؟» سؤال لا جواب له
- *     بلا هذه القائمة. الجواب دائمًا سلال مفتوحة أو طلبات لم
- *     تُشحن، وبلا رؤيتها يبدو النظام وكأنه يُخفي بضاعة.
+ *     "The balance is 100 and available is 60 — where are the forty?" is a
+ *     question with no answer without this list. The answer is always open
+ *     carts or unshipped orders, and without seeing them the system looks as
+ *     though it is hiding goods.
  */
 export function useReservations(params: { status?: string; page?: number }, enabled = true) {
   return useQuery({
@@ -407,12 +410,12 @@ export function useReservations(params: { status?: string; page?: number }, enab
 }
 
 /**
- * تعديل حدود التنبيه — **الحدود وحدها**.
+ * Editing the alert thresholds — **the thresholds alone**.
  *
- * ⚠️  الكميات لا تُعدَّل من هنا (الخادم يمنعها `read_only`):
- *     كل حركة مخزون تمرّ بمسارها المسجَّل (استلام · تسوية ·
- *     تحويل · تلف)، وتعديل رقم مباشرةً يترك فرقًا بلا سبب في
- *     الدفتر.
+ * ⚠️  Quantities are not edited from here (the server marks them `read_only`):
+ *     every stock movement goes through its recorded path (receipt · adjustment ·
+ *     transfer · damage), and editing a number directly leaves a discrepancy
+ *     with no cause in the ledger.
  */
 export function useUpdateStockThresholds() {
   return useInventoryMutation(

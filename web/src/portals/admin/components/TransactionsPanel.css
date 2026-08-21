@@ -60,8 +60,8 @@
   font-weight: 600;
 }
 
-/* ⚠️  سبب الفشل بلون تحذيري وسطر كامل: هو ما يقرّر أتُعاد
-   المحاولة أم يُتصل بالعميل. */
+/* ⚠️  The failure reason in a warning colour and on a full line: it is what
+   decides whether to retry or to call the customer. */
 .tx-detail__failure {
   flex-direction: column !important;
   align-items: start !important;

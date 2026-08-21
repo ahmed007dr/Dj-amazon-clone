@@ -17,11 +17,12 @@ import { useToast } from '@/shared/ui/useToast';
 import './MailAccountForm.css';
 
 /**
- * نموذج حساب بريد.
+ * The mail account form.
  *
- * ⚠️  **حقل كلمة المرور يُقدَّم فارغًا دائمًا** — القيمة لا تُقرأ من
- *     الخادم أصلًا. وفراغه عند الحفظ يعني «أبقِ الحالية» لا «امسح»:
- *     تعديل المنفذ وحده كان سيمسح كلمة المرور ويوقف البريد كله.
+ * ⚠️  **The password field is always presented empty** — the value is never
+ *     read from the server at all. And leaving it empty on save means "keep the
+ *     current one", not "clear it": editing the port alone would have erased
+ *     the password and stopped all mail.
  */
 export function MailAccountForm({
   account,
@@ -84,8 +85,8 @@ export function MailAccountForm({
         },
         onError: (cause) => {
           if (isApiError(cause) && cause.fields) {
-            // ⚠️  خطأ الحقل يُعرض **عند حقله**: رسالة عامة فوق نموذج
-            //     بعشرين حقلًا تترك المشغّل يبحث عن الخطأ بالعين.
+            // ⚠️  A field's error is shown **at its field**: a generic message above a
+            //     form with twenty fields leaves the operator hunting for the error by eye.
             const mapped: Record<string, string> = {};
             for (const [name, errors] of Object.entries(cause.fields)) {
               const first = errors[0];

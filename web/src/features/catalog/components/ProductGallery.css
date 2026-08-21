@@ -6,7 +6,7 @@
 .gallery__main {
   display: grid;
   place-items: center;
-  /* يحجز المساحة قبل التحميل فلا يقفز التخطيط */
+  /* Reserves the space before loading so the layout does not jump */
   aspect-ratio: 1;
   overflow: hidden;
 

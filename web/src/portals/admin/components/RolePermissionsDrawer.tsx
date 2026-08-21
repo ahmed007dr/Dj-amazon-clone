@@ -17,27 +17,30 @@ import { useToast } from '@/shared/ui/useToast';
 
 import './RolePermissionsDrawer.css';
 
-/** ⚠️  الصلاحية التي تمنح الصلاحيات — تُعلَّم ولا تُخفى. */
+/** ⚠️  The permission that grants permissions — flagged and never hidden. */
 const GRANTING_PERMISSION = 'employees.change_customerassignment';
 
 /**
- * منح صلاحيات الدور.
+ * Granting a role's permissions.
  *
- * ⚠️  **هذه الشاشة شرط الإخفاء لا رفاهية بعده.**
+ * ⚠️  **This screen is a precondition for the hiding, not a luxury after it.**
  *
- *     نظام يُخفي ما لا يملكه المستخدم بلا شاشة تمنح = نظام يُقفَل
- *     على صاحبه عند أول ضبط، ولا يُفتح إلا من سطر الأوامر. بُنيت
- *     قبل أن يُوصَل الإخفاء لا بعده.
+ *     A system that hides what the user does not hold, with no screen to grant,
+ *     is a system locked away from its own owner at the first configuration,
+ *     reopening only from the command line. It was built before the hiding was
+ *     wired up, not after.
  *
- * ⚠️  و**الصلاحيات على الدور لا على الشخص**.
+ * ⚠️  And **permissions sit on the role, not on the person**.
  *
- *     منحها فردًا يجعل كل موظف جديد ضبطًا يدويًا، وأول منسيّ يبقى
- *     بلا صلاحية أو بأكثر مما يجب.
+ *     Granting them to an individual makes every new employee a manual
+ *     configuration, and the first one forgotten is left with too few
+ *     permissions or too many.
  *
- * ⚠️  و**من يعدّل دوره هو تُعاد قراءة صلاحياته فورًا**.
+ * ⚠️  And **whoever edits their own role has their permissions re-read immediately**.
  *
- *     بقاء النسخة القديمة يجعله يرى روابط سحبها عن نفسه للتوّ ثم
- *     تُرفض عند الضغط — فيظنّ العطل في النظام لا في ضبطه.
+ *     Keeping the old copy makes them see links they have just withdrawn from
+ *     themselves and then be refused on click — so they blame the system rather
+ *     than their own configuration.
  */
 export function RolePermissionsDrawer({
   role,
@@ -107,8 +110,8 @@ export function RolePermissionsDrawer({
               <fieldset key={group.key}>
                 <legend>{localized(group, 'label')}</legend>
 
-                {/* ⚠️  «الكل» لكل مجموعة: منح دور مخزن كامل بضغطة
-                    واحدة بدل تسع، وأقل فرصة لنسيان واحدة. */}
+                {/* ⚠️  "All" per group: granting a full warehouse role in one press
+                    instead of nine, and less chance of forgetting one. */}
                 <label className="role-permissions__all">
                   <input
                     type="checkbox"
@@ -131,8 +134,8 @@ export function RolePermissionsDrawer({
                       />
                       <span>
                         {localized(row, 'label')}
-                        {/* ⚠️  من يملكها يمنح نفسه كل شيء — تُقال
-                            صراحةً عند الضغط لا في وثيقة. */}
+                        {/* ⚠️  Whoever holds it grants themselves everything — said
+                            explicitly at the press rather than in a document. */}
                         {row.code === GRANTING_PERMISSION ? (
                           <em>{t('staff.grantsGranting')}</em>
                         ) : null}

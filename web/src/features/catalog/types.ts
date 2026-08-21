@@ -1,6 +1,6 @@
-/** عقود الكتالوج — تطابق `catalog/serializers.py`. */
+/** Catalogue contracts — matching `catalog/serializers.py`. */
 
-/** ⚠️  ترقيم بالمؤشر لا بالصفحات: الخادم لا يكشف العدد الكلي (ADR-32). */
+/** ⚠️  Cursor pagination rather than pages: the server does not expose the total (ADR-32). */
 export interface CursorPage<T> {
   results: T[];
   next: string | null;
@@ -36,19 +36,19 @@ export interface ProductListItem {
   short_description_ar: string;
   short_description_en: string;
   kind: string;
-  /** ⚠️  نص لا رقم — المال يعبر الشبكة نصًّا (ADR-31). */
+  /** ⚠️  A string, not a number — money crosses the network as text (ADR-31). */
   base_price: string;
   category: CategoryBrief | null;
   brand: BrandBrief | null;
   /**
-   * ⚠️  **كائن لا نص** — `ProductListSerializer.get_primary_image` يعيد
-   *     `ProductImageSerializer(...).data` كاملًا لا مسار الصورة وحده.
+   * ⚠️  **An object, not a string** — `ProductListSerializer.get_primary_image`
+   *     returns the complete `ProductImageSerializer(...).data`, not the image path alone.
    *
-   *     تعريفه `string` هنا كان يمرّ صامتًا لأن البذرة بلا صور: أول
-   *     صورة يرفعها الأدمن تجعل `mediaUrl` تستدعي `startsWith` على
-   *     كائن، فتنهار شبكة المنتجات كلها بـ TypeError.
+   *     Declaring it `string` here passed silently because the seed has no
+   *     images: the first image the admin uploads makes `mediaUrl` call
+   *     `startsWith` on an object, so the whole product grid collapses with a TypeError.
    *
-   *     والنص البديل يأتي معه — وهو أدقّ من اسم المنتج لقارئ الشاشة.
+   *     And the alt text comes with it — more precise than the product name for a screen reader.
    */
   primary_image: ProductImage | null;
   is_featured: boolean;
@@ -100,7 +100,7 @@ export interface ProductDetail extends ProductListItem {
   images: ProductImage[];
   variants: ProductVariant[];
   barcode: string;
-  /** الحقول الدوائية — ذات معنى للأدوية وحدها */
+  /** The pharmaceutical fields — meaningful for medicines alone */
   active_ingredient_ar: string;
   active_ingredient_en: string;
   strength: string;
@@ -115,10 +115,11 @@ export interface ProductDetail extends ProductListItem {
 }
 
 /**
- * ⚠️  **لا رقم دقيق للعامة.**
+ * ⚠️  **No exact figure for the public.**
  *
- *     «متبقٍ ٣ قطع» مفيد تسويقيًا، لكن «متبقٍ ٨٤٧» يعطي المنافس
- *     حجم مخزونك. الخادم يحسم: تحت العتبة رقم، وفوقها «متوفر» فقط.
+ *     "3 left" is useful commercially, but "847 left" gives a competitor your
+ *     stock volume. The server decides: below the threshold a number, above it
+ *     just "in stock".
  */
 export interface Availability {
   product_id: string;
@@ -140,10 +141,10 @@ export interface Review {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  الماركات والمصنّعون والفئات — صفحات المتجر العامة
+//  Brands, manufacturers and categories — the public store pages
 // ═══════════════════════════════════════════════════════════
 
-/** ⚠️  المصنّع كائن مضمَّن لا معرّف: `BrandSerializer` يُدرجه كاملًا. */
+/** ⚠️  The manufacturer is an embedded object, not an id: `BrandSerializer` includes it in full. */
 export interface Manufacturer {
   id: string;
   slug: string;

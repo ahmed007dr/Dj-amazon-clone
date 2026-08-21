@@ -2,16 +2,17 @@ import { http } from '@/shared/http';
 import type { OrderDetail } from '@/features/orders/types';
 
 /**
- * عقود نقطة البيع.
+ * Point-of-sale contracts.
  *
- * ⚠️  **لا مبلغ يُرسَل من الجهاز إطلاقًا.**
+ * ⚠️  **No amount is ever sent from the terminal.**
  *
- *     الكاشير يرسل المنتج والكمية؛ السعر يحسبه الخادم. قبول سعر
- *     من الواجهة يعني بيعة يحدّد سعرها من يملك الجهاز — وهو أول
- *     ما يُستغَل في فرع فعلي.
+ *     The cashier sends the product and the quantity; the server computes the
+ *     price. Accepting a price from the frontend means a sale whose price is
+ *     set by whoever holds the terminal — the first thing exploited in a real branch.
  *
- *     الاستثناء الوحيد `payments[].amount`: وهو **ما دفعه العميل**
- *     لا سعر البضاعة، والخادم يرفض ما لا يساوي إجماليه بالضبط.
+ *     The one exception is `payments[].amount`: that is **what the customer
+ *     paid**, not the price of the goods, and the server refuses anything not
+ *     exactly equal to its total.
  */
 
 export interface Register {
@@ -37,7 +38,7 @@ export interface Session {
   closed_at: string | null;
   opening_float: string;
   counted_cash: string | null;
-  /** ⚠️  `null` قبل الإغلاق عمدًا — لئلا يعدّ الكاشير حتى يطابقه. */
+  /** ⚠️  `null` before closing, deliberately — so the cashier does not count until it matches. */
   expected_cash: string | null;
   variance: string | null;
   variance_note: string;
@@ -100,7 +101,7 @@ export interface CashMovement {
 
 export const listRegisters = () => http.get<Register[]>('/pos/registers/');
 
-/** ⚠️  `null` حين لا وردية — لا خطأ. الحالة عادية في بداية اليوم. */
+/** ⚠️  `null` when there is no shift — not an error. It is a normal state at the start of the day. */
 export const getMySession = () => http.get<Session | null>('/pos/session/');
 
 export const openSession = (register: string, opening_float: string) =>

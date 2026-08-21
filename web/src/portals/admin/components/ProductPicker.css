@@ -34,8 +34,8 @@
   outline-offset: 1px;
 }
 
-/* ⚠️  النتائج داخل التدفّق لا طبقة عائمة: اللوح يتمرّر، والقائمة
-       المعلّقة تبقى مكانها بينما ينزل الحقل تحتها. */
+/* ⚠️  The results sit in the flow rather than a floating layer: the panel
+       scrolls, and a suspended list stays where it is while the field moves below it. */
 .product-picker__results {
   display: flex;
   flex-direction: column;

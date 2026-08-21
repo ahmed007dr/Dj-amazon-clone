@@ -14,15 +14,16 @@ import './ExpenseForm.css';
 const MEANS = ['CASH', 'BANK', 'CARD', 'OTHER'] as const;
 
 /**
- * إدخال مصروف.
+ * Entering an expense.
  *
- * ⚠️  **بلا حقل حالة.**
+ * ⚠️  **No status field.**
  *
- *     المصروف يبدأ مسوّدة دائمًا، ويعتمده شخص آخر بصلاحية أخرى.
- *     حقل حالة هنا — ولو معطّلًا — يوحي بأن المُدخِل يملك اعتماد
- *     مصروفه، وهو ما تمنعه الخطوة كلها.
+ *     An expense always starts as a draft, and someone else approves it under a
+ *     different permission. A status field here — even a disabled one —
+ *     suggests that whoever enters it can approve their own expense, which is
+ *     what the whole step prevents.
  *
- * ⚠️  و`FormData` لا JSON: المرفق ملف.
+ * ⚠️  And `FormData`, not JSON: the attachment is a file.
  */
 export function ExpenseForm({ onDone }: { onDone: () => void }) {
   const { t } = useTranslation();
@@ -33,8 +34,8 @@ export function ExpenseForm({ onDone }: { onDone: () => void }) {
 
   const [category, setCategory] = useState('');
   const [amount, setAmount] = useState('');
-  // ⚠️  تاريخ اليوم افتراضًا لا فارغ: أغلب المصروفات تُدخَل يوم
-  //     وقوعها، وتركه فارغًا يجعل الحقل الإلزامي عائقًا في كل مرة.
+  // ⚠️  Today's date by default rather than empty: most expenses are entered on
+  //     the day they occur, and leaving it empty makes the mandatory field an obstacle every time.
   const [incurredOn, setIncurredOn] = useState(() => new Date().toISOString().slice(0, 10));
   const [vendor, setVendor] = useState('');
   const [reference, setReference] = useState('');
@@ -70,8 +71,8 @@ export function ExpenseForm({ onDone }: { onDone: () => void }) {
           <option value="">{t('common.choose')}</option>
           {active.map((row) => (
             <option key={row.id} value={row.id}>
-              {/* ⚠️  البند الفرعي مُزاح بصريًا: «كهرباء» تحت
-                  «مرافق» تُقرأ كبند مستقل بلا هذه الإزاحة. */}
+              {/* ⚠️  The subcategory is visually indented: "electricity" under
+                  "utilities" reads as an independent category without it. */}
               {row.parent ? '— ' : ''}
               {localized(row, 'name')}
             </option>

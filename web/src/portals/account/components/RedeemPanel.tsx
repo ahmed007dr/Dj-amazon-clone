@@ -15,18 +15,19 @@ import { useToast } from '@/shared/ui/useToast';
 import './RedeemPanel.css';
 
 /**
- * لوح الاستبدال.
+ * The redemption panel.
  *
- * ⚠️  **التسعير يمرّ بالخادم قبل الالتزام.**
+ * ⚠️  **Pricing goes through the server before committing.**
  *
- *     حساب القيمة هنا يجعل ما يراه العميل يخالف ما يُخصم منه —
- *     وهي أسوأ مفاجأة ممكنة في نظام نقاط. الزر يسأل أولًا ثم
- *     يلتزم.
+ *     Computing the value here makes what the customer sees differ from what is
+ *     deducted from them — the worst possible surprise in a points system. The
+ *     button asks first and then commits.
  *
- * ⚠️  و**الناتج كوبون لا خصم فوري**.
+ * ⚠️  And **the result is a coupon, not an immediate discount**.
  *
- *     قوله صراحةً قبل الضغط يمنع العميل من توقّع أن سلته ستنقص
- *     من تلقائها — ثم يجدها كما هي فيظن النظام معطّلًا.
+ *     Saying so explicitly before the press stops the customer expecting their
+ *     cart to shrink by itself — and then finding it unchanged and assuming the
+ *     system is broken.
  */
 export function RedeemPanel({ summary }: { summary: LoyaltySummary }) {
   const { t } = useTranslation();
@@ -52,8 +53,8 @@ export function RedeemPanel({ summary }: { summary: LoyaltySummary }) {
     return (
       <section className="redeem-panel surface">
         <h3>{t('loyalty.redeem')}</h3>
-        {/* ⚠️  «موقوف مؤقتًا» لا رسالة خطأ: الكسب مستمر، والعميل
-            لا يخسر شيئًا — والصياغة تقول ذلك. */}
+        {/* ⚠️  "Temporarily paused", not an error message: earning continues and
+            the customer loses nothing — and the wording says so. */}
         <Alert tone="info">{t('loyalty.redemptionPaused')}</Alert>
       </section>
     );
@@ -83,8 +84,8 @@ export function RedeemPanel({ summary }: { summary: LoyaltySummary }) {
           <small>{t('loyalty.available', { count: usable })}</small>
         </label>
 
-        {/* ⚠️  إجمالي الطلب مطلوب لأن السقف نسبة منه لا رقم مطلق:
-            بلا سقف يُدفَع طلب كامل بالنقاط. */}
+        {/* ⚠️  The order total is required because the cap is a percentage of it
+            rather than an absolute figure: with no cap a whole order is paid in points. */}
         <label>
           {t('loyalty.orderTotal')}
           <input
@@ -145,8 +146,8 @@ export function RedeemPanel({ summary }: { summary: LoyaltySummary }) {
       {result ? (
         <div className="redeem-panel__coupon">
           <p>{t('loyalty.couponReady')}</p>
-          {/* ⚠️  الكود بحجم يُقرأ من شاشة هاتف بيد واحدة: العميل
-              ينسخه في صفحة الدفع لا يحفظه. */}
+          {/* ⚠️  The code at a size readable from a phone screen one-handed: the
+              customer copies it on the payment page rather than memorising it. */}
           <code dir="ltr">{result.coupon_code}</code>
           <p className="muted">
             {t('loyalty.couponValue', { value: result.value })} ·{' '}

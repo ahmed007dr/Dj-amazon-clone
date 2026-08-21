@@ -12,19 +12,19 @@ import { SELF_SIGNUP_TYPES, type SelfSignupType } from '../types';
 import './RegisterForm.css';
 
 /**
- * نموذج إنشاء الحساب.
+ * The registration form.
  *
- * ⚠️  **الحساب لا يعمل حتى يُفعَّل بالبريد.**
+ * ⚠️  **The account does not work until it is activated by email.**
  *
- *     ولذلك النجاح هنا لا يسجّل الدخول ولا يوجّه إلى المتجر — بل
- *     يقول للمستخدم ما عليه فعله بالضبط. التوجيه الصامت يجعله
- *     يجرّب الدخول ويفشل بلا أن يعرف السبب.
+ *     So success here neither logs the user in nor redirects to the store — it
+ *     tells them exactly what to do next. A silent redirect makes them try to
+ *     log in and fail with no idea why.
  *
- * ⚠️  وقيود كلمة المرور تأتي من الخادم كما هي.
+ * ⚠️  And the password constraints come from the server as they are.
  *
- *     Django يفرض أربعة مدققات (الطول · الشيوع · التشابه مع البريد ·
- *     الأرقام فقط). إعادة كتابتها هنا تُنتج قائمتين تتباعدان،
- *     فيرى المستخدم «كلمة مرور صالحة» ثم يرفضها الخادم.
+ *     Django enforces four validators (length · commonness · similarity to the
+ *     email · digits only). Rewriting them here produces two lists that drift
+ *     apart, so the user sees "a valid password" and the server then rejects it.
  */
 export function RegisterForm({ onSuccess }: { onSuccess: (email: string) => void }) {
   const { t, i18n } = useTranslation();
@@ -150,7 +150,7 @@ export function RegisterForm({ onSuccess }: { onSuccess: (email: string) => void
             </label>
           ))}
         </div>
-        {/* ⚠️  المهني يمرّ بمراجعة يدوية — قوله الآن يمنع توقّعًا خاطئًا */}
+        {/* ⚠️  A professional goes through a manual review — saying so now prevents a false expectation */}
         {form.account_type !== 'STUDENT' ? (
           <p className="register-form__note muted">{t('auth.professionalNote')}</p>
         ) : null}

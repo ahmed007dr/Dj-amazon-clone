@@ -22,14 +22,15 @@ const ACCOUNT_TYPES = [
 ] as const;
 
 /**
- * قائمة أسعار.
+ * A price list.
  *
- * ⚠️  **قائمة لا نسبة خصم** (قاعدة العمل ٩).
+ * ⚠️  **A list, not a discount percentage** (business rule 9).
  *
- *     «خصم الطلاب ١٥٪» يبدو أبسط، لكنه يجعل كل سعر طالب مشتقًا من
- *     سعر التجزئة: فلا يمكن تسعير منتج للطلاب بأقل من التكلفة
- *     ترويجيًا، ولا تدقيق ما دفعه الطالب فعلًا بعد تغيّر السعر
- *     الأصلي. ولذلك لا يوجد هنا حقل نسبة.
+ *     "A 15% student discount" looks simpler, but it makes every student price
+ *     derived from the retail price: so a product cannot be priced for students
+ *     below cost as a promotion, and what a student actually paid cannot be
+ *     audited after the original price changes. Hence there is no percentage
+ *     field here.
  */
 export function PriceListForm({
   list,
@@ -79,7 +80,7 @@ export function PriceListForm({
       account_types: form.account_types,
       priority: Number(form.priority) || 0,
       valid_from: form.valid_from,
-      // ⚠️  فارغ = بلا نهاية. إرساله سلسلة فارغة يُرفض كتاريخ غير صالح.
+      // ⚠️  Empty = no end. Sending it as an empty string is refused as an invalid date.
       valid_to: form.valid_to || null,
       is_active: form.is_active,
     };
@@ -149,7 +150,7 @@ export function PriceListForm({
         </select>
       </label>
 
-      {/* ⚠️  فارغ = كل الأنواع. يُقال صراحةً وإلا فُهم الفراغ منعًا. */}
+      {/* ⚠️  Empty = every type. Stated explicitly, or emptiness is read as a block. */}
       <fieldset className="pricing-form__types">
         <legend>{t('pricing.accountTypes')}</legend>
         <p className="pricing-form__hint">{t('pricing.accountTypesHint')}</p>

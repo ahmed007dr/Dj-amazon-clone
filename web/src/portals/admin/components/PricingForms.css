@@ -76,8 +76,8 @@
   border-block-start: 1px solid var(--color-border);
 }
 
-/* ⚠️  الأنواع المسموحة صناديق اختيار لا قائمة متعددة: الأخيرة
-       تحتاج Ctrl+نقر على الحاسوب ولا تعمل باللمس أصلًا. */
+/* ⚠️  The permitted types are checkboxes rather than a multi-select: the
+       latter needs Ctrl+click on a computer and does not work by touch at all. */
 .pricing-form__types {
   display: flex;
   flex-wrap: wrap;
@@ -133,7 +133,7 @@
   text-transform: uppercase;
 }
 
-/* المنتج المثبَّت في التعديل — لا يُغيَّر */
+/* The product pinned during editing — it is not changed */
 .pricing-form__fixed {
   margin: 0;
   padding: var(--space-3);
@@ -142,7 +142,7 @@
   border-radius: var(--radius-sm);
 }
 
-/* ── أهداف الفريق دفعةً ─────────────────────────── */
+/* ── Team targets in one batch ───────────────────── */
 .bulk-list {
   display: flex;
   flex-direction: column;
@@ -175,7 +175,7 @@
   border-radius: var(--radius-sm);
 }
 
-/* ── قواعد العمولة ──────────────────────────────── */
+/* ── Commission rules ───────────────────────────── */
 .schemes {
   display: flex;
   flex-direction: column;

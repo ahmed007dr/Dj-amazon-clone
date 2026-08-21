@@ -10,12 +10,13 @@ import { useToast } from '@/shared/ui/useToast';
 import './ReferralPanel.css';
 
 /**
- * لوح الإحالة.
+ * The referral panel.
  *
- * ⚠️  **«المكافأة عند أول طلب لصديقك» تُقال قبل المشاركة لا بعدها.**
+ * ⚠️  **"The reward comes on your friend's first order" is said before sharing, not after.**
  *
- *     من يشارك كوده وهو يظن أن التسجيل وحده يكافئه سيعدّ خمسة
- *     أصدقاء مسجَّلين ولا نقطة واحدة — ويقرأ ذلك عطلًا لا شرطًا.
+ *     Someone who shares their code believing registration alone rewards them
+ *     will count five registered friends and not one point — and read that as a
+ *     fault rather than a condition.
  */
 export function ReferralPanel() {
   const { t } = useTranslation();
@@ -31,14 +32,14 @@ export function ReferralPanel() {
   const share = async () => {
     const text = t('loyalty.shareText', { code: referral.data?.code ?? '' });
 
-    // ⚠️  المشاركة الأصلية أولًا: على الهاتف تفتح واتساب مباشرةً،
-    //     وهو المسار الحقيقي لكل إحالة في مصر. والنسخ ارتداد.
+    // ⚠️  Native sharing first: on a phone it opens WhatsApp directly,
+    //     which is the real route of every referral in Egypt. Copying is the fallback.
     if (navigator.share) {
       try {
         await navigator.share({ text });
         return;
       } catch {
-        // إلغاء المستخدم للمشاركة ليس خطأً — نصمت ونرتد للنسخ
+        // The user cancelling the share is not an error — we stay silent and fall back to copying
       }
     }
 
@@ -65,7 +66,7 @@ export function ReferralPanel() {
         </Button>
       </div>
 
-      {/* ⚠️  الشرط مذكور بجوار الكود لا في تذييل الصفحة */}
+      {/* ⚠️  The condition is stated beside the code, not in the page footer */}
       <p className="referral-panel__condition">
         {t('loyalty.referralCondition', {
           amount: referral.data.program?.min_order_amount ?? '0',
@@ -89,8 +90,8 @@ export function ReferralPanel() {
         </dl>
       ) : null}
 
-      {/* ⚠️  إدخال كود مُحيل يظهر لمن لم يُحَل بعد فقط — والخادم
-          يرفض الثاني بقيد `OneToOne` بصرف النظر عن الواجهة. */}
+      {/* ⚠️  Entering a referrer's code appears only to someone not yet referred —
+          and the server refuses a second one with a `OneToOne` constraint regardless of the frontend. */}
       {stats && stats.total === 0 ? (
         <form
           className="referral-panel__apply"

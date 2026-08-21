@@ -12,7 +12,7 @@ import { useToast } from '@/shared/ui/useToast';
 
 import './BrandIdentityForm.css';
 
-/** الحقول التي يحرّرها هذا النموذج — ما عدا الألوان والأصول. */
+/** The fields this form edits — everything except the colours and the assets. */
 const EDITABLE = [
   'name_ar',
   'name_en',
@@ -50,16 +50,18 @@ const SOCIAL: EditableKey[] = [
 ];
 
 /**
- * تحرير بيانات ملف الهوية — الاسم والخطوط والشكل والتواصل.
+ * Editing the identity profile's details — the name, the fonts, the shape and the contacts.
  *
- * ⚠️  **الحفظ يرسل ما تغيّر وحده.**
+ * ⚠️  **The save sends only what changed.**
  *
- *     إرسال الكائن كاملًا يكتب فوق حقول لم يفتحها الأدمن أصلًا،
- *     ويُدرج الأصول (وهي ملفات) في حمولة JSON فترفضها الخدمة.
+ *     Sending the whole object overwrites fields the admin never opened, and
+ *     puts the assets (which are files) into a JSON payload, so the service
+ *     refuses them.
  *
- * ⚠️  و`shadow_level` و`radius` و`font_size_base` أرقام مقيّدة على
- *     الخادم. تُرسَل نصًّا كما كتبها الأدمن، والخادم هو من يرفض —
- *     فحصان متطابقان في مكانين يفترقان عند أول تعديل.
+ * ⚠️  And `shadow_level`, `radius` and `font_size_base` are numbers bounded on
+ *     the server. They are sent as text exactly as the admin typed them, and
+ *     the server is what refuses — two identical checks in two places drift
+ *     apart at the first edit.
  */
 export function BrandIdentityForm({ profile }: { profile: AdminBrandProfile }) {
   const { t } = useTranslation();
@@ -117,7 +119,7 @@ export function BrandIdentityForm({ profile }: { profile: AdminBrandProfile }) {
 
   return (
     <div className="identity-form">
-      {/* ── الاسم ─────────────────────────────────── */}
+      {/* ── The name ──────────────────────────────── */}
       <h3 className="identity-form__legend">{t('branding.sectionIdentity')}</h3>
 
       <div className="identity-form__row">
@@ -155,11 +157,11 @@ export function BrandIdentityForm({ profile }: { profile: AdminBrandProfile }) {
         />
       </div>
 
-      {/* ── الخطوط والشكل ─────────────────────────── */}
+      {/* ── Fonts and shape ───────────────────────── */}
       <h3 className="identity-form__legend">{t('branding.sectionType')}</h3>
 
-      {/* ⚠️  خطّان منفصلان: خط لاتيني جيد قد لا يحمل محارف عربية
-          أصلًا، فيسقط النص إلى خط النظام بلا تحذير. */}
+      {/* ⚠️  Two separate fonts: a good Latin font may carry no Arabic glyphs
+          at all, so the text falls back to the system font with no warning. */}
       <div className="identity-form__row">
         <Field
           label={t('branding.fontAr')}
@@ -223,7 +225,7 @@ export function BrandIdentityForm({ profile }: { profile: AdminBrandProfile }) {
         />
       </div>
 
-      {/* ── التواصل ───────────────────────────────── */}
+      {/* ── Contacts ──────────────────────────────── */}
       <h3 className="identity-form__legend">{t('branding.sectionContact')}</h3>
 
       <div className="identity-form__row">
@@ -269,10 +271,10 @@ export function BrandIdentityForm({ profile }: { profile: AdminBrandProfile }) {
         {...errorFor('address_en')}
       />
 
-      {/* ── روابط التواصل ─────────────────────────── */}
+      {/* ── Social links ──────────────────────────── */}
       <h3 className="identity-form__legend">{t('branding.sectionSocial')}</h3>
-      {/* ⚠️  الرابط الفارغ يختفي من تذييل المتجر تلقائيًا — فلا
-          حاجة إلى مفتاح إظهار لكل شبكة. */}
+      {/* ⚠️  An empty link disappears from the store footer automatically — so no
+          show/hide switch is needed per network. */}
       <p className="identity-form__note">{t('branding.socialHint')}</p>
 
       <div className="identity-form__row">
@@ -284,10 +286,10 @@ export function BrandIdentityForm({ profile }: { profile: AdminBrandProfile }) {
             onChange={(event) => set(key)(event.target.value)}
             dir="ltr"
             inputMode="url"
-            // ⚠️  النائب من الترجمة لا نصًّا مكتوبًا: قاعدة ESLint
-            //     ترفض أي عنوان مطلق خارج `shared/http` — والعنوان
-            //     المبعثر في الكود هو ما يجعل تبديل البيئة بحثًا
-            //     واستبدالًا.
+            // ⚠️  The placeholder comes from the translations rather than written text:
+            //     an ESLint rule refuses any absolute URL outside `shared/http` — and a
+            //     URL scattered through the code is what makes switching environment a
+            //     find-and-replace.
             placeholder={t('branding.urlPlaceholder')}
             {...errorFor(key)}
           />

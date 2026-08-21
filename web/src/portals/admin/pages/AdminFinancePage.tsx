@@ -15,14 +15,14 @@ import { PnlStatement } from '../components/PnlStatement';
 import './AdminFinancePage.css';
 
 /**
- * قائمة الأرباح والخسائر.
+ * The profit and loss statement.
  *
- * ⚠️  **٤٠٣ هنا ليست خطأً بل الحالة المتوقَّعة لأغلب الأدمن.**
+ * ⚠️  **A 403 here is not an error but the expected state for most admins.**
  *
- *     رؤية الأرباح صلاحية صريحة لا تتبع الدخول للوحة: مدير
- *     الكتالوج وخدمة العملاء يفتحان اللوحة ولا يحتاجان معرفة
- *     الهوامش ولا الرواتب. رسالة «اطلب الصلاحية» أوضح من شاشة
- *     خطأ تبدو عطلًا.
+ *     Seeing profits is an explicit permission that does not follow from
+ *     entering the panel: the catalogue manager and customer service open the
+ *     panel and need to know neither the margins nor the salaries. A "request
+ *     the permission" message is clearer than an error screen that looks like a fault.
  */
 export function AdminFinancePage() {
   const { t } = useTranslation();
@@ -52,9 +52,9 @@ export function AdminFinancePage() {
 
       {pnl.data ? (
         <>
-          {/* ⚠️  تحذير الموثوقية **فوق الأرقام لا تحتها**.
-              بضاعة بتكلفة مجهولة تجعل الربح أعلى من حقيقته؛
-              وقراءة الرقم قبل التحذير تعني أن القرار اتُّخذ. */}
+          {/* ⚠️  The reliability warning goes **above the figures, not below them**.
+              Goods of unknown cost make the profit higher than reality; and
+              reading the figure before the warning means the decision has been taken. */}
           {!pnl.data.is_reliable ? (
             <Alert tone="warning">
               {t('finance.unreliable', { count: pnl.data.unknown_cost_units })}

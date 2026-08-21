@@ -26,8 +26,8 @@
 }
 
 .address-card input {
-  /* ⚠️  هدف اللمس يشمل البطاقة كلها لأنها `label` — الزر نفسه
-     يبقى مرئيًا للتصفّح بلوحة المفاتيح */
+  /* ⚠️  The touch target covers the whole card because it is a `label` — the
+     radio itself stays visible for keyboard navigation */
   margin-block-start: 0.35rem;
   inline-size: 1.1rem;
   block-size: 1.1rem;

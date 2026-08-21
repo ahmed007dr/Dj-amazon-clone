@@ -22,11 +22,11 @@ export function useOrder(id: string | undefined) {
 }
 
 /**
- * ⚠️  عروض الشحن من الخادم عند كل تغيير محافظة.
+ * ⚠️  The shipping quotes come from the server on every governorate change.
  *
- *     الرسوم تعتمد على المنطقة والوزن وحد الشحن المجاني — وكلها
- *     تتغيّر من لوحة الأدمن. حفظها في الواجهة يجعل تعديل الأدمن
- *     بلا أثر حتى إعادة النشر.
+ *     The fees depend on the zone, the weight and the free-shipping threshold —
+ *     all of which are changed from the admin panel. Holding them in the
+ *     frontend makes the admin's edit take no effect until redeployment.
  */
 export function useShippingQuotes(governorate: string, subtotal: string) {
   return useQuery({
@@ -38,11 +38,11 @@ export function useShippingQuotes(governorate: string, subtotal: string) {
 }
 
 /**
- * ⚠️  طرق الدفع تُحسب من البوابات **المفعّلة الآن**.
+ * ⚠️  The payment methods are computed from the gateways **enabled right now**.
  *
- *     الأدمن يوقف بوابة فتختفي من هنا في الطلب التالي بلا نشر.
- *     قائمة ثابتة في الواجهة تعرض بوابة موقوفة، فيختارها العميل
- *     ويفشل دفعه.
+ *     The admin disables a gateway and it disappears from here on the next
+ *     request, with no deployment. A fixed list in the frontend shows a
+ *     disabled gateway, so the customer chooses it and their payment fails.
  */
 export function usePaymentMethods(amount: string) {
   return useQuery({
@@ -58,8 +58,8 @@ export function useCheckout() {
   return useMutation({
     mutationFn: (payload: CheckoutPayload) => api.checkout(payload),
     onSuccess: () => {
-      // ⚠️  السلة أُفرغت في الخادم — إبقاؤها في الكاش يعرض أصنافًا
-      //     اشتُريت للتوّ ويسمح بطلب ثانٍ لها.
+      // ⚠️  The cart was emptied on the server — keeping it in the cache displays items
+      //     that were just bought and allows a second order for them.
       void queryClient.invalidateQueries({ queryKey: CART_KEY });
       void queryClient.invalidateQueries({ queryKey: ['orders'] });
     },

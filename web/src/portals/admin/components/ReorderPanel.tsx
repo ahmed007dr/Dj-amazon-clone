@@ -17,19 +17,21 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import './ReorderPanel.css';
 
 /**
- * ما يجب شراؤه.
+ * What needs buying.
  *
- * ⚠️  **الصنف بلا مورّد يُدرَج ويُعلَّم لا يُحذف.**
+ * ⚠️  **An item with no supplier is listed and flagged, not dropped.**
  *
- *     استبعاده يُخفي أهم نقص في المخزن من شاشة الشراء — والسبب
- *     أنه بلا مورّد، وهو بالضبط ما يجب أن يُعالَج. الخادم يُدرجه
- *     بعلامة `has_supplier=false` والشاشة تُبرزه.
+ *     Excluding it hides the most important shortage in the warehouse from the
+ *     purchasing screen — and the reason is that it has no supplier, which is
+ *     exactly what needs dealing with. The server includes it with a
+ *     `has_supplier=false` flag and the screen highlights it.
  *
- * ⚠️  و**البدائل تُقارَن قبل الشراء**.
+ * ⚠️  And **the alternatives are compared before buying**.
  *
- *     أمر شراء يُكتب بلا رؤية من غير المورّد المعتاد يدفع سعر أول
- *     اسم يخطر على البال. اللوح يعرض كل من يعرض الصنف مرتّبين
- *     بالسعر — والمفضّل مُعلَّم لكنه لا يُخفي الأرخص.
+ *     A purchase order written without seeing anyone but the usual supplier
+ *     pays the price of the first name that comes to mind. The panel shows
+ *     everyone offering the item ordered by price — and the preferred one is
+ *     flagged but does not hide the cheapest.
  */
 export function ReorderPanel() {
   const { t } = useTranslation();
@@ -54,8 +56,8 @@ export function ReorderPanel() {
       key: 'stock',
       header: t('suppliers.onHand'),
       align: 'end',
-      // ⚠️  الرصيد بجوار نقطة إعادة الطلب لا وحده: الرقم بلا عتبته
-      //     لا يقول أعاجلٌ هو أم لا.
+      // ⚠️  The balance beside the reorder point rather than alone: the number
+      //     without its threshold does not say whether it is urgent.
       render: (row) => (
         <span dir="ltr" className={row.on_hand <= 0 ? 'reorder-out' : 'reorder-low'}>
           {row.on_hand} / {row.reorder_point}
