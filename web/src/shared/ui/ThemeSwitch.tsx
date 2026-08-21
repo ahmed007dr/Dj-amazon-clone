@@ -12,10 +12,10 @@ const OPTIONS: { value: DefaultMode; icon: string; key: string }[] = [
 ];
 
 /**
- * ⚠️  ثلاثة خيارات لا زرّ تبديل ثنائي.
+ * ⚠️  Three options rather than a binary toggle.
  *
- *     الزر الثنائي يفقد «حسب الجهاز» — فمستخدم يبدّل هاتفه إلى
- *     الداكن ليلًا يجد الموقع وحده بقي فاتحًا، بلا طريقة للعودة.
+ *     A binary toggle loses "follow the device" — so a user who switches their
+ *     phone to dark at night finds the site alone still light, with no way back.
  */
 export function ThemeSwitch() {
   const { t } = useTranslation();

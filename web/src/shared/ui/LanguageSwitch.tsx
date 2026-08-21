@@ -6,14 +6,14 @@ import { useDirection } from '@/shared/i18n/useDirection';
 import './LanguageSwitch.css';
 
 /**
- * مبدّل اللغة.
+ * The language switcher.
  *
- * ⚠️  التبديل **فوري بلا إعادة جلب ولا إعادة تحميل**.
+ * ⚠️  Switching is **instant, with no refetch and no reload**.
  *
- *     الخادم يرسل المحتوى باللغتين معًا (ADR-34)، فالنص المترجَم
- *     موجود في الذاكرة أصلًا. لو أرسل المترجَم وحده لاحتاج كل
- *     تبديل إعادة جلب كل شاشة مفتوحة — أي وميضًا وشاشات تحميل عند
- *     ضغطة يتوقّع منها المستخدم أن تكون لحظية.
+ *     The server sends the content in both languages together (ADR-34), so the
+ *     translated text is already in memory. Were it to send the translated one
+ *     alone, every switch would need every open screen refetched — that is, a
+ *     flash and loading screens on a press the user expects to be instantaneous.
  */
 export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation();

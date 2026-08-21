@@ -1,10 +1,11 @@
 import { useSyncExternalStore } from 'react';
 
 /**
- * ⚠️  `useSyncExternalStore` لا `useState` + `useEffect`.
+ * ⚠️  `useSyncExternalStore`, not `useState` + `useEffect`.
  *
- *     الثاني يرسم أولًا بقيمة خاطئة ثم يصحّحها — أي وميض تخطيط
- *     مرئي عند كل تحميل. الأول يقرأ القيمة الصحيحة في نفس الرسمة.
+ *     The latter renders first with the wrong value and then corrects it — that
+ *     is, a visible layout flash on every load. The former reads the correct
+ *     value in the same render.
  */
 export function useMediaQuery(query: string): boolean {
   return useSyncExternalStore(
@@ -20,7 +21,7 @@ export function useMediaQuery(query: string): boolean {
   );
 }
 
-/** نقاط الكسر الموحّدة — موروثة، لا تُخترع غيرها. */
+/** The shared breakpoints — inherited; no others are invented. */
 export const BREAKPOINTS = {
   sm: '(min-width: 576px)',
   md: '(min-width: 768px)',

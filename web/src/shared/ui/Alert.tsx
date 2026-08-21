@@ -5,10 +5,11 @@ import './Alert.css';
 type Tone = 'info' | 'success' | 'warning' | 'danger';
 
 /**
- * ⚠️  `role="alert"` للخطأ فقط.
+ * ⚠️  `role="alert"` for errors only.
  *
- *     يقاطع قارئ الشاشة فورًا — مناسب لفشل تسجيل دخول، ومزعج
- *     لرسالة معلوماتية تُقرأ فوق ما كان المستخدم يستمع إليه.
+ *     It interrupts the screen reader immediately — appropriate for a failed
+ *     sign-in, and irritating for an informational message read over whatever
+ *     the user was listening to.
  */
 export function Alert({ tone = 'info', children }: { tone?: Tone; children: ReactNode }) {
   return (

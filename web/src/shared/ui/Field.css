@@ -33,11 +33,11 @@
 }
 
 /*
-  ⚠️  البريد وكلمة المرور لاتينيان دائمًا.
+  ⚠️  Email and password are always Latin.
 
-      تركهما يرثان اتجاه الصفحة العربي يضع المؤشّر يمينًا ويعرض
-      `user@mail.com` مقلوبًا بصريًا — وهو ما يجعل المستخدم يظن
-      أنه أخطأ الكتابة.
+      Leaving them to inherit the page's Arabic direction puts the caret on the
+      right and displays `user@mail.com` visually reversed — which makes the
+      user think they mistyped it.
 */
 .field__input[type='email'],
 .field__input[type='password'],

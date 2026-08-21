@@ -17,13 +17,13 @@ import { CustomerPanel } from '../components/CustomerPanel';
 import './StaffCustomersPage.css';
 
 /**
- * عملاء المندوب.
+ * The rep's customers.
  *
- * ⚠️  **البحث يعمل داخل المُسنَد — والخادم هو من يضمن ذلك.**
+ * ⚠️  **Search operates within what is assigned — and the server is what guarantees that.**
  *
- *     التصفية هنا تحسين تجربة لا أمان: `/employees/customers/`
- *     مُصفّاة بالإسناد على الخادم، ولا تعيد عميل زميل مهما كان
- *     نص البحث.
+ *     The filtering here is a user-experience improvement, not security:
+ *     `/employees/customers/` is filtered by assignment on the server, and
+ *     returns no colleague's customer whatever the search text.
  */
 export function StaffCustomersPage() {
   const { t, i18n } = useTranslation();
@@ -74,8 +74,8 @@ export function StaffCustomersPage() {
       key: 'last',
       header: t('staff.lastOrder'),
       secondary: true,
-      // ⚠️  «لم يطلب بعد» لا شرطة: العميل الذي لم يشترِ قط هو
-      //     بالضبط من يجب أن يتصل به المندوب، وشرطة تخفيه.
+      // ⚠️  "Has not ordered yet" rather than a dash: a customer who has never bought is
+      //     exactly the one the rep should call, and a dash hides them.
       render: (row) =>
         row.last_order_at ? (
           formatDate(row.last_order_at, i18n.language)

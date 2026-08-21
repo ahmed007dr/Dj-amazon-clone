@@ -6,13 +6,13 @@ import { useLockBodyScroll } from '@/shared/hooks/useLockBodyScroll';
 import './Modal.css';
 
 /**
- * نافذة حوارية.
+ * A dialog.
  *
- * ⚠️  التركيز ينتقل إليها وEscape يغلقها.
+ * ⚠️  Focus moves into it and Escape closes it.
  *
- *     بدون الأول يبقى التركيز خلف الطبقة فيتنقّل مستخدم لوحة
- *     المفاتيح في محتوى لا يراه؛ وبدون الثاني يصير الإغلاق نقرة
- *     دقيقة على زر صغير.
+ *     Without the first, focus stays behind the overlay so a keyboard user
+ *     navigates through content they cannot see; and without the second, closing
+ *     becomes a precise click on a small button.
  */
 export function Modal({
   open,

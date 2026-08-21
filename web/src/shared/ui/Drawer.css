@@ -14,7 +14,7 @@
 .drawer__panel {
   position: absolute;
   inset-block: 0;
-  /* ⚠️  منطقي: يمين في RTL ويسار في LTR بلا كود اتجاهي */
+  /* ⚠️  Logical: right in RTL and left in LTR with no directional code */
   inset-inline-start: 0;
 
   display: grid;

@@ -1,8 +1,8 @@
 /*
- * ⚠️  الخريطة الحرارية **تتمرّر أفقيًا داخل حاويتها**.
+ * ⚠️  The heatmap **scrolls horizontally inside its container**.
  *
- *     ٢٤ عمودًا لا تتّسع على هاتف؛ وبلا الحاوية كانت الصفحة كلها
- *     تتمرّر أفقيًا فتنزلق القائمة الجانبية والعناوين معها.
+ *     24 columns do not fit on a phone; and without the container the whole
+ *     page scrolled horizontally, so the sidebar and the headings slid with it.
  */
 
 .traffic-panel {
@@ -47,7 +47,7 @@
   flex: 0 0 1.25rem;
   block-size: 1.25rem;
   border-radius: 3px;
-  /* الخلية الفارغة ليست شفافة: الشبكة نفسها معلومة */
+  /* An empty cell is not transparent: the grid itself is information */
   background: var(--color-surface-sunken, var(--color-border));
 }
 
@@ -55,7 +55,7 @@
   background: var(--color-primary);
 }
 
-/* ── الأجهزة ─────────────────────────────────────────── */
+/* ── Devices ─────────────────────────────────────────── */
 
 .traffic-devices {
   display: grid;
@@ -80,7 +80,7 @@
   color: var(--color-primary);
 }
 
-/* ── مبدّل الترتيب ───────────────────────────────────── */
+/* ── The sort switcher ───────────────────────────────── */
 
 .traffic-toggle {
   display: flex;
@@ -105,7 +105,7 @@
   font-weight: 600;
 }
 
-/* ── الجدول ──────────────────────────────────────────── */
+/* ── The table ───────────────────────────────────────── */
 
 .traffic-table-scroll {
   overflow-x: auto;

@@ -66,8 +66,8 @@
   justify-content: end;
 }
 
-/* ⚠️  «حيّ» بلون مختلف: الرقم قبل الإقفال يتغيّر، وعرضه كأنه
-   نهائي في جدول يجعله يُقرأ التزامًا. */
+/* ⚠️  "Live" in a different colour: the figure before closing changes, and
+   showing it as though it were final in a table makes it read as a commitment. */
 .target-live {
   font-size: 0.8125rem;
   color: var(--color-text-muted);

@@ -23,8 +23,8 @@ export function OrderDetailPage() {
 
   if (isPending) return <Spinner />;
 
-  // ⚠️  `404` قد يعني «غير موجود» أو «ليس لك» — والخادم لا يفرّق
-  //     عمدًا لمنع تعداد الطلبات. الواجهة لا تخمّن أيهما.
+  // ⚠️  `404` may mean "does not exist" or "not yours" — and the server does not
+  //     distinguish them deliberately, to prevent order enumeration. The frontend does not guess which.
   if (error || !order) {
     return (
       <div className="container">
@@ -50,8 +50,9 @@ export function OrderDetailPage() {
 
       <div className="order-detail">
         <section className="order-detail__lines surface">
-          {/* ⚠️  الأسماء من لقطة السطر لا من المنتج الحالي (ADR-30):
-              الفاتورة القديمة يجب ألا تتغيّر بتغيّر اسم المنتج اليوم */}
+          {/* ⚠️  The names come from the line's snapshot, not from the current
+              product (ADR-30): an old invoice must not change because the
+              product's name changed today */}
           {order.lines.map((line) => (
             <article key={line.id} className="order-line">
               <div className="order-line__info">
@@ -109,8 +110,8 @@ export function OrderDetailPage() {
             </address>
           </section>
 
-          {/* ⚠️  `can_cancel` من الخادم — يُحسب من آلة الحالة نفسها
-              لا من قائمة حالات موازية هنا */}
+          {/* ⚠️  `can_cancel` comes from the server — computed from the state
+              machine itself rather than from a parallel list of statuses here */}
           {order.can_cancel ? (
             <section className="surface order-detail__box">
               <h2 className="order-detail__heading">{t('orders.cancel')}</h2>

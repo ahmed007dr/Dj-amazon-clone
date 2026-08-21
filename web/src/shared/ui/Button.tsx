@@ -8,7 +8,7 @@ type Size = 'sm' | 'md' | 'lg';
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
-  /** يملأ عرض الحاوية — الافتراضي على الهاتف في النماذج. */
+  /** Fills the container's width — the default on a phone in forms. */
   block?: boolean;
   loading?: boolean;
   icon?: ReactNode;
@@ -29,8 +29,8 @@ export function Button({
     <button
       type="button"
       className={`btn btn--${variant} btn--${size} ${block ? 'btn--block' : ''} ${className}`}
-      // ⚠️  التعطيل أثناء التحميل يمنع إرسالًا مزدوجًا — وهو ما
-      //     ينتج طلبين متطابقين حين تتأخر الشبكة والمستخدم ينقر ثانيةً.
+      // ⚠️  Disabling while loading prevents a double submission — which is what
+      //     produces two identical requests when the network is slow and the user clicks again.
       disabled={disabled ?? loading}
       aria-busy={loading}
       {...rest}

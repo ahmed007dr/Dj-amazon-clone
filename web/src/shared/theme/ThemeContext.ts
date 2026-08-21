@@ -4,9 +4,9 @@ import type { BrandTheme, DefaultMode, ThemeMode } from './types';
 
 export interface ThemeContextValue {
   theme: BrandTheme | null;
-  /** الوضع المطبَّق فعليًا — بعد حسم `SYSTEM`. */
+  /** The mode actually applied — after `SYSTEM` is resolved. */
   mode: ThemeMode;
-  /** اختيار المستخدم، وقد يكون `SYSTEM`. */
+  /** The user's choice, which may be `SYSTEM`. */
   preference: DefaultMode;
   setPreference: (next: DefaultMode) => void;
   isLoading: boolean;

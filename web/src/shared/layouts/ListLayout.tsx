@@ -3,11 +3,11 @@ import type { ReactNode } from 'react';
 import './ListLayout.css';
 
 /**
- * تخطيط القوائم: ترويسة · فلاتر · محتوى · ترقيم.
+ * The list layout: header · filters · content · pagination.
  *
- * ⚠️  الفلاتر شريط جانبي على الديسكتوب و Drawer على الهاتف —
- *     يتكفّل به المستدعي عبر `filters`. حشرها فوق القائمة على
- *     الهاتف يدفع أول نتيجة تحت الطيّة.
+ * ⚠️  The filters are a sidebar on desktop and a drawer on a phone — the caller
+ *     supplies them through `filters`. Cramming them above the list on a phone
+ *     pushes the first result below the fold.
  */
 export function ListLayout({
   header,

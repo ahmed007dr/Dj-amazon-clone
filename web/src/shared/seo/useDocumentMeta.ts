@@ -1,24 +1,25 @@
 /**
- * وسوم الصفحة — العنوان والوصف والمعاينة والبيانات المنظَّمة.
+ * The page's tags — the title, the description, the preview and the structured data.
  *
- * ⚠️  **حقن وقت التشغيل، وحدوده معروفة** (ADR-37).
+ * ⚠️  **Runtime injection, with known limits** (ADR-37).
  *
- *     جوجل ينفّذ JavaScript فيقرأ ما يُحقن هنا — بتأخّر وبلا ضمان.
- *     أما فيسبوك وواتساب فلا ينفّذانه إطلاقًا: معاينة رابط منتج
- *     مُشارَك ستبقى ناقصة حتى يُنفَّذ التوليد المسبق. حقن هذه
- *     الوسوم لا يلغي ذلك القيد؛ يعالج نصفه الذي يخصّ البحث.
+ *     Google executes JavaScript and so reads what is injected here — with a
+ *     delay and with no guarantee. Facebook and WhatsApp, by contrast, do not
+ *     execute it at all: the preview of a shared product link will stay
+ *     incomplete until pre-rendering is implemented. Injecting these tags does
+ *     not remove that constraint; it addresses the half of it that concerns search.
  *
- * ⚠️  ولا مكتبة (`react-helmet`).
+ * ⚠️  And no library (`react-helmet`).
  *
- *     الحاجة أربعة وسوم وعنوان. مكتبة لها موفّر سياق وطابور
- *     تحديث ونسخة خادم — لسلوك يُكتب في ثلاثين سطرًا — تُضاف إلى
- *     الحزمة التي يحمّلها طالب على شبكة ضعيفة.
+ *     The need is four tags and a title. A library with a context provider, an
+ *     update queue and a server version — for behaviour written in thirty lines
+ *     — is added to the bundle a student downloads on a weak connection.
  *
- * ⚠️  والوسوم المحقونة **تُوسَم بـ `data-managed`**.
+ * ⚠️  And the injected tags are **marked with `data-managed`**.
  *
- *     بدونها لا يمكن تنظيفها عند مغادرة الصفحة، فتتراكم وسوم كل
- *     منتج زاره المستخدم في نفس الرأس — ويقرأ المزحف أول وصف
- *     وجده، وهو وصف صفحة أخرى.
+ *     Without it they cannot be cleaned up when the page is left, so the tags
+ *     for every product the user visited pile up in the same head — and the
+ *     crawler reads the first description it finds, which is another page's.
  */
 
 import { useEffect } from 'react';
@@ -28,15 +29,16 @@ const MANAGED = 'data-managed-meta';
 export interface DocumentMeta {
   title: string;
   description?: string | undefined;
-  /** مسار الصورة الكامل — للمعاينة عند المشاركة. */
+  /** The full image path — for the preview when shared. */
   image?: string | undefined;
-  /** `website` للقوائم · `product` لصفحة منتج. */
+  /** `website` for listings · `product` for a product page. */
   type?: 'website' | 'product';
   /**
-   * بيانات منظَّمة (JSON-LD).
+   * Structured data (JSON-LD).
    *
-   * ⚠️  تُبنى في المستدعي لا هنا: شكلها يختلف بين منتج وحزمة
-   *     وقائمة، ودالة واحدة تحاول تغطيتها كلها تصير شرطًا داخل شرط.
+   * ⚠️  Built in the caller rather than here: its shape differs between a
+   *     product, a bundle and a listing, and one function trying to cover them
+   *     all becomes a condition inside a condition.
    */
   jsonLd?: Record<string, unknown> | undefined;
 }
@@ -74,10 +76,10 @@ export function useDocumentMeta(meta: DocumentMeta | null): void {
   const serializedJsonLd = jsonLd ? JSON.stringify(jsonLd) : null;
 
   useEffect(() => {
-    // ⚠️  البيانات لم تصل بعد — لا يُكتب عنوان مؤقت.
+    // ⚠️  The data has not arrived yet — no placeholder title is written.
     //
-    //     كتابة «جارٍ التحميل» في العنوان تجعلها ما يظهر في تبويب
-    //     المتصفح وفي سجل التاريخ، وأحيانًا ما يلتقطه المزحف السريع.
+    //     Writing "loading" into the title makes it what appears in the browser tab
+    //     and in the history log, and sometimes what a fast crawler picks up.
     if (!title) return;
 
     const previousTitle = document.title;
@@ -95,8 +97,8 @@ export function useDocumentMeta(meta: DocumentMeta | null): void {
     setMeta('og:type', type ?? 'website', true);
     setMeta('og:url', url, true);
     setMeta('twitter:title', title);
-    // ⚠️  `summary_large_image` لا `summary`: البطاقة الصغيرة تقصّ
-    //     صورة المنتج إلى مربّع يقطع العبوة من الجانبين.
+    // ⚠️  `summary_large_image`, not `summary`: the small card crops the product
+    //     image to a square that cuts the packaging off on both sides.
     setMeta('twitter:card', image ? 'summary_large_image' : 'summary');
 
     if (image) {
@@ -112,8 +114,8 @@ export function useDocumentMeta(meta: DocumentMeta | null): void {
         return link;
       },
       (element) => {
-        // ⚠️  بلا معاملات استعلام: `?page=2&sort=price` تنتج عشرات
-        //     الروابط لمحتوى واحد، فيوزّع المزحف وزنها على نسخ.
+        // ⚠️  Without query parameters: `?page=2&sort=price` produces dozens of
+        //     links for one piece of content, so the crawler splits its weight across copies.
         element.setAttribute('href', `${window.location.origin}${window.location.pathname}`);
       },
     );
@@ -135,11 +137,11 @@ export function useDocumentMeta(meta: DocumentMeta | null): void {
 }
 
 /**
- * تنظيف الوسوم المحقونة عند مغادرة الصفحة.
+ * Cleaning up the injected tags when the page is left.
  *
- * ⚠️  يُستدعى مرة واحدة من جذر التطبيق لا من كل شاشة: الوسوم
- *     تُعاد كتابتها بقيم الصفحة الجديدة، والحذف عند كل تنقّل يعني
- *     ومضة بلا وصف بين شاشتين.
+ * ⚠️  Called once from the application root rather than from every screen: the
+ *     tags are rewritten with the new page's values, and removing them on every
+ *     navigation means a flash with no description between two screens.
  */
 export function clearManagedMeta(): void {
   document.head.querySelectorAll(`[${MANAGED}]`).forEach((element) => {

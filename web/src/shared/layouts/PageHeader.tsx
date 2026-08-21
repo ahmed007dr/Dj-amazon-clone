@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 import './PageHeader.css';
 
 /**
- * ترويسة الصفحة — عنوان ووصف وإجراءات.
+ * The page header — a title, a description and actions.
  *
- * ⚠️  الإجراءات تنزل تحت العنوان على الهاتف لا تُضغط بجانبه.
- *     ضغطها يجعل زر «إضافة» أضيق من هدف اللمس.
+ * ⚠️  The actions drop below the title on a phone rather than being squeezed
+ *     beside it. Squeezing them makes the "add" button narrower than a touch target.
  */
 export function PageHeader({
   title,

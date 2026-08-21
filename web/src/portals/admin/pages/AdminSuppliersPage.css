@@ -15,7 +15,7 @@
   color: var(--color-text-muted);
 }
 
-/* ⚠️  ما علينا يُبرَز: هو ما تُفتح الشاشة لأجله. */
+/* ⚠️  What we owe is emphasised: it is what the screen is opened for. */
 .supplier-owed {
   color: var(--color-warning);
 }

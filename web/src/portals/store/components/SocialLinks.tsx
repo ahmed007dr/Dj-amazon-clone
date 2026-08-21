@@ -2,7 +2,7 @@ import { useBrand } from '@/shared/branding/useBrand';
 
 import './SocialLinks.css';
 
-/** المفتاح في حمولة الهوية → الرمز المعروض. */
+/** The key in the identity payload → the icon displayed. */
 const ICONS: Record<string, string> = {
   facebook: 'f',
   instagram: '◎',
@@ -13,10 +13,11 @@ const ICONS: Record<string, string> = {
 };
 
 /**
- * ⚠️  الروابط الفارغة لا تُعرض.
+ * ⚠️  Empty links are not displayed.
  *
- *     أيقونة تؤدي إلى صفحة فارغة أسوأ من غيابها — والأدمن يترك
- *     الحقل فارغًا حين لا يملك الحساب، لا لينشئه لاحقًا.
+ *     An icon leading to an empty page is worse than its absence — and the admin
+ *     leaves the field empty when they do not have the account, not in order to
+ *     create it later.
  */
 export function SocialLinks() {
   const { social } = useBrand();

@@ -20,16 +20,17 @@ import { SupplierPanel } from '../components/SupplierPanel';
 import './AdminSuppliersPage.css';
 
 /**
- * الموردون.
+ * Suppliers.
  *
- * ⚠️  **الرصيد وإجمالي المشتريات في القائمة نفسها.**
+ * ⚠️  **The balance and total purchases are in the list itself.**
  *
- *     من يفتح هذه الشاشة يفتحها ليعرف «كم علينا لمن؟» قبل أي شيء.
- *     دفنهما في التفاصيل يجبره على فتح كل مورّد ليجد من يستحق
- *     السداد — وهو ما تُفتح الشاشة لأجله.
+ *     Whoever opens this screen opens it to learn "how much do we owe whom?"
+ *     before anything else. Burying them in the details forces them to open
+ *     every supplier to find who is due payment — which is what the screen is
+ *     opened for.
  *
- * ⚠️  والرقمان يأتيان من **تجميع في استعلام واحد** لا من نداء لكل
- *     صف: الحساب لكل مورّد على حدة كان استعلامًا لكل سطر.
+ * ⚠️  And the two figures come from **an aggregation in a single query** rather
+ *     than a call per row: computing per supplier separately was one query per line.
  */
 export function AdminSuppliersPage() {
   const { t } = useTranslation();
@@ -101,8 +102,8 @@ export function AdminSuppliersPage() {
       key: 'payable',
       header: t('suppliers.payable'),
       align: 'end',
-      // ⚠️  الرصيد الموجب يعني **علينا** — يُبرَز بالوزن لأنه ما
-      //     تُفتح الشاشة لأجله.
+      // ⚠️  A positive balance means **we owe** — emphasised by weight because it is
+      //     what the screen is opened for.
       render: (row) => (
         <strong dir="ltr" className={Number(row.payable) > 0 ? 'supplier-owed' : ''}>
           {row.payable}
@@ -119,8 +120,8 @@ export function AdminSuppliersPage() {
           ) : (
             <Badge tone="neutral">{t('suppliers.inactive')}</Badge>
           )}
-          {/* ⚠️  المتأخر علامة مستقلة لا حالة: مورّد نشط وله فاتورة
-              متأخرة حالة شائعة — ودمجهما يُخفي إحداهما. */}
+          {/* ⚠️  Overdue is its own flag rather than a status: an active supplier with an
+              overdue invoice is a common state — and merging them hides one of the two. */}
           {row.has_overdue ? <Badge tone="danger">{t('suppliers.overdue')}</Badge> : null}
         </div>
       ),
@@ -141,9 +142,9 @@ export function AdminSuppliersPage() {
     <>
       <PageHeader title={t('suppliers.title')} />
 
-      {/* ⚠️  «ما يجب شراؤه» تبويب في شاشة الموردين لا شاشة بعيدة:
-          من يفتح الموردين إنما يفتحهم ليشتري، والنقص هو سبب
-          الفتح — لا قائمة الأسماء. */}
+      {/* ⚠️  "What needs buying" is a tab on the suppliers screen rather than a distant
+          one: whoever opens the suppliers opens them in order to buy, and the
+          shortage is the reason for opening — not the list of names. */}
       <div className="supplier-view-tabs" role="tablist">
         {(['suppliers', 'reorder'] as const).map((value) => (
           <button
@@ -186,8 +187,8 @@ export function AdminSuppliersPage() {
         />
       </FilterBar>
 
-      {/* ⚠️  فلترا المتابعة مفتاحان لا قائمة: يُستخدمان معًا كثيرًا
-          («عليه مديونية **و**متأخر»)، والقائمة تسمح بواحد. */}
+      {/* ⚠️  The two follow-up filters are switches rather than a list: they are used
+          together often ("has debt **and** is overdue"), and a list permits one. */}
       <div className="supplier-toggles">
         <label>
           <input

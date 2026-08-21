@@ -4,13 +4,13 @@ import { useTranslation } from 'react-i18next';
 import './FilterBar.css';
 
 /**
- * شريط الفلاتر.
+ * The filter bar.
  *
- * ⚠️  **الفلترة من الخادم دائمًا.**
+ * ⚠️  **Filtering always happens on the server.**
  *
- *     تحميل كل الصفوف ثم ترشيحها في المتصفح يعمل على عشرين صفًّا
- *     ويتوقّف عن العمل على ألفين — والفرق لا يظهر في بيئة التطوير
- *     أبدًا لأن بياناتها قليلة.
+ *     Loading every row and then filtering it in the browser works on twenty
+ *     rows and stops working on two thousand — and the difference never shows in
+ *     the development environment, because its data is sparse.
  */
 export function FilterBar({
   children,
@@ -36,7 +36,7 @@ export function FilterBar({
   );
 }
 
-/** حقل بحث موحّد داخل الشريط. */
+/** A shared search field inside the bar. */
 export function FilterSearch({
   value,
   onChange,
@@ -62,7 +62,7 @@ export function FilterSearch({
   );
 }
 
-/** قائمة اختيار موحّدة داخل الشريط. */
+/** A shared select inside the bar. */
 export function FilterSelect({
   value,
   onChange,

@@ -5,11 +5,12 @@ import { Button } from './Button';
 import './Pagination.css';
 
 /**
- * ترقيم بالصفحات — لشاشات الأدمن وحدها.
+ * Page-number pagination — for the admin screens alone.
  *
- * ⚠️  «صفحة ٥ من ٤٢» معلومة تشغيلية يحتاجها من يعالج الطلبات،
- *     والخادم يكشف `count` لهذه الشاشات فقط. القوائم العامة تستخدم
- *     المؤشر لأن كشف العدد الكلي يعطي المنافس حجم النشاط. (ADR-32)
+ * ⚠️  "Page 5 of 42" is operational information whoever processes orders needs,
+ *     and the server exposes `count` for these screens only. The public listings
+ *     use a cursor, because exposing the total count tells a competitor the
+ *     volume of activity. (ADR-32)
  */
 export function Pagination({
   page,

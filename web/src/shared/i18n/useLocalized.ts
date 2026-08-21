@@ -1,26 +1,28 @@
 /**
- * اختيار الحقل المطابق للغة من محتوى ثنائي اللغة.
+ * Picking the field matching the language from bilingual content.
  *
- * ⚠️  هذا هو ما يجعل تبديل اللغة **فوريًا بلا شبكة**.
+ * ⚠️  This is what makes switching language **instant, with no network**.
  *
- *     الخادم أرسل `name_ar` و`name_en` معًا (ADR-34)، فالبيانات في
- *     الذاكرة أصلًا. لو كان يرسل المترجَم وحده لاحتاج كل تبديل
- *     لغة إعادة جلب كل شاشة مفتوحة — ووميضًا وشاشات تحميل.
+ *     The server sent `name_ar` and `name_en` together (ADR-34), so the data is
+ *     already in memory. Were it to send the translated one alone, every
+ *     language switch would need every open screen refetched — a flash and
+ *     loading screens.
  *
- *     الارتداد إلى العربية مقصود: منتج نُشر بالعربية ولم يُترجم
- *     يجب أن يظهر باسمه لا فارغًا.
+ *     Falling back to Arabic is deliberate: a product published in Arabic and
+ *     never translated should appear under its name rather than blank.
  */
 
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * أي كائن يحمل `<field>_ar` و`<field>_en`.
+ * Any object carrying `<field>_ar` and `<field>_en`.
  *
- * ⚠️  `object` لا `Record<string, unknown>`.
+ * ⚠️  `object`, not `Record<string, unknown>`.
  *
- *     الثاني يرفض كل واجهة مصرَّحة الحقول (`ProductListItem`) لأنها
- *     بلا توقيع فهرسة — فيضطر كل مستدعٍ إلى `as` يُبطل الفحص كله.
+ *     The latter rejects every interface with declared fields
+ *     (`ProductListItem`) because it has no index signature — forcing every
+ *     caller into an `as` that defeats the whole check.
  */
 type Bilingual = object;
 
@@ -42,7 +44,7 @@ export function useLocalized(): (source: Bilingual, field: string) => string {
   );
 }
 
-/** نسخة لخريطة `{ ar, en }` — كما تعيدها واجهة الهوية البصرية. */
+/** A variant for an `{ ar, en }` map — as the visual identity API returns it. */
 export function useLocalizedMap(): (source: Record<string, string> | undefined) => string {
   const { i18n } = useTranslation();
   const locale = i18n.language.slice(0, 2);

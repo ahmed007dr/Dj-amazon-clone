@@ -1,11 +1,11 @@
 /**
- * مزوّد الثيم — يجلب الهوية من الخادم ويحقنها.
+ * The theme provider — it fetches the identity from the server and injects it.
  *
- * ⚠️  اختيار الوضع محلي، والألوان من الخادم.
+ * ⚠️  The mode choice is local, and the colours come from the server.
  *
- *     الأدمن يملك **اللوحتين**؛ والمستخدم يملك **أيهما يرى**. خلط
- *     الاثنين يعني إما أدمنًا لا يستطيع تغيير الألوان، أو مستخدمًا
- *     لا يستطيع اختيار الوضع الداكن.
+ *     The admin owns **both palettes**; the user owns **which of them they see**.
+ *     Mixing the two means either an admin who cannot change the colours, or a
+ *     user who cannot choose dark mode.
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -32,8 +32,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const { data: theme, isLoading } = useQuery({
     queryKey: ['branding', 'theme'],
     queryFn: getTheme,
-    // ⚠️  الهوية لا تتغيّر مرة في الشهر — إعادة جلبها عند كل تركيز
-    //     نافذة إهدار خالص على بيانات ثابتة.
+    // ⚠️  The identity does not change once a month — refetching it on every window
+    //     focus is pure waste on static data.
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -44,14 +44,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
   const [system, setSystem] = useState<ThemeMode>(systemMode);
 
-  // اختيار المستخدم يسبق افتراضي الأدمن؛ وافتراضي الأدمن يسبق النظام
+  // The user's choice takes precedence over the admin's default; and the admin's default over the system
   const effectivePreference: DefaultMode =
     storedPreference() ?? theme?.default_mode ?? preference;
 
   const mode: ThemeMode = effectivePreference === 'SYSTEM' ? system : effectivePreference;
 
-  // ⚠️  تفضيل الجهاز يتغيّر أثناء الجلسة (غروب الشمس على الهاتف).
-  //     قراءته مرة عند الإقلاع تترك الصفحة فاتحة بينما صار النظام داكنًا.
+  // ⚠️  The device preference changes during a session (sunset, on a phone).
+  //     Reading it once at boot leaves the page light while the system has gone dark.
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const onChange = (event: MediaQueryListEvent) => {

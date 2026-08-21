@@ -26,13 +26,14 @@ import './AdminTaxPage.css';
 const KEY = ['admin', 'tax'] as const;
 
 /**
- * الضريبة.
+ * Tax.
  *
- * ⚠️  **تغيير النسبة لا يمسّ الطلبات الصادرة.**
+ * ⚠️  **Changing the rate does not touch orders already issued.**
  *
- *     كل سطر يحمل نسبته وقت البيع (ADR-30)، والأثر يبدأ من الطلب
- *     التالي. قوله في الشاشة يمنع خوفًا مشروعًا من الضغط، ويمنع
- *     توقّعًا خاطئًا بأن التقارير القديمة ستتغيّر.
+ *     Every line carries its rate at the time of sale (ADR-30), and the effect
+ *     starts with the next order. Saying so on the screen prevents a legitimate
+ *     fear of pressing, and prevents a false expectation that the old reports
+ *     will change.
  */
 export function AdminTaxPage() {
   const { t } = useTranslation();
@@ -120,7 +121,7 @@ export function AdminTaxPage() {
       key: 'products',
       header: t('admin.affectedProducts'),
       align: 'end',
-      // ⚠️  العدد قبل التعديل يحوّل القرار من تخمين إلى معرفة
+      // ⚠️  The count before the edit turns the decision from a guess into knowledge
       render: (item) => item.product_count,
     },
     {

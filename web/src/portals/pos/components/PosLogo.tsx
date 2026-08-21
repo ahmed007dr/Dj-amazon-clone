@@ -5,14 +5,15 @@ import { BrandLogo } from '@/shared/branding/BrandLogo';
 import './PosLogo.css';
 
 /**
- * لوجو نقطة البيع.
+ * The point-of-sale logo.
  *
- * ⚠️  **غير قابل للنقر — بخلاف لوجو المتجر والأدمن.**
+ * ⚠️  **Not clickable — unlike the store and admin logos.**
  *
- *     على الكاونتر يكون اللوجو أعلى الشاشة وإصبع الكاشير يمرّ فوقه
- *     عشرات المرات في الساعة. جعله رابطًا للصفحة الرئيسية يعني
- *     مغادرة بيعة نصف مبنية بلمسة عارضة — وإعادة بنائها أمام
- *     العميل. الخروج يكون من قائمة الحساب قصدًا لا سهوًا.
+ *     At the counter the logo sits at the top of the screen and the cashier's
+ *     finger passes over it dozens of times an hour. Making it a link to the
+ *     home page means leaving a half-built sale with an incidental touch — and
+ *     rebuilding it in front of the customer. Leaving happens from the account
+ *     menu deliberately, not by accident.
  */
 export function PosLogo() {
   const { t } = useTranslation();

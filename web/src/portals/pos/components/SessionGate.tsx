@@ -13,13 +13,13 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import './SessionGate.css';
 
 /**
- * فتح الوردية.
+ * Opening the shift.
  *
- * ⚠️  **رصيد الافتتاح مطلوب صراحةً — بلا افتراضي.**
+ * ⚠️  **The opening balance is required explicitly — with no default.**
  *
- *     الفكّة التي في الدرج صباحًا جزء من التسوية. افتراضها صفرًا
- *     يجعل إغلاق اليوم يُظهر فائضًا يساويها، فيبدو الكاشير وكأنه
- *     أضاف نقدًا من عنده — كل يوم.
+ *     The float in the drawer in the morning is part of the reconciliation.
+ *     Defaulting it to zero makes closing the day show a surplus equal to it, so
+ *     the cashier looks as though they added cash of their own — every day.
  */
 export function SessionGate() {
   const { t } = useTranslation();
@@ -40,8 +40,8 @@ export function SessionGate() {
       <StateMessage
         icon="▣"
         title={t('pos.noRegisters')}
-        // ⚠️  الجهاز المشغول ليس عطلًا: زميل يعمل عليه الآن، وهي
-        //     أول حالة يقابلها كاشير الوردية الثانية.
+        // ⚠️  A busy device is not a fault: a colleague is working on it right now, and it is
+        //     the first case the second-shift cashier meets.
         body={t('pos.noRegistersBody')}
       />
     );

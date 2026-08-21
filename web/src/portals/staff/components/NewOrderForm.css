@@ -96,8 +96,8 @@
   cursor: pointer;
 }
 
-/* ⚠️  ملاحظة التسعير ليست تفصيلًا صغيرًا: هي ما يمنع المندوب من
-   قول رقم للعميل في الهاتف قبل أن يُسعّر الخادم. */
+/* ⚠️  The pricing note is not a small detail: it is what stops the rep from
+   quoting a figure to the customer on the phone before the server has priced it. */
 .new-order__pricing-note {
   margin: 0;
   padding: var(--space-2) var(--space-3);

@@ -7,14 +7,14 @@ import { Drawer } from '@/shared/ui/Drawer';
 import './SidebarLayout.css';
 
 /**
- * تخطيط بشريط جانبي — لوحات الأدمن والموظفين.
+ * A layout with a sidebar — the admin and staff panels.
  *
- * ⚠️  الشريط ثابت على الديسكتوب و Drawer على الهاتف — **نفس
- *     المحتوى** في الحالتين.
+ * ⚠️  The bar is fixed on desktop and a drawer on a phone — **the same content**
+ *     in both cases.
  *
- *     بناء قائمتين منفصلتين يجعل عنصرًا يُضاف إلى إحداهما ويُنسى
- *     في الأخرى، فتختفي شاشة كاملة عن مستخدمي الهاتف بلا أن يلاحظ
- *     أحد.
+ *     Building two separate lists means an item added to one and forgotten in
+ *     the other, so a whole screen disappears for phone users without anyone
+ *     noticing.
  */
 export function SidebarLayout({
   sidebar,

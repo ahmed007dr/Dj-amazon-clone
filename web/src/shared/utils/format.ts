@@ -1,17 +1,18 @@
 /**
- * التنسيق — أرقام وعملة وتواريخ.
+ * Formatting — numbers, currency and dates.
  *
- * ⚠️  `Intl` دائمًا، ولا تنسيق يدوي.
+ * ⚠️  Always `Intl`, never manual formatting.
  *
- *     الفاصلة العشرية والألفية وموضع رمز العملة كلها تختلف بين
- *     العربية والإنجليزية. «١٢٣٤٫٥٠ ج.م» مقابل «EGP 1,234.50» —
- *     والتنسيق اليدوي ينتج أحدهما في اللغتين.
+ *     The decimal separator, the thousands separator and the position of the
+ *     currency symbol all differ between Arabic and English — the Arabic-locale
+ *     rendering against `EGP 1,234.50`. Manual formatting produces one of them
+ *     in both languages.
  *
- * ⚠️  المال يصل من الخادم **نصًّا** لا رقمًا (ADR-31).
+ * ⚠️  Money arrives from the server **as a string**, not a number (ADR-31).
  *
- *     تحويله إلى `number` في JavaScript يفقد الدقة عند مبالغ
- *     كبيرة، والعرض هنا هو الاستخدام الوحيد المسموح به. أي حساب
- *     مالي يقع في الخادم.
+ *     Converting it to a `number` in JavaScript loses precision at large
+ *     amounts, and display here is the only permitted use. Any financial
+ *     arithmetic happens on the server.
  */
 
 const CURRENCY = 'EGP';
@@ -50,7 +51,7 @@ export function formatDateTime(value: string | Date, locale: string): string {
   }).format(date);
 }
 
-/** «منذ ٣ أيام» — بالـ locale الصحيح وبلا مكتبة. */
+/** "3 days ago" — in the correct locale and with no library. */
 export function formatRelative(value: string | Date, locale: string): string {
   const date = typeof value === 'string' ? new Date(value) : value;
   const seconds = (date.getTime() - Date.now()) / 1000;

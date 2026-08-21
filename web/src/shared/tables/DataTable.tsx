@@ -11,22 +11,22 @@ export interface Column<T> {
   key: string;
   header: string;
   render: (row: T) => ReactNode;
-  /** يُخفى على الشاشات الضيّقة — للأعمدة الثانوية. */
+  /** Hidden on narrow screens — for secondary columns. */
   secondary?: boolean;
   align?: 'start' | 'end';
 }
 
 /**
- * جدول بيانات.
+ * A data table.
  *
- * ⚠️  **يتحوّل إلى بطاقات على الهاتف — لا يُضغط ولا يتمرّر أفقيًا.**
+ * ⚠️  **It turns into cards on a phone — it is neither squeezed nor scrolled horizontally.**
  *
- *     جدول بثمانية أعمدة على ٣٦٠px إما يقصّ النص إلى حرفين أو يجبر
- *     المستخدم على تمرير أفقي يفقد فيه عمود الهوية. البطاقة تُبقي
- *     كل صف مقروءًا كوحدة.
+ *     A table of eight columns at 360px either crops the text to two characters
+ *     or forces the user into a horizontal scroll in which they lose the
+ *     identity column. A card keeps every row readable as a unit.
  *
- * ⚠️  والصف كله قابل للنقر حين يكون له وجهة — لا رابط في عمود واحد.
- *     هدف اللمس على الهاتف يجب أن يكون الصف لا كلمة داخله.
+ * ⚠️  And the whole row is clickable when it has a destination — not a link in
+ *     one column. The touch target on a phone must be the row, not a word inside it.
  */
 export function DataTable<T>({
   columns,
@@ -63,7 +63,7 @@ export function DataTable<T>({
     );
   }
 
-  // ── بطاقات على الهاتف ──────────────────────────────────
+  // ── Cards on a phone ────────────────────────────────────
   if (!isDesktop) {
     return (
       <ul className="data-cards">
@@ -99,7 +99,7 @@ export function DataTable<T>({
     );
   }
 
-  // ── جدول على الديسكتوب ─────────────────────────────────
+  // ── A table on desktop ──────────────────────────────────
   return (
     <div className="scroll-x data-table__wrap">
       <table className="data-table">

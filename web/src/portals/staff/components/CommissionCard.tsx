@@ -16,18 +16,20 @@ const TONE: Record<string, 'info' | 'success' | 'danger' | 'neutral'> = {
 };
 
 /**
- * بطاقة عمولة شهر.
+ * A month's commission card.
  *
- * ⚠️  **زر «كيف حُسبت؟» ليس زينة.**
+ * ⚠️  **The "how was this calculated?" button is not decoration.**
  *
- *     المندوب يقرأ مبلغًا سيُصرَف له. بلا تفسير يقارنه بتقديره
- *     الخاص ويتصل بالمحاسبة عند كل فرق — والفرق طبيعي لأن
- *     المرتجعات والحد الأدنى والشرائح لا تُحسب في الرأس.
+ *     The rep reads an amount that will be paid to them. With no explanation
+ *     they compare it against their own estimate and call accounting on every
+ *     difference — and a difference is normal, because returns, the floor and
+ *     the tiers are not computed in one's head.
  *
- * ⚠️  والتفسير يأتي **من السجل** لا بإعادة حساب.
+ * ⚠️  And the explanation comes **from the record**, not from a recomputation.
  *
- *     الأرقام مخزَّنة لحظة الحساب؛ فإعادة حسابها عند فتح الشاشة
- *     تعطي جوابًا يتغيّر بين يوم وآخر عن مبلغ لم يتغيّر.
+ *     The numbers are stored at the moment of calculation; recomputing them when
+ *     the screen opens gives an answer that changes from one day to the next
+ *     about an amount that has not changed.
  */
 export function CommissionCard({ record }: { record: CommissionRecord }) {
   const { t } = useTranslation();

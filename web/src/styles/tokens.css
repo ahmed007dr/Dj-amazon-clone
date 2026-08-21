@@ -1,19 +1,19 @@
 /*
-  رموز التصميم.
+  Design tokens.
 
-  ⚠️  الألوان هنا **قيم ابتدائية فقط** — تُستبدل وقت التشغيل من
-      `GET /api/v1/branding/theme/`. (ADR-22)
+  ⚠️  The colours here are **initial values only** — they are replaced at runtime
+      from `GET /api/v1/branding/theme/`. (ADR-22)
 
-      لو كُتبت كمتغيرات Sass لصار التحكم من لوحة الأدمن مستحيلًا
-      دون إعادة بناء، ولاحتاج كل ملف أنماط إعادة كتابة لاحقًا.
-      لذلك: خصائص CSS مخصّصة من اليوم الأول.
+      Had they been written as Sass variables, control from the admin panel
+      would have become impossible without a rebuild, and every stylesheet would
+      have needed rewriting later. Hence: CSS custom properties from day one.
 
-  ⚠️  المسافات ونقاط الكسر **ليست** قابلة للتحكم من الأدمن.
-      تغييرها يكسر التخطيط لا يعيد تلوينه.
+  ⚠️  The spacing and the breakpoints are **not** controllable from the admin panel.
+      Changing them breaks the layout rather than recolouring it.
 */
 
 :root {
-  /* ── الألوان: تُحقن من branding ─────────────────────── */
+  /* ── Colours: injected from branding ─────────────────── */
   --color-primary: #2e7d32;
   --color-on-primary: #ffffff;
   --color-secondary: #00695c;
@@ -30,17 +30,17 @@
   --color-text: #1b1f23;
   --color-text-muted: #5c6670;
 
-  /* ── الخطوط: تُحقن من branding ──────────────────────── */
+  /* ── Fonts: injected from branding ──────────────────── */
   --font-ar: 'Cairo', 'Segoe UI', system-ui, sans-serif;
   --font-en: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --font-active: var(--font-ar);
   --font-size-base: 1rem;
 
-  /* ── الشكل: يُحقن من branding ───────────────────────── */
+  /* ── Shape: injected from branding ──────────────────── */
   --radius: 0.5rem;
   --shadow-level: 1;
 
-  /* ── المسافات: ثابتة ────────────────────────────────── */
+  /* ── Spacing: fixed ─────────────────────────────────── */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -52,7 +52,7 @@
   --space-12: 3rem;
   --space-16: 4rem;
 
-  /* ── مقاييس مشتقّة ──────────────────────────────────── */
+  /* ── Derived measures ───────────────────────────────── */
   --radius-sm: calc(var(--radius) * 0.5);
   --radius-lg: calc(var(--radius) * 1.75);
   --radius-pill: 999px;
@@ -61,8 +61,8 @@
   --shadow-md: 0 2px 8px rgb(0 0 0 / 8%);
   --shadow-lg: 0 8px 24px rgb(0 0 0 / 12%);
 
-  /* ⚠️  هدف اللمس ٤٤px — ليس تفضيلًا جماليًا بل حد إرشادات
-       الوصول. الزر الأصغر يُخطئه الإصبع على الهاتف. */
+  /* ⚠️  A 44px touch target — not an aesthetic preference but the accessibility
+       guidelines' minimum. A smaller button is missed by the finger on a phone. */
   --touch-target: 2.75rem;
 
   --header-height: 3.5rem;
@@ -71,7 +71,7 @@
 
   --transition: 150ms ease;
 
-  /* ── الطبقات ────────────────────────────────────────── */
+  /* ── Layers ─────────────────────────────────────────── */
   --z-header: 100;
   --z-drawer: 200;
   --z-modal: 300;
@@ -79,10 +79,10 @@
 }
 
 /*
-  ⚠️  لوحة الوضع الداكن الافتراضية.
+  ⚠️  The default dark-mode palette.
 
-      تُستبدل بالكامل من `branding` عند الإقلاع. وجودها هنا يمنع
-      وميضًا أبيض قبل وصول الاستجابة على شاشة داكنة.
+      It is replaced entirely from `branding` at boot. Its presence here
+      prevents a white flash before the response arrives on a dark screen.
 */
 :root[data-theme='dark'] {
   --color-primary: #66bb6a;

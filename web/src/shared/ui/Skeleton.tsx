@@ -1,11 +1,11 @@
 import './Skeleton.css';
 
 /**
- * ⚠️  هيكل بأبعاد المحتوى القادم لا دوّارة في المنتصف.
+ * ⚠️  A skeleton with the dimensions of the content to come, not a spinner in the middle.
  *
- *     الدوّارة تُبقي التخطيط يقفز عند وصول البيانات؛ والهيكل يحجز
- *     المساحة فيثبت المكان — وهو الفرق بين صفحة تبدو سريعة وأخرى
- *     تبدو مضطربة.
+ *     A spinner leaves the layout jumping when the data arrives; a skeleton
+ *     reserves the space and so fixes the position — which is the difference
+ *     between a page that feels fast and one that feels unsettled.
  */
 export function Skeleton({
   width = '100%',

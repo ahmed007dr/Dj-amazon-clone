@@ -7,16 +7,17 @@ import './Toast.css';
 const DURATION = 4000;
 
 /**
- * إشعارات عابرة.
+ * Transient notifications.
  *
- * ⚠️  **للتأكيد لا للأخطاء التي تحتاج تصرّفًا.**
+ * ⚠️  **For confirmation, not for errors that need an action.**
  *
- *     «حُفظ» إشعار مناسب؛ أما «الكمية غير كافية» فمعلومة يحتاج
- *     المستخدم قراءتها والتصرّف بناءً عليها، والإشعار العابر يختفي
- *     قبل أن يفهمها. تلك تُعرض مكان الحدث.
+ *     "Saved" is an appropriate notification; whereas "insufficient quantity" is
+ *     information the user needs to read and act on, and a transient
+ *     notification disappears before they grasp it. Those are shown where the
+ *     event happened.
  *
- * ⚠️  و`aria-live="polite"` لا `assertive`: المقاطعة تُزعج قارئ
- *     الشاشة وسط قراءة المستخدم لشيء آخر.
+ * ⚠️  And `aria-live="polite"`, not `assertive`: interruption disturbs the screen
+ *     reader in the middle of the user reading something else.
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);

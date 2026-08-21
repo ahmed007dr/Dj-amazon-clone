@@ -1,12 +1,12 @@
 /**
- * يربط لغة `i18next` بسمتَي `lang` و`dir` على عنصر الجذر.
+ * Binds the `i18next` language to the `lang` and `dir` attributes on the root element.
  *
- * ⚠️  الاتجاه **من الجذر وحده**.
+ * ⚠️  The direction comes **from the root alone**.
  *
- *     تثبيت `dir` أو `text-align` داخل مكوّن يعني مكوّنًا لا ينقلب
- *     مع بقية الصفحة — والنتيجة تخطيط نصفه يمين ونصفه يسار. مع
- *     الخصائص المنطقية (`margin-inline-start`) لا يحتاج أي مكوّن
- *     أن يعرف الاتجاه أصلًا.
+ *     Hard-coding `dir` or `text-align` inside a component means a component
+ *     that does not flip with the rest of the page — and the result is a layout
+ *     half right-to-left and half left-to-right. With logical properties
+ *     (`margin-inline-start`) no component needs to know the direction at all.
  */
 
 import { useEffect } from 'react';
@@ -27,8 +27,8 @@ export function useDirection(): {
     const root = document.documentElement;
     root.lang = locale;
     root.dir = dir;
-    // ⚠️  رمز الخط يتبدّل مع اللغة: خط لاتيني جيد قد لا يحمل
-    //     محارف عربية، فيسقط النص إلى خط النظام بلا تحذير.
+    // ⚠️  The font token switches with the language: a good Latin font may not carry
+    //     Arabic glyphs, so the text falls back to the system font with no warning.
     root.style.setProperty('--font-active', `var(--font-${locale})`);
   }, [locale, dir]);
 

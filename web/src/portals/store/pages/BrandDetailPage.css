@@ -5,8 +5,8 @@
   padding-block: var(--space-5);
 }
 
-/* ⚠️  عمودان على الشاشة الواسعة وعمود واحد على الهاتف: الشعار
-   بجوار النص يضغط الوصف إلى شريط ضيّق غير مقروء على ٣٦٠ بكسل. */
+/* ⚠️  Two columns on a wide screen and one column on a phone: the logo beside
+   the text squeezes the description into a narrow, unreadable strip at 360 px. */
 .brand-detail__head {
   display: flex;
   flex-wrap: wrap;

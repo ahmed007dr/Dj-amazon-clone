@@ -10,18 +10,18 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import './BrandsPage.css';
 
 /**
- * صفحة الماركات.
+ * The brands page.
  *
- * ⚠️  **المميّزة أولًا وبعنوان يفصلها.**
+ * ⚠️  **The featured ones first, under a heading that separates them.**
  *
- *     `is_featured` قرار تجاري يتّخذه الأدمن ويكلّف اتفاقًا مع
- *     المورّد؛ عرض الماركات بترتيب واحد يُلغي القرار كله ويجعل
- *     الحقل زخرفة في قاعدة البيانات.
+ *     `is_featured` is a commercial decision the admin takes and one that costs
+ *     an agreement with the supplier; showing the brands in a single order
+ *     cancels the whole decision and makes the field decoration in the database.
  *
- * ⚠️  و**الشعار الغائب يُستبدَل بالحرف الأول لا بمربع فارغ**.
+ * ⚠️  And **a missing logo is replaced by the first letter, not by an empty square**.
  *
- *     أغلب الماركات المحلية بلا شعار مرفوع؛ الشبكة المليئة
- *     بمربعات رمادية تُقرأ «الصور لم تُحمَّل» لا «لا شعار».
+ *     Most local brands have no uploaded logo; a grid full of grey squares reads
+ *     as "the images did not load" rather than "no logo".
  */
 export function BrandsPage() {
   const { t } = useTranslation();
@@ -90,9 +90,10 @@ export function BrandsPage() {
         </section>
       ) : null}
 
-      {/* ⚠️  المصنّعون قائمة نصّية لا شبكة: العميل يبحث بالماركة
-          («بنادول») لا بالمصنّع («GSK»)، والمصنّع سياق يُطمئن
-          لا مدخل تصفّح. */}
+      {/* ⚠️  Manufacturers are a text list rather than a grid: the customer
+          searches by the brand ("Panadol") not by the manufacturer ("GSK"),
+          and the manufacturer is reassuring context rather than a browsing
+          entry point. */}
       {manufacturers.data && manufacturers.data.length > 0 ? (
         <section>
           <h2 className="brands-page__heading">{t('catalog.manufacturers')}</h2>

@@ -28,8 +28,8 @@ export function BundleDetailPage() {
     );
   }
 
-  // ⚠️  الفصل بين الأساسي والاختياري ليس تجميلًا: الطالب الذي
-  //     يملك السماعة يحتاج أن يرى المطلوب وحده قبل أن يقرّر.
+  // ⚠️  Separating the essential from the optional is not cosmetic: a student who
+  //     already owns the stethoscope needs to see the required items alone before deciding.
   const essentials = bundle.items.filter((item) => item.is_essential);
   const optional = bundle.items.filter((item) => !item.is_essential);
 

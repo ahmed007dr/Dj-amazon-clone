@@ -1,11 +1,11 @@
 /*
-  الأساس.
+  The base.
 
-  ⚠️  كل قاعدة اتجاهية هنا **منطقية** (`inline-start` لا `left`).
+  ⚠️  Every directional rule here is **logical** (`inline-start`, not `left`).
 
-      هذا ما يلغي الحاجة إلى نسخة أنماط عربية وأخرى إنجليزية —
-      وهو ما كان يفعله المشروع القديم بمجلدين `static/ar` و
-      `static/en` يتضاعفان مع كل تعديل.
+      This is what removes the need for one Arabic stylesheet and one English
+      one — which is what the old project did, with two directories
+      `static/ar` and `static/en` that doubled with every edit.
 */
 
 *,
@@ -47,8 +47,8 @@ body {
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
 
-  /* ⚠️  الصفحة لا تتمرّر أفقيًا أبدًا. الجداول والمخططات العريضة
-       تتمرّر داخل حاوياتها هي. */
+  /* ⚠️  The page never scrolls horizontally. Wide tables and charts scroll
+       inside their own containers. */
   overflow-x: hidden;
 }
 
@@ -96,7 +96,7 @@ p {
   text-wrap: pretty;
 }
 
-/* ⚠️  مؤشر تركيز ظاهر — إزالته تجعل التصفّح بلوحة المفاتيح عمياء. */
+/* ⚠️  A visible focus indicator — removing it makes keyboard navigation blind. */
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
@@ -107,7 +107,7 @@ p {
   outline: none;
 }
 
-/* ── مساعدات الوصول ────────────────────────────────────── */
+/* ── Accessibility helpers ─────────────────────────────── */
 
 .visually-hidden {
   position: absolute;

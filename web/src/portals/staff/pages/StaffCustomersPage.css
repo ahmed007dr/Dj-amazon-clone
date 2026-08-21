@@ -10,7 +10,7 @@
   color: var(--color-text-muted);
 }
 
-/* ⚠️  «لم يطلب بعد» مُبرَز: هو من يجب أن يتصل به المندوب. */
+/* ⚠️  "Has not ordered yet" is highlighted: they are the ones the rep should call. */
 .staff-never {
   color: var(--color-warning);
   font-weight: 600;

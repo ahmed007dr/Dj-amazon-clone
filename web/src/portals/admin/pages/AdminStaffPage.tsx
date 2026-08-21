@@ -32,13 +32,14 @@ import './AdminStaffPage.css';
 type Tab = 'staff' | 'unassigned' | 'roles' | 'assignments';
 
 /**
- * الموظفون وإسناد العملاء.
+ * Employees and customer assignment.
  *
- * ⚠️  **«عملاء بلا مسؤول» تبويب لا شاشة مدفونة.**
+ * ⚠️  **"Customers with no owner" is a tab, not a buried screen.**
  *
- *     عميل بلا إسناد لا يتابعه أحد ولا يظهر في لوحة أي مندوب —
- *     ولا شيء ينبّه إليه إطلاقًا. وضعه بجوار قائمة الموظفين
- *     يجعل توزيعه فعلًا يوميًا لا مهمة تُتذكَّر.
+ *     An unassigned customer is followed up by nobody and appears on no rep's
+ *     dashboard — and nothing draws attention to them at all. Placing it beside
+ *     the employees list makes distributing them a daily act rather than a task
+ *     to be remembered.
  */
 export function AdminStaffPage() {
   const { t } = useTranslation();
@@ -100,8 +101,8 @@ export function AdminStaffPage() {
         row.is_active ? (
           <Badge tone="success">{t('staff.onDuty')}</Badge>
         ) : (
-          // ⚠️  الموقوف يظهر في القائمة ولا يُخفى: إخفاؤه يجعل
-          //     عملاءه يبدون بلا مسؤول بلا تفسير.
+          // ⚠️  A deactivated employee appears in the list and is not hidden: hiding them
+          //     makes their customers look unassigned with no explanation.
           <Badge tone="danger">{t('staff.offDuty')}</Badge>
         ),
     },
@@ -210,8 +211,9 @@ export function AdminStaffPage() {
         >
           {t('staff.roles')}
         </button>
-        {/* ⚠️  سجل الإسناد بجوار الموظفين: من يراجع عمولة يراجع
-            من كان يخدم العميل وقتها — وهما شاشة واحدة عمليًا. */}
+        {/* ⚠️  The assignment log beside the employees: whoever reviews a commission
+            reviews who was serving the customer at the time — and they are
+            practically one screen. */}
         <button
           type="button"
           role="tab"
@@ -257,9 +259,9 @@ export function AdminStaffPage() {
         </>
       ) : (
         <>
-          {/* ⚠️  اختيار الموظف **قبل** الجدول لا في كل صف.
-              وضع قائمة منسدلة في كل صف يجعل توزيع عشرين عميلًا
-              عشرين اختيارًا متكررًا لنفس المندوب. */}
+          {/* ⚠️  Choosing the employee **before** the table rather than in every row.
+              Putting a dropdown in each row makes distributing twenty customers
+              twenty repeated selections of the same rep. */}
           <label className="staff-assign-picker">
             {t('staff.assignTo')}
             <select value={assignTo} onChange={(event) => setAssignTo(event.target.value)}>

@@ -9,19 +9,19 @@ import { SessionGate } from './components/SessionGate';
 import './PosShell.css';
 
 /**
- * قشرة نقطة البيع.
+ * The point-of-sale shell.
  *
- * ⚠️  **الوردية شرط دخول لا خطوة داخل الشاشة.**
+ * ⚠️  **The shift is an entry condition, not a step inside the screen.**
  *
- *     كل نقطة على الخادم ترفض العمل بلا وردية مفتوحة (٤٠٩). ترك
- *     شاشة البيع تُفتح بلا وردية يعني أن الكاشير يبني بيعة كاملة
- *     أمام العميل ثم يُرفض في آخر ضغطة — فيبني حاجزًا هنا بدلًا
- *     من ترجمة رفضٍ متأخّر.
+ *     Every endpoint on the server refuses to work with no open shift (409).
+ *     Letting the sale screen open with no shift means the cashier builds a
+ *     whole sale in front of the customer and is then refused on the last press
+ *     — so a barrier is built here instead of translating a late refusal.
  *
- * ⚠️  وبلا فوتر.
+ * ⚠️  And no footer.
  *
- *     الفوتر روابط تسويق ومعلومات شركة؛ لا مكان لها على جهاز
- *     كاونتر، وتأكل ارتفاعًا تحتاجه قائمة الأصناف.
+ *     A footer is marketing links and company information; it has no place on a
+ *     counter terminal, and it eats height the item list needs.
  */
 export function PosShell() {
   const session = useMySession();

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 
 /**
- * ⚠️  البحث بلا تأخير يرسل نداءً لكل حرف.
+ * ⚠️  Search with no delay sends a call per character.
  *
- *     كتابة «باراسيتامول» = ١٢ نداءً، تصل استجاباتها بترتيب غير
- *     مضمون فتعرض الشاشة نتائج «بارا» بعد نتائج الكلمة الكاملة.
+ *     Typing "paracetamol" = 12 calls, whose responses arrive in an unguaranteed
+ *     order, so the screen shows the results for "para" after the results for
+ *     the complete word.
  */
 export function useDebounced<T>(value: T, delay = 350): T {
   const [debounced, setDebounced] = useState(value);

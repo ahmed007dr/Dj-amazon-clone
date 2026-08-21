@@ -25,7 +25,7 @@
   background: color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
 
-/* أفقي على الديسكتوب — رأسي داخل الـ Drawer على الهاتف */
+/* Horizontal on desktop — vertical inside the drawer on a phone */
 @media (min-width: 992px) {
   .store-nav {
     flex-direction: row;

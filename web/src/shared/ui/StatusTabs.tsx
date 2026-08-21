@@ -7,12 +7,12 @@ export interface TabOption {
 }
 
 /**
- * تبويبات الحالة.
+ * The status tabs.
  *
- * ⚠️  تتمرّر أفقيًا على الهاتف ولا تُلفّ في سطرين.
+ * ⚠️  They scroll horizontally on a phone rather than wrapping onto two lines.
  *
- *     اللفّ يجعل ارتفاع الشريط يقفز عند تغيّر عدد التبويبات، فيتحرّك
- *     المحتوى تحته بينما يقرأه المستخدم.
+ *     Wrapping makes the bar's height jump when the number of tabs changes, so
+ *     the content beneath it moves while the user is reading it.
  */
 export function StatusTabs({
   options,

@@ -4,7 +4,7 @@
   border: 1px solid;
   border-radius: var(--radius);
 
-  /* ⚠️  شريط على حافة البداية — ينتقل تلقائيًا عند تبديل اللغة */
+  /* ⚠️  A bar on the start edge — it moves automatically when the language switches */
   border-inline-start-width: 4px;
 }
 

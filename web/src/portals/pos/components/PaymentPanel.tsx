@@ -8,18 +8,20 @@ import { Button } from '@/shared/ui/Button';
 import './PaymentPanel.css';
 
 /**
- * تحصيل البيعة.
+ * Charging the sale.
  *
- * ⚠️  **الخادم يرفض ما لا يساوي الإجمالي بالضبط.**
+ * ⚠️  **The server refuses anything not exactly equal to the total.**
  *
- *     الأقل بيعة غير مسدَّدة تُسجَّل كمكتملة؛ والأكثر فائض لا يعرف
- *     النظام أين يذهب. لذلك الباقي للعميل يُحسب هنا ولا يُرسَل:
- *     المسجَّل هو ثمن البضاعة، والفكّة تخرج من الدرج فورًا.
+ *     Less is an unsettled sale recorded as complete; more is a surplus the
+ *     system does not know where to put. So the customer's change is computed
+ *     here and never sent: what is recorded is the price of the goods, and the
+ *     change leaves the drawer immediately.
  *
- * ⚠️  و«المبلغ المستلم» يخصّ النقد وحده.
+ * ⚠️  And "amount received" applies to cash alone.
  *
- *     البطاقة تُمرَّر بالقيمة بالضبط على الطرفية — لا باقي فيها،
- *     وحقل استلام لها يدعو إلى خطأ إدخال بلا أي فائدة.
+ *     A card is charged for the exact value at the terminal — there is no
+ *     change in it, and a received-amount field for it invites a data-entry
+ *     error with no benefit whatsoever.
  */
 export function PaymentPanel({
   total,
@@ -41,8 +43,8 @@ export function PaymentPanel({
   const totalNumber = Number(total || '0');
   const cardNumber = Number(cardAmount || '0');
 
-  // ⚠️  الحساب بأرقام عشرية للعرض فقط — لا يُرسَل منه شيء.
-  //     المبالغ المرسلة نصوص، والخادم هو مرجع كل مقارنة.
+  // ⚠️  The arithmetic uses decimals for display only — nothing from it is sent.
+  //     The amounts sent are strings, and the server is the reference for every comparison.
   const cashDue = useMemo(
     () => Math.max(totalNumber - (split ? cardNumber : 0), 0),
     [totalNumber, split, cardNumber],
@@ -62,10 +64,10 @@ export function PaymentPanel({
       payments.push({ method: 'CARD', amount: cardAmount });
     }
     if (cashDue > 0) {
-      // ⚠️  **المستحق لا المستلم.**
+      // ⚠️  **What is due, not what was received.**
       //
-      //     إرسال ما في يد الكاشير يجعل الفكّة تُسجَّل كإيراد،
-      //     فيُظهر الدرج فائضًا يساوي كل باقٍ أعطاه اليوم.
+      //     Sending what is in the cashier's hand records the change as revenue,
+      //     so the drawer shows a surplus equal to all the change they gave that day.
       payments.push({ method: 'CASH', amount: cashDue.toFixed(2) });
     }
 
@@ -126,8 +128,8 @@ export function PaymentPanel({
             />
           </label>
 
-          {/* ⚠️  الباقي بخط كبير: هو الرقم الوحيد الذي يُقرأ بسرعة
-              أثناء تسليم النقد، وقراءته خطأً تعني عجزًا في الدرج. */}
+          {/* ⚠️  The change in a large font: it is the one figure read quickly
+              while handing over cash, and misreading it means a shortfall in the drawer. */}
           {change > 0 ? (
             <div className="pay-panel__change">
               <span>{t('pos.change')}</span>

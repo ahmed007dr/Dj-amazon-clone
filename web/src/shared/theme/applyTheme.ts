@@ -1,10 +1,11 @@
 /**
- * حقن رموز الثيم في عنصر الجذر.
+ * Injecting the theme tokens into the root element.
  *
- * ⚠️  الرموز تأتي **جاهزة** من الخادم (`--color-primary: #…`).
+ * ⚠️  The tokens arrive **ready-made** from the server (`--color-primary: #…`).
  *
- *     بناء أسماء الرموز في الواجهة يعني تكرارها في مستودعين، فتصير
- *     إضافة لون واحد تعديلين — وأحدهما يُنسى.
+ *     Building the token names in the frontend means duplicating them in two
+ *     repositories, so adding one colour becomes two edits — and one of them
+ *     gets forgotten.
  */
 
 import type { BrandTheme, ThemeMode } from './types';
@@ -22,12 +23,12 @@ export function applyTheme(theme: BrandTheme, mode: ThemeMode): void {
 
   root.dataset.theme = mode === 'DARK' ? 'dark' : 'light';
 
-  // ⚠️  يخبر المتصفح بلون واجهاته الأصلية (شريط التمرير · حقول
-  //     الإدخال). بدونه تبقى بيضاء داخل صفحة داكنة.
+  // ⚠️  Tells the browser the colour of its native controls (the scrollbar ·
+  //     input fields). Without it they stay white inside a dark page.
   root.style.colorScheme = mode === 'DARK' ? 'dark' : 'light';
 }
 
-/** يحدّث أيقونة التبويب حين يرفع الأدمن أيقونة جديدة. */
+/** Updates the tab icon when the admin uploads a new one. */
 export function applyFavicon(href: string): void {
   if (!href) return;
 

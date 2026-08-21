@@ -11,18 +11,19 @@ import { StaffHeader } from './components/StaffHeader';
 import './StaffShell.css';
 
 /**
- * قشرة بوابة الموظفين.
+ * The staff portal shell.
  *
- * ⚠️  **الملف شرط دخول لا خطوة داخل الشاشة.**
+ * ⚠️  **The profile is an entry condition, not a step inside the screen.**
  *
- *     كل نقطة على الخادم ترفض العمل بلا ملف موظف نشط. ترك
- *     الشاشات تُفتح ثم تفشل واحدة واحدة يعطي المستخدم أربع رسائل
- *     خطأ متفرّقة بدل جواب واحد.
+ *     Every endpoint on the server refuses to work without an active employee
+ *     profile. Letting the screens open and then fail one by one gives the user
+ *     four scattered error messages instead of one answer.
  *
- * ⚠️  و**الموظف الموقوف يُصدّ هنا** لا عند أول عملية.
+ * ⚠️  And **a suspended employee is turned away here**, not at their first operation.
  *
- *     موظف انتهت خدمته وتوكنه صالح هو أوضح ثغرة ممكنة؛ والخادم
- *     يردّ ٤٠٣ على كل نقطة، والقشرة تترجمها إلى رسالة مفهومة.
+ *     An employee whose service has ended while their token is still valid is
+ *     the clearest possible hole; the server returns 403 on every endpoint, and
+ *     the shell translates that into an intelligible message.
  */
 export function StaffShell() {
   const { t } = useTranslation();

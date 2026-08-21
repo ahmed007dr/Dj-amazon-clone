@@ -11,12 +11,13 @@ import { Spinner } from '@/shared/ui/Spinner';
 import './ShiftPage.css';
 
 /**
- * الوردية: حركات الصندوق وإغلاق اليوم.
+ * The shift: drawer movements and closing the day.
  *
- * ⚠️  **المتوقَّع لا يُعرض قبل العدّ — والخادم لا يرسله أصلًا.**
+ * ⚠️  **The expected figure is not shown before the count — and the server does not send it at all.**
  *
- *     عرضه للكاشير يجعله يعدّ حتى يطابقه، فتصير التسوية شكلية
- *     والفرق صفرًا دائمًا. الرقم يظهر **بعد** الإغلاق، ومعه الفرق.
+ *     Showing it to the cashier makes them count until it matches, so the
+ *     reconciliation becomes a formality and the discrepancy is always zero. The
+ *     figure appears **after** closing, together with the discrepancy.
  */
 export function ShiftPage() {
   const { t } = useTranslation();
@@ -36,10 +37,10 @@ export function ShiftPage() {
 
   if (session.isPending) return <Spinner />;
 
-  // ⚠️  التسوية تُقرأ من نتيجة الإغلاق لا من استعلام الوردية.
+  // ⚠️  The reconciliation is read from the closing result, not from the shift query.
   //
-  //     `/session/` تعيد `null` بعد الإغلاق مباشرةً، فلا مكان
-  //     آخر يحمل الفرق النقدي في تلك اللحظة.
+  //     `/session/` returns `null` immediately after closing, so there is no other
+  //     place carrying the cash discrepancy at that moment.
   const closed = close.data ?? null;
   const error = cash.error ?? close.error;
 
@@ -71,8 +72,8 @@ export function ShiftPage() {
             onChange={(event) => setAmount(event.target.value)}
           />
 
-          {/* ⚠️  السبب إلزامي: نقد يخرج من الدرج بلا سبب هو بالضبط
-              ما يجعل فرق الإغلاق غير قابل للتفسير آخر اليوم. */}
+          {/* ⚠️  The reason is mandatory: cash leaving the drawer with no reason is exactly
+              what makes the closing discrepancy unaccountable at the end of the day. */}
           <Field
             label={t('pos.reason')}
             value={reason}
@@ -126,9 +127,9 @@ export function ShiftPage() {
               </dd>
             </dl>
 
-            {/* ⚠️  الخروج بفعل مقصود بعد قراءة الفرق — لا تلقائيًا.
-                القفز الفوري إلى بوابة وردية جديدة كان يخفي الرقم
-                الذي أُغلقت الوردية من أجله. */}
+            {/* ⚠️  Leaving is a deliberate act after reading the discrepancy — not automatic.
+                Jumping straight to a new shift gate used to hide the very figure
+                the shift was closed for. */}
             <Button block onClick={close.finish}>
               {t('pos.doneShift')}
             </Button>
@@ -153,10 +154,10 @@ export function ShiftPage() {
               onChange={(event) => setNote(event.target.value)}
             />
 
-            {/* ⚠️  خطوة تأكيد قبل الإغلاق.
-                الإغلاق لا رجعة فيه: `expected_cash` يُثبَّت لقطةً
-                ولا يُعاد حسابه. ضغطة واحدة بالخطأ تنهي وردية
-                ما زالت تعمل — وتفتح فرقًا لا يُفسَّر. */}
+            {/* ⚠️  A confirmation step before closing.
+                Closing is irreversible: `expected_cash` is fixed as a snapshot
+                and never recomputed. One press by mistake ends a shift that is
+                still running — and opens a discrepancy that cannot be explained. */}
             {confirming ? (
               <div className="shift__confirm">
                 <Alert tone="warning">{t('pos.closeWarning')}</Alert>

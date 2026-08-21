@@ -15,12 +15,12 @@ const LINKS = [
 ];
 
 /**
- * هيدر بوابة الموظفين.
+ * The staff portal header.
  *
- * ⚠️  شاشتان فقط — فالتنقّل في الهيدر لا في شريط جانبي.
+ * ⚠️  Two screens only — so navigation lives in the header rather than a sidebar.
  *
- *     الشريط الجانبي يأكل عرضًا تحتاجه جداول العملاء والطلبات
- *     مقابل رابطين، والمندوب يعمل على لابتوب لا شاشة كبيرة.
+ *     A sidebar eats width that the customer and order tables need in exchange
+ *     for two links, and the rep works on a laptop rather than a large screen.
  */
 export function StaffHeader() {
   const { t } = useTranslation();

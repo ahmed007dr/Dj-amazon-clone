@@ -9,13 +9,14 @@ interface Props extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 /**
- * حقل إدخال بتسمية وخطأ مرتبطين.
+ * An input field with a label and an error bound to it.
  *
- * ⚠️  `useId` لا رقم عشوائي ولا اسم الحقل.
+ * ⚠️  `useId`, not a random number and not the field's name.
  *
- *     التسمية غير المرتبطة تجعل النقر عليها لا يركّز الحقل، وقارئ
- *     الشاشة يقرأ «حقل نصي» بلا اسم. و`aria-describedby` هو ما
- *     يجعله ينطق رسالة الخطأ بدل أن تبقى نصًّا أحمر لا يراه.
+ *     An unbound label means clicking it does not focus the field, and the
+ *     screen reader announces "text field" with no name. And `aria-describedby`
+ *     is what makes it speak the error message instead of leaving it as red text
+ *     they cannot see.
  */
 export function Field({ label, error, hint, id, ...rest }: Props) {
   const generated = useId();

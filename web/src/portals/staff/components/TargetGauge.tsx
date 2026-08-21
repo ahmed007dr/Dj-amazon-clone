@@ -5,19 +5,20 @@ import type { MyTarget } from '@/features/targets/api';
 import './TargetGauge.css';
 
 /**
- * مقياس تحقيق الهدف.
+ * The target achievement gauge.
  *
- * ⚠️  **الشريط يتجاوز ١٠٠٪ بصريًا ولا يتوقّف عندها.**
+ * ⚠️  **The bar goes visually past 100% and does not stop there.**
  *
- *     قصّه عند الامتلاء يجعل من حقّق ١٠٠٪ ومن حقّق ٢٠٠٪ سواءً على
- *     الشاشة — وهي أهم لحظة في شهر المندوب. الرقم يبقى صريحًا،
- *     والجزء الزائد يظهر بلون مختلف.
+ *     Clipping it at full makes someone who reached 100% and someone who reached
+ *     200% identical on screen — and that is the most important moment of a
+ *     rep's month. The number stays explicit, and the excess portion appears in
+ *     a different colour.
  *
- * ⚠️  و**الحد الأدنى معلَّم على الشريط**.
+ * ⚠️  And **the floor is marked on the bar**.
  *
- *     نسبة تحقيق دون الحد تعني عمولة صفر مهما بيع. علامة عليه
- *     تجعل المندوب يرى كم يفصله عن أول قرش — بدل أن يكتشفه آخر
- *     الشهر.
+ *     An achievement below the floor means zero commission no matter how much
+ *     was sold. A marker on it lets the rep see how far they are from their
+ *     first piastre — instead of discovering it at the end of the month.
  */
 export function TargetGauge({ data }: { data: MyTarget }) {
   const { t } = useTranslation();
@@ -25,7 +26,7 @@ export function TargetGauge({ data }: { data: MyTarget }) {
   const percent = Number(data.achievement_percent);
   const minimum = Number(data.target.minimum_achievement_percent);
 
-  // الجزء داخل المئة والجزء الزائد يُرسمان منفصلين
+  // The portion within 100% and the excess portion are drawn separately
   const within = Math.min(percent, 100);
   const beyond = Math.max(percent - 100, 0);
 
@@ -72,8 +73,8 @@ export function TargetGauge({ data }: { data: MyTarget }) {
         <dd dir="ltr">{data.target.target_value}</dd>
       </dl>
 
-      {/* ⚠️  التحذير يظهر **حين لا يُستحق شيء** — وهو ما يجب أن
-          يعرفه المندوب في منتصف الشهر لا في آخره. */}
+      {/* ⚠️  The warning appears **when nothing is due** — which is what the
+          rep needs to know mid-month, not at its end. */}
       {!data.meets_minimum && minimum > 0 ? (
         <p className="gauge__warning">
           {t('targets.belowMinimum', { minimum: data.target.minimum_achievement_percent })}

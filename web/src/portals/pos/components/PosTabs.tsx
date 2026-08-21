@@ -4,13 +4,13 @@ import { useTranslation } from 'react-i18next';
 import './PosTabs.css';
 
 /**
- * تنقّل نقطة البيع — شاشتان لا أكثر.
+ * Point-of-sale navigation — two screens, no more.
  *
- * ⚠️  **شريط جانبي هنا خطأ.**
+ * ⚠️  **A sidebar here is a mistake.**
  *
- *     الأدمن يتنقّل بين عشر شاشات فيستحق شريطًا؛ والكاشير يعيش في
- *     شاشة واحدة ويزور الثانية مرتين في اليوم. شريط جانبي يأكل
- *     ربع عرض التابلت من قائمة الأصناف مقابل رابطين.
+ *     The admin moves between ten screens and so deserves a bar; the cashier
+ *     lives in one screen and visits the second twice a day. A sidebar eats a
+ *     quarter of the tablet's width from the item list in exchange for two links.
  */
 export function PosTabs() {
   const { t } = useTranslation();

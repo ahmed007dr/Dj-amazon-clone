@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 
 /**
- * ⚠️  يمنع تمرير الصفحة خلف الـ Drawer والـ Modal.
+ * ⚠️  Prevents the page scrolling behind the drawer and the modal.
  *
- *     بدونه يتمرّر المحتوى تحت النافذة على الهاتف، فيغلقها المستخدم
- *     ليجد نفسه في مكان آخر من الصفحة بلا سبب مفهوم.
+ *     Without it the content scrolls beneath the overlay on a phone, so the user
+ *     closes it and finds themselves somewhere else on the page for no
+ *     comprehensible reason.
  */
 export function useLockBodyScroll(locked: boolean): void {
   useEffect(() => {

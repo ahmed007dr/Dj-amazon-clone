@@ -3,13 +3,14 @@ import type { ReactNode } from 'react';
 import './StateMessage.css';
 
 /**
- * الحالة الفارغة والخطأ.
+ * The empty and error states.
  *
- * ⚠️  «لا شاشة بيضاء» قاعدة لا تفضيلًا.
+ * ⚠️  "No blank screens" is a rule, not a preference.
  *
- *     الشاشة الفارغة بلا رسالة تجعل المستخدم لا يعرف: هل ينتظر؟
- *     هل أخطأ؟ هل تعطّل النظام؟ ثلاثة احتمالات وثلاثة تصرّفات
- *     مختلفة — والصمت لا يرجّح أيًّا منها.
+ *     An empty screen with no message leaves the user not knowing: should they
+ *     wait? did they get something wrong? has the system broken? Three
+ *     possibilities and three different courses of action — and silence favours
+ *     none of them.
  */
 export function StateMessage({
   icon,

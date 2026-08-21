@@ -1,4 +1,4 @@
-/** عقد `GET /api/v1/branding/theme/` — يطابق `branding.services.theme_payload`. */
+/** The `GET /api/v1/branding/theme/` contract — it matches `branding.services.theme_payload`. */
 
 export type ThemeMode = 'LIGHT' | 'DARK';
 export type DefaultMode = ThemeMode | 'SYSTEM';
@@ -15,9 +15,9 @@ export interface BrandTheme {
     og_image: string;
   };
   default_mode: DefaultMode;
-  /** رموز ثابتة عبر الوضعين: الخطوط والشكل. */
+  /** Tokens constant across both modes: the fonts and the shape. */
   tokens: Record<string, string>;
-  /** خريطة رموز لونية لكل وضع — جاهزة للحقن بلا معالجة. */
+  /** A map of colour tokens per mode — ready for injection with no processing. */
   palettes: Record<ThemeMode, Record<string, string>>;
   contact: {
     email: string;

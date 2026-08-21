@@ -15,8 +15,8 @@ export function LoginPage() {
   const { isAuthenticated, isRestoring } = useAuth();
   const { name } = useBrand();
 
-  // ⚠️  الانتظار قبل الحكم: عرض نموذج الدخول لمستخدم جلسته صالحة
-  //     ثم إخفاؤه بعد جزء من الثانية يبدو عطلًا.
+  // ⚠️  Wait before judging: showing the login form to a user whose session is valid
+  //     and then hiding it a fraction of a second later looks like a fault.
   if (isRestoring) return <Spinner />;
 
   const from = (location.state as { from?: string } | null)?.from;
@@ -29,7 +29,7 @@ export function LoginPage() {
         <h1 className="login-page__title">{t('auth.signInTo', { name })}</h1>
         <LoginForm
           onSuccess={() => {
-            // العودة إلى ما كان يحاول فتحه لا إلى الرئيسية
+            // Return to whatever they were trying to open rather than to the home page
             void navigate(from ?? '/', { replace: true });
           }}
         />

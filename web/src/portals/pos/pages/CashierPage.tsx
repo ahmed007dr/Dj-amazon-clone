@@ -16,19 +16,20 @@ import { SaleLines } from '../components/SaleLines';
 import './CashierPage.css';
 
 /**
- * شاشة الكاشير.
+ * The cashier screen.
  *
- * ⚠️  **ثلاثة أعمدة على التابلت، عمود على الهاتف.**
+ * ⚠️  **Three columns on a tablet, one column on a phone.**
  *
- *     الجهاز المقصود تابلت أفقي على الكاونتر: البحث والسلة
- *     والتحصيل مرئية معًا فلا يتنقّل الكاشير بين شاشات والعميل
- *     واقف. الهاتف حالة اضطرارية (جهاز عُطل) فيكفيه عمود.
+ *     The intended device is a landscape tablet at the counter: search, cart and
+ *     charging all visible together, so the cashier does not move between
+ *     screens while the customer stands there. The phone is an emergency case (a
+ *     device broke down) and a single column is enough for it.
  *
- * ⚠️  وبعد الإتمام تُستبدل الشاشة بالإيصال لا تُفرَّغ فقط.
+ * ⚠️  And after completion the screen is replaced by the receipt rather than merely cleared.
  *
- *     التفريغ الصامت يترك الكاشير يشكّ: هل تمّت البيعة؟ فيعيدها.
- *     الإيصال إقرار لا يحتمل التأويل — والانتقال منه إلى بيعة
- *     جديدة فعل مقصود.
+ *     Clearing silently leaves the cashier in doubt: did the sale go through? So
+ *     they repeat it. The receipt is a confirmation open to no interpretation —
+ *     and moving from it to a new sale is a deliberate act.
  */
 export function CashierPage() {
   const { t } = useTranslation();
@@ -60,8 +61,8 @@ export function CashierPage() {
     );
   };
 
-  // ⚠️  الإجمالي من الخادم أو صفر — لا حساب احتياطي في الواجهة.
-  //     رقم مُخمَّن يُعرض ثم يُصحَّح أسوأ من انتظار قصير.
+  // ⚠️  The total comes from the server or is zero — no fallback arithmetic in the frontend.
+  //     A guessed figure shown and then corrected is worse than a short wait.
   const total = quote.data?.total ?? '0.00';
 
   const error = quote.error ?? checkout.error;
@@ -103,8 +104,8 @@ export function CashierPage() {
 
         <PaymentPanel
           total={total}
-          // ⚠️  التعطيل حتى يصل التسعير: التحصيل بإجمالي قديم يعني
-          //     مبلغًا يرفضه الخادم لأنه لا يساوي الحساب الحالي.
+          // ⚠️  Disabled until the pricing arrives: charging on a stale total means
+          //     an amount the server refuses because it does not equal the current calculation.
           disabled={cart.lines.length === 0 || quote.isFetching || !quote.data}
           pending={checkout.isPending}
           onSubmit={submit}

@@ -1,6 +1,6 @@
-/* ⚠️  تابلت أفقي أولًا — الجهاز المقصود على الكاونتر.
-   البحث والسلة والتحصيل معًا فلا يتنقّل الكاشير بين شاشات
-   والعميل واقف. */
+/* ⚠️  Landscape tablet first — the intended device at the counter.
+   Search, cart and charging together, so the cashier does not move between
+   screens while the customer stands there. */
 .cashier {
   display: grid;
   grid-template-columns: 1fr 1fr minmax(16rem, 20rem);
@@ -43,7 +43,7 @@
   border-radius: var(--radius-sm);
 }
 
-/* تابلت رأسي: عمودان والتحصيل أسفلهما بعرض كامل */
+/* Portrait tablet: two columns with charging below them at full width */
 @media (max-width: 64rem) {
   .cashier {
     grid-template-columns: 1fr 1fr;
@@ -54,7 +54,7 @@
   }
 }
 
-/* الهاتف — حالة اضطرارية: عمود واحد */
+/* The phone — an emergency case: a single column */
 @media (max-width: 48rem) {
   .cashier {
     grid-template-columns: 1fr;

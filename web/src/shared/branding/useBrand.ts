@@ -1,8 +1,9 @@
 /**
- * بيانات الهوية النصية — للاستهلاك في الهيدر والفوتر وعنوان الصفحة.
+ * The textual identity data — for use in the header, the footer and the page title.
  *
- * ⚠️  الاسم والشعار والتواصل تُقرأ في مواضع كثيرة. تمريرها كخصائص
- *     من الجذر يعني سلسلة `props` تعبر خمس طبقات لتصل إلى الفوتر.
+ * ⚠️  The name, the wordmark and the contact details are read in many places.
+ *     Passing them as props from the root means a `props` chain crossing five
+ *     layers to reach the footer.
  */
 
 import { useLocalizedMap } from '@/shared/i18n/useLocalized';

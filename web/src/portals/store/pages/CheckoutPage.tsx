@@ -22,21 +22,23 @@ import { formatMoney } from '@/shared/utils/format';
 import './CheckoutPage.css';
 
 /**
- * ⚠️  قيمة داخلية لا تُرسَل إلى الخادم.
+ * ⚠️  An internal value never sent to the server.
  *
- *     مسار الآجل لا يقبل `payment_method` إطلاقًا — هذه علامة
- *     للواجهة وحدها تميّز «على الحساب» عن بوابات الدفع.
+ *     The credit path does not accept `payment_method` at all — this is a marker
+ *     for the frontend alone, distinguishing "on account" from the payment gateways.
  */
 const CREDIT_METHOD = '__credit__';
 
 /**
- * إتمام الشراء.
+ * Checkout.
  *
- * ⚠️  الإجماليات تُعاد من الخادم مع **المحافظة وطريقة الشحن**.
+ * ⚠️  The totals are returned from the server together with **the governorate
+ *     and the shipping method**.
  *
- *     اختيار العنوان يغيّر رسوم الشحن، فتُمرَّر المحافظة إلى نداء
- *     السلة ليعيد الخادم إجمالياتٍ صحيحة. حساب الشحن محليًا وجمعه
- *     على الإجمالي ينتج رقمًا يخالف الفاتورة.
+ *     Choosing the address changes the shipping charge, so the governorate is
+ *     passed to the cart call for the server to return correct totals. Computing
+ *     shipping locally and adding it to the total produces a figure that
+ *     contradicts the invoice.
  */
 export function CheckoutPage() {
   const { t, i18n } = useTranslation();
@@ -55,20 +57,20 @@ export function CheckoutPage() {
   });
   const checkout = useCheckout();
 
-  // ⚠️  الحساب الآجل يُقرأ بلا إفشال الصفحة لغير التجاري.
+  // ⚠️  The credit account is read without failing the page for non-business customers.
   //
-  //     `useMyAccount` يردّ ٤٠٣ لعميل التجزئة — وهي حالة عادية لا
-  //     خطأ. عرض «تعذّر التحميل» على صفحة إتمام سليمة يوقف بيعة.
+  //     `useMyAccount` returns 403 for a retail customer — a normal state, not an
+  //     error. Showing "could not load" on a healthy checkout page stops a sale.
   const tradeAccount = useMyAccount();
   const creditCheckout = useCreditCheckout();
 
   const credit = tradeAccount.data;
   const cart = cartQuery.data;
 
-  // ⚠️  تغيير المحافظة يُبطل طريقة الشحن المختارة.
+  // ⚠️  Changing the governorate invalidates the selected shipping method.
   //
-  //     «سريع» متاح في القاهرة وغير متاح في مطروح؛ إبقاء الاختيار
-  //     يرسل رمزًا يرفضه الخادم بعد أن ملأ العميل كل شيء.
+  //     "Express" is available in Cairo and unavailable in Matrouh; keeping the
+  //     selection sends a code the server refuses after the customer filled everything in.
   useEffect(() => {
     setShippingMethod(null);
   }, [governorate]);
@@ -93,11 +95,11 @@ export function CheckoutPage() {
     );
   }
 
-  // ⚠️  الآجل متاح فقط بحساب نشط وحدٍّ يكفي المبلغ.
+  // ⚠️  Credit is available only with an active account and a limit sufficient for the amount.
   //
-  //     عرضه لحساب معلَّق أو تجاوز حدَّه يعني اختيارًا يُرفض بعد
-  //     ملء النموذج كاملًا — والفحص هنا يقع على نفس الأرقام التي
-  //     يفحصها الخادم، وهو يبقى الحَكَم.
+  //     Offering it for a suspended account or one over its limit means a choice
+  //     refused after the whole form is filled in — and the check here runs on the
+  //     same figures the server checks, and the server remains the arbiter.
   const creditAvailable =
     credit !== undefined &&
     credit.credit_status === 'ACTIVE' &&
@@ -112,9 +114,9 @@ export function CheckoutPage() {
     setError(null);
 
     const onError = (cause: unknown) => {
-      // ⚠️  ٤٠٩ = تغيّرت الحقيقة بين عرض السلة والضغط (نفد
-      //     المخزون · أُوقف المنتج). الرسالة من الخادم محدّدة،
-      //     وإعادة جلب السلة تُظهر السطر المتأثر.
+      // ⚠️  409 = the truth changed between showing the cart and the press (stock
+      //     ran out · the product was discontinued). The server's message is
+      //     specific, and refetching the cart reveals the affected line.
       setError(isApiError(cause) ? cause.displayMessage : t('state.errorTitle'));
       void cartQuery.refetch();
     };
@@ -190,10 +192,10 @@ export function CheckoutPage() {
               onChange={setPaymentMethod}
             />
 
-            {/* ⚠️  الآجل خارج `PaymentPicker` عمدًا.
-                تلك القائمة تأتي من بوابات الدفع المفعّلة، والآجل
-                ليس بوابة: لا مال ينتقل الآن، والقيد يقع على حساب
-                العميل بمسار خادم مختلف تمامًا. */}
+            {/* ⚠️  Credit sits outside `PaymentPicker` deliberately.
+                That list comes from the enabled payment gateways, and credit is
+                not a gateway: no money moves now, and the entry lands on the
+                customer's account through an entirely different server path. */}
             {creditAvailable ? (
               <label className={`checkout__credit ${payingOnCredit ? 'is-selected' : ''}`}>
                 <input
@@ -213,7 +215,7 @@ export function CheckoutPage() {
                 </span>
               </label>
             ) : credit && credit.credit_status === 'ACTIVE' ? (
-              // الحساب تجاري لكن الحد لا يكفي — يُقال بدل الإخفاء
+              // The account is a business one but the limit is insufficient — said rather than hidden
               <p className="checkout__credit-note muted">
                 {t('checkout.creditInsufficient', {
                   amount: formatMoney(credit.available, i18n.language),

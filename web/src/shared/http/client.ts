@@ -1,12 +1,12 @@
 /**
- * العميل الموحّد — **كل** نداء يمرّ من هنا.
+ * The unified client — **every** call passes through here.
  *
- * ⚠️  لا `fetch` مباشر في أي feature. قاعدة ESLint ترفضه.
+ * ⚠️  No direct `fetch` in any feature. An ESLint rule refuses it.
  *
- *     السبب: التوكن واللغة ومعالجة الأخطاء وتجديد الجلسة كلها
- *     سلوك عابر للنطاقات. تكرارها في كل وحدة يعني أن إصلاح واحد
- *     منها يحتاج تعديل عشرين ملفًا — وأن ملفًا منسيًّا يبقى ينادي
- *     بلا توكن.
+ *     The reason: the token, the language, error handling and session refresh
+ *     are all cross-cutting behaviour. Duplicating them in every module means
+ *     fixing one of them requires editing twenty files — and that a forgotten
+ *     file keeps calling with no token.
  */
 
 import { BASE_URL } from './config';
@@ -20,11 +20,11 @@ interface RequestOptions {
   params?: Query;
   body?: unknown;
   signal?: AbortSignal;
-  /** يتجاوز تجديد الجلسة — لنداءات المصادقة نفسها. */
+  /** Bypasses session refresh — for the authentication calls themselves. */
   skipAuthRefresh?: boolean;
 }
 
-/** لغة الطلب — يضبطها `i18n` عند كل تبديل. */
+/** The request language — set by `i18n` on every switch. */
 let currentLocale = 'ar';
 
 export function setRequestLocale(locale: string): void {
@@ -35,8 +35,8 @@ function buildUrl(path: string, params?: Query): string {
   const url = new URL(`${BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`);
 
   for (const [key, value] of Object.entries(params ?? {})) {
-    // ⚠️  القيم الفارغة تُحذف لا تُرسل كسلسلة فارغة.
-    //     `?category=` تعني للخادم «فلتر بفئة فارغة» لا «بلا فلتر».
+    // ⚠️  Empty values are dropped rather than sent as an empty string.
+    //     `?category=` means "filter by an empty category" to the server, not "no filter".
     if (value !== undefined && value !== null && value !== '') {
       url.searchParams.set(key, String(value));
     }
@@ -53,7 +53,7 @@ async function parse(response: Response): Promise<unknown> {
   try {
     return JSON.parse(text);
   } catch {
-    // خادم أعاد HTML (صفحة خطأ من الوكيل مثلًا) — لا نُظهرها للمستخدم
+    // The server returned HTML (an error page from the proxy, say) — we do not show it to the user
     return { detail: text.slice(0, 200) };
   }
 }
@@ -65,8 +65,8 @@ async function request<T>(
 ): Promise<T> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
-    // ⚠️  اللغة في كل طلب: الخادم يترجم رسائل الأخطاء بها.
-    //     المحتوى نفسه يأتي باللغتين دائمًا (ADR-34) فلا يتأثر.
+    // ⚠️  The language on every request: the server translates error messages into it.
+    //     The content itself always comes in both languages (ADR-34) so it is unaffected.
     'Accept-Language': currentLocale,
   };
 
@@ -75,12 +75,12 @@ async function request<T>(
     headers.Authorization = `Bearer ${token}`;
   }
 
-  // ⚠️  ترويسة سلة الزائر تُرسَل **دائمًا**، حتى للمسجَّل.
+  // ⚠️  The guest cart header is **always** sent, even for a signed-in user.
   //
-  //     الخادم يتجاهلها حين يجد توكنًا؛ ووجودها هو ما يسمح بدمج
-  //     سلة الزائر مع سلة الحساب لحظة الدخول. إرسالها للزائر وحده
-  //     يعني أن السلة تُفقد عند تسجيل الدخول — وهي أسوأ لحظة
-  //     ممكنة لفقدها.
+  //     The server ignores it when it finds a token; and its presence is what allows
+  //     merging the guest cart with the account's cart at the moment of sign-in.
+  //     Sending it for guests alone means the cart is lost on sign-in — the worst
+  //     possible moment to lose it.
   headers['X-Cart-Session'] = getGuestCartSession();
 
   const isFormData = options.body instanceof FormData;
@@ -101,8 +101,8 @@ async function request<T>(
     });
   } catch (cause) {
     if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
-    // ⚠️  حالة ٠ = لا استجابة إطلاقًا. تمييزها عن ٥٠٠ يسمح للواجهة
-    //     بقول «لا اتصال» بدل «خطأ في الخادم» — وهما إجراءان مختلفان.
+    // ⚠️  Status 0 = no response at all. Distinguishing it from 500 lets the frontend
+    //     say "no connection" instead of "server error" — two different courses of action.
     throw new ApiError(0, { code: 'NETWORK_ERROR', detail: 'تعذّر الوصول إلى الخادم' });
   }
 

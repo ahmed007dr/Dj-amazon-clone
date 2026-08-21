@@ -59,8 +59,8 @@ export function CartPage() {
     <div className="container">
       <PageHeader title={t('nav.cart')} />
 
-      {/* ⚠️  المشاكل أولًا — من لا يستطيع الشراء يحتاج السبب في
-          أول ما يراه لا أسفل قائمة طويلة */}
+      {/* ⚠️  Problems first — whoever cannot buy needs the reason in the
+          first thing they see, not at the bottom of a long list */}
       <CartIssues issues={cart.issues} />
 
       <div className="cart-page">
@@ -74,9 +74,9 @@ export function CartPage() {
           </div>
         </section>
 
-        {/* ⚠️  الشحن غير معروف هنا: المحافظة تُختار في إتمام الشراء.
-            عرض صفر يوحي بأنه مجاني ثم يظهر مبلغ — وهو أشهر سبب
-            لهجر السلة. */}
+        {/* ⚠️  Shipping is not known here: the governorate is chosen at checkout.
+            Showing zero suggests it is free and then an amount appears — the
+            most common reason for cart abandonment. */}
         <CartSummary totals={cart.totals} shippingKnown={false}>
           <Button
             block

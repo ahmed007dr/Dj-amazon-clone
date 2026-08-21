@@ -16,7 +16,7 @@
 }
 
 .list-layout__content {
-  min-inline-size: 0; /* ⚠️  يمنع تجاوز عنصر شبكة لعرض الحاوية */
+  min-inline-size: 0; /* ⚠️  Stops a grid item exceeding the container's width */
 }
 
 .list-layout__footer {
@@ -25,7 +25,7 @@
   padding-block: var(--space-4);
 }
 
-/* الفلاتر شريط جانبي من الديسكتوب فقط */
+/* The filters are a sidebar on desktop only */
 @media (min-width: 992px) {
   .list-layout__body.has-filters {
     grid-template-columns: 15rem 1fr;

@@ -102,9 +102,9 @@ export function AdminSettingsPage() {
           {t('common.edit')}
         </Button>
 
-        {/* ⚠️  السياسة الافتراضية بلا زر حذف: حذفها يترك كل مورد
-            بلا سياسة صريحة بلا مرجع — والخادم يرفض، لكن إخفاء
-            الزر أوضح من رسالة رفض. */}
+        {/* ⚠️  The default policy has no delete button: deleting it leaves every
+            resource with no explicit policy and no reference — and the server
+            refuses, but hiding the button is clearer than a refusal message. */}
         {'is_default' in row && row.is_default ? null : (
           <Button
             size="sm"
@@ -138,8 +138,8 @@ export function AdminSettingsPage() {
             key: 'sellable',
             header: t('settings.sellable'),
             secondary: true,
-            // ⚠️  «يُباع منه» ليس تفصيلًا: الحجر غير قابل للبيع،
-            //     وموقع مُعلَّم بالخطأ يعرض تالفًا في المتجر.
+            // ⚠️  "Sellable from" is not a detail: quarantine is not sellable,
+            //     and a location flagged wrongly displays damaged goods in the store.
             render: (row) =>
               'is_sellable' in row && row.is_sellable ? t('common.yes') : t('common.no'),
           },
@@ -203,8 +203,8 @@ export function AdminSettingsPage() {
           { value: 'locations', label: t('settings.locations') },
           { value: 'expense-categories', label: t('settings.expenseCategories') },
           { value: 'policies', label: t('settings.policies') },
-          // ⚠️  المصفوفة بجوار السياسات لا في شاشة بعيدة: تُقرأ
-          //     بعد كل تعديل للتأكّد من أثره الفعلي.
+          // ⚠️  The matrix beside the policies rather than on a distant screen: it is read
+          //     after every edit to confirm its actual effect.
           { value: 'matrix', label: t('access.matrix') },
         ]}
         value={tab}

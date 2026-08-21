@@ -10,9 +10,9 @@
   font-size: 1rem;
 }
 
-/* ⚠️  `auto-fill` بحدّ أدنى لا عدد أعمدة ثابت: الشبكة تُعرض على
-   هاتف ٣٦٠ بكسل وعلى شاشة ١٩٢٠، وعمودان مفروضان يقصّان الأسماء
-   على الأول ويتركان فراغًا على الثاني. */
+/* ⚠️  `auto-fill` with a minimum rather than a fixed column count: the grid is
+   shown on a 360 px phone and on a 1920 screen, and two enforced columns crop
+   the names on the first and leave a gap on the second. */
 .brands-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
@@ -27,7 +27,7 @@
   flex-direction: column;
   gap: var(--space-2);
   align-items: center;
-  /* ⚠️  مساحة لمس كاملة: الشبكة تُلمس بالإبهام على الهاتف. */
+  /* ⚠️  A full touch area: the grid is touched with a thumb on a phone. */
   min-block-size: var(--touch-target);
   padding: var(--space-4) var(--space-3);
   color: var(--color-text);
@@ -50,8 +50,8 @@
   object-fit: contain;
 }
 
-/* ⚠️  الحرف الأول بدل المربع الفارغ: أغلب الماركات المحلية بلا
-   شعار مرفوع، وشبكة المربعات الرمادية تُقرأ «الصور لم تُحمَّل». */
+/* ⚠️  The first letter instead of an empty square: most local brands have no
+   uploaded logo, and a grid of grey squares reads as "the images did not load". */
 .brand-card__initial {
   display: grid;
   place-items: center;

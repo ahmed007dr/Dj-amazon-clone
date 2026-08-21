@@ -15,12 +15,12 @@ import { StoreNav } from './StoreNav';
 import './StoreHeader.css';
 
 /**
- * هيدر بوابة المتجر.
+ * The store portal header.
  *
- * ⚠️  خاص بالمتجر وحده. الأدمن ونقطة البيع لكلٍّ هيدره:
- *     أولوياتها مختلفة تمامًا (بحث منتجات هنا · اسم الوردية هناك)،
- *     وهيدر واحد بأعلام شرطية يتحوّل بعد ثلاث بوابات إلى ملف لا
- *     يفهمه أحد.
+ * ⚠️  Specific to the store alone. The admin panel and the point of sale each
+ *     have their own header: their priorities are entirely different (product
+ *     search here · the shift name there), and one header with conditional flags
+ *     turns after three portals into a file nobody understands.
  */
 export function StoreHeader() {
   const { t } = useTranslation();
@@ -68,8 +68,8 @@ export function StoreHeader() {
       {!isDesktop && (
         <Drawer open={menuOpen} onClose={closeMenu} title={t('common.menu')}>
           <StoreNav onNavigate={closeMenu} />
-          {/* ⚠️  مبدّل اللغة داخل القائمة على الهاتف لا في الهيدر —
-              الهيدر الضيّق يدفع اللوجو خارج الشاشة لولا ذلك */}
+          {/* ⚠️  The language switcher lives inside the menu on a phone rather than
+              in the header — a narrow header would otherwise push the logo off the screen */}
           <div className="store-header__drawer-tools">
             <LanguageSwitch />
           </div>

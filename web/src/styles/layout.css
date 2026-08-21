@@ -1,12 +1,12 @@
 /*
-  أدوات التخطيط.
+  Layout utilities.
 
-  ⚠️  Mobile-first: القاعدة الأساسية للهاتف، والتوسيع بـ
-      `min-width` فقط. القاعدة المكتوبة للديسكتوب ثم المضغوطة
-      للهاتف تنتج شاشة هاتف مليئة بتجاوزات، وهي الشاشة الأكثر
-      استخدامًا في متجر الطلاب.
+  ⚠️  Mobile-first: the base rule targets the phone, and widening happens with
+      `min-width` alone. A rule written for desktop and then squeezed for the
+      phone produces a phone screen full of overflows — and that is the most
+      used screen in a student store.
 
-  نقاط الكسر — موروثة، لا تُخترع غيرها:
+  The breakpoints — inherited; no others are invented:
       sm 576  ·  md 768  ·  lg 992  ·  xl 1200  ·  xxl 1400
 */
 
@@ -44,10 +44,10 @@
 }
 
 /*
-  ⚠️  شبكة تلقائية بـ `auto-fill` لا بنقاط كسر يدوية.
+  ⚠️  An automatic grid with `auto-fill` rather than manual breakpoints.
 
-      `minmax(min(100%, 15rem), 1fr)` يمنع تجاوز العنصر لعرض
-      الشاشة على ٣٦٠px — وهو الخطأ الذي يسبّب التمرير الأفقي.
+      `minmax(min(100%, 15rem), 1fr)` stops the item exceeding the screen's
+      width at 360px — the mistake that causes horizontal scrolling.
 */
 .grid-auto {
   display: grid;
@@ -59,14 +59,14 @@
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
 }
 
-/* حاوية التمرير الأفقي — الجداول والمخططات العريضة */
+/* The horizontal scroll container — wide tables and charts */
 .scroll-x {
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   -webkit-overflow-scrolling: touch;
 }
 
-/* شريط تبويبات يتمرّر أفقيًا على الهاتف ويمتد على الديسكتوب */
+/* A tab bar that scrolls horizontally on a phone and stretches on desktop */
 .tabs-scroll {
   display: flex;
   gap: var(--space-1);
@@ -107,7 +107,7 @@
   overflow: hidden;
 }
 
-/* يظهر على الديسكتوب فقط */
+/* Shown on desktop only */
 .desktop-only {
   display: none;
 }

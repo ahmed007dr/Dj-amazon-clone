@@ -1,14 +1,14 @@
 /**
- * إعداد الترجمة.
+ * Translation setup.
  *
- * ⚠️  التمييز الحاسم: **ترجمة الواجهة ≠ ترجمة المحتوى.**
+ * ⚠️  The decisive distinction: **interface translation ≠ content translation.**
  *
- *         الواجهة  →  ملفات JSON هنا     (أزرار · عناوين · رسائل)
- *         المحتوى  →  الخادم، باللغتين   (أسماء منتجات · أوصاف)
+ *         Interface  →  the JSON files here    (buttons · titles · messages)
+ *         Content    →  the server, in both    (product names · descriptions)
  *
- *     الخادم يرسل `name_ar` و`name_en` معًا دائمًا (ADR-34). ولهذا
- *     **تبديل اللغة لا يحتاج إعادة جلب أي شيء** — البيانات في
- *     الذاكرة أصلًا تحمل اللغتين، والواجهة تختار الحقل.
+ *     The server always sends `name_ar` and `name_en` together (ADR-34). Which
+ *     is why **switching language requires refetching nothing** — the data
+ *     already in memory carries both languages, and the frontend picks the field.
  */
 
 import i18n from 'i18next';
@@ -30,8 +30,8 @@ function initialLocale(): Locale {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored && (LOCALES as readonly string[]).includes(stored)) return stored as Locale;
 
-  // ⚠️  تفضيل المتصفح قبل الافتراضي: زائر بمتصفح إنجليزي يرى
-  //     إنجليزية من أول ثانية بلا نقرة.
+  // ⚠️  The browser's preference before the default: a visitor with an English
+  //     browser sees English from the first second with no click.
   const browser = navigator.language.slice(0, 2);
   if ((LOCALES as readonly string[]).includes(browser)) return browser as Locale;
 
@@ -53,7 +53,7 @@ setRequestLocale(i18n.language);
 
 i18n.on('languageChanged', (locale) => {
   localStorage.setItem(STORAGE_KEY, locale);
-  // رسائل أخطاء الخادم تُترجَم بهذه الترويسة
+  // The server's error messages are translated using this header
   setRequestLocale(locale);
 });
 

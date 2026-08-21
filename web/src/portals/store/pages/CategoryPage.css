@@ -18,9 +18,9 @@
   color: var(--color-text-muted);
 }
 
-/* ⚠️  شريط يتمرّر أفقيًا لا شبكة تلتفّ: فئات الأدوية قد تبلغ
-   العشرين، والالتفاف يدفع المنتجات خارج الشاشة الأولى فتبدو
-   الصفحة بلا بضاعة. */
+/* ⚠️  A horizontally scrolling strip rather than a wrapping grid: medicine
+   categories may reach twenty, and wrapping pushes the products off the first
+   screen so the page looks as though it has no merchandise. */
 .category-children {
   display: flex;
   gap: var(--space-2);

@@ -12,15 +12,15 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import './AuthPage.css';
 
 /**
- * تعيين كلمة مرور جديدة.
+ * Setting a new password.
  *
- * ⚠️  المسار `/auth/reset-password` يطابق ما يرسله الخادم في البريد
- *     حرفيًا — تغييره يكسر كل رابط أُرسل فعلًا.
+ * ⚠️  The path `/auth/reset-password` matches literally what the server sends in
+ *     the email — changing it breaks every link that has actually been sent.
  *
- * ⚠️  والتأكيد بحقلين لا بحقل واحد.
+ * ⚠️  And the confirmation uses two fields rather than one.
  *
- *     خطأ مطبعي في كلمة مرور لا تُرى يقفل الحساب على صاحبه، ويحتاج
- *     دورة استرجاع كاملة ثانية.
+ *     A typo in a password that cannot be seen locks the account against its
+ *     owner, and needs a whole second recovery cycle.
  */
 export function ResetPasswordPage() {
   const { t } = useTranslation();
@@ -76,8 +76,8 @@ export function ResetPasswordPage() {
             ✓
           </p>
           <h1 className="auth-page__title">{t('auth.passwordChanged')}</h1>
-          {/* ⚠️  لا تسجيل دخول تلقائي: تغيير كلمة المرور يُبطل كل
-              الجلسات، والدخول اليدوي يؤكد أن الجديدة تعمل فعلًا */}
+          {/* ⚠️  No automatic sign-in: changing the password invalidates every
+              session, and signing in by hand confirms the new one really works */}
           <Button block onClick={() => void navigate('/login')}>
             {t('auth.signIn')}
           </Button>

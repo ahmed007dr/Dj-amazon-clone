@@ -5,17 +5,18 @@ import { useTheme } from '@/shared/theme';
 import './BrandLogo.css';
 
 /**
- * اللوجو الأساس — يقرأ الهوية من الخادم.
+ * The base logo — it reads the identity from the server.
  *
- * ⚠️  لوجو لكل وضع لا لوجو واحد.
+ * ⚠️  A logo per mode rather than a single logo.
  *
- *     لوجو بخلفية شفافة ونص داكن يختفي تمامًا على الوضع الداكن —
- *     ولا أحد يلاحظ لأن الشاشة تبدو سليمة، فقط بلا علامة.
+ *     A logo with a transparent background and dark text disappears entirely in
+ *     dark mode — and nobody notices, because the screen looks fine, just with
+ *     no mark on it.
  *
- * ⚠️  هذا المكوّن **لا يُستدعى مباشرة في الصفحات**. كل بوابة تلفّه
- *     بنسختها (`portals/<portal>/components/Logo.tsx`) لأن حجمه
- *     ووجهته وشكله تختلف: المتجر يعود للرئيسية، ونقطة البيع لا
- *     تغادر الشاشة أصلًا.
+ * ⚠️  This component is **not called directly in pages**. Every portal wraps it
+ *     in its own version (`portals/<portal>/components/Logo.tsx`) because its
+ *     size, its destination and its shape differ: the store returns to the home
+ *     page, and the point of sale does not leave the screen at all.
  */
 export function BrandLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   const { theme, mode } = useTheme();
@@ -30,10 +31,10 @@ export function BrandLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
     return <img className={`brand-logo brand-logo--${size}`} src={href} alt={name} />;
   }
 
-  // ⚠️  بديل نصي لا مربّع فارغ.
+  // ⚠️  A text fallback rather than an empty square.
   //
-  //     الهوية قبل أن يرفع الأدمن لوجو — وهي الحالة الافتراضية في
-  //     أول يوم تشغيل. المربّع الفارغ يبدو عطلًا.
+  //     The identity before the admin uploads a logo — the default state on the
+  //     first day of operation. An empty square looks like a fault.
   return (
     <span className={`brand-logo brand-logo--text brand-logo--${size}`} aria-label={name}>
       {name}

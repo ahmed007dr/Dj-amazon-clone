@@ -11,19 +11,20 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import './ProductSearch.css';
 
 /**
- * بحث الأصناف على الكاونتر.
+ * Item search at the counter.
  *
- * ⚠️  **`Enter` يضيف النتيجة الأولى ويفرّغ الحقل.**
+ * ⚠️  **`Enter` adds the first result and clears the field.**
  *
- *     الماسح الضوئي يعمل كلوحة مفاتيح: يكتب الباركود ثم يرسل
- *     `Enter`. بلا هذا السلوك يمسح الكاشير الصنف فيظهر في القائمة
- *     ولا يُضاف — فيمدّ يده إلى الشاشة عند كل صنف، وهو ما تلغيه
- *     نقطة البيع أصلًا.
+ *     The scanner works as a keyboard: it types the barcode then sends `Enter`.
+ *     Without this behaviour the cashier scans the item, it appears in the list
+ *     and is not added — so they reach for the screen on every item, which is
+ *     the very thing a point of sale exists to eliminate.
  *
- * ⚠️  والتركيز يعود إلى الحقل بعد كل إضافة.
+ * ⚠️  And focus returns to the field after every addition.
  *
- *     ضياعه يجعل المسحة التالية تذهب إلى العدم بلا أي مؤشّر —
- *     أسوأ من خطأ ظاهر لأن الكاشير يمسح ثلاث مرات قبل أن ينتبه.
+ *     Losing it sends the next scan into the void with no indication at all —
+ *     worse than a visible error, because the cashier scans three times before
+ *     noticing.
  */
 export function ProductSearch({ onPick }: { onPick: (product: POSProduct) => void }) {
   const { t } = useTranslation();
@@ -51,8 +52,8 @@ export function ProductSearch({ onPick }: { onPick: (product: POSProduct) => voi
         value={term}
         placeholder={t('pos.searchPlaceholder')}
         aria-label={t('pos.searchPlaceholder')}
-        // ⚠️  التركيز التلقائي عند فتح الشاشة: أول ما يفعله الكاشير
-        //     هو المسح، ومطالبته بنقرة قبله تكلّف ثانية في كل بيعة.
+        // ⚠️  Autofocus when the screen opens: the first thing the cashier does
+        //     is scan, and asking for a click first costs a second on every sale.
         autoFocus
         onChange={(event) => setTerm(event.target.value)}
         onKeyDown={(event) => {

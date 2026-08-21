@@ -46,13 +46,13 @@ const COMMISSION_TONE: Record<string, 'info' | 'success' | 'danger' | 'neutral'>
 };
 
 /**
- * الأهداف والعمولات.
+ * Targets and commissions.
  *
- * ⚠️  **الشهر يُختار مرة ويحكم التبويبين.**
+ * ⚠️  **The month is chosen once and governs both tabs.**
  *
- *     الهدف والعمولة وجهان لنفس الشهر؛ اختيار فترة مستقلة لكل
- *     تبويب يجعل الأدمن يقرأ عمولة يوليو بجوار هدف أغسطس ولا
- *     يلاحظ.
+ *     The target and the commission are two faces of the same month; choosing
+ *     an independent period per tab makes the admin read July's commission
+ *     beside August's target without noticing.
  */
 export function AdminTargetsPage() {
   const { t } = useTranslation();
@@ -121,8 +121,8 @@ export function AdminTargetsPage() {
       key: 'achieved',
       header: t('targets.achieved'),
       align: 'end',
-      // ⚠️  المُحقَّق يظهر **للمقفل وحده**: قبل الإقفال هو رقم حيّ
-      //     يتغيّر، وعرضه في جدول ثابت يجعله يبدو نهائيًا.
+      // ⚠️  The achievement appears **for closed ones alone**: before closing it is a
+      //     live figure that changes, and showing it in a static table makes it look final.
       render: (row) =>
         row.achievement_percent !== null ? (
           <span dir="ltr">{row.achievement_percent}%</span>
@@ -224,16 +224,16 @@ export function AdminTargetsPage() {
       align: 'end',
       render: (row) => (
         <div className="target-actions">
-          {/* ⚠️  «لماذا؟» أول الصف: «لماذا عمولتي ٤٢٠ لا ٦٠٠؟»
-              يُسأل قبل الاعتماد لا بعده، والاعتماد بلا تفسير هو
-              كيف يُصرَف رقم خاطئ. */}
+          {/* ⚠️  "Why?" first in the row: "why is my commission 420 and not 600?"
+              is asked before approval, not after — and approving with no
+              explanation is how a wrong figure gets paid. */}
           <Button size="sm" variant="ghost" onClick={() => setExplaining(row)}>
             {t('targets.why')}
           </Button>
 
-          {/* ⚠️  «صرف» لا تظهر إلا بعد الاعتماد: القفز فوقه يتجاوز
-              المراجعة — وهي الخطوة الوحيدة التي تمسك خطأ الحساب
-              قبل خروج المال. */}
+          {/* ⚠️  "Pay" appears only after approval: skipping it bypasses the
+              review — the one step that catches a calculation error before
+              the money leaves. */}
           {row.status === 'CALCULATED' ? (
             <Button
               size="sm"
@@ -321,8 +321,8 @@ export function AdminTargetsPage() {
         </Button>
       </div>
 
-      {/* ⚠️  المتخطَّون يُعرَضون بأسمائهم وأسبابهم — لا «تمّ» فقط.
-          موظف بلا خطة عمولة يبقى بلا عمولة بصمت لو اكتُفي بعدد. */}
+      {/* ⚠️  Those skipped are shown by name with their reasons — not merely "done".
+          An employee with no commission scheme stays without one silently if only a count is given. */}
       {calculate.data && calculate.data.skipped.length > 0 ? (
         <Alert tone="warning">
           {t('targets.skipped')}

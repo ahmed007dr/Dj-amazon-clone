@@ -54,8 +54,9 @@
   }
 }
 
-/* ⚠️  الآجل يبدو خيارًا من نفس العائلة بصريًا رغم أنه مسار خادم
-       مختلف — العميل يرى «كيف أدفع؟» لا معمارية الخادم. */
+/* ⚠️  Credit looks visually like an option from the same family even though it
+       is a different server path — the customer sees "how do I pay?" not the
+       server's architecture. */
 .checkout__credit {
   display: flex;
   gap: var(--space-3);

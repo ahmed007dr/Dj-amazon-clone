@@ -6,12 +6,12 @@ import { useBrand } from '@/shared/branding/useBrand';
 import './StoreLogo.css';
 
 /**
- * لوجو المتجر.
+ * The store logo.
  *
- * ⚠️  خاص بهذه البوابة: يعود إلى الرئيسية ويعرض الشعار النصي بجانبه
- *     على الشاشات الواسعة. لوجو الأدمن لا يفعل هذا، ولوجو نقطة
- *     البيع لا يرتبط بأي وجهة أصلًا — ولذلك ثلاثة ملفات لا ملف
- *     واحد بثلاثة شروط.
+ * ⚠️  Specific to this portal: it returns to the home page and shows the wordmark
+ *     beside it on wide screens. The admin logo does not do this, and the
+ *     point-of-sale logo links to no destination at all — hence three files
+ *     rather than one file with three conditions.
  */
 export function StoreLogo() {
   const { name, tagline } = useBrand();

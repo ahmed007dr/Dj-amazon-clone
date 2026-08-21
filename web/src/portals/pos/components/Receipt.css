@@ -71,9 +71,9 @@
   flex: 1;
 }
 
-/* ⚠️  الطباعة تُخرج الورقة وحدها.
-   بلا هذا يطبع المتصفح الهيدر والقائمة والأزرار على ورق حراري
-   عرضه ٨ سنتيمترات — فيخرج إيصال مقصوص لا يُقرأ. */
+/* ⚠️  Printing outputs the receipt alone.
+   Without this the browser prints the header, the menu and the buttons onto
+   8 cm thermal paper — producing a cropped receipt that cannot be read. */
 @media print {
   body * {
     visibility: hidden;

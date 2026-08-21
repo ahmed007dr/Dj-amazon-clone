@@ -52,8 +52,8 @@
   transition: inline-size var(--transition);
 }
 
-/* ⚠️  الزائد فوق المئة بلون مختلف: من حقّق ٢٠٠٪ يجب ألا يبدو
-   كمن حقّق ١٠٠٪ بالضبط — وهي أهم لحظة في شهره. */
+/* ⚠️  The excess above 100% in a different colour: someone who reached 200% must not look
+   like someone who reached exactly 100% — and it is the most important moment of their month. */
 .gauge__overflow {
   display: block;
   block-size: 100%;
@@ -69,7 +69,7 @@
   background: var(--color-warning);
 }
 
-/* علامة الحد الأدنى — الخط الذي دونه لا عمولة */
+/* The floor marker — the line below which there is no commission */
 .gauge__minimum {
   position: absolute;
   inset-block: 0;

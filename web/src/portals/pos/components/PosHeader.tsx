@@ -10,19 +10,21 @@ import { PosTabs } from './PosTabs';
 import './PosHeader.css';
 
 /**
- * هيدر نقطة البيع.
+ * The point-of-sale header.
  *
- * ⚠️  **رقم الوردية والكاشير ظاهران دائمًا.**
+ * ⚠️  **The shift number and the cashier are always visible.**
  *
- *     الجهاز يبقى مفتوحًا طوال النهار وتتناوب عليه ورديتان أو
- *     ثلاث. كاشير يبيع على وردية زميل انصرف ولم يُغلق هو أشهر
- *     سبب لفرق نقدي لا يُفسَّر — وظهور الاسم يجعله خطأً يُلاحَظ
- *     في الثانية الأولى لا عند التسوية.
+ *     The device stays open all day and two or three shifts take turns on it. A
+ *     cashier selling on the shift of a colleague who left without closing is
+ *     the most common cause of an unexplained cash discrepancy — and showing the
+ *     name makes it a mistake noticed in the first second rather than at
+ *     reconciliation.
  *
- * ⚠️  وبلا جرس إشعارات ولا مبدّل سِمة.
+ * ⚠️  And no notification bell and no theme switcher.
  *
- *     تنبيهات المخزون شأن الأدمن؛ ومقاطعة الكاشير بينما يعدّ نقدًا
- *     تُخطئ العدّ. والسِمة تُضبط مرة عند تركيب الجهاز لا في كل بيعة.
+ *     Stock alerts are the admin's business; and interrupting the cashier while
+ *     they count cash makes them miscount. The theme is set once when the device
+ *     is installed, not on every sale.
  */
 export function PosHeader({ session }: { session: Session | null }) {
   const { t } = useTranslation();
@@ -31,9 +33,9 @@ export function PosHeader({ session }: { session: Session | null }) {
     <header className="pos-header">
       <PosLogo />
 
-      {/* ⚠️  التبويبات تظهر مع الوردية فقط: بلا وردية لا شيء
-          يُفعل في أيّ منهما، ورابط يقود إلى شاشة معطّلة أسوأ من
-          غيابه. */}
+      {/* ⚠️  The tabs appear only with a shift: with no shift nothing
+          can be done in either of them, and a link leading to a
+          disabled screen is worse than its absence. */}
       {session ? <PosTabs /> : null}
 
       {session ? (

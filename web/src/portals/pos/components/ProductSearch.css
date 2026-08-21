@@ -5,8 +5,8 @@
   min-block-size: 0;
 }
 
-/* ⚠️  حقل كبير عمدًا: يُستخدم بإصبع على تابلت، ويستقبل مسحات
-   الباركود طوال اليوم. الحقل القياسي يُخطئه الإصبع. */
+/* ⚠️  A deliberately large field: it is used with a finger on a tablet, and it
+   receives barcode scans all day. A standard-sized field is missed by the finger. */
 .pos-search__input {
   min-block-size: 3.25rem;
   padding-inline: var(--space-4);

@@ -20,7 +20,7 @@
   background: var(--color-primary);
 }
 
-/* على الهاتف تكبر أهداف اللمس */
+/* Touch targets grow on a phone */
 @media (pointer: coarse) {
   .lang-switch__option {
     min-block-size: var(--touch-target);

@@ -1,27 +1,28 @@
 /**
- * حالة الجلسة على مستوى النقل.
+ * Session state at the transport level.
  *
- * ⚠️  هنا **التوكن فقط** — لا بيانات مستخدم ولا صلاحيات.
+ * ⚠️  **The token only** here — no user data and no permissions.
  *
- *     وضع المستخدم هنا يجعل طبقة النقل تعرف نموذج الحساب، فتصير
- *     أي إضافة حقل تعديلًا في مكانين. الحساب يسكن `features/auth`.
+ *     Putting the user here makes the transport layer know the account model, so
+ *     adding any field becomes an edit in two places. The account lives in
+ *     `features/auth`.
  *
- * ⚠️  **توكن الوصول في الذاكرة وحدها** — لا يُكتب في أي تخزين.
+ * ⚠️  **The access token is in memory alone** — it is written to no storage.
  *
- *     عمره عشر دقائق، وبقاؤه في الذاكرة يعني أن إغلاق التبويب
- *     يمحوه فورًا.
+ *     Its lifetime is ten minutes, and keeping it in memory means closing the
+ *     tab erases it immediately.
  *
- * ⚠️  توكن التحديث في `localStorage` — وهذه **مقايضة معروفة**،
- *     لا سهو. انظر `features/auth/storage.ts` لسببها الكامل
- *     ولمسار إزالتها.
+ * ⚠️  The refresh token is in `localStorage` — and this is **a known trade-off**,
+ *     not an oversight. See `features/auth/storage.ts` for the full reasoning
+ *     and for the path to removing it.
  */
 
 let accessToken: string | null = null;
 
-/** يُحقن من `features/auth` — تجديد الجلسة منطق مصادقة لا نقل. */
+/** Injected from `features/auth` — session refresh is authentication logic, not transport. */
 let refreshHandler: (() => Promise<boolean>) | null = null;
 
-/** يمنع عشرة نداءات متزامنة من إطلاق عشر محاولات تجديد. */
+/** Stops ten concurrent calls firing ten refresh attempts. */
 let refreshInFlight: Promise<boolean> | null = null;
 
 export function getAccessToken(): string | null {
@@ -39,11 +40,11 @@ export function registerRefreshHandler(handler: () => Promise<boolean>): void {
 export async function onUnauthorized(): Promise<boolean> {
   if (!refreshHandler) return false;
 
-  // ⚠️  محاولة واحدة مشتركة.
+  // ⚠️  A single shared attempt.
   //
-  //     صفحة لوحة تُطلق ست نداءات؛ انتهاء التوكن يجعلها ستّ محاولات
-  //     تجديد متوازية — خمس منها تفشل بتوكن تحديث مستهلك، فتُنهي
-  //     جلسة صالحة.
+  //     A dashboard page fires six calls; an expired token turns that into six
+  //     parallel refresh attempts — five of which fail on a consumed refresh
+  //     token, ending a valid session.
   refreshInFlight ??= refreshHandler().finally(() => {
     refreshInFlight = null;
   });

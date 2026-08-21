@@ -13,7 +13,7 @@
 .data-table th,
 .data-table td {
   padding: var(--space-3) var(--space-4);
-  /* منطقي — يحاذي لليمين في العربية ولليسار في الإنجليزية */
+  /* Logical — aligns right in Arabic and left in English */
   text-align: start;
   white-space: nowrap;
 }
@@ -46,7 +46,7 @@
   background: color-mix(in srgb, var(--color-primary) 6%, transparent);
 }
 
-/* ── بطاقات الهاتف ─────────────────────────────────────── */
+/* ── Phone cards ───────────────────────────────────────── */
 
 .data-cards {
   display: grid;

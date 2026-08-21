@@ -10,15 +10,16 @@ import { Field } from '@/shared/ui/Field';
 import './AuthPage.css';
 
 /**
- * طلب استرجاع كلمة المرور.
+ * Requesting a password reset.
  *
- * ⚠️  **نفس الرسالة سواء وُجد البريد أو لم يوجد.**
+ * ⚠️  **The same message whether the email exists or not.**
  *
- *     التفريق يحوّل الشاشة إلى أداة تعداد حسابات: يجرّب المهاجم
- *     بريدًا ويعرف من الرد وحده إن كان مسجَّلًا. الخادم يوحّد الرد،
- *     والواجهة لا تُعيد بناء الفرق من رمز الخطأ.
+ *     Distinguishing them turns the screen into an account-enumeration tool: an
+ *     attacker tries an address and learns from the response alone whether it is
+ *     registered. The server unifies the response, and the frontend does not
+ *     reconstruct the difference from the error code.
  *
- *     ولذلك النجاح والفشل يعرضان نفس الشاشة هنا عمدًا.
+ *     Which is why success and failure show the same screen here, deliberately.
  */
 export function ForgotPasswordPage() {
   const { t } = useTranslation();
@@ -32,7 +33,7 @@ export function ForgotPasswordPage() {
 
     void requestPasswordReset(email)
       .catch(() => {
-        // متعمَّد: لا نكشف إن كان البريد مسجَّلًا
+        // Deliberate: we do not reveal whether the email is registered
       })
       .finally(() => {
         setPending(false);

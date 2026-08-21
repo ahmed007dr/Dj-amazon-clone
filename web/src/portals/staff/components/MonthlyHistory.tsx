@@ -6,12 +6,12 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import './MonthlyHistory.css';
 
 /**
- * أداء الأشهر السابقة.
+ * Performance over previous months.
  *
- * ⚠️  **الصافي عمود مستقل لا فرق يُحسب بالنظر.**
+ * ⚠️  **Net is its own column, not a difference worked out by eye.**
  *
- *     المندوب يقارن شهره بما قبله؛ وإجباره على طرح المرتجعات من
- *     الإجمالي في رأسه يجعله يقارن الأرقام الخطأ.
+ *     The rep compares this month with the one before; and forcing them to
+ *     subtract returns from the total in their head makes them compare the wrong numbers.
  */
 export function MonthlyHistory({ rows }: { rows: MonthRow[] }) {
   const { t } = useTranslation();

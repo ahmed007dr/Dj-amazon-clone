@@ -7,14 +7,15 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import './SaleLines.css';
 
 /**
- * أسطر البيعة الجارية.
+ * The lines of the sale in progress.
  *
- * ⚠️  **بلا مبالغ لكل سطر.**
+ * ⚠️  **No amounts per line.**
  *
- *     السعر يحسبه الخادم (شرائح · خصومات · ضريبة قد تكون غائبة).
- *     عرض `base_price × الكمية` هنا يعطي رقمًا يخالف الإجمالي
- *     الحقيقي أسفل الشاشة — والكاشير يقرأ الاثنين ويصدّق الأقرب
- *     إلى عينه. الإجمالي وحده يأتي من `/quote/`.
+ *     The price is computed by the server (tiers · discounts · a tax that may be
+ *     absent). Showing `base_price × quantity` here gives a figure that
+ *     contradicts the real total at the bottom of the screen — and the cashier
+ *     reads both and believes whichever is nearer their eye. The total alone
+ *     comes from `/quote/`.
  */
 export function SaleLines({
   lines,
@@ -48,8 +49,8 @@ export function SaleLines({
             >
               −
             </button>
-            {/* ⚠️  حقل لا نص: الكاشير يكتب «١٢» مباشرةً بدل اثنتي
-                عشرة ضغطة — والصنف الذي يُباع بالعشرات وارد يوميًا. */}
+            {/* ⚠️  A field, not text: the cashier types "12" directly instead of
+                twelve presses — and an item sold by the dozen comes up daily. */}
             <input
               type="number"
               inputMode="numeric"

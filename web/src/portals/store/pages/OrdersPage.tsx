@@ -48,7 +48,7 @@ export function OrdersPage() {
         <ul className="orders-list">
           {orders.map((order) => (
             <li key={order.id}>
-              {/* ⚠️  الرابط بالمعرّف UUID والرقم للعرض فقط (ADR-25) */}
+              {/* ⚠️  The link uses the UUID and the number is for display only (ADR-25) */}
               <Link to={`/orders/${order.id}`} className="order-row surface">
                 <span className="order-row__number">{order.number}</span>
 

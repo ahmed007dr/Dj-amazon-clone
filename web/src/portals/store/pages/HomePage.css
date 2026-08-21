@@ -13,8 +13,8 @@
 }
 
 .hero__title {
-  /* ⚠️  `clamp` بدل نقاط كسر للخط — يتدرّج بسلاسة بين ٣٦٠px
-       و١٩٢٠px بلا قفزات عند حدود بعينها. */
+  /* ⚠️  `clamp` instead of type breakpoints — it scales smoothly between 360px
+       and 1920px with no jumps at particular boundaries. */
   font-size: clamp(1.5rem, 4vw, 2.5rem);
 }
 

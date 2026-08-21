@@ -20,11 +20,12 @@ export function RegisterPage() {
 
   if (registered) {
     /**
-     * ⚠️  شاشة «تفقّد بريدك» لا توجيه صامت إلى المتجر.
+     * ⚠️  A "check your email" screen rather than a silent redirect to the store.
      *
-     *     الحساب لا يعمل قبل التفعيل؛ توجيهه إلى المتجر يجعله يجرّب
-     *     الدخول ويفشل بلا أن يعرف السبب. وزر إعادة الإرسال هنا
-     *     لأن أول رسالة تسقط في المهملات كثيرًا.
+     *     The account does not work before activation; redirecting them to the
+     *     store makes them try to sign in and fail without knowing why. And the
+     *     resend button is here because the first message lands in the spam
+     *     folder often.
      */
     return (
       <div className="container auth-page">

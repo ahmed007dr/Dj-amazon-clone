@@ -34,12 +34,13 @@ export function ProductDetailPage() {
 
   if (error || !product) {
     /**
-     * ⚠️  `404` قد يعني «غير موجود» أو «ليس لك».
+     * ⚠️  `404` may mean "does not exist" or "not yours".
      *
-     *     الخادم لا يفرّق عمدًا لمنع تعداد المنتجات المقيّدة —
-     *     ومنتج مخفي بسياسة وصول يعطي نفس الرد تمامًا. الواجهة
-     *     لا تخمّن أيهما، لكنها تقترح تسجيل الدخول لأنه المسار
-     *     الوحيد الذي قد يفتحه.
+     *     The server does not distinguish them deliberately, to prevent
+     *     enumeration of restricted products — and a product hidden by an
+     *     access policy gives exactly the same response. The frontend does not
+     *     guess which, but it suggests signing in because that is the only
+     *     path that might open it.
      */
     const restricted = isApiError(error) && error.isNotFound;
 
@@ -65,8 +66,8 @@ export function ProductDetailPage() {
   const stock = availability.data?.[product.id];
   const variants = product.variants;
 
-  // ⚠️  فرق سعر النسخة يُضاف إلى السعر المرجعي — والخادم هو من
-  //     يحسم السعر النهائي عند الإضافة للسلة. هذا للعرض فقط.
+  // ⚠️  The variant's price difference is added to the reference price — and the server
+  //     is what settles the final price when it is added to the cart. This is for display only.
   const selected = variants.find((variant) => variant.id === variantId);
   const displayPrice = selected
     ? (Number.parseFloat(product.base_price) + Number.parseFloat(selected.price_adjustment)).toFixed(
@@ -115,9 +116,10 @@ export function ProductDetailPage() {
 
           <StockBadge availability={stock} />
 
-          {/* ⚠️  الوصفة الطبية خارج نطاق العمل الحالي، والحقل موجود
-              لتجنّب هجرة لاحقة. عرضه حين يكون صحيحًا يمنع بيع صنف
-              يتطلب وصفة عبر مسار لا يفحصها. */}
+          {/* ⚠️  Prescriptions are outside the current scope of work, and the field
+              exists to avoid a later migration. Showing it when it is true
+              prevents selling an item that requires a prescription through a
+              path that does not check for one. */}
           {product.requires_prescription ? (
             <Alert tone="warning">{t('catalog.prescriptionRequired')}</Alert>
           ) : null}
@@ -160,8 +162,9 @@ export function ProductDetailPage() {
           {t('catalog.reviews')}
           {product.rating.count > 0 ? ` (${product.rating.count})` : ''}
         </h2>
-        {/* ⚠️  المعرّف مطلوب للكتابة: الخادم يربط التقييم بالمنتج
-            بمعرّفه لا بـ `slug` — والأخير قابل للتغيّر نظريًا. */}
+        {/* ⚠️  The id is required for writing: the server links the review to the
+            product by its id rather than by `slug` — and the latter is
+            theoretically changeable. */}
         {slug ? <ReviewList slug={slug} productId={product.id} /> : null}
       </section>
     </div>

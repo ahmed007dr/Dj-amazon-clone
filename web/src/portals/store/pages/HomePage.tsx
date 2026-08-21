@@ -12,7 +12,7 @@ export function HomePage() {
   const { t } = useTranslation();
   const { name, tagline } = useBrand();
 
-  // ⚠️  المميّزة فقط — لا تُجلب كل المنتجات لصفحة تعرض ثمانية.
+  // ⚠️  Featured only — we do not fetch every product for a page that shows eight.
   const query = useProducts({ ordering: '-created_at', limit: 8 });
   const products = query.data?.pages[0]?.results ?? [];
 

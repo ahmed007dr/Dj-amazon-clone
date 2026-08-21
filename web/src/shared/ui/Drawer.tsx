@@ -6,10 +6,10 @@ import { useLockBodyScroll } from '@/shared/hooks/useLockBodyScroll';
 import './Drawer.css';
 
 /**
- * لوح منزلق من حافة البداية.
+ * A panel sliding in from the start edge.
  *
- * ⚠️  `inset-inline-start` لا `left` — ينزلق من اليمين في العربية
- *     ومن اليسار في الإنجليزية بلا أي كود اتجاهي.
+ * ⚠️  `inset-inline-start`, not `left` — it slides in from the right in Arabic
+ *     and from the left in English with no directional code at all.
  */
 export function Drawer({
   open,
@@ -27,9 +27,9 @@ export function Drawer({
 
   useLockBodyScroll(open);
 
-  // ⚠️  Escape يغلق، والتركيز ينتقل إلى اللوح.
-  //     بدون الثاني يبقى التركيز خلف الطبقة، فيتنقّل مستخدم لوحة
-  //     المفاتيح في محتوى لا يراه.
+  // ⚠️  Escape closes, and focus moves into the panel.
+  //     Without the second, focus stays behind the overlay, so a keyboard user
+  //     navigates through content they cannot see.
   useEffect(() => {
     if (!open) return;
 

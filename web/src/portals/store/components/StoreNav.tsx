@@ -6,18 +6,18 @@ import './StoreNav.css';
 const LINKS = [
   { to: '/', key: 'nav.home', end: true },
   { to: '/products', key: 'nav.catalog' },
-  // ⚠️  الماركات مدخل تصفّح مستقل لا فلتر داخل الكتالوج: مشتري
-  //     الدواء يبحث باسم الماركة التي يعرفها قبل أن يعرف فئتها.
+  // ⚠️  Brands are an independent browsing entry point rather than a filter inside
+  //     the catalogue: a medicine buyer searches by the brand they know before they know its category.
   { to: '/brands', key: 'nav.brands' },
   { to: '/bundles', key: 'nav.bundles' },
 ];
 
 /**
- * روابط تنقّل المتجر.
+ * The store's navigation links.
  *
- * ⚠️  مكوّن مستقل يستدعيه الهيدر والـ Drawer معًا — **مصدر واحد**
- *     للروابط. قائمتان منفصلتان تعني رابطًا يُضاف لإحداهما ويُنسى
- *     في الأخرى.
+ * ⚠️  A standalone component called by both the header and the drawer — **a
+ *     single source** for the links. Two separate lists mean a link added to one
+ *     and forgotten in the other.
  */
 export function StoreNav({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();

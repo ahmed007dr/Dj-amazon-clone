@@ -1,20 +1,21 @@
 /**
- * المصدر **الوحيد** لعناوين الخادم. (ADR-19)
+ * The **single** source for the server's addresses. (ADR-19)
  *
- * ⚠️  هذا الملف هو الاستثناء الوحيد المسموح له بقراءة
- *     `import.meta.env` — قاعدة ESLint ترفضها في كل مكان آخر.
+ * ⚠️  This file is the only exception permitted to read `import.meta.env` — an
+ *     ESLint rule refuses it everywhere else.
  *
- *     السبب ليس أناقة: عنوان مبعثر في عشرين ملفًا يعني أن تبديل
- *     البيئة عملية بحث واستبدال، وأن ملفًا منسيًّا واحدًا يجعل
- *     الإنتاج يضرب خادم التطوير — وهو خطأ صامت لا يظهر في أي اختبار.
+ *     The reason is not elegance: an address scattered across twenty files means
+ *     switching environments is a search-and-replace operation, and that a
+ *     single forgotten file makes production hit the development server — a
+ *     silent error that shows up in no test.
  */
 
 function required(name: string, value: string | undefined): string {
   if (!value) {
-    // ⚠️  فشل صريح عند الإقلاع لا سقوط إلى قيمة افتراضية.
+    // ⚠️  Fail loudly at boot rather than falling back to a default value.
     //
-    //     الافتراضي الصامت (`?? 'http://localhost:8000'`) ينتج
-    //     نشرًا يبدو ناجحًا ثم يفشل كل نداء عند أول مستخدم.
+    //     A silent default (`?? 'http://localhost:8000'`) produces a deployment that
+    //     looks successful and then fails on every call at the first user.
     throw new Error(
       `متغيّر البيئة ${name} غير مضبوط. انسخ .env.example إلى .env واضبطه.`,
     );
@@ -32,11 +33,11 @@ export const MEDIA_BASE_URL = required(
 export const DEFAULT_LOCALE = (import.meta.env.VITE_DEFAULT_LOCALE ?? 'ar') as 'ar' | 'en';
 
 /**
- * مسار وسائط → عنوان كامل.
+ * A media path → a full URL.
  *
- * ⚠️  الخادم يعيد أحيانًا مسارًا نسبيًا (`/media/…`) وأحيانًا عنوانًا
- *     كاملًا (حين تكون الوسائط على CDN). التعامل مع الحالتين هنا
- *     يمنع تكرار الفحص في كل مكوّن يعرض صورة.
+ * ⚠️  The server sometimes returns a relative path (`/media/…`) and sometimes a
+ *     full URL (when the media sits on a CDN). Handling both cases here avoids
+ *     repeating the check in every component that displays an image.
  */
 export function mediaUrl(path: string | null | undefined): string {
   if (!path) return '';

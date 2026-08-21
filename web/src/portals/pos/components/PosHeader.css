@@ -39,8 +39,8 @@
   font-size: 0.875rem;
 }
 
-/* ⚠️  `margin-inline-start: auto` لا `margin-left` — يدفع الأدوات
-   إلى حافة النهاية في الاتجاهين بقاعدة واحدة. */
+/* ⚠️  `margin-inline-start: auto`, not `margin-left` — it pushes the tools
+   to the end edge in both directions with a single rule. */
 .pos-header__actions {
   display: flex;
   align-items: center;
@@ -48,8 +48,8 @@
   margin-inline-start: auto;
 }
 
-/* ⚠️  على الشاشات الضيّقة يُخفى اسم الكاشير لا رقم الوردية:
-   الرقم هو ما يُكتب في التسوية، والاسم يعرفه صاحبه. */
+/* ⚠️  On narrow screens the cashier's name is hidden, not the shift number:
+   the number is what gets written on the reconciliation, and the name its owner knows. */
 @media (max-width: 40rem) {
   .pos-header__cashier {
     display: none;

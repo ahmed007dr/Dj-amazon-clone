@@ -1,17 +1,18 @@
 /**
- * مفتاح سلة الزائر.
+ * The guest cart key.
  *
- * ⚠️  **الزائر يتسوّق قبل أن يسجّل.**
+ * ⚠️  **A guest shops before they register.**
  *
- *     إجباره على إنشاء حساب ليضيف صنفًا إلى السلة يفقد المبيعة
- *     عند أعلى نقطة نية شراء. الخادم يربط السلة بمفتاح يرسله
- *     العميل في `X-Cart-Session`، ثم تُدمج مع سلة الحساب عند الدخول.
+ *     Forcing them to create an account in order to add an item to the cart
+ *     loses the sale at the point of highest purchase intent. The server ties
+ *     the cart to a key the client sends in `X-Cart-Session`, and it is then
+ *     merged with the account's cart on sign-in.
  *
- * ⚠️  المفتاح **معرّف سلة لا هوية**.
+ * ⚠️  The key is **a cart identifier, not an identity**.
  *
- *     لا يمنح أي صلاحية ولا يُقبل بديلًا عن توكن. أسوأ ما يفعله من
- *     يسرقه هو رؤية سلة مجهولة الصاحب — ولذلك يكفيه `crypto`
- *     بلا أي ربط بالمستخدم.
+ *     It grants no permission and is accepted as no substitute for a token. The
+ *     worst thing whoever steals it can do is see a cart with no known owner —
+ *     which is why `crypto` alone suffices, with no link to the user.
  */
 
 const KEY = 'cart-session';
@@ -29,8 +30,8 @@ export function getGuestCartSession(): string {
     }
     return value;
   } catch {
-    // ⚠️  وضع التصفّح الخاص يرفض التخزين — مفتاح لكل جلسة ذاكرة
-    //     يعني سلة تُفقد عند إعادة التحميل، وهو أفضل من انهيار.
+    // ⚠️  Private browsing mode refuses storage — a per-session in-memory key
+    //     means a cart lost on reload, which is better than a crash.
     memoryFallback ??= generate();
     return memoryFallback;
   }
@@ -42,7 +43,7 @@ export function clearGuestCartSession(): void {
   try {
     localStorage.removeItem(KEY);
   } catch {
-    // لا شيء يُفعل
+    // Nothing to do
   }
   memoryFallback = null;
 }

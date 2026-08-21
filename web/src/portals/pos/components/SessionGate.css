@@ -21,7 +21,7 @@
   font-weight: 600;
 }
 
-/* ⚠️  هدف اللمس الكامل: تُستخدم على تابلت بإصبع لا بفأرة. */
+/* ⚠️  A full touch target: used on a tablet with a finger, not with a mouse. */
 .session-gate__select {
   min-block-size: var(--touch-target);
   padding-inline: var(--space-3);

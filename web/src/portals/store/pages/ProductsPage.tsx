@@ -20,7 +20,7 @@ export function ProductsPage() {
   const [category, setCategory] = useState<string | undefined>(undefined);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  // ⚠️  بلا تأخير يصير كل حرف نداءً، وتصل الاستجابات بترتيب غير مضمون
+  // ⚠️  With no delay every character becomes a call, and the responses arrive in an unguaranteed order
   const debouncedSearch = useDebounced(search);
 
   const query = useProducts({
@@ -59,8 +59,8 @@ export function ProductsPage() {
             )}
           </>
         }
-        // ⚠️  الفلاتر شريط جانبي على الديسكتوب و Drawer على الهاتف —
-        //     نفس المكوّن في الحالتين، فلا تتفرّع النسختان
+        // ⚠️  The filters are a sidebar on desktop and a drawer on a phone —
+        //     the same component in both cases, so the two versions do not diverge
         {...(isDesktop ? { filters } : {})}
         footer={
           query.hasNextPage ? (

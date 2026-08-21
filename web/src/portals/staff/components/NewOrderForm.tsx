@@ -23,20 +23,20 @@ interface Line {
 }
 
 /**
- * إنشاء طلب نيابةً عن عميل.
+ * Creating an order on a customer's behalf.
  *
- * ⚠️  **بلا إجمالي معروض — والخادم يسعّر.**
+ * ⚠️  **No total is displayed — the server prices it.**
  *
- *     التسعير يعتمد على **من يشتري**: صيدلية تأخذ سعر الجملة
- *     وطالب يأخذ سعر الطلاب. حساب إجمالي في الواجهة من
- *     `base_price` يعرض رقمًا يخالف الفاتورة، والمندوب يقوله
- *     للعميل في الهاتف قبل أن يُنشأ الطلب.
+ *     Pricing depends on **who is buying**: a pharmacy gets the wholesale price
+ *     and a student the student price. Computing a total in the frontend from
+ *     `base_price` shows a figure that contradicts the invoice, and the rep says
+ *     it to the customer on the phone before the order is even created.
  *
- * ⚠️  ويعيد استخدام بحث نقطة البيع.
+ * ⚠️  And it reuses the point-of-sale search.
  *
- *     `/pos/products/` مفتوحة لكل موظف (`CanOperatePOS`) وتردّ
- *     بحمولة خفيفة مناسبة للبحث الحيّ — ونسخة ثانية منها كانت
- *     ستعني عقدين يتباعدان.
+ *     `/pos/products/` is open to every employee (`CanOperatePOS`) and responds
+ *     with a light payload suited to live search — and a second copy of it would
+ *     have meant two contracts drifting apart.
  */
 export function NewOrderForm({
   customer,
@@ -159,7 +159,7 @@ export function NewOrderForm({
         ))}
       </ul>
 
-      {/* ⚠️  لا سطر إجمالي هنا عمدًا — انظر تعليق المكوّن. */}
+      {/* ⚠️  No total line here, deliberately — see the component's comment. */}
       <p className="new-order__pricing-note">{t('staff.pricingNote')}</p>
 
       <Field

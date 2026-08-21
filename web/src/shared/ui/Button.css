@@ -4,7 +4,7 @@
   justify-content: center;
   gap: var(--space-2);
 
-  /* ⚠️  ٤٤px حدّ إرشادات اللمس — لا تفضيل جمالي. */
+  /* ⚠️  44px is the touch-guidelines minimum — not an aesthetic preference. */
   min-block-size: var(--touch-target);
   padding-inline: var(--space-4);
 

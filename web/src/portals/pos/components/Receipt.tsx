@@ -7,19 +7,20 @@ import { Button } from '@/shared/ui/Button';
 import './Receipt.css';
 
 /**
- * إيصال البيعة.
+ * The sale receipt.
  *
- * ⚠️  **كل رقم من الطلب المخزَّن — لا حساب هنا.**
+ * ⚠️  **Every number comes from the stored order — no arithmetic here.**
  *
- *     الطلب يحمل لقطة وقت البيع (ADR-30): السعر والضريبة والخصم
- *     كما كانت في تلك اللحظة. إعادة حسابها للطباعة تنتج ورقة
- *     تخالف السجل، والفارق يظهر عند أول مرتجع.
+ *     The order carries a snapshot of the moment of sale (ADR-30): the price,
+ *     the tax and the discount as they were at that instant. Recomputing them
+ *     for printing produces a sheet that contradicts the record, and the
+ *     difference surfaces at the first return.
  *
- * ⚠️  والطباعة `window.print` بأنماط `@media print` — لا مكتبة.
+ * ⚠️  And printing is `window.print` with `@media print` styles — no library.
  *
- *     طابعة الإيصالات على الكاونتر طابعة نظام عادية. إدخال مكتبة
- *     توليد PDF يضيف حزمة ثقيلة لجهاز لوحي مقابل خطوة إضافية
- *     (تنزيل ثم فتح ثم طباعة) في كل بيعة.
+ *     The receipt printer at the counter is an ordinary system printer.
+ *     Introducing a PDF-generation library adds a heavy bundle to a tablet in
+ *     exchange for an extra step (download, then open, then print) on every sale.
  */
 export function Receipt({
   order,
@@ -54,9 +55,10 @@ export function Receipt({
           <dt>{t('orders.subtotal')}</dt>
           <dd dir="ltr">{order.subtotal}</dd>
 
-          {/* ⚠️  الضريبة **تُخفى حين تكون صفرًا** لا تُعرض «٠.٠٠».
-              نسبتها متغيّرة وقد تغيب عن صنف أو عن المتجر كله؛
-              وسطر بصفر يجعل العميل يسأل عن ضريبة لم تُحصَّل. */}
+          {/* ⚠️  The tax is **hidden when it is zero** rather than displayed as "0.00".
+              Its rate varies and it may be absent from an item or from the
+              whole store; and a zero line makes the customer ask about a tax
+              that was never charged. */}
           {Number(order.tax_total) > 0 ? (
             <>
               <dt>{t('orders.tax')}</dt>
@@ -79,8 +81,8 @@ export function Receipt({
       </div>
 
       <div className="receipt__actions">
-        {/* ⚠️  إعادة الطباعة متاحة ما دام الإيصال معروضًا: أول
-            طباعة تفشل لورق ناقص أو طابعة نائمة أكثر مما يُتوقَّع. */}
+        {/* ⚠️  Reprinting stays available as long as the receipt is displayed: the
+            first print fails to short paper or a sleeping printer more often than expected. */}
         <Button variant="secondary" onClick={() => window.print()}>
           {t('pos.print')}
         </Button>

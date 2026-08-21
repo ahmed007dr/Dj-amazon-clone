@@ -13,12 +13,12 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import './BundlesPage.css';
 
 /**
- * حزم مستلزمات الطالب.
+ * Student supply bundles.
  *
- * ⚠️  الحزم تُختار في **الخادم** من كلية الطالب وسنته.
+ * ⚠️  The bundles are selected on the **server** from the student's faculty and year.
  *
- *     تحميلها كلها ثم الترشيح محليًا يعني طالب صيدلة يرى حزم
- *     الطب — وحزمًا لجامعات لا يدرس فيها.
+ *     Loading them all and then filtering locally means a pharmacy student sees
+ *     the medicine bundles — and bundles for universities they do not attend.
  */
 export function BundlesPage() {
   const { t } = useTranslation();
@@ -30,7 +30,7 @@ export function BundlesPage() {
 
   if (isRestoring) return <Spinner />;
 
-  // ── زائر ─────────────────────────────────────────────────
+  // ── Visitor ─────────────────────────────────────────────
   if (!user) {
     return (
       <div className="container">
@@ -51,7 +51,7 @@ export function BundlesPage() {
     );
   }
 
-  // ── حساب غير طالبي ───────────────────────────────────────
+  // ── A non-student account ───────────────────────────────
   if (!student) {
     return (
       <div className="container">
@@ -63,12 +63,12 @@ export function BundlesPage() {
 
   if (profile.isPending || bundles.isPending) return <Spinner />;
 
-  // ── طالب بلا ملف أكاديمي ─────────────────────────────────
-  // ⚠️  ليست حالة «لا حزم».
+  // ── A student with no academic profile ──────────────────
+  // ⚠️  This is not the "no bundles" case.
   //
-  //     الخادم يختار الحزم بالكلية والسنة، فبلا ملف يعيد قائمة
-  //     فارغة — نفس شكل «لا حزم لسنتك». عرض الرسالتين متطابقتين
-  //     يجعل الطالب ينتظر حزمًا لن تصل أبدًا، والسبب بيده هو.
+  //     The server selects the bundles by faculty and year, so with no profile
+  //     it returns an empty list — the same shape as "no bundles for your year".
+  //     Showing both messages identically makes the student wait for bundles that never arrive, when the cause is their own.
   if (profile.data === null) {
     return (
       <div className="container">
@@ -102,8 +102,8 @@ export function BundlesPage() {
           : {})}
       />
 
-      {/* ⚠️  الطالب غير الموثّق يرى الحزم لكن بأسعار التجزئة —
-          قوله صراحةً يمنعه من الشكوى بأن «خصم الطلاب لا يعمل». */}
+      {/* ⚠️  An unverified student sees the bundles but at retail prices —
+          saying so explicitly stops them complaining that "the student discount does not work". */}
       {profile.data && !profile.data.is_verified ? (
         <p className="bundles__notice">{t('academic.notVerifiedYet')}</p>
       ) : null}

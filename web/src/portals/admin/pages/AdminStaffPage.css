@@ -37,7 +37,7 @@
   font-weight: 600;
 }
 
-/* ⚠️  العدّاد يجعل «عملاء بلا مسؤول» مهمة مرئية لا تبويبًا خاملًا. */
+/* ⚠️  The counter makes "customers with no owner" a visible task rather than an idle tab. */
 .staff-tabs__count {
   padding: 0.05rem var(--space-2);
   font-size: 0.75rem;

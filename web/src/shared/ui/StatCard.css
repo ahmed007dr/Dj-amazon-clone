@@ -3,7 +3,7 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4);
-  /* شريط اللون على حافة البداية — ينتقل مع اتجاه اللغة */
+  /* The colour bar on the start edge — it moves with the language's direction */
   border-inline-start: 3px solid var(--color-border);
 }
 

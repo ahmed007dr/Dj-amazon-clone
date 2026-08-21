@@ -6,13 +6,13 @@ import { BrandLogo } from '@/shared/branding/BrandLogo';
 import './StaffLogo.css';
 
 /**
- * لوجو بوابة الموظفين.
+ * The staff portal logo.
  *
- * ⚠️  **اللصيقة تحسم أي بوابة مفتوحة.**
+ * ⚠️  **The badge settles which portal is open.**
  *
- *     المندوب قد يفتح المتجر وبوابته في تبويبين — يتصفّح كعميل
- *     ليرى ما يراه، ثم ينشئ طلبًا. ولوجو متطابق يجعله يبني السلة
- *     في المكان الخطأ.
+ *     The rep may have the store and their portal open in two tabs — browsing as
+ *     a customer to see what the customer sees, then creating an order. An
+ *     identical logo makes them build the cart in the wrong place.
  */
 export function StaffLogo() {
   const { t } = useTranslation();

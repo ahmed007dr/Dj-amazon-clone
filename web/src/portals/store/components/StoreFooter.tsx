@@ -9,11 +9,11 @@ import { StoreLogo } from './StoreLogo';
 import './StoreFooter.css';
 
 /**
- * فوتر بوابة المتجر.
+ * The store portal footer.
  *
- * ⚠️  خاص بالمتجر: بيانات التواصل والسوشيال وحقوق النشر.
- *     لوحة الأدمن لا فوتر لها أصلًا (الشاشة كلها عمل)، ونقطة البيع
- *     تعرض شريط حالة الوردية بدله.
+ * ⚠️  Specific to the store: contact details, social links and copyright.
+ *     The admin panel has no footer at all (the whole screen is work), and the
+ *     point of sale shows the shift status bar in its place.
  */
 export function StoreFooter() {
   const { t } = useTranslation();

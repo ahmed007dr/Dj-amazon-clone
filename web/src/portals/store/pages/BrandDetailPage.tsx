@@ -13,18 +13,19 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import './BrandDetailPage.css';
 
 /**
- * صفحة ماركة.
+ * A brand page.
  *
- * ⚠️  **رأس الماركة ثم منتجاتها — لا قائمة منتجات بعنوان.**
+ * ⚠️  **The brand header, then its products — not a product list with a title.**
  *
- *     الوصف والمصنّع وبلده هي ما يطمئن مشتري الدواء قبل أن يقرأ
- *     سعرًا. حذفها يجعل الصفحة نسخة من صفحة المنتجات بفلتر، ولا
- *     سبب لوجودها أصلًا.
+ *     The description, the manufacturer and its country are what reassure a
+ *     medicine buyer before they read a price. Removing them makes the page a
+ *     copy of the products page with a filter, and there is no reason for it to
+ *     exist at all.
  *
- * ⚠️  و**الفلترة بالـ slug على الخادم** لا بترشيح المصفوفة هنا.
+ * ⚠️  And **filtering is by slug on the server**, not by filtering the array here.
  *
- *     الترشيح في الواجهة يعمل على الصفحة المحمَّلة وحدها، فتبدو
- *     ماركة بمنتج واحد بينما لها عشرون في الصفحات التالية.
+ *     Filtering in the frontend operates on the loaded page alone, so a brand
+ *     looks as though it has one product while it has twenty on the following pages.
  */
 export function BrandDetailPage() {
   const { t } = useTranslation();

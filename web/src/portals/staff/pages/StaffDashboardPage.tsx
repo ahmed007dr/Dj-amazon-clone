@@ -14,18 +14,18 @@ import { TargetGauge } from '../components/TargetGauge';
 import './StaffDashboardPage.css';
 
 /**
- * لوحة أداء المندوب.
+ * The rep's performance dashboard.
  *
- * ⚠️  **تُركَّب من ثلاث نقاط لا واحدة.**
+ * ⚠️  **Assembled from three endpoints, not one.**
  *
- *     `employees` تحت `targets` و`commissions` في ترتيب الطبقات
- *     على الخادم، فلا نقطة واحدة تجمعها. والتركيب هنا ثلاثة
- *     استعلامات متوازية صغيرة — أرخص من كسر حدود النطاقات.
+ *     `employees` sits below `targets` and `commissions` in the server's layer
+ *     ordering, so no single endpoint gathers them. Assembling here is three
+ *     small parallel queries — cheaper than breaking the domain boundaries.
  *
- * ⚠️  و**الهدف أعلى الشاشة قبل الأرقام**.
+ * ⚠️  And **the target sits at the top of the screen, before the figures**.
  *
- *     المندوب يفتحها ليعرف موقفه من هدفه؛ ودفنه تحت ستّ بطاقات
- *     إحصائية يجعله يبحث عمّا جاء من أجله.
+ *     The rep opens it to learn where they stand against their target; burying
+ *     it under six statistics cards makes them search for what they came for.
  */
 export function StaffDashboardPage() {
   const { t } = useTranslation();
@@ -44,8 +44,9 @@ export function StaffDashboardPage() {
     <>
       <PageHeader title={t('staff.dashboard')} description={data.full_name} />
 
-      {/* ⚠️  «لا هدف» رسالة صريحة لا شاشة فارغة: غيابه أول الشهر
-          حالة عادية تنتظر الإدارة، لا عطل ولا أداء سيئ. */}
+      {/* ⚠️  "No target" is an explicit message rather than an empty screen: its
+          absence at the start of the month is a normal state awaiting
+          management — neither a fault nor poor performance. */}
       {target.isPending ? (
         <Spinner />
       ) : target.data ? (
@@ -60,8 +61,8 @@ export function StaffDashboardPage() {
         <StatCard label={t('staff.averageOrder')} value={data.average_order} />
         <StatCard label={t('staff.customersCount')} value={String(data.customers_count)} />
         <StatCard label={t('staff.newCustomers')} value={String(data.new_customers)} />
-        {/* ⚠️  المرتجعات تُعرَض دائمًا ولو صفرًا: إخفاؤها عند الصفر
-            يجعل ظهورها لاحقًا يبدو حقلًا جديدًا لا رقمًا تغيّر. */}
+        {/* ⚠️  Returns are always displayed, even at zero: hiding them at zero
+            makes their later appearance look like a new field rather than a figure that changed. */}
         <StatCard label={t('staff.returns')} value={data.returns_total} />
       </div>
 

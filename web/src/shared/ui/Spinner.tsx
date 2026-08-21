@@ -8,7 +8,7 @@ export function Spinner({ label }: { label?: string }) {
   return (
     <div className="spinner" role="status">
       <span className="spinner__ring" aria-hidden />
-      {/* ⚠️  نص للقارئ الشاشي — الدوّارة وحدها صامتة تمامًا. */}
+      {/* ⚠️  Text for the screen reader — the spinner alone is entirely silent. */}
       <span className="visually-hidden">{label ?? t('common.loading')}</span>
     </div>
   );

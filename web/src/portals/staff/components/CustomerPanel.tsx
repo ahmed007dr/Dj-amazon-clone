@@ -13,13 +13,13 @@ import { NewOrderForm } from './NewOrderForm';
 import './CustomerPanel.css';
 
 /**
- * لوح العميل: تاريخه ثم إنشاء طلب له.
+ * The customer panel: their history, then creating an order for them.
  *
- * ⚠️  **التاريخ قبل النموذج — والترتيب هو الفائدة.**
+ * ⚠️  **History before the form — and the order is the point.**
  *
- *     المندوب يتصل بالعميل ليبيع؛ وأول ما يحتاجه هو ما اشتراه
- *     آخر مرة. فتح نموذج فارغ فوق الشاشة يجعله يسأل العميل عمّا
- *     يعرفه النظام.
+ *     The rep calls the customer in order to sell; and the first thing they need
+ *     is what the customer bought last time. Opening an empty form over the
+ *     screen makes them ask the customer about what the system already knows.
  */
 export function CustomerPanel({ customer }: { customer: AssignedCustomer }) {
   const { t, i18n } = useTranslation();

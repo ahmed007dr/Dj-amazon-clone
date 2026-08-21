@@ -44,8 +44,8 @@
 .sale-lines__qty input {
   inline-size: 3.5rem;
   block-size: var(--touch-target);
-  /* ⚠️  الأرقام في الوسط ومن اليسار دائمًا: القراءة السريعة لعمود
-     كميات تعتمد على محاذاة ثابتة لا تتبدّل مع لغة الواجهة. */
+  /* ⚠️  The numbers are centred and always read from the left: reading a column of
+     quantities quickly depends on a fixed alignment that does not flip with the interface language. */
   text-align: center;
   direction: ltr;
   font-size: 1rem;

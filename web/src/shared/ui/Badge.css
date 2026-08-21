@@ -11,11 +11,11 @@
 }
 
 /*
-  ⚠️  `color-mix` بدل ألوان خلفية ثابتة.
+  ⚠️  `color-mix` instead of fixed background colours.
 
-      الخلفية مشتقّة من نفس الرمز، فتغيير `--color-danger` من لوحة
-      الأدمن ينقل الشارة كلها معه. لون خلفية مكتوب يدويًا يبقى
-      أحمر بعد أن يصير الخطر برتقاليًا.
+      The background is derived from the same token, so changing
+      `--color-danger` from the admin panel carries the whole badge with it. A
+      hand-written background colour stays red after danger has become orange.
 */
 .badge--neutral {
   color: var(--color-text-muted);

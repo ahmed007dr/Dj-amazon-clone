@@ -17,7 +17,7 @@ import './AdminTrafficPage.css';
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
-/** آخر ٣٠ يومًا — سؤال الضغط أسبوعي الطابع، والشهر الجاري يبدأ بعمود واحد. */
+/** The last 30 days — the load question is weekly in character, and the current month starts with a single column. */
 function lastThirtyDays() {
   const end = new Date();
   const start = new Date(end);
@@ -28,17 +28,18 @@ function lastThirtyDays() {
 }
 
 /**
- * خريطة حرارية ٧×٢٤.
+ * A 7×24 heatmap.
  *
- * ⚠️  التدرّج **نسبي إلى أعلى خلية لا مطلق**.
+ * ⚠️  The gradient is **relative to the highest cell, not absolute**.
  *
- *     متجر يبيع عشرة طلبات في اليوم ومتجر يبيع ألفًا يحتاجان نفس
- *     الشاشة؛ سلّم ثابت يجعل الأول كله باهتًا بلا ذروة مقروءة.
+ *     A store selling ten orders a day and one selling a thousand need the same
+ *     screen; a fixed scale makes the first entirely pale with no readable peak.
  *
- * ⚠️  واللون **ليس المعلومة الوحيدة**.
+ * ⚠️  And the colour is **not the only information**.
  *
- *     الرقم في `title` وفي `aria-label` لأن قارئ الشاشة لا يرى
- *     تدرّجًا، ولأن عمى الألوان يجعل الفرق بين درجتين غير مُدرَك.
+ *     The number is in `title` and in `aria-label` because a screen reader sees
+ *     no gradient, and because colour blindness makes the difference between
+ *     two shades imperceptible.
  */
 function Heatmap({
   cells,
@@ -74,7 +75,7 @@ function Heatmap({
           {HOURS.map((hour) => {
             const cell = index.get(`${weekday}-${hour}`);
             const value = cell ? valueOf(cell) : 0;
-            // ⚠️  حارس القسمة على صفر — فترة بلا حركة حالة عادية
+            // ⚠️  A division-by-zero guard — a period with no traffic is a normal state
             const intensity = peak > 0 ? value / peak : 0;
 
             return (
@@ -95,13 +96,13 @@ function Heatmap({
 }
 
 /**
- * الضغط على النظام.
+ * Load on the system.
  *
- * ⚠️  **ذروة التصفّح وذروة الشراء شاشة واحدة وخريطتان.**
+ * ⚠️  **The browsing peak and the buying peak are one screen and two maps.**
  *
- *     الفجوة بينهما هي المعلومة الحقيقية: ساعة يتصفّح فيها الناس
- *     ولا يشترون تعني مشكلة سعر أو مخزون لا نقص زيارات. عرض
- *     إحداهما وحدها يخفي السؤال أصلًا.
+ *     The gap between them is the real insight: an hour when people browse and
+ *     do not buy means a price or stock problem, not a shortage of visits.
+ *     Showing one of them alone hides the question entirely.
  */
 export function AdminTrafficPage() {
   const { t, i18n } = useTranslation();
@@ -136,7 +137,7 @@ export function AdminTrafficPage() {
     <>
       <PageHeader title={t('traffic.title')} description={t('traffic.hint')} />
 
-      {/* ── الآن ─────────────────────────────────────────── */}
+      {/* ── Now ──────────────────────────────────────────── */}
       <div className="reports-grid">
         <StatCard
           label={t('admin.onlineNow')}
@@ -169,11 +170,12 @@ export function AdminTrafficPage() {
         />
       </div>
 
-      {/* ⚠️  التقدير يُعلَن، ولا يُترك القارئ يظنّه إحصاءً دقيقًا:
-          من يبدّل الشبكة يُعَدّ مرتين، ومن يشارك شبكة مكتب مرة. */}
+      {/* ⚠️  The estimate is declared, and the reader is not left taking it for an
+          exact count: someone who switches network is counted twice, and
+          everyone sharing an office network once. */}
       <Alert tone="info">{t('traffic.estimateNotice')}</Alert>
 
-      {/* ── الأجهزة ──────────────────────────────────────── */}
+      {/* ── Devices ──────────────────────────────────────── */}
       <h2 className="reports-heading">{t('traffic.devices')}</h2>
       {traffic.isPending ? (
         <Spinner />
@@ -195,7 +197,7 @@ export function AdminTrafficPage() {
         <StateMessage icon="◍" title={t('traffic.noTraffic')} />
       )}
 
-      {/* ── ذروة التصفّح ─────────────────────────────────── */}
+      {/* ── The browsing peak ────────────────────────────── */}
       <h2 className="reports-heading">{t('traffic.browsingPeak')}</h2>
       {browsing.isPending ? (
         <Spinner />
@@ -220,7 +222,7 @@ export function AdminTrafficPage() {
         </section>
       ) : null}
 
-      {/* ── ذروة الشراء ──────────────────────────────────── */}
+      {/* ── The buying peak ──────────────────────────────── */}
       <h2 className="reports-heading">{t('traffic.buyingPeak')}</h2>
       {buying.isPending ? (
         <Spinner />
@@ -245,11 +247,12 @@ export function AdminTrafficPage() {
         </section>
       ) : null}
 
-      {/* ── الأكثر طلبًا ─────────────────────────────────── */}
+      {/* ── Most ordered ─────────────────────────────────── */}
       <h2 className="reports-heading">{t('reports.topProducts')}</h2>
 
-      {/* ⚠️  المقياس مُعلَن ومُبدَّل: «الأكثر طلبًا» بالعدد قرار
-          مخزون، وبالقيمة قرار شراء — والجدولان مختلفان تمامًا. */}
+      {/* ⚠️  The measure is declared and switchable: "most ordered" by count is a
+          stock decision, and by value a purchasing one — and the two tables are
+          entirely different. */}
       <div className="traffic-toggle" role="group" aria-label={t('traffic.sortedBy')}>
         {(['quantity', 'revenue'] as const).map((option) => (
           <button

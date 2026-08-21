@@ -14,17 +14,17 @@ import './AuthPage.css';
 type State = 'checking' | 'done' | 'failed';
 
 /**
- * تفعيل البريد.
+ * Email activation.
  *
- * ⚠️  المسار `/auth/verify-email` **يطابق ما يرسله الخادم** في
- *     البريد حرفيًا (`accounts/api.py`). تغييره هنا يكسر كل رابط
- *     أُرسل فعلًا — بما فيها روابط في بُرُد وصلت أمس.
+ * ⚠️  The path `/auth/verify-email` **matches what the server sends** in the
+ *     email literally (`accounts/api.py`). Changing it here breaks every link
+ *     already sent — including links in emails that arrived yesterday.
  *
- * ⚠️  والتفعيل يُنفَّذ **مرة واحدة**.
+ * ⚠️  And activation runs **once**.
  *
- *     التوكن يُستهلك عند أول استخدام؛ و`StrictMode` في التطوير
- *     يشغّل التأثير مرتين، فبلا حارس تفشل المحاولة الثانية ويرى
- *     المستخدم «رابط غير صالح» بعد تفعيل ناجح.
+ *     The token is consumed on first use; and `StrictMode` in development runs
+ *     the effect twice, so without a guard the second attempt fails and the user
+ *     sees "invalid link" after a successful activation.
  */
 export function VerifyEmailPage() {
   const { t } = useTranslation();
@@ -50,7 +50,7 @@ export function VerifyEmailPage() {
     void (async () => {
       try {
         const response = await verifyEmail(token);
-        // الجلسة تبدأ فورًا — من ضغط الرابط في بريده أثبت ملكيته
+        // The session starts immediately — whoever clicked the link in their email proved ownership
         setAccessToken(response.access);
         setState('done');
       } catch (cause) {
@@ -93,8 +93,8 @@ export function VerifyEmailPage() {
         <Button
           block
           onClick={() => {
-            // ⚠️  إعادة تحميل كاملة: الجلسة بدأت خارج `AuthProvider`
-            //     فلا يعرف بها حتى يُعاد إقلاعه.
+            // ⚠️  A full reload: the session started outside `AuthProvider`,
+            //     so it does not know about it until it is booted again.
             window.location.assign(isAuthenticated ? '/' : '/');
             void navigate('/');
           }}

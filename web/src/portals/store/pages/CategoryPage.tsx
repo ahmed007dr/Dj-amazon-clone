@@ -13,16 +13,18 @@ import { StateMessage } from '@/shared/ui/StateMessage';
 import './CategoryPage.css';
 
 /**
- * صفحة فئة.
+ * A category page.
  *
- * ⚠️  **الفئات الفرعية تظهر روابط لا تختفي.**
+ * ⚠️  **Subcategories appear as links rather than being hidden.**
  *
- *     الخادم يُدرج منتجات الفئة وكل ما تحتها (`path__startswith`)،
- *     فصفحة «أدوية» تعرض المئات. بلا روابط الفروع يبقى العميل
- *     يمرّر في قائمة عامة ولا يعرف أن «مسكنات» موجودة أصلًا.
+ *     The server lists the category's products and everything beneath it
+ *     (`path__startswith`), so the "Medicines" page shows hundreds. Without the
+ *     branch links the customer keeps scrolling through a generic list and never
+ *     learns that "Painkillers" exists at all.
  *
- * ⚠️  و**الوصف يُعرض إن وُجد**: فئات الأدوية تحمل تحذيرات
- *     وإرشادات صرف، وإخفاؤها يجعل الحقل بلا قيمة في اللوحة.
+ * ⚠️  And **the description is shown when present**: medicine categories carry
+ *     warnings and dispensing guidance, and hiding them makes the field
+ *     worthless in the panel.
  */
 export function CategoryPage() {
   const { t } = useTranslation();

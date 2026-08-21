@@ -1,6 +1,6 @@
-/* ⚠️  ارتفاع ثابت لا تمرير للصفحة كلها.
-   على الكاونتر يجب أن يبقى الإجمالي وزر التحصيل مرئيين دائمًا؛
-   تمرير الصفحة كان يدفعهما خارج الشاشة عند الصنف العاشر. */
+/* ⚠️  A fixed height rather than scrolling the whole page.
+   At the counter the total and the charge button must stay visible at all
+   times; scrolling the page pushed them off the screen at the tenth item. */
 .pos-shell {
   display: flex;
   flex-direction: column;
@@ -18,7 +18,7 @@
 @media (max-width: 48rem) {
   .pos-shell__body {
     padding: var(--space-2);
-    /* الشاشة الضيّقة تعرض عمودًا واحدًا فيصير التمرير ضروريًا */
+    /* A narrow screen shows a single column, so scrolling becomes necessary */
     overflow-y: auto;
   }
 }

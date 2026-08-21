@@ -24,8 +24,8 @@
 }
 
 .store-header__nav {
-  /* ⚠️  يأخذ المساحة المتبقية فتُدفع الإجراءات إلى الحافة —
-       بلا `margin-left` الذي ينكسر في RTL */
+  /* ⚠️  Takes the remaining space so the actions are pushed to the edge —
+       without the `margin-left` that breaks in RTL */
   flex: 1;
 }
 

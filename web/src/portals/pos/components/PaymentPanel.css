@@ -53,8 +53,8 @@
   color: var(--color-text-muted);
 }
 
-/* ⚠️  الباقي أبرز عنصر في اللوح — يُقرأ أثناء تسليم النقد
-   وقراءته خطأً تعني عجزًا في الدرج آخر اليوم. */
+/* ⚠️  The change is the most prominent element in the panel — it is read while
+   handing over cash, and misreading it means a shortfall in the drawer at the end of the day. */
 .pay-panel__change {
   display: flex;
   align-items: baseline;

@@ -3,10 +3,11 @@ import type { ReactNode } from 'react';
 import './StatCard.css';
 
 /**
- * بطاقة رقم في لوحة المعلومات.
+ * A figure card on the dashboard.
  *
- * ⚠️  الرقم بلا سياق لا يعني شيئًا: «١٢» طلبًا كثير أم قليل؟
- *     ولذلك `hint` ليس زخرفة — هو ما يحوّل الرقم إلى معلومة.
+ * ⚠️  A number with no context means nothing: is "12" orders many or few?
+ *     Which is why `hint` is not decoration — it is what turns the number into
+ *     information.
  */
 export function StatCard({
   label,
