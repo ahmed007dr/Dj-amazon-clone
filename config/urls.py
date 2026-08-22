@@ -5,10 +5,13 @@ The API structure mirrors domain boundaries — there is no single giant API mod
 See docs/backend/08-API-CONVENTIONS.md
 """
 
+import re
+
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
+from django.views.generic import TemplateView
+from django.views.static import serve
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
@@ -86,7 +89,16 @@ api_v1 = [
 ]
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    # ⚠️  The path comes from `ADMIN_URL` in the secrets file, not from a literal.
+    #
+    #     `/admin/` is the first path every credential-stuffing bot tries. Moving
+    #     it is obscurity and nothing more — the login and the permissions behind
+    #     it are what actually protect the panel — but it costs nothing and takes
+    #     the door off the list.
+    #
+    #     ⚠️  This is **Django's** admin, served from the API domain. `/admin` on
+    #         the site domain is the React portal and is untouched by this.
+    path(f"{settings.ADMIN_URL}/", admin.site.urls),
     path("api/v1/", include((api_v1, "api"), namespace="v1")),
     path("i18n/", include("django.conf.urls.i18n")),
     # ⚠️  Sitemaps live **at the root with no prefix** — crawlers request
@@ -100,4 +112,72 @@ if settings.DEBUG:
         path("api/v1/schema/", schema_view.without_ui(), name="schema"),
         path("__debug__/", include("debug_toolbar.urls")),
     ]
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+
+# ═══════════════════════════════════════════════════════════
+#  Media — served by Django, minus the private tree
+# ═══════════════════════════════════════════════════════════
+# ⚠️  `static()` returns an empty list when DEBUG is off, so media used to be
+#     unreachable in production. One domain means Passenger owns everything and
+#     no web server sits in front of the files — so the route is unconditional here.
+#
+# ⚠️  **And `private/` and `mail/` are excluded in the pattern itself.**
+#
+#     Customer verification documents, expense invoices and inbound mail
+#     attachments are served through a signed URL with a five-minute life and an
+#     ownership check (`customers/api.py`), reading from disk. Serving the whole
+#     of MEDIA_ROOT here would have handed every one of them to anyone who knows
+#     the path — turning a protected download into a public one while every
+#     screen kept working exactly as before.
+#
+#     The negative lookahead is the boundary. It lives in the URLconf rather than
+#     in `.htaccess` because a rule in the application cannot be lost by a
+#     careless upload.
+urlpatterns += [
+    re_path(
+        r"^media/(?!private/|mail/)(?P<path>.*)$",
+        serve,
+        {"document_root": settings.MEDIA_ROOT},
+    ),
+]
+
+
+# ═══════════════════════════════════════════════════════════
+#  The React application — last, and it must stay last
+# ═══════════════════════════════════════════════════════════
+# ⚠️  React Router owns the paths a human types, and the server knows none of
+#     them. Without this, `/cart` works while navigating inside the app and
+#     returns 404 on refresh or on a pasted link — a fault that appears for the
+#     visitor and never for the developer.
+#
+# ⚠️  The exclusions are what keep Django's own routes reachable.
+#
+#     A bare catch-all would swallow `/api/v1/` and the admin, and the API would
+#     answer every call with the HTML of the home page — a "200 OK" that breaks
+#     every request, which is far harder to read than a 404.
+#
+# ⚠️  `ADMIN_URL` is interpolated, not written literally: the admin path comes
+#     from the environment, so a hard-coded `admin/` here would exclude the wrong
+#     path the moment it is changed, and lock the panel behind the SPA.
+#
+# ⚠️  Not to be confused with React's own `/admin` — that is the twenty-one-screen
+#     admin portal, and it is *meant* to fall through to this rule.
+_DJANGO_PREFIXES = "|".join(
+    [
+        r"api/",
+        rf"{re.escape(settings.ADMIN_URL)}/",
+        r"i18n/",
+        r"media/",
+        r"static/",
+        r"robots\.txt",
+        r"sitemap\.xml",
+    ]
+)
+
+urlpatterns += [
+    re_path(
+        rf"^(?!{_DJANGO_PREFIXES}).*$",
+        TemplateView.as_view(template_name="index.html"),
+        name="react-app",
+    ),
+]

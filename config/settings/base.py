@@ -133,6 +133,38 @@ DEBUG = env.bool("DJANGO_DEBUG", default=False)
 #:     settings module gets the strict checks whatever the switch says.
 IS_PRODUCTION = environment.IS_PRODUCTION
 
+# ═══════════════════════════════════════════════════════════
+#  Django's built-in admin — behind a path that is not `/admin/`
+# ═══════════════════════════════════════════════════════════
+# ⚠️  **This is obscurity, not authentication.** It buys one thing only:
+#     it takes the panel off the list every credential-stuffing bot tries first.
+#     Everything behind it — the login, the permissions, the sessions — is
+#     unchanged and remains the actual protection.
+#
+# ⚠️  **And the value belongs in the secrets file, never in `config/environment.py`.**
+#
+#     That file is committed to Git. Writing the path there publishes it to
+#     everyone with repository access and to every future clone — which defeats
+#     the entire point in the one place it looks most natural to put it.
+#
+# ⚠️  Not to be confused with `/admin` on the site domain: that is the React
+#     admin portal (`web/src/app/router.tsx`), twenty-one screens that talk to
+#     `/api/v1/`. This setting moves **Django's** built-in panel, which lives on
+#     the API domain and is a separate, internal tool.
+#
+#     Slashes are stripped so `drNashwa2024`, `/drNashwa2024` and
+#     `drNashwa2024/` all mean the same thing — a stray one would otherwise
+#     produce `//drNashwa2024//` and a 404 nobody expects.
+#
+# ⚠️  A blank value falls back to `admin` rather than becoming an empty segment.
+#
+#     `ADMIN_URL=` with nothing after it is an easy thing to leave in a file, and
+#     without this it produced `path("/", admin.site.urls)` — the panel silently
+#     mounted at the root of the API domain, answering paths nothing else claimed.
+#     Falling back is loud in the right way: `core.W002` then reports that the
+#     default is still in use.
+ADMIN_URL = env("ADMIN_URL", default="admin").strip().strip("/") or "admin"
+
 # ⚠️  The site domain is listed alongside the server domain.
 #
 #     `seo/` serves `robots.txt` and `sitemap.xml` at the **root**, because a
@@ -266,6 +298,17 @@ AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # ⚠️  **Immediately after SecurityMiddleware — the position is required.**
+    #
+    #     WhiteNoise answers static requests and returns before the rest of the
+    #     stack runs. Placing it lower means every CSS and JS file is dragged
+    #     through session lookup, authentication and the traffic recorder — work
+    #     that produces the same bytes and pollutes the analytics with asset hits.
+    #
+    #     And it belongs here at all because Passenger owns the whole domain:
+    #     the React bundle and the admin's stylesheets arrive as Django requests,
+    #     and Django serves no static files with DEBUG off.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -339,7 +382,15 @@ WSGI_APPLICATION = "config.wsgi.application"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        # ⚠️  The frontend build is a template directory.
+        #
+        #     `web/dist/index.html` is rendered by the catch-all route in
+        #     `config/urls.py` so React Router can own `/cart`, `/orders` and the
+        #     rest. Without this entry the catch-all raises
+        #     TemplateDoesNotExist — and every frontend route 500s while `/api/`
+        #     keeps working, which reads as a frontend fault rather than a
+        #     missing settings line.
+        "DIRS": [BASE_DIR / "web" / "dist"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -492,7 +543,24 @@ LOCALE_PATHS = [BASE_DIR / "locale"]
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "static"]
+# ⚠️  The frontend build is collected alongside Django's own static files.
+#
+#     `collectstatic` copies `web/dist/assets/` into `STATIC_ROOT`, and WhiteNoise
+#     serves it — so one command, one directory and one cache policy cover the
+#     admin's CSS and the React bundle alike.
+#
+#     ⚠️  This requires `base: '/static/'` in `web/vite.config.ts`: the built
+#         `index.html` must reference `/static/assets/…`, because that is where
+#         the files actually end up. A build made without it references
+#         `/assets/…` and every one of them 404s — the page loads white with no
+#         server-side error at all.
+#     ⚠️  And it points at `dist` itself, not `dist/assets`.
+#
+#         A `STATICFILES_DIRS` entry is copied **by its contents**, so naming the
+#         inner directory would flatten `assets/app.js` to `/static/app.js` while
+#         the built HTML asks for `/static/assets/app.js`. Naming `dist` keeps the
+#         `assets/` level and picks up `favicon.svg` beside it.
+STATICFILES_DIRS = [BASE_DIR / "static", BASE_DIR / "web" / "dist"]
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"

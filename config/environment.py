@@ -41,8 +41,8 @@ The environment switch — development or production, decided on one line.
 #  ⇩⇩⇩  THE SWITCH  ⇩⇩⇩
 # ═══════════════════════════════════════════════════════════
 
-# IS_PRODUCTION = True    # production
-IS_PRODUCTION = False  # development
+IS_PRODUCTION = True    # production
+#IS_PRODUCTION = False  # development
 
 
 # ═══════════════════════════════════════════════════════════
@@ -86,15 +86,24 @@ PRODUCTION = {
     # ⚠️  `https` is mandatory: `core/checks.py` refuses to boot on `http` in
     #     production, because the access token would cross the network in clear.
     "SCHEME": "https",
-    #: The site a human visits — the built frontend on public_html
+    # ⚠️  **One domain serves both sides.** There is no `api.` subdomain.
+    #
+    #     The two names below are deliberately identical: Django and the React
+    #     build live at the same origin, and the prefix is what separates them.
+    #
+    #         med-box.net/              → React
+    #         med-box.net/api/v1/       → Django REST
+    #         med-box.net/<ADMIN_URL>/  → Django admin
+    #
+    #     The derivation in `base.py` is unchanged — it simply resolves both to
+    #     the same origin, which makes CORS a same-origin case and removes a
+    #     whole class of silent browser-side failures.
     "SITE_DOMAIN": "med-box.net",
-    #: The Django server — its own cPanel subdomain
-    "API_DOMAIN": "api.med-box.net",
+    "API_DOMAIN": "med-box.net",
     "API_PREFIX": "/api/v1",
-    # ⚠️  Set explicitly, because media sits under `public_html` — the *site*
-    #     domain, not the server's. Leaving it empty makes every image be
-    #     requested from `api.med-box.net` while the file is on `med-box.net`.
-    "MEDIA_ORIGIN": "https://med-box.net",
+    # ⚠️  Empty on purpose now: media follows the API origin, and the API origin
+    #     *is* the site origin. Naming it again would be a second copy of one value.
+    "MEDIA_ORIGIN": "",
     "DEFAULT_LOCALE": "ar",
     # ⚠️  `www` is a different host to Django, and its absence returns 400 —
     #     for the crawler's `robots.txt` request among others.

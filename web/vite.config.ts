@@ -136,6 +136,19 @@ const sitePort = Number(publicEnv.PUBLIC_SITE_DOMAIN?.split(':')[1] ?? 5173);
 export default defineConfig({
   plugins: [react()],
 
+  /**
+   * ⚠️  **Assets are referenced under `/static/`, not `/`.**
+   *
+   *     Django serves this build: `collectstatic` copies `web/dist` into
+   *     `STATIC_ROOT` and WhiteNoise serves it at `/static/`. The default base
+   *     of `/` would emit `<script src="/assets/app.js">`, and nothing answers
+   *     `/assets/` — the page loads white, with no error in the Django log,
+   *     because a 404 for a script is not a server fault.
+   *
+   *     Change this and `STATICFILES_DIRS` together or not at all.
+   */
+  base: '/static/',
+
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

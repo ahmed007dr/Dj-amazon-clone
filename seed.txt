@@ -1,0 +1,5 @@
+python manage.py seed_access_policies       # سياسات الصلاحيات
+python manage.py seed_employee_roles        # أدوار الموظفين
+python manage.py seed_expense_categories    # تصنيفات المصروفات
+python manage.py seed_payment_providers     # بوابات الدفع
+python manage.py seed_commission_schemes    # خطط العمولات

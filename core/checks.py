@@ -23,7 +23,7 @@ Domain configuration checks — at startup, not after deployment.
 from __future__ import annotations
 
 from django.conf import settings
-from django.core.checks import Error, register
+from django.core.checks import Error, Warning, register
 from django.http.request import validate_host
 
 #: A tag allowing them to be run alone: `manage.py check --tag domain`
@@ -157,26 +157,64 @@ def check_production_domains(app_configs, **kwargs):
 
 
 @register(DOMAIN)
-def check_production_database(app_configs, **kwargs):
+def check_production_secrets_file(app_configs, **kwargs):
     """
-    Production does not run against a local database.
+    Production boots against its own secrets file, not the development one.
 
     ⚠️  **This is the guard that makes the committed switch safe.**
 
-        `config/environment.py` is tracked in Git, so `IS_PRODUCTION = True`
-        can be committed and then pulled onto a development machine. There the
-        switch names the production settings module and the production domain
-        while `DATABASE_URL` still points at `127.0.0.1` — a configuration that
-        boots happily and reports itself as production.
+        `config/environment.py` is tracked in Git, so `IS_PRODUCTION = True` can
+        be committed and then pulled onto a machine that has no
+        `.env.production`. `base.py` falls back to `.env` there — deliberately,
+        so a half-migrated machine still runs — and the result is production
+        settings reading development secrets: the production domain, `DEBUG`
+        off, HTTPS enforced, over a development database and a development
+        secret key. It boots, and it reports itself as production.
 
-        The pair is what identifies the mistake: a production marker over a
-        local database is never a deployment, always a switch left flipped.
-        Either half alone is legitimate — a developer exercising production
-        settings locally, or a production server on a socket-local database
-        which is exactly what cPanel provides.
+        The absent file is the signal, and it is exact: a real deployment has
+        the file, and a switch left flipped never does.
+    """
+    if not getattr(settings, "IS_PRODUCTION", False):
+        return []
 
-        So the test is deliberately narrow: it fires on a **networked** local
-        host, and says nothing about a UNIX socket or an empty host.
+    from config import environment
+
+    if (settings.BASE_DIR / environment.SECRETS_FILE).exists():
+        return []
+
+    return [
+        Error(
+            f"IS_PRODUCTION مفعَّل بينما {environment.SECRETS_FILE} غير موجود.",
+            hint=(
+                f"أنشئه من القالب: cp .env.example {environment.SECRETS_FILE} — "
+                "وإلّا قُرئ `.env` بدلًا منه، فتعمل إعدادات الإنتاج بأسرار التطوير."
+            ),
+            id="core.E006",
+        )
+    ]
+
+
+@register(DOMAIN)
+def check_production_database_host(app_configs, **kwargs):
+    """
+    A production database on a networked-local host — reported, not refused.
+
+    ⚠️  **A warning and not an error, deliberately.**
+
+        The first draft of this check raised `Error` on a `127.0.0.1` database
+        under `IS_PRODUCTION`, on the reasoning that the pair identifies a switch
+        left flipped on a development machine.
+
+        It would have blocked the actual deployment. Shared hosting — cPanel
+        here — puts PostgreSQL on `127.0.0.1` and reaches it over TCP, so the
+        pair is the *normal* production state there, not a mistake. A check that
+        refuses the very configuration it was written for teaches its operator
+        to bypass checks.
+
+        So the signal is kept and its severity dropped: worth reading on the
+        machine where it is wrong, harmless on the machine where it is right.
+        The exact case — the switch flipped without production secrets — is
+        caught as an error by `core.E006` above.
     """
     if not getattr(settings, "IS_PRODUCTION", False):
         return []
@@ -187,13 +225,46 @@ def check_production_database(app_configs, **kwargs):
         return []
 
     return [
-        Error(
-            f"IS_PRODUCTION مفعَّل بينما قاعدة البيانات على {host}.",
+        Warning(
+            f"IS_PRODUCTION مفعَّل وقاعدة البيانات على {host}.",
             hint=(
-                "إمّا أن السويتش في config/environment.py تُرك على True بعد نشر، "
-                "أو أن DATABASE_URL لم يُضبط على قاعدة الخادم. "
-                "راجع الملفين معًا — لا أحدهما."
+                "سليم على استضافة مشتركة (cPanel يضع PostgreSQL على 127.0.0.1). "
+                "أمّا على جهاز التطوير فيعني أن السويتش تُرك على True."
             ),
-            id="core.E006",
+            id="core.W001",
+        )
+    ]
+
+
+@register(DOMAIN)
+def check_admin_url_is_not_default(app_configs, **kwargs):
+    """
+    Production does not serve Django's admin from `/admin/`.
+
+    ⚠️  A warning, because the panel is not *unprotected* at the default path —
+        the login and the permissions are untouched. What the default costs is
+        the first filter: `/admin/` is the opening guess of every
+        credential-stuffing bot, so leaving it there guarantees the login page
+        is found and hammered, and the failures fill the log until the real
+        signal is buried in them.
+
+    ⚠️  And the check exists because the failure is **invisible**: the panel
+        works perfectly at `/admin/`. Nothing about a working page says the
+        setting was never applied — only this line does.
+    """
+    if not getattr(settings, "IS_PRODUCTION", False):
+        return []
+
+    if getattr(settings, "ADMIN_URL", "admin") != "admin":
+        return []
+
+    return [
+        Warning(
+            "لوحة أدمن Django ما زالت على المسار الافتراضي /admin/ في الإنتاج.",
+            hint=(
+                "اضبط ADMIN_URL في .env.production — لا في config/environment.py، "
+                "فذاك مرفوع في Git."
+            ),
+            id="core.W002",
         )
     ]

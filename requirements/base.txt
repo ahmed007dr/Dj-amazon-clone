@@ -55,6 +55,14 @@ psycopg2-binary==2.9.9
 # ── Cache ──────────────────────────────────────────────────
 redis==5.0.1
 
+# ── Static files in production ─────────────────────────────
+# ⚠️  Django refuses to serve static files when DEBUG is off, and this deployment
+#     has no separate web server in front of them: Passenger owns the whole
+#     domain, so the React bundle and the admin's CSS both arrive as ordinary
+#     Django requests. Without WhiteNoise every one of them is a 404 — the site
+#     loads as unstyled HTML and the frontend never boots.
+whitenoise==6.7.0
+
 # ── Media ──────────────────────────────────────────────────
 Pillow==11.2.1
 

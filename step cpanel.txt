@@ -1,0 +1,8 @@
+١. اقلب السويتش عندك          config/environment.py
+٢. ابنِ الواجهة               cd web && npm run build
+٣. ارفع الكود                 → /home/medboxne/med-box
+٤. ارفع web/dist              → /home/medboxne/public_html
+٥. اعمل .env.production        على السيرفر
+٦. migrate · collectstatic · pybabel
+٧. touch tmp/restart.txt
+٨. ارجّع السويتش False         عندك عشان تكمل شغل

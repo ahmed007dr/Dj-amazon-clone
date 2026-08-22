@@ -8,7 +8,7 @@
 | **جذر الموقع** | `/home/medboxne/public_html` |
 | **نطاق الواجهة** | `med-box.net` |
 | **نطاق الخادم** | `api.med-box.net` |
-| **قاعدة البيانات** | `medboxne_medbox` · مستخدم `medboxne_medboxadmin` |
+| **قاعدة البيانات** | `medboxne` · مستخدم `medboxne` · PostgreSQL على `127.0.0.1:5433` |
 
 ---
 
@@ -81,7 +81,7 @@ mail/inbound/                 مرفقات البريد الوارد
 
 ```sql
 SELECT datname, pg_encoding_to_char(encoding) FROM pg_database
-WHERE datname = 'medboxne_medbox';
+WHERE datname = 'medboxne';
 ```
 
 يجب أن يعيد `UTF8`. غير ذلك: احذف القاعدة وأنشئها من جديد **الآن** —
@@ -159,10 +159,11 @@ IS_PRODUCTION = True    # production
 ```ini
 DJANGO_SECRET_KEY=<مفتاح جديد — ليس مفتاح التطوير>
 DJANGO_DEBUG=False
-DATABASE_URL=postgres://medboxne_medboxadmin:<كلمة المرور مُرمَّزة>@127.0.0.1:5432/medboxne_medbox
+DATABASE_URL=postgres://medboxne:<كلمة المرور>@127.0.0.1:5433/medboxne
 REDIS_URL=
 FIELD_ENCRYPTION_KEY=<إلزامي — prod.py لا يقلع بدونه>
 SEO_INDEXING_ENABLED=True
+ADMIN_URL=<مسار غير قابل للتخمين — ليس admin>
 EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
 EMAIL_HOST=mail.med-box.net
 EMAIL_PORT=587
@@ -172,6 +173,11 @@ EMAIL_USE_TLS=True
 DEFAULT_FROM_EMAIL=noreply@med-box.net
 TIME_ZONE=Africa/Cairo
 ```
+
+⚠️ **المنفذ `5433` لا `5432`.** cPanel يضع PostgreSQL على منفذ غير
+افتراضي هنا، و`5432` هو ما تكتبه كل وثيقة وكل مثال. الخطأ فيه يعطي
+`connection refused` — وهي رسالة تُقرأ عادةً على أنها «القاعدة لا تعمل»
+فيُبحث عن العطل في الخدمة بدل العنوان.
 
 ⚠️ **ترميز كلمة المرور في `DATABASE_URL` إلزامي.** الرموز التي تكسر
 العنوان: `%`→`%25` · `]`→`%5D` · `)`→`%29` · `@`→`%40` · `#`→`%23` ·
@@ -216,6 +222,22 @@ DJANGO_SECRET_KEY="..."      # ✕ أسوأ: تبقى العلامة داخل ا
 بيانات بوابات الدفع المخزّنة غير قابلة للقراءة. للتدوير: الجديد ثم القديم
 مفصولين بفاصلة، أعد حفظ الصفوف، ثم احذف القديم.
 
+⚠️ **`ADMIN_URL` يُكتب هنا، لا في `config/environment.py`.**
+
+ذاك الملف مرفوع في Git، فكتابة المسار فيه تنشره لكل من يملك وصولًا
+للمستودع ولكل نسخة مستقبلية — ويُبطل الغرض في المكان الذي يبدو أنسب
+لوضعه فيه.
+
+وهو **إخفاء لا مصادقة**: يفيد في شيء واحد — أن يرفع اللوحة من قائمة
+المسارات التي تجرّبها روبوتات كلمات المرور أولًا. تسجيل الدخول
+والصلاحيات خلفه هما الحماية الفعلية وتبقى بلا تغيير. وتركه على
+`admin` يُبلَّغ عنه بـ`core.W002`.
+
+⚠️ ولا يُخلط بـ`/admin` على نطاق الموقع: ذاك بوابة React
+([router.tsx:323](../../web/src/app/router.tsx#L323))، إحدى وعشرون شاشة
+تنادي `/api/v1/`. هذا الإعداد ينقل لوحة **Django** المدمجة وحدها،
+وهي على نطاق الخادم.
+
 ## ٥. الفحص قبل أي هجرة
 
 ```bash
@@ -255,15 +277,47 @@ pybabel compile -d locale -D django
 تنادي `msgfmt` من GNU gettext الذي نادرًا ما توفّره الاستضافة المشتركة،
 ولهذا `babel` في `base.txt`. بدونها يعود كل نص مترجم إلى مُعرِّفه بصمت.
 
-## ٧. الميديا و `.htaccess`
+## ٧. الميديا والملفات الثابتة و `.htaccess`
+
+⚠️ **وصلتان في جذرين مختلفين — والفرق بينهما هو سبب أشهر عطل هنا.**
+
+الميديا والملفات الثابتة **لا تُقدَّمان من النطاق نفسه**، لأن Django يكتب
+عنوانيهما بطريقتين مختلفتين:
+
+| | ما يُكتب في HTML | فيُطلب من | فالوصلة مكانها |
+|---|---|---|---|
+| الميديا | `https://med-box.net/media/…` **مطلق** | نطاق الموقع | `public_html/` |
+| الثابتة | `/static/…` **نسبي** | النطاق الذي فتح الصفحة | جذر النطاق الفرعي |
+
+`MEDIA_ORIGIN` مضبوط صراحةً على نطاق الموقع في كتلة `PRODUCTION`، فالواجهة
+تبني عنوان كل صورة كاملًا. أمّا `STATIC_URL` فيبقى `/static/` نسبيًا —
+ولوحة `/admin/` تُفتح من `api.med-box.net`، فيطلب المتصفح
+`https://api.med-box.net/static/admin/css/base.css`.
+
+**وصلة في `public_html` وحدها تجعل لوحة الأدمن بلا تنسيق ولا جافاسكربت
+تمامًا**، بينما الواجهة تعمل بلا خلل — فيبدو العطل كأنه في الأدمن نفسه.
+
+أولًا اعرف جذر النطاق الفرعي (cPanel يسمّيه بأحد شكلين):
 
 ```bash
+ls -d /home/medboxne/api.med-box.net /home/medboxne/public_html/api 2>/dev/null
+```
+
+ثم — مع استبدال `<APIROOT>` بما ظهر:
+
+```bash
+# ــ نطاق الموقع: الميديا (عنوانها مطلق ويشير إلى هنا)
 ln -s /home/medboxne/med-box/media /home/medboxne/public_html/media
-ln -s /home/medboxne/med-box/staticfiles /home/medboxne/public_html/static
+
+# ــ نطاق الخادم: الملفات الثابتة (عنوانها نسبي فيتبع هذا النطاق)
+ln -s /home/medboxne/med-box/staticfiles /home/medboxne/<APIROOT>/static
 
 cp deploy/public_html.htaccess /home/medboxne/public_html/.htaccess
 cp deploy/media.htaccess       /home/medboxne/med-box/media/.htaccess
 ```
+
+⚠️ الوصلتان لا تحتاجان `touch tmp/restart.txt`: الملفات الثابتة يقدّمها
+الويب سيرفر مباشرةً ولا تمرّ على Passenger إطلاقًا.
 
 ⚠️ ملف الميديا يوضع في **مجلد الميديا نفسه** لا في `public_html`: الحماية
 تلازم الملفات أينما قُدِّمت، فلا تسقط لو تغيّرت طريقة التقديم لاحقًا.
@@ -271,14 +325,16 @@ cp deploy/media.htaccess       /home/medboxne/med-box/media/.htaccess
 **تحقّق يدويًا — لا تفترض:**
 
 ```bash
+curl -I https://api.med-box.net/static/admin/css/base.css               # ⇐ 200
 curl -I https://med-box.net/media/private/customer-documents/anything   # ⇐ 404
 curl -I https://med-box.net/media/mail/inbound/anything                 # ⇐ 404
 curl -I https://med-box.net/cart                                        # ⇐ 200 (SPA)
 curl -I http://med-box.net/                                             # ⇐ 301 إلى https
 ```
 
-⚠️ السطران الأولان هما الاختبار الوحيد الفاصل بين وثائق العملاء والعلن.
-أعِد تشغيلهما بعد **كل** رفع يمسّ `public_html`.
+⚠️ السطر الأول يكشف عطل الأدمن بلا تنسيق قبل أن تفتحها. والسطران بعده هما
+الاختبار الوحيد الفاصل بين وثائق العملاء والعلن — أعِد تشغيلهما بعد **كل**
+رفع يمسّ `public_html`.
 
 ## ٨. الواجهة
 
@@ -340,6 +396,14 @@ touch /home/medboxne/med-box/tmp/restart.txt
 ⚠️ `touch` الأخير ليس اختياريًا. بدونه ترفع الكود ولا يتغيّر شيء —
 وتبحث عن العطل في الكود الجديد بينما القديم هو الذي يعمل.
 
+⚠️ و`collectstatic` يكتب داخل `staticfiles/` وحده — لا يلمس الوصلة. فإن
+اختفى تنسيق لوحة الأدمن بعد نشر، فالوصلة هي المشتبه به الأول لا الأمر:
+
+```bash
+ls -l /home/medboxne/<APIROOT>/static     # وصلة سليمة إلى staticfiles؟
+curl -I https://api.med-box.net/static/admin/css/base.css   # ⇐ 200
+```
+
 ---
 
 ## ما لم يُنفَّذ بعد
@@ -347,6 +411,6 @@ touch /home/medboxne/med-box/tmp/restart.txt
 | | |
 |---|---|
 | فصل `MEDIA_ROOT` عام/خاص | العطل الصامت ١ — `.htaccess` حاجز مؤقّت |
-| `STATIC_ROOT` بمتغيّر بيئة | يعمل بالوصلة الرمزية حاليًا |
+| `STATIC_ROOT` بمتغيّر بيئة | يعمل بوصلة رمزية في جذر النطاق الفرعي — و`STATIC_URL` نسبي فلا يمكن نقله إلى نطاق آخر بلا تعديل كود |
 | Redis | العطل الصامت ٢ — التواجد والحركة معطّلان بدونه |
 | `ruff check .` | ١٠٤ مخالفة تجميلية سابقة — خطوة الفحص في CI حمراء |

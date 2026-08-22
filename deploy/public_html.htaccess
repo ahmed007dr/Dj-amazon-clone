@@ -59,10 +59,17 @@ RedirectMatch 404 ^/media/mail/
 
 
 # ── 4. Files that actually exist are served as they are ────
-# ⚠️  /media is a symbolic link to /home/medboxne/med-box/media, and /static
-#     is the output of collectstatic. Excluding them here stops the SPA rule swallowing them
-#     and returning index.html instead of the image — the fault that appears as broken images
-#     on every page while the server answers 200.
+# ⚠️  /media is a symbolic link to /home/medboxne/med-box/media. Excluding it here
+#     stops the SPA rule swallowing it and returning index.html instead of the image —
+#     the fault that appears as broken images on every page while the server answers 200.
+#
+# ⚠️  /static is listed too, but its symlink does **not** live in this document root.
+#
+#     Django writes static URLs relative (`/static/…`), so the browser requests them
+#     from whichever domain served the page — and /admin/ is served by api.med-box.net.
+#     The symlink therefore belongs in the API subdomain's root, not here. It stays
+#     named in this condition anyway: if a static symlink is ever added to this domain
+#     as well, the SPA rule must not swallow it. Costless, and it removes a trap.
 RewriteCond %{REQUEST_URI} ^/(media|static)/ [OR]
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d

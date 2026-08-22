@@ -65,6 +65,15 @@ class Command(BaseCommand):
 
         self._note("بيئة التشغيل تعلو الملفات · وملف البيئة يعلو `.env`")
 
+        # ⚠️  الحالة لا القيمة.
+        #
+        #     مسار لوحة الأدمن نصف سرّ: طباعته هنا تضعه في كل تذكرة دعم
+        #     ولقطة شاشة يُنسخ إليها هذا المخرَج — وهو ما يُبطل الغرض منه.
+        self._row(
+            "ADMIN_URL",
+            "— الافتراضي /admin/" if settings.ADMIN_URL == "admin" else "✓ مسار مخصّص",
+        )
+
         self._section("الدومين — المكتوب")
         self._row("PUBLIC_SCHEME", settings.PUBLIC_SCHEME)
         self._row("PUBLIC_SITE_DOMAIN", settings.PUBLIC_SITE_DOMAIN)
