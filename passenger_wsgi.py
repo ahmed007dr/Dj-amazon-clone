@@ -33,24 +33,41 @@ BASE_DIR = Path(__file__).resolve().parent
 #     `ModuleNotFoundError: No module named 'config'` — a message that points at
 #     the project rather than at the path, so it is debugged in the wrong place.
 #
-#     `settings/base.py` reads `.env` and `.env.public` through an absolute
-#     `BASE_DIR`, so the configuration itself is already immune to the working
-#     directory. This covers the import, which is not.
+#     `settings/base.py` reads its secrets file through an absolute `BASE_DIR`,
+#     so the configuration itself is already immune to the working directory.
+#     This covers the import, which is not.
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
+
+from config import environment  # noqa: E402
+
+# ⚠️  **This file exists only on the production server, so the switch must say so.**
+#
+#     `config/environment.py` is committed, and its committed value is
+#     `IS_PRODUCTION = False` — the right default for the machine the code is
+#     written on and the wrong one for the machine it is served from. Uploading
+#     without flipping it would boot `config.settings.dev` on the public domain:
+#     `DEBUG` on, the debug toolbar exposing settings and SQL to every visitor,
+#     and `devtools` installed — which carries `seed_dev`, a command that
+#     creates accounts with a published password.
+#
+#     Failing to start is the cheap outcome. Serving that is not, and nothing
+#     about it looks wrong from the outside until someone opens a stack trace.
+if not environment.IS_PRODUCTION:
+    raise RuntimeError(
+        "passenger_wsgi.py refuses to boot with IS_PRODUCTION = False.\n"
+        "This entry point runs on the production server only.\n"
+        "Set IS_PRODUCTION = True in config/environment.py and touch tmp/restart.txt."
+    )
 
 # ⚠️  **Assignment, not `setdefault`** — unlike `config/wsgi.py`.
 #
 #     cPanel's interface has an environment-variable panel, and a value set
 #     there outranks a default. `setdefault` would let one stray
-#     `DJANGO_SETTINGS_MODULE=config.settings.dev` boot the development
-#     configuration on the public domain: the debug toolbar exposing settings
-#     and SQL to every visitor, and `devtools` installed — which carries
-#     `seed_dev`, a command that creates accounts with a published password.
-#
+#     `DJANGO_SETTINGS_MODULE=config.settings.dev` defeat the guard above.
 #     There is no legitimate reason for this process to run any other settings
 #     module, so it is not left as a preference.
-os.environ["DJANGO_SETTINGS_MODULE"] = "config.settings.prod"
+os.environ["DJANGO_SETTINGS_MODULE"] = environment.SETTINGS_MODULE
 
 from django.core.wsgi import get_wsgi_application  # noqa: E402
 

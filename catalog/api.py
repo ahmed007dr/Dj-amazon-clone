@@ -233,7 +233,8 @@ class AdminProductListCreateAPI(generics.ListCreateAPIView):
         #
         #     The server used to read `inactive` alone, so the status filter passed
         #     through with no effect: the screen showed "active" while the results
-        #     included the discontinued. A filter that does not filter is worse than none — it gets believed.
+        #     included the discontinued. A filter that does not filter is worse than none — it gets
+        #     believed.
         if (is_active := params.get("is_active")) in ("true", "false"):
             queryset = queryset.filter(is_active=is_active == "true")
 
@@ -369,7 +370,8 @@ class ProductFormOptionsAPI(APIView):
                         "level": policy.level,
                         "is_default": policy.is_default,
                         # ⚠️  Both conditions are displayed alongside the name: "verified
-                        #     professionals" alone does not say that an unverified doctor is blocked.
+                        #     professionals" alone does not say that an unverified doctor is
+                        #     blocked.
                         "requires_verification": policy.requires_verification,
                         "allowed_account_types": policy.allowed_account_types,
                         "description_ar": policy.description_ar,

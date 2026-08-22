@@ -24,7 +24,8 @@ urlpatterns = [
     path("admin/outbox/<uuid:pk>/retry/", api.RetryMessageAPI.as_view(), name="outbox-retry"),
     # ── Templates ──────────────────────────────────────────
     # ⚠️  The key is a string, not a UUID: a template's identity is its name
-    #     (`password_reset`), fixed in code, unlike the override row, which may be deleted and recreated.
+    #     (`password_reset`), fixed in code, unlike the override row, which may be deleted and
+    #     recreated.
     path("admin/templates/", api.TemplateListAPI.as_view(), name="templates"),
     path("admin/templates/<slug:key>/", api.TemplateDetailAPI.as_view(), name="template-detail"),
     # ── Inbox ──────────────────────────────────────────────

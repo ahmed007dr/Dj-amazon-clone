@@ -87,7 +87,8 @@ class Order(BaseModel):
         #     customer mandatory here means one of two things: either a cashier
         #     who refuses to sell to anyone not registering, or a cashier who
         #     invents a dummy account for every passer-by — so the customer
-        #     record fills with people who do not exist and every statistic about them becomes a lie.
+        #     record fills with people who do not exist and every statistic about them becomes a
+        #     lie.
         #
         #     `null` here means "a counter sale" explicitly, and that is what the
         #     reports read with no ambiguity.

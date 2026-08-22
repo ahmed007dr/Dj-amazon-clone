@@ -266,12 +266,14 @@ ACCOUNT_ACTIVATED = register(
 #  ⚠️  **The order number in every message, and once in the first line.**
 #
 #      A customer searching their mail for a specific order searches by its
-#      number; burying it mid-paragraph makes the search fail and turns the question into a support call.
+#      number; burying it mid-paragraph makes the search fail and turns the question into a support
+#      call.
 #
 #  ⚠️  And no computed amounts here.
 #
 #      Every figure arrives ready from the stored order — a snapshot at the
-#      time of sale (ADR-30). Recomputing it in the template produces an invoice that contradicts the record.
+#      time of sale (ADR-30). Recomputing it in the template produces an invoice that contradicts
+#      the record.
 
 ORDER_PLACED = register(
     MailTemplate(

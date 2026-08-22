@@ -285,7 +285,8 @@ class TestTax:
 @pytest.mark.django_db
 class TestSoftDelete:
     def test_soft_delete_hides_but_keeps(self):
-        """A product that has actually been sold is never deleted — historical orders point at it."""
+        """A product that has actually been sold is never deleted — historical orders point at
+        it."""
         from core.models import TaxClass
 
         tax = TaxClass.objects.create(

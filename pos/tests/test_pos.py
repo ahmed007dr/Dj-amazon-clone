@@ -327,7 +327,8 @@ class TestCheckout:
 
     def test_stock_is_deducted_immediately(self, session, product, location):
         """
-        ⚠️  With no reservation — a counter sale is instantaneous and the goods are handed over at once.
+        ⚠️  With no reservation — a counter sale is instantaneous and the goods are handed over at
+            once.
         """
         before = inventory_services.available_quantity(product, location=location)
 
@@ -474,7 +475,8 @@ class TestRefund:
 @pytest.mark.django_db
 class TestPermissions:
     def test_a_customer_cannot_touch_pos(self, db):
-        """⚠️  Point of sale is an internal tool — a customer never reaches it under any circumstances."""
+        """⚠️  Point of sale is an internal tool — a customer never reaches it under any
+        circumstances."""
         customer = User.objects.create_user(email="c-pos@test.local", password=PASSWORD)
         customer.is_active = True
         customer.save()
@@ -741,7 +743,8 @@ class TestQuote:
 
 @pytest.mark.django_db
 def test_cash_movements_are_append_only(session):
-    """Corrections go through an offsetting movement, not an edit — the log is the basis of the reconciliation."""
+    """Corrections go through an offsetting movement, not an edit — the log is the basis of the
+    reconciliation."""
     movement = services.record_cash(
         session, kind=CashMovementKind.PAY_IN, amount=Decimal("10.00"), reason="فكّة"
     )

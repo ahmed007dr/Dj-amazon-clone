@@ -320,7 +320,8 @@ class TestReadEndpoints:
         assert api.get(reverse("v1:analytics:live")).status_code == 403
 
     def test_traffic_needs_more_than_panel_access(self, admin_user, reports_user):
-        """⚠️  The traffic curve reveals the size of the business — the reporting permission, not panel access."""
+        """⚠️  The traffic curve reveals the size of the business — the reporting permission, not
+        panel access."""
         panel_only = APIClient()
         panel_only.force_authenticate(user=admin_user)
         assert panel_only.get(reverse("v1:analytics:traffic")).status_code == 403

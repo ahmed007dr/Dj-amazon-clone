@@ -60,7 +60,8 @@ class TestMissingCredentials:
         assert "merchant_code" in result.failure_message
 
     def test_webhooks_are_rejected_without_a_secret(self):
-        """With no key there is no verification — and accepting by default means marking any order paid."""
+        """With no key there is no verification — and accepting by default means marking any order
+        paid."""
         assert PaymobAdapter({}, sandbox=True).verify_webhook({}, "anything") is False
         assert FawryAdapter({}, sandbox=True).verify_webhook({}, "anything") is False
 
@@ -142,7 +143,8 @@ class TestPaymobSignature:
         assert _lookup({}, "order.id") == ""
 
     def test_field_order_is_part_of_the_contract(self):
-        """Reordering the fields produces a different signature — which is why the order is fixed."""
+        """Reordering the fields produces a different signature — which is why the order is
+        fixed."""
         payload = self._payload()
         forward = "".join(_lookup(payload["obj"], f) for f in HMAC_FIELDS)
         reversed_order = "".join(_lookup(payload["obj"], f) for f in reversed(HMAC_FIELDS))
@@ -152,7 +154,8 @@ class TestPaymobSignature:
 class TestPaymobAmounts:
     def test_amount_is_converted_to_piastres(self):
         """
-        ⚠️  Sending 150.00 instead of 15000 collects one and a half pounds instead of a hundred and fifty.
+        ⚠️  Sending 150.00 instead of 15000 collects one and a half pounds instead of a hundred and
+            fifty.
         """
         captured = {}
 

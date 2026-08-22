@@ -177,7 +177,8 @@ class PurchaseOrderLineInputSerializer(serializers.Serializer):
 
 
 class CreatePurchaseOrderSerializer(serializers.Serializer):
-    """⚠️  The price is optional: from the offer by default, and it accepts an audited negotiation."""
+    """⚠️  The price is optional: from the offer by default, and it accepts an audited
+    negotiation."""
 
     supplier = serializers.UUIDField()
     location = serializers.UUIDField()

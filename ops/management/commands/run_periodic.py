@@ -56,7 +56,8 @@ def _expire_points() -> int:
 #
 #     An expired reservation is deducted from available; so computing the alerts
 #     before the release produces a "critical stock" alert for stock that comes
-#     back a second later — and the alert is then resolved the next day, so the system looks erratic.
+#     back a second later — and the alert is then resolved the next day, so the system looks
+#     erratic.
 JOBS: dict[str, tuple[str, str, Callable[[], int]]] = {
     "release_reservations": (
         "inventory",

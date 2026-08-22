@@ -7,7 +7,16 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")
+    # ⚠️  The module comes from the switch in `config/environment.py`, not from a
+    #     literal here. It used to default to `dev` unconditionally, so running
+    #     `manage.py migrate` on the server without `--settings=` pointed
+    #     development settings at the production database — silently.
+    #
+    #     `setdefault` is kept on purpose: an explicit `DJANGO_SETTINGS_MODULE`
+    #     in the real environment still wins, which is what CI relies on.
+    from config.environment import SETTINGS_MODULE
+
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", SETTINGS_MODULE)
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

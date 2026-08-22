@@ -38,11 +38,11 @@ python -m venv .venv
 #     والتطوير هو dev.txt (يستدعي base.txt داخله). الإنتاج يثبّت base.txt وحده.
 pip install -r requirements/dev.txt
 
-# ٣. متغيرات البيئة — ملفان: الأسرار، والمشترك مع الفرونت إند
-copy .env.example .env                          # ويندوز
-copy .env.public.example .env.public
-# cp .env.example .env
-# cp .env.public.example .env.public
+# ٣. الأسرار — ملف واحد يختاره السويتش
+# ⚠️  الاسم ليس .env بل .env.development — يختاره IS_PRODUCTION في
+#     config/environment.py. الدومين ليس هنا: إنه في ذلك الملف نفسه.
+copy .env.example .env.development              # ويندوز
+# cp .env.example .env.development
 
 # ٤. مفتاح سري جديد — ضعه في .env
 python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
@@ -195,24 +195,27 @@ project/settings/
 
 1. **صفر سر في الكود.** كل قيمة حساسة عبر `env(...)`.
 2. **كل متغير جديد يُضاف إلى النموذج المناسب** بقيمة نموذجية — وإلا لن يعرف أحد بوجوده.
-3. `prod.py` **بلا قيم افتراضية للمتغيرات الحرجة.** غياب `PUBLIC_SITE_DOMAIN` أو `PUBLIC_API_DOMAIN` يوقف الإقلاع عمدًا — أفضل من إقلاع صامت بإعداد غير آمن.
+3. `prod.py` **بلا قيم افتراضية للأسرار.** غياب `FIELD_ENCRYPTION_KEY` يوقف الإقلاع عمدًا — أفضل من إقلاع صامت بإعداد غير آمن. أمّا الدومين فلم يعد متغيّر بيئة يُنسى: يأتي من كتلة `PRODUCTION` التي اختارها السويتش نفسه.
 4. **`.env` لا يُرفع أبدًا.**
-5. **الفصل بين ملفَي البيئة بالحساسية لا بالجهة** (ADR-73):
+5. **الفصل بالحساسية لا بالجهة** (ADR-73 · ADR-86):
 
-   | الملف | يقرؤه | ما فيه |
-   |---|---|---|
-   | `.env.public` | Django **و** Vite | الدومين · المخطَّط · بادئة الـ API · اللغة الافتراضية |
-   | `.env` | Django وحده | المفتاح السري · قاعدة البيانات · البريد · مفتاح التشفير |
+   | الملف | يقرؤه | ما فيه | مرفوع؟ |
+   |---|---|---|---|
+   | `config/environment.py` | Django **و** Vite | السويتش · الدومين · المخطَّط · اللغة | ✅ نعم |
+   | `.env.development` / `.env.production` | Django وحده | المفتاح السري · قاعدة البيانات · البريد · مفتاح التشفير | ⛔ أبدًا |
 
-   ⚠️  **لا سرّ في `.env.public`** — كل ما فيه قد ينتهي في حزمة
-   المتصفح. والبادئة `PUBLIC_` هي العقد: قارئ الفرونت إند في
-   `web/vite.config.ts` يرفض أي مفتاح بغيرها.
+   ⚠️  **لا سرّ في `config/environment.py` إطلاقًا** — إنه مرفوع في Git،
+   فما فيه معلوم لكل من يملك وصولًا للمستودع. الدومين ليس سرًّا؛ كلمة
+   المرور نعم. وهذا هو سبب الفصل، لا الجهة التي تقرأ.
 
 6. **الدومين يُكتب مرة واحدة** (ADR-74). `ALLOWED_HOSTS` و`CORS_ALLOWED_ORIGINS`
    و`CSRF_TRUSTED_ORIGINS` و`FRONTEND_BASE_URL` و`VITE_API_BASE_URL`
-   و`VITE_MEDIA_BASE_URL` **كلها مشتقّة** من `PUBLIC_SITE_DOMAIN`
-   و`PUBLIC_API_DOMAIN`. كل واحدة تقبل تجاوزًا صريحًا — للحالات
-   الخارجة عن النمط وحدها.
+   و`VITE_MEDIA_BASE_URL` **كلها مشتقّة** من `SITE_DOMAIN` و`API_DOMAIN`
+   في كتلة البيئة الفعّالة. كل واحدة تقبل تجاوزًا صريحًا بمتغيّر بيئة —
+   للحالات الخارجة عن النمط وحدها.
+
+7. **سويتش واحد لا ثلاثة** (ADR-86). `IS_PRODUCTION` يختار وحدة الإعدادات
+   وملف الأسرار والدومين معًا، فلا يمكن أن يتفق اثنان ويخالف الثالث.
 
 ---
 
@@ -220,10 +223,9 @@ project/settings/
 
 | الملف | الحالة |
 |---|---|
-| `.env` | ⛔ محظور في `.gitignore` |
+| `.env.development` · `.env.production` | ⛔ محظوران في `.gitignore` |
 | `.env.example` | ✅ يُرفع — بقيم نموذجية فقط |
-| `.env.public` | ⛔ محظور — بلا سرّ، لكنه إعداد بيئة بعينها |
-| `.env.public.example` | ✅ يُرفع — **مُستثنى صراحةً**، فـ `.env.*` يبتلعه |
+| `config/environment.py` | ✅ يُرفع — **بلا سرّ بالتصميم**، وهو السويتش |
 | `db.sqlite3` | ⛔ أُزيل من التتبع في المرحلة 0.1 |
 | `media/` | ⛔ محظور |
 | `full-temp/` | ⛔ محظور — قالب خارجي |
@@ -513,6 +515,7 @@ src/
 ├── .venv/                  ⛔ محلي
 ├── manage.py
 ├── passenger_wsgi.py       ← مدخل Passenger على cPanel
+├── config/environment.py   ← ⇦ السويتش: تطوير / إنتاج
 ├── requirements/
 │   ├── base.txt            ← الإنتاج
 │   └── dev.txt             ← التطوير و CI

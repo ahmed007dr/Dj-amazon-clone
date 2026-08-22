@@ -283,7 +283,8 @@ class MailRoute(BaseModel):
     """
     The responsibility: this purpose (or this specific template) goes out from this account.
 
-    ⚠️  **Resolution runs from the most specific to the most general, and always ends in a terminus.**
+    ⚠️  **Resolution runs from the most specific to the most general, and always ends in a
+        terminus.**
 
             a specific template   (password_reset ← the security account)
                   ↓ if absent
@@ -354,7 +355,8 @@ class MailRoute(BaseModel):
                 self.purpose = template.purpose
 
         if self.account_id and not self.account.sends:
-            # A receiving account is not a sending account — conflating them sends mail out of the support inbox
+            # A receiving account is not a sending account — conflating them sends mail out of the
+            # support inbox
             errors["account"] = _("هذا الحساب لا يرسل — اتجاهه استقبال فقط")
 
         if self.account_id and self.purpose in SECURITY_PURPOSES and self.account.is_marketing:
@@ -442,7 +444,8 @@ class OutboundMessage(BaseModel):
     references = models.TextField(_("سلسلة المراجع"), blank=True)
 
     #: ⚠️  `SET_NULL`, not `PROTECT`: an account deleted after its messages were delivered
-    #:     must not stay pinned by a historical record. The message remains, and its attribution drops.
+    #:     must not stay pinned by a historical record. The message remains, and its attribution
+    #:     drops.
     account = models.ForeignKey(
         EmailAccount,
         on_delete=models.SET_NULL,
@@ -599,7 +602,8 @@ class InboundMessage(BaseModel):
     message_id = models.CharField(_("معرّف الرسالة"), max_length=998, db_index=True)
 
     #: ⚠️  For building `In-Reply-To` on reply — without it our answer appears to
-    #:     the customer as a separate message rather than an answer, so they lose the context and ask again.
+    #:     the customer as a separate message rather than an answer, so they lose the context and
+    #:     ask again.
     in_reply_to = models.CharField(_("ردّ على"), max_length=998, blank=True)
     references = models.TextField(_("سلسلة المراجع"), blank=True)
 

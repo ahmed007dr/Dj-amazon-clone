@@ -384,7 +384,8 @@ PRODUCTS = [
 
 def _seed_categories():
     categories = {}
-    # The path is built from the parent — and the ordering here guarantees it exists before its child
+    # The path is built from the parent — and the ordering here guarantees it exists before its
+    # child
     for slug, name_ar, name_en, parent_slug, icon, order in CATEGORIES:
         category, _created = Category.objects.update_or_create(
             slug=slug,

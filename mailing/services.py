@@ -666,7 +666,8 @@ def reply(inbound, *, body: str, subject: str = "", actor=None) -> OutboundMessa
         )
 
     # ⚠️  The thread is built by appending the message id to its references, not replacing them:
-    #     replacing breaks the thread at the customer's end, so the reply appears as a new conversation.
+    #     replacing breaks the thread at the customer's end, so the reply appears as a new
+    #     conversation.
     references = " ".join(filter(None, [inbound.references, inbound.message_id]))
 
     outbound = enqueue_raw(

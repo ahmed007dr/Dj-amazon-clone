@@ -15,20 +15,22 @@ DEBUG = False
 #: Enables the strict domain checks in `core/checks.py`
 IS_PRODUCTION = True
 
-# ⚠️  The domains are **mandatory here, with no default** — absence halts startup.
+# ⚠️  The domains used to be **required as environment variables here**, with no
+#     default, so that a production boot without them halted rather than serving
+#     `localhost` to the world.
 #
-#     `base.py` gives them development defaults (`localhost`) so the development
-#     environment boots without configuration. Those are exactly the values
-#     production must never boot with: a real server with
-#     `ALLOWED_HOSTS = ["localhost"]` returns 400 to every visitor, and with a
-#     `localhost` origin in CORS the browser blocks every response. The value read
-#     here is never used — the point is to fail startup now instead of
-#     failing the site after deployment.
+#     That guard is gone because what it guarded against cannot happen any more:
+#     the domain is no longer something an operator remembers to set. It comes
+#     from the `PRODUCTION` block in `config/environment.py`, chosen by the same
+#     switch that selected this very module — so reaching this file at all means
+#     the production domain is already loaded.
+#
+#     What the guard actually protected — a real server answering on a local
+#     domain — is now checked directly by `core.E005`, on the effective value
+#     rather than on the presence of a variable.
 #
 #     `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS`
-#     stay derived from them in `base.py` — they are not repeated here.
-env("PUBLIC_SITE_DOMAIN")
-env("PUBLIC_API_DOMAIN")
+#     stay derived in `base.py` — they are not repeated here.
 
 # ⚠️  Encryption key for gateway credentials — **mandatory here**.
 #

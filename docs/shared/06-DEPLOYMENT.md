@@ -123,22 +123,38 @@ pip install -r requirements/base.txt
 
 ## ٤. الإعداد
 
-**`.env.public`** — يقرؤه Django و Vite معًا:
+### السويتش — سطر واحد
 
-```ini
-PUBLIC_SCHEME=https
-PUBLIC_SITE_DOMAIN=med-box.net
-PUBLIC_API_DOMAIN=api.med-box.net
-PUBLIC_API_PREFIX=/api/v1
-PUBLIC_MEDIA_ORIGIN=https://med-box.net
-PUBLIC_DEFAULT_LOCALE=ar
+في [config/environment.py](../../config/environment.py):
+
+```python
+IS_PRODUCTION = True    # production
+# IS_PRODUCTION = False   # development
 ```
 
-⚠️ `PUBLIC_MEDIA_ORIGIN` **يُضبط صراحةً هنا**. تركه فارغًا يجعله يتبع نطاق
-الخادم ([base.py:73](../../config/settings/base.py#L73))، والميديا على
-`public_html` أي على نطاق الموقع — فكل صورة تُطلب من العنوان الخطأ.
+هذا السطر وحده يقرّر **ثلاثة أشياء معًا**:
 
-**`.env`** — الأسرار، لا يقرؤه Vite أبدًا:
+| | |
+|---|---|
+| وحدة الإعدادات | `config.settings.prod` |
+| ملف الأسرار | `.env.production` |
+| الدومين | كتلة `PRODUCTION` — يقرؤها Django و Vite من الملف نفسه |
+
+⚠️ **الملف مرفوع في Git، وقيمته المرفوعة `False`.** فالرفع بلا قلبه يعني
+إعدادات تطوير على الدومين العام. ولهذا يرفض
+[passenger_wsgi.py](../../passenger_wsgi.py) الإقلاع أصلًا حين يجده `False`:
+الفشل أرخص من `DEBUG` مفتوح أمام كل زائر و`devtools` مثبَّتًا بأمر
+`seed_dev` الذي ينشئ حسابات بكلمة مرور منشورة.
+
+⚠️ ولا سرّ في هذا الملف إطلاقًا — مرفوع في Git، فما فيه معلوم لكل من يملك
+وصولًا للمستودع. الدومين ليس سرًّا؛ كلمة المرور نعم.
+
+⚠️ و`MEDIA_ORIGIN` مضبوط صراحةً على `https://med-box.net` في كتلة
+`PRODUCTION`. تركه فارغًا يجعله يتبع نطاق الخادم
+([base.py:73](../../config/settings/base.py#L73))، والميديا على `public_html`
+أي على نطاق الموقع — فكل صورة تُطلب من العنوان الخطأ.
+
+**`.env.production`** — الأسرار، لا يقرؤه Vite أبدًا:
 
 ```ini
 DJANGO_SECRET_KEY=<مفتاح جديد — ليس مفتاح التطوير>
@@ -172,6 +188,30 @@ python -c "from django.core.management.utils import get_random_secret_key; print
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
+⚠️ **ضع `DJANGO_SECRET_KEY` بين علامتَي اقتباس مفردتين — دائمًا.**
+
+```ini
+DJANGO_SECRET_KEY='...'      # ✓
+DJANGO_SECRET_KEY=...        # ✕ يُقصّ عند أول #
+DJANGO_SECRET_KEY="..."      # ✕ أسوأ: تبقى العلامة داخل القيمة ويُقصّ أيضًا
+```
+
+`#` داخل القيمة يبدأ تعليقًا عند `django-environ`، فمفتاح من ٥٠ حرفًا يصل
+إلى Django وطوله **٥**. وأبجدية `get_random_secret_key()` تحوي `#`:
+قياسًا على ٢٠٠٠ مفتاح مولَّد، **٦٤٪ منها تحتوي عليه** — فالإصابة هي
+القاعدة لا الاستثناء.
+
+وما يوقّعه هذا المفتاح: الجلسات · رموز CSRF · روابط استعادة كلمة المرور ·
+الروابط الموقّعة لوثائق العملاء ([core/files.py](../../core/files.py)).
+
+والعَرَض الوحيد سطر واحد بين مخرَجات `check --deploy`:
+`security.W009` — **تحذير لا خطأ**، فلا يوقف شيئًا ويمرّ دون أن يُقرأ.
+
+> رُصد هذا فعليًا أثناء إعداد ملفات هذا الدليل، لا نظريًا.
+
+`FIELD_ENCRYPTION_KEY` من Fernet بترميز base64 فلا يحوي `#` أبدًا،
+وكلمة مرور القاعدة محميّة بترميز `#`→`%23` أعلاه.
+
 ⚠️ `FIELD_ENCRYPTION_KEY` **لا يتغيّر بعد أول حفظ** — تغييره يجعل كل
 بيانات بوابات الدفع المخزّنة غير قابلة للقراءة. للتدوير: الجديد ثم القديم
 مفصولين بفاصلة، أعد حفظ الصفوف، ثم احذف القديم.
@@ -179,14 +219,22 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 ## ٥. الفحص قبل أي هجرة
 
 ```bash
-python manage.py check --deploy --settings=config.settings.prod
-python manage.py env_doctor --settings=config.settings.prod
+python manage.py check --deploy
+python manage.py env_doctor
 ```
 
-⚠️ الفحص الأول يرفض الإقلاع على إعداد تطوير: `PUBLIC_SCHEME=http` أو
-دومين `localhost` يوقفانه بـ `core.E004`/`core.E005`
-([core/checks.py](../../core/checks.py)). هذا مقصود — الخطأ هنا أرخص من
-موقع يردّ 400 على كل زائر.
+⚠️ لا حاجة إلى `--settings=` بعد اليوم: `manage.py` يقرأ السويتش بنفسه.
+
+⚠️ والفحص يرفض الإقلاع على إعداد متناقض:
+
+| | |
+|---|---|
+| `core.E004` | `SCHEME` ليس `https` في الإنتاج |
+| `core.E005` | دومين محلي في إعداد إنتاج |
+| `core.E006` | `IS_PRODUCTION` مفعَّل وقاعدة البيانات على `127.0.0.1` |
+
+الأخير هو حارس السويتش المرفوع: يمسك الحالة التي يُترك فيها `True` بعد
+نشر، فتعمل إعدادات الإنتاج على قاعدة محلية وتبدو سليمة تمامًا.
 
 و`env_doctor` يطبع الإعداد **الفعّال** (لا ما في الملفات) بلا أي سرّ —
 مخرَجه آمن للصق في تذكرة دعم.
@@ -194,9 +242,9 @@ python manage.py env_doctor --settings=config.settings.prod
 ## ٦. القاعدة والملفات الثابتة
 
 ```bash
-python manage.py migrate --settings=config.settings.prod
-python manage.py createsuperuser --settings=config.settings.prod
-python manage.py collectstatic --noinput --settings=config.settings.prod
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py collectstatic --noinput
 pybabel compile -d locale -D django
 ```
 
@@ -263,13 +311,13 @@ npm run build            # في web/ — يقرأ ../.env.public وقت البن
 PYTHONIOENCODING=utf-8
 
 # كل خمس دقائق — البريد
-*/5 * * * * cd /home/medboxne/med-box && /home/medboxne/virtualenv/med-box/3.11/bin/python manage.py run_periodic --job mail --settings=config.settings.prod
+*/5 * * * * cd /home/medboxne/med-box && /home/medboxne/virtualenv/med-box/3.11/bin/python manage.py run_periodic --job mail
 
 # يوميًا ٣ صباحًا — المخزون والسلال والولاء والحركة
-0 3 * * * cd /home/medboxne/med-box && /home/medboxne/virtualenv/med-box/3.11/bin/python manage.py run_periodic --job inventory --settings=config.settings.prod
-15 3 * * * cd /home/medboxne/med-box && /home/medboxne/virtualenv/med-box/3.11/bin/python manage.py run_periodic --job cart --settings=config.settings.prod
-30 3 * * * cd /home/medboxne/med-box && /home/medboxne/virtualenv/med-box/3.11/bin/python manage.py run_periodic --job loyalty --settings=config.settings.prod
-45 3 * * * cd /home/medboxne/med-box && /home/medboxne/virtualenv/med-box/3.11/bin/python manage.py run_periodic --job traffic --settings=config.settings.prod
+0 3 * * * cd /home/medboxne/med-box && /home/medboxne/virtualenv/med-box/3.11/bin/python manage.py run_periodic --job inventory
+15 3 * * * cd /home/medboxne/med-box && /home/medboxne/virtualenv/med-box/3.11/bin/python manage.py run_periodic --job cart
+30 3 * * * cd /home/medboxne/med-box && /home/medboxne/virtualenv/med-box/3.11/bin/python manage.py run_periodic --job loyalty
+45 3 * * * cd /home/medboxne/med-box && /home/medboxne/virtualenv/med-box/3.11/bin/python manage.py run_periodic --job traffic
 ```
 
 ⚠️ `--job mail` كل خمس دقائق لا يوميًا: التسليم يبدأ لحظة الحدث، وهذه
@@ -284,8 +332,8 @@ PYTHONIOENCODING=utf-8
 ```bash
 # ارفع الكود، ثم:
 pip install -r requirements/base.txt      # عند تغيّر الاعتماديات
-python manage.py migrate --settings=config.settings.prod
-python manage.py collectstatic --noinput --settings=config.settings.prod
+python manage.py migrate
+python manage.py collectstatic --noinput
 touch /home/medboxne/med-box/tmp/restart.txt
 ```
 

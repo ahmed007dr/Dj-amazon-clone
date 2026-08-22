@@ -169,7 +169,8 @@ class DocumentDeleteAPI(generics.DestroyAPIView):
     def perform_destroy(self, instance):
         from customers.models import DocumentStatus
 
-        # An approved document is the basis of a verification decision — deleting it corrupts the audit trail
+        # An approved document is the basis of a verification decision — deleting it corrupts the
+        # audit trail
         if instance.status == DocumentStatus.APPROVED:
             raise BusinessError(
                 ErrorCode.CONFLICT,

@@ -9,30 +9,42 @@ from pathlib import Path
 
 import environ
 
+from config import environment
+
 # BASE_DIR = .../src
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 env = environ.Env()
 
+# ⚠️  **The secrets file is chosen by the switch, not by name.**
+#
+#     `config/environment.py` decides whether this is development or production,
+#     and that one decision picks the settings module, the domain **and** the
+#     file opened here. A single `.env` serving both meant the production
+#     password sat on the development machine; separate files make the wrong one
+#     *absent* rather than merely unselected.
+#
 # ⚠️  **The first file wins.**
 #
 #     `read_env` never replaces a value already present in the environment — nor
 #     one read by an earlier file. The order below is exactly the precedence ladder:
 #
-#         the real process environment  >  .env (private)  >  .env.public (shared)
+#         the real process environment  >  .env.<environment>  >  .env (legacy)
 #
 #     This is the reverse of what a reader usually expects (that the last one
-#     wins), so it is stated explicitly: the container overrides both files, and
-#     the private file overrides the shared one without modifying it.
+#     wins), so it is stated explicitly: the container overrides both files.
+#
+#     `.env` is read last as a fallback so a machine that has not yet split its
+#     secrets keeps working — it never overrides the environment-specific file.
+environ.Env.read_env(BASE_DIR / environment.SECRETS_FILE)
 environ.Env.read_env(BASE_DIR / ".env")
-environ.Env.read_env(BASE_DIR / ".env.public")
 
 
 # ═══════════════════════════════════════════════════════════
 #  Domain — one source both sides derive from (ADR-73 · ADR-74)
 # ═══════════════════════════════════════════════════════════
-# ⚠️  The domain is written once in `.env.public`, and the frontend reads
-#     **the same file** (`web/vite.config.ts`).
+# ⚠️  The domain is written once in `config/environment.py`, and the frontend
+#     reads **the same file** (`web/vite.config.ts` parses it directly).
 #
 #     Before this the domain was spread over five values across two files:
 #     `DJANGO_ALLOWED_HOSTS` (host without scheme), `CORS_ALLOWED_ORIGINS`
@@ -41,16 +53,31 @@ environ.Env.read_env(BASE_DIR / ".env.public")
 #     forgetting one produces a **silent** failure — deriving them makes
 #     forgetting impossible rather than merely rare.
 #
+# ⚠️  The source moved here from `.env.public`; the derivation below is unchanged.
+#
+#     `.env.public` was a file edited by hand per environment, which made
+#     switching a matter of remembering to edit it. The switch is now one boolean
+#     that also picks the settings module and the secrets file — so the three
+#     cannot disagree. **That file is gone**: leaving it readable would let a
+#     stale `PUBLIC_SITE_DOMAIN=localhost` silently outrank the block below,
+#     because an environment variable beats a default.
+#
 # ⚠️  Explicit overrides stay possible: every derived value below accepts an
 #     environment variable that outranks it, for the cases that fall outside the
 #     pattern (a second domain · a CDN · a load balancer forwarding an internal host).
 
-PUBLIC_SCHEME = env("PUBLIC_SCHEME", default="http")
-PUBLIC_SITE_DOMAIN = env("PUBLIC_SITE_DOMAIN", default="localhost:5173")
-PUBLIC_API_DOMAIN = env("PUBLIC_API_DOMAIN", default="127.0.0.1:8000")
-PUBLIC_API_PREFIX = env("PUBLIC_API_PREFIX", default="/api/v1")
-PUBLIC_MEDIA_ORIGIN = env("PUBLIC_MEDIA_ORIGIN", default="")
-PUBLIC_DEFAULT_LOCALE = env("PUBLIC_DEFAULT_LOCALE", default="ar")
+_ACTIVE = environment.ACTIVE
+
+PUBLIC_SCHEME = env("PUBLIC_SCHEME", default=_ACTIVE["SCHEME"])
+PUBLIC_SITE_DOMAIN = env("PUBLIC_SITE_DOMAIN", default=_ACTIVE["SITE_DOMAIN"])
+PUBLIC_API_DOMAIN = env("PUBLIC_API_DOMAIN", default=_ACTIVE["API_DOMAIN"])
+PUBLIC_API_PREFIX = env("PUBLIC_API_PREFIX", default=_ACTIVE["API_PREFIX"])
+PUBLIC_MEDIA_ORIGIN = env("PUBLIC_MEDIA_ORIGIN", default=_ACTIVE["MEDIA_ORIGIN"])
+PUBLIC_DEFAULT_LOCALE = env("PUBLIC_DEFAULT_LOCALE", default=_ACTIVE["DEFAULT_LOCALE"])
+
+#: Hosts and origins beyond the two domains — `www`, the LAN address, spare Vite ports
+PUBLIC_EXTRA_HOSTS = _ACTIVE["EXTRA_HOSTS"]
+PUBLIC_EXTRA_ORIGINS = _ACTIVE["EXTRA_ORIGINS"]
 
 
 def _origin(domain: str) -> str:
@@ -59,7 +86,17 @@ def _origin(domain: str) -> str:
 
 
 def _hostname(domain: str) -> str:
-    """⚠️  `ALLOWED_HOSTS` matches on the host alone — a port in it breaks the match."""
+    """
+    ⚠️  `ALLOWED_HOSTS` matches on the host alone — a port in it breaks the match.
+
+    ⚠️  And a bracketed IPv6 literal is returned untouched.
+
+        `[::1]` is all colons and no port; splitting on the last one yields
+        `[:` — a host that matches nothing, added silently to `ALLOWED_HOSTS`.
+    """
+    if domain.startswith("["):
+        return domain.split("]")[0] + "]"
+
     return domain.rsplit(":", 1)[0] if ":" in domain else domain
 
 
@@ -90,7 +127,11 @@ DEBUG = env.bool("DJANGO_DEBUG", default=False)
 #:     forces it, and developers enable it to exercise production behaviour
 #:     locally. Tying the "domain is not localhost" and "scheme is https" checks
 #:     to it was failing the tests on a configuration that was perfectly correct.
-IS_PRODUCTION = False
+#:
+#: ⚠️  It now follows the switch in `config/environment.py`. `prod.py` still
+#:     asserts `True` explicitly, so an operator who names the production
+#:     settings module gets the strict checks whatever the switch says.
+IS_PRODUCTION = environment.IS_PRODUCTION
 
 # ⚠️  The site domain is listed alongside the server domain.
 #
@@ -99,9 +140,21 @@ IS_PRODUCTION = False
 #     forwarding them to Django arrives with a `Host` header carrying the site
 #     domain — so its absence here returns 400 for the crawler's two requests
 #     alone, a fault nobody notices until the pages vanish from search results.
+#
+# ⚠️  `EXTRA_HOSTS` carries what the two domains do not imply: `www` in
+#     production, and `localhost`/`127.0.0.1`/a LAN address in development.
+#     Ports are stripped here — `ALLOWED_HOSTS` matches on the host alone.
 ALLOWED_HOSTS = env.list(
     "DJANGO_ALLOWED_HOSTS",
-    default=list(dict.fromkeys([_hostname(PUBLIC_API_DOMAIN), _hostname(PUBLIC_SITE_DOMAIN)])),
+    default=list(
+        dict.fromkeys(
+            [
+                _hostname(PUBLIC_API_DOMAIN),
+                _hostname(PUBLIC_SITE_DOMAIN),
+                *(_hostname(host) for host in PUBLIC_EXTRA_HOSTS),
+            ]
+        )
+    ),
 )
 
 
@@ -235,7 +288,10 @@ MIDDLEWARE = [
 # ═══════════════════════════════════════════════════════════
 
 #: The only allowed origin — derived from the site domain, not written beside it
-CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[SITE_ORIGIN])
+CORS_ALLOWED_ORIGINS = env.list(
+    "CORS_ALLOWED_ORIGINS",
+    default=list(dict.fromkeys([SITE_ORIGIN, *PUBLIC_EXTRA_ORIGINS])),
+)
 
 # ⚠️  Both the site **and the server** belong in the CSRF trusted origins.
 #
@@ -244,7 +300,7 @@ CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[SITE_ORIGIN])
 #     with 403 behind an HTTPS proxy.
 CSRF_TRUSTED_ORIGINS = env.list(
     "CSRF_TRUSTED_ORIGINS",
-    default=list(dict.fromkeys([SITE_ORIGIN, API_ORIGIN])),
+    default=list(dict.fromkeys([SITE_ORIGIN, API_ORIGIN, *PUBLIC_EXTRA_ORIGINS])),
 )
 
 CORS_ALLOW_CREDENTIALS = True
@@ -412,8 +468,8 @@ else:
 #  Language and time
 # ═══════════════════════════════════════════════════════════
 
-# ⚠️  The default language is written once in `.env.public` and read by both
-#     sides: the server here, and the frontend through `VITE_DEFAULT_LOCALE`.
+# ⚠️  The default language is written once in `config/environment.py` and read by
+#     both sides: the server here, and the frontend through `VITE_DEFAULT_LOCALE`.
 #     Two separate values meant a server answering in Arabic and a frontend
 #     starting in English — a contradiction visible on the very first page load.
 LANGUAGE_CODE = env("LANGUAGE_CODE", default=PUBLIC_DEFAULT_LOCALE)

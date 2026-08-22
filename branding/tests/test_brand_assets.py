@@ -97,7 +97,8 @@ class TestUpload:
         assert not profile.logo_light.name
 
     def test_an_oversized_file_is_refused(self, admin_client, profile):
-        """The logo is downloaded on every page by every visitor — a heavy file slows the whole site."""
+        """The logo is downloaded on every page by every visitor — a heavy file slows the whole
+        site."""
         heavy = real_png_bytes() + b"0" * (3 * 1024 * 1024)
 
         response = admin_client.patch(

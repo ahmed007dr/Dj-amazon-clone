@@ -170,7 +170,8 @@ class TestCreditGate:
         assert "الترخيص" in decision.reason
 
     def test_a_missing_licence_date_is_treated_as_valid(self, pharmacy):
-        """⚠️  Treating absence as expiry blocked every long-standing customer with no recorded date."""
+        """⚠️  Treating absence as expiry blocked every long-standing customer with no recorded
+        date."""
         assert pharmacy.license_expires_on is None
         assert pharmacy.license_is_valid
         assert services.evaluate_credit(pharmacy, Decimal("100.00")).allowed
@@ -332,7 +333,8 @@ class TestCreditNotes:
         assert services.available_credit(pharmacy) == Decimal("10000.00")
 
     def test_the_original_charge_is_kept(self, pharmacy):
-        """⚠️  The invoice was issued and delivered — cancelling it leaves the customer's accountant with no counterpart."""
+        """⚠️  The invoice was issued and delivered — cancelling it leaves the customer's accountant
+        with no counterpart."""
         order = make_order(pharmacy.customer, "1000.00")
         services.charge_on_credit(pharmacy, order)
 

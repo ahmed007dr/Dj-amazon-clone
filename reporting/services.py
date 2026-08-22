@@ -39,7 +39,8 @@ from core.money import ZERO, quantize
 #
 #     Django does not infer the result type from two different operands, so it
 #     refuses the aggregation with an obscure `FieldError`. Declaring the type
-#     once here is clearer than repeating it in every query — and the financial precision follows it.
+#     once here is clearer than repeating it in every query — and the financial precision follows
+#     it.
 #
 # ⚠️  And no aggregate in the same call may be named `quantity`.
 #

@@ -106,7 +106,8 @@ def products(db):
 class TestHierarchyConsistency:
     def test_faculty_must_belong_to_the_chosen_university(self, student_user, university, db):
         """
-        ⚠️  A faculty not belonging to the chosen university gives a student bundles that are not theirs.
+        ⚠️  A faculty not belonging to the chosen university gives a student bundles that are not
+            theirs.
         """
         other = University.objects.create(code="asu", name_ar="عين شمس", name_en="ASU")
         foreign = Faculty.objects.create(

@@ -42,7 +42,8 @@ class TestAdminProfile:
         assert first.admin_number != second.admin_number
 
     def test_only_one_owner_allowed(self, admin_user):
-        """There is exactly one owner — several make "who owns the system" a question with no answer."""
+        """There is exactly one owner — several make "who owns the system" a question with no
+        answer."""
         from django.db.utils import IntegrityError
 
         AdminProfile.objects.create(user=admin_user, is_owner=True)

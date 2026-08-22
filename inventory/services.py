@@ -639,7 +639,8 @@ def record_counted(count: StockCount, line: StockCountLine, counted: int, *, not
 @transaction.atomic
 def apply_count(count: StockCount, *, actor=None) -> dict:
     """
-    Approves the stock count: **it settles the discrepancies with `COUNT` movements and closes the session**.
+    Approves the stock count: **it settles the discrepancies with `COUNT` movements and closes the
+    session**.
 
     ⚠️  Settlement happens through a recorded movement, not by writing the balance directly.
 

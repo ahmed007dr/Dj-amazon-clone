@@ -403,7 +403,7 @@ class TestPeakHours:
         assert len(result["by_weekday"]) == 7
 
     def test_an_empty_period_has_no_peak(self, db):
-        """"Your peak is Monday 12am with zero orders" is worse than no answer."""
+        """ "Your peak is Monday 12am with zero orders" is worse than no answer."""
         start, end = today_range()
         result = services.peak_hours(start, end)
 

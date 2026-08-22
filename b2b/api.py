@@ -303,7 +303,8 @@ class AdminBusinessDetailAPI(generics.RetrieveUpdateAPIView):
 
 class AdminGrantCreditAPI(APIView):
     """
-    ⚠️  Granting is **a documented act** — "who raised the limit, and when?" is answered from the log.
+    ⚠️  Granting is **a documented act** — "who raised the limit, and when?" is answered from the
+        log.
     """
 
     permission_classes = [CanManageCredit]

@@ -34,6 +34,11 @@ _LOCAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"}  # noqa: S1
 
 
 def _hostname(domain: str) -> str:
+    """⚠️  A bracketed IPv6 literal is all colons and no port — `[::1]` split on
+    the last one yields `[:`, a host that matches nothing."""
+    if domain.startswith("["):
+        return domain.split("]")[0] + "]"
+
     return domain.rsplit(":", 1)[0] if ":" in domain else domain
 
 
@@ -59,7 +64,7 @@ def check_frontend_origin_allowed(app_configs, **kwargs):
         Error(
             f"أصل الفرونت إند {origin} غير مدرَج في CORS_ALLOWED_ORIGINS ({sorted(allowed)}).",
             hint=(
-                "الأصلان يُشتقّان من PUBLIC_SITE_DOMAIN في .env.public — "
+                "الأصلان يُشتقّان من SITE_DOMAIN في config/environment.py — "
                 "فاختلافهما يعني تجاوزًا صريحًا لأحدهما بمتغيّر بيئة. "
                 "احذف التجاوز أو أكمله."
             ),
@@ -131,7 +136,7 @@ def check_production_domains(app_configs, **kwargs):
         errors.append(
             Error(
                 f"PUBLIC_SCHEME = {settings.PUBLIC_SCHEME} — الإنتاج يتطلّب https.",
-                hint="اضبط PUBLIC_SCHEME=https في .env.public",
+                hint="اضبط IS_PRODUCTION = True في config/environment.py",
                 id="core.E004",
             )
         )
@@ -143,9 +148,52 @@ def check_production_domains(app_configs, **kwargs):
             errors.append(
                 Error(
                     f"{name} = {host} — دومين محلي في إعداد إنتاج.",
-                    hint="اضبط الدومين الحقيقي في .env.public قبل النشر.",
+                    hint="الدومين يأتي من كتلة PRODUCTION في config/environment.py.",
                     id="core.E005",
                 )
             )
 
     return errors
+
+
+@register(DOMAIN)
+def check_production_database(app_configs, **kwargs):
+    """
+    Production does not run against a local database.
+
+    ⚠️  **This is the guard that makes the committed switch safe.**
+
+        `config/environment.py` is tracked in Git, so `IS_PRODUCTION = True`
+        can be committed and then pulled onto a development machine. There the
+        switch names the production settings module and the production domain
+        while `DATABASE_URL` still points at `127.0.0.1` — a configuration that
+        boots happily and reports itself as production.
+
+        The pair is what identifies the mistake: a production marker over a
+        local database is never a deployment, always a switch left flipped.
+        Either half alone is legitimate — a developer exercising production
+        settings locally, or a production server on a socket-local database
+        which is exactly what cPanel provides.
+
+        So the test is deliberately narrow: it fires on a **networked** local
+        host, and says nothing about a UNIX socket or an empty host.
+    """
+    if not getattr(settings, "IS_PRODUCTION", False):
+        return []
+
+    host = settings.DATABASES.get("default", {}).get("HOST", "")
+
+    if host.lower() not in {"localhost", "127.0.0.1", "::1"}:
+        return []
+
+    return [
+        Error(
+            f"IS_PRODUCTION مفعَّل بينما قاعدة البيانات على {host}.",
+            hint=(
+                "إمّا أن السويتش في config/environment.py تُرك على True بعد نشر، "
+                "أو أن DATABASE_URL لم يُضبط على قاعدة الخادم. "
+                "راجع الملفين معًا — لا أحدهما."
+            ),
+            id="core.E006",
+        )
+    ]

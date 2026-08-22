@@ -44,11 +44,26 @@ class Command(BaseCommand):
         failures = 0
 
         self._section("المصدر")
-        for name in (".env.public", ".env"):
-            path = settings.BASE_DIR / name
-            state = "✓ موجود" if path.exists() else "— غائب"
-            self._row(name, state)
-        self._note("بيئة التشغيل تعلو الملفين · و`.env` يعلو `.env.public`")
+
+        # ⚠️  السويتش أول سطر في المخرَج عمدًا.
+        #
+        #     كل سطر بعده — الدومين والقاعدة والكاش — نتيجةٌ له. وقارئ يرى
+        #     دومين إنتاج دون أن يعرف أي بيئة فعّالة يخمّن، وأول ما يُسأل
+        #     في أي حادثة هو «أنا على أي بيئة؟».
+        from config import environment
+
+        self._row("IS_PRODUCTION", "✓ إنتاج" if environment.IS_PRODUCTION else "— تطوير")
+        self._row("config/environment.py", "✓ موجود")
+        self._row("وحدة الإعدادات", settings.SETTINGS_MODULE)
+
+        secrets = settings.BASE_DIR / environment.SECRETS_FILE
+        self._row(environment.SECRETS_FILE, "✓ موجود" if secrets.exists() else "— غائب")
+
+        legacy = settings.BASE_DIR / ".env"
+        if legacy.exists():
+            self._row(".env", "✓ موجود (احتياطي — لا يعلو ملف البيئة)")
+
+        self._note("بيئة التشغيل تعلو الملفات · وملف البيئة يعلو `.env`")
 
         self._section("الدومين — المكتوب")
         self._row("PUBLIC_SCHEME", settings.PUBLIC_SCHEME)

@@ -400,7 +400,8 @@ def _apply_webhook(provider: PaymentProvider, envelope) -> WebhookResult:
         #
         #     A gateway that collected something other than what we asked for (or a
         #     partial payment at an outlet) arrives with a perfectly sound signature.
-        #     Marking it paid creates a completed order with money missing — visible only in a monthly reconciliation.
+        #     Marking it paid creates a completed order with money missing — visible only in a
+        #     monthly reconciliation.
         logger.error(
             "مبلغ الحدث لا يطابق المعاملة %s: %s مقابل %s",
             payment.reference,

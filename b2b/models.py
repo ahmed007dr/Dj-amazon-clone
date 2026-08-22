@@ -238,7 +238,8 @@ class LedgerEntry(BaseModel):
 
     @property
     def signed_amount(self):
-        """The amount with its sign in the balance — positive against the customer, negative for them."""
+        """The amount with its sign in the balance — positive against the customer, negative for
+        them."""
         return self.amount if self.is_debit else -self.amount
 
     def save(self, *args, **kwargs):

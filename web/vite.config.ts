@@ -5,57 +5,94 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 /**
- * ⚠️  **No environment file inside `web/`.** Configuration comes from
- *     `../.env.public` — the very same file Django reads. (ADR-73 · ADR-74)
+ * ⚠️  **No environment file inside `web/`, and none beside it either.**
+ *
+ *     Configuration comes from `../config/environment.py` — the very same file
+ *     Django reads. (ADR-73 · ADR-74)
  *
  *     There used to be a `web/.env` holding `VITE_API_BASE_URL` while `src/.env`
  *     held `CORS_ALLOWED_ORIGINS` and `FRONTEND_BASE_URL`: the same domain
  *     written in four shapes across two files. Switching environment in one and
  *     forgetting the other produces a **silent** failure — the browser blocks
  *     the response and nothing appears in the server log.
+ *
+ *     That source was `.env.public` until the switch moved into
+ *     `config/environment.py`. Parsing Python from a bundler is unusual; reading
+ *     a *second* copy of the domain would be worse. The frontend must be built
+ *     for the same environment the server runs, and one file is how that is
+ *     guaranteed rather than remembered.
  */
 
 /**
- * Reading the shared configuration.
+ * Reading the shared configuration out of `config/environment.py`.
  *
  * ⚠️  **By explicit name, never by scanning a directory.**
  *
- *     Vite's `loadEnv` would have read `../.env` too — the secrets file: the
- *     secret key, the database password and the encryption key for payment
- *     gateway credentials. It only exports prefixed values, true, but opening
- *     the secrets file inside the tool that builds the browser bundle is risk
- *     with no upside: one wrong prefix ships all of it to every visitor.
+ *     Vite's `loadEnv` would have read `../.env.production` too — the secrets
+ *     file: the secret key, the database password and the encryption key for
+ *     payment gateway credentials. It only exports prefixed values, true, but
+ *     opening the secrets file inside the tool that builds the browser bundle is
+ *     risk with no upside: one wrong prefix ships all of it to every visitor.
  *
- * ⚠️  And the matcher below accepts `PUBLIC_` alone.
- *
- *     So even if this reader were ever pointed at the wrong file, not one
- *     unprefixed key could escape. The guarantee is structural, not a matter of
- *     staying alert.
+ * ⚠️  And the file this reads **cannot** hold a secret by construction: it is
+ *     committed to Git, which is exactly why the secrets were never put in it.
  */
-const PUBLIC_KEY = /^\s*(?:export\s+)?(PUBLIC_[A-Z0-9_]+)\s*=\s*(.*)$/;
 
-function readPublicEnv(): Record<string, string> {
-  const values: Record<string, string> = {};
+/** `IS_PRODUCTION = True` — a commented line does not match, `^` sees to that. */
+const SWITCH = /^\s*IS_PRODUCTION\s*=\s*(True|False)\b/m;
 
-  // `.env.public.local` is a local developer override — not committed, and outranks the shared file
-  for (const name of ['.env.public', '.env.public.local']) {
-    let content: string;
-    try {
-      content = readFileSync(fileURLToPath(new URL(`../${name}`, import.meta.url)), 'utf8');
-    } catch {
-      continue;
-    }
+/** Only `"KEY": "value"` pairs. List values (EXTRA_*) are for Django alone. */
+const ENTRY = /^\s*"([A-Z_]+)"\s*:\s*"([^"]*)"/gm;
 
-    for (const line of content.split(/\r?\n/)) {
-      const match = PUBLIC_KEY.exec(line);
-      if (match) {
-        values[match[1]] = match[2].trim().replace(/^(['"])(.*)\1$/, '$2');
-      }
-    }
+/**
+ * The two blocks, as literal patterns rather than one built from a string.
+ *
+ * ⚠️  A template literal would eat the escapes: `\s` inside `` `...` `` is not a
+ *     whitespace class, it is the letter `s`. The regex then matches nothing and
+ *     the build fails with "block not found" while the block is plainly there.
+ *
+ * ⚠️  `^\}` with the multiline flag — the closing brace of the block sits at
+ *     column 0, while the `]` of the nested lists never does. Matching braces
+ *     properly would mean writing a parser; anchoring to the layout the file
+ *     already has is enough, and it fails loudly rather than quietly if broken.
+ */
+const BLOCKS = {
+  PRODUCTION: /^PRODUCTION\s*=\s*\{([\s\S]*?)^\}/m,
+  DEVELOPMENT: /^DEVELOPMENT\s*=\s*\{([\s\S]*?)^\}/m,
+};
+
+function readEnvironment(): Record<string, string> {
+  const path = fileURLToPath(new URL('../config/environment.py', import.meta.url));
+
+  let source: string;
+  try {
+    source = readFileSync(path, 'utf8');
+  } catch {
+    throw new Error('config/environment.py غير موجود — هو مصدر الدومين للطرفين.');
   }
 
-  // ⚠️  The real process environment outranks both files — the same precedence ladder as Django.
-  //     Containers and deployment platforms set a variable, not a file.
+  const flag = SWITCH.exec(source);
+  if (!flag) {
+    throw new Error('لم يُعثر على IS_PRODUCTION في config/environment.py.');
+  }
+
+  const blockName = flag[1] === 'True' ? 'PRODUCTION' : 'DEVELOPMENT';
+
+  const block = BLOCKS[blockName].exec(source);
+  if (!block) {
+    throw new Error(`لم يُعثر على كتلة ${blockName} في config/environment.py.`);
+  }
+
+  const values: Record<string, string> = {};
+  ENTRY.lastIndex = 0;
+  let entry: RegExpExecArray | null;
+  while ((entry = ENTRY.exec(block[1])) !== null) {
+    // The `PUBLIC_` prefix is what the rest of this file and Django both speak
+    values[`PUBLIC_${entry[1]}`] = entry[2];
+  }
+
+  // ⚠️  The real process environment outranks the file — the same precedence
+  //     ladder as Django. Containers and deployment platforms set a variable, not a file.
   for (const [key, value] of Object.entries(process.env)) {
     if (key.startsWith('PUBLIC_') && value) {
       values[key] = value;
@@ -65,7 +102,7 @@ function readPublicEnv(): Record<string, string> {
   return values;
 }
 
-const publicEnv = readPublicEnv();
+const publicEnv = readEnvironment();
 
 function required(name: string): string {
   const value = publicEnv[name];
@@ -75,7 +112,7 @@ function required(name: string): string {
     //     A silent default produces a deployment that looks successful and then
     //     fails every call for the first user — which is what `shared/http/config.ts`
     //     guards at runtime. The guard here comes one step earlier: before the bundle is built.
-    throw new Error(`${name} غير مضبوط. انسخ .env.public.example إلى .env.public واضبطه.`);
+    throw new Error(`${name} غير مضبوط — راجع كتلة البيئة في config/environment.py.`);
   }
   return value;
 }

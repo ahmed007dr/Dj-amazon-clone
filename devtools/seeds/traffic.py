@@ -38,7 +38,8 @@ HOUR_WEIGHTS = [
 #: The weight of each day in ISO order — Monday 1 … Sunday 7.
 #
 # ⚠️  Friday is lowest: the weekend in the Egyptian market, with the peaks
-#     before and after it. A figure contradicting local reality makes the screen read but not believed.
+#     before and after it. A figure contradicting local reality makes the screen read but not
+#     believed.
 WEEKDAY_WEIGHTS = {1: 1.0, 2: 1.05, 3: 1.0, 4: 1.1, 5: 0.55, 6: 0.9, 7: 0.95}
 
 #: The device split — phone first, which is the reality of any retail store.

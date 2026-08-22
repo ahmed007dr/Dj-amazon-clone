@@ -79,7 +79,8 @@ class Coupon(BilingualNameMixin, BaseModel):
     #:
     #:     A points-redemption coupon was paid for with a balance actually consumed
     #:     from the customer's ledger. With no owner it is enough to photograph the
-    #:     code and send it to anyone to spend — so its owner loses their points and someone else takes the discount.
+    #:     code and send it to anyone to spend — so its owner loses their points and someone else
+    #:     takes the discount.
     #:
     #:     And `usage_limit=1` is not enough: it limits the count, not the person.
     owner = models.ForeignKey(

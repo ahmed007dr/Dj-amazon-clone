@@ -135,7 +135,8 @@ def notify(
             #
             #     Recording it as "sent" at enqueue time made the log answer
             #     "yes, it arrived" about a message that had not left yet — and that
-            #     is the first question in every complaint, where the worst answer is a confident wrong one.
+            #     is the first question in every complaint, where the worst answer is a confident
+            #     wrong one.
             #     The delivery outcome is known from the outbox row.
             queued = mail_services.send_to_user(template_key, user, context)
             sent.append(channel) if queued else skipped.append(channel)

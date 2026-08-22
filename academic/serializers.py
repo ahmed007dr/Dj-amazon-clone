@@ -137,7 +137,8 @@ class CreateStudentProfileSerializer(serializers.Serializer):
 # ═══════════════════════════════════════════════════════════
 #
 #  ⚠️  The tree is **a precondition for registering any student**: they pick
-#      their university and faculty before creating an account. It used to be managed from the Django admin alone.
+#      their university and faculty before creating an account. It used to be managed from the
+#      Django admin alone.
 
 
 class AdminUniversitySerializer(serializers.ModelSerializer):

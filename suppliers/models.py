@@ -104,7 +104,8 @@ class SupplierProduct(BaseModel):
         verbose_name=_("المنتج"),
     )
 
-    #: The product's code at the supplier — it differs from ours and is written on the purchase order
+    #: The product's code at the supplier — it differs from ours and is written on the purchase
+    #:     order
     supplier_sku = models.CharField(_("رمز المورّد"), max_length=64, blank=True)
 
     unit_cost = MoneyField(_("سعر الشراء"), validators=[MinValueValidator(ZERO)])
@@ -124,7 +125,8 @@ class SupplierProduct(BaseModel):
                 condition=models.Q(deleted_at__isnull=True),
                 name="unique_offer_per_supplier_product",
             ),
-            # ⚠️  One preferred supplier per product — or the purchase order would not know which to choose
+            # ⚠️  One preferred supplier per product — or the purchase order would not know which to
+            # choose
             models.UniqueConstraint(
                 fields=["product"],
                 condition=models.Q(is_preferred=True, deleted_at__isnull=True),

@@ -124,7 +124,7 @@ class TestVariableTax:
         assert after.tax_rate == Decimal("15.00")
 
     def test_tax_can_be_disabled_for_everything(self, standard, category):
-        """"It may not exist … for any product" — a single switch."""
+        """ "It may not exist … for any product" — a single switch."""
         product = make_product(category, standard)
         assert pricing.price_for(product).tax_amount > 0
 

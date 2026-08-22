@@ -412,7 +412,8 @@ def checkout(
     #
     # ⚠️  The reference here is **the shift**, because the order does not exist yet.
     #
-    #     The order is deliberate: if an item runs out the transaction is rolled back with no orphan order.
+    #     The order is deliberate: if an item runs out the transaction is rolled back with no orphan
+    #     order.
     #     But it leaves the movements tied to the shift rather than to the sale — and they are
     #     redirected to the order immediately after it is created (step 3b).
     movements = []

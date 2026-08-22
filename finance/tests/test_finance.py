@@ -707,7 +707,8 @@ class TestPOSCostIsNotZero:
 
 @pytest.mark.django_db
 def test_cogs_is_deleted_with_its_revenue_entry(location, product):
-    """The cost entry belongs to the revenue entry — it does not linger as an orphan distorting the totals."""
+    """The cost entry belongs to the revenue entry — it does not linger as an orphan distorting the
+    totals."""
     order = make_order(location)
     entry = services.record_order_revenue(order)
 

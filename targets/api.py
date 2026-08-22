@@ -84,7 +84,8 @@ class AdminTargetDetailAPI(generics.RetrieveUpdateAPIView):
     queryset = MonthlyTarget.objects.select_related("employee__user")
 
     def perform_update(self, serializer):
-        # ⚠️  A closed one is not edited: its snapshot is the basis of a commission that may have been paid.
+        # ⚠️  A closed one is not edited: its snapshot is the basis of a commission that may have
+        # been paid.
         from core.errors import BusinessError, ErrorCode
 
         if serializer.instance.is_closed:

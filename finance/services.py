@@ -87,7 +87,8 @@ def record_order_revenue(order) -> RevenueEntry | None:
         #     `completed_at` is stored in UTC, and taking its date directly
         #     posts a 1am Cairo sale on **the previous day**
         #     accounting day. The result: a daily close that does not match the
-        #     cashier's drawer, with the discrepancy showing every night in the shift's last three hours.
+        #     cashier's drawer, with the discrepancy showing every night in the shift's last three
+        #     hours.
         occurred_on=timezone.localdate(order.completed_at or timezone.now()),
     )
 
@@ -297,7 +298,8 @@ class ProfitAndLoss:
 
     @property
     def is_reliable(self) -> bool:
-        """⚠️  A report containing unknown cost is read with caution — and that is stated explicitly."""
+        """⚠️  A report containing unknown cost is read with caution — and that is stated
+        explicitly."""
         return self.unknown_cost_units == 0
 
 

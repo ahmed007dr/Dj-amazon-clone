@@ -277,7 +277,8 @@ class TestCancellationAndLedger:
             services.cancel_order(order, reason="تراجعنا")
 
     def test_cancelling_a_sent_order_reverses_the_invoice(self, supplier, location, offer, product):
-        """⚠️  A credit note, not a deletion: the invoice was sent and the supplier has recorded it."""
+        """⚠️  A credit note, not a deletion: the invoice was sent and the supplier has recorded
+        it."""
         order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
         services.send_order(order)
         services.cancel_order(order, reason="نفد لديه")
@@ -380,7 +381,8 @@ class TestNegotiatedPrice:
         assert rows[0]["list_cost"] == "60.00"
 
     def test_matching_prices_produce_no_variance_noise(self, supplier, location, offer, product):
-        """A line at the offer price is not logged — the log is for the exception, not the routine."""
+        """A line at the offer price is not logged — the log is for the exception, not the
+        routine."""
         order = services.create_order(supplier, location, [{"product": product.pk, "quantity": 10}])
 
         assert services.price_variances(order) == []
@@ -503,7 +505,8 @@ class TestSupplierReturns:
             services.return_to_supplier(line, 1, reason="   ")
 
     def test_the_original_invoice_is_never_deleted(self, supplier, location, offer, product):
-        """⚠️  The invoice was issued and the supplier recorded it — the correction is a note, not an eraser."""
+        """⚠️  The invoice was issued and the supplier recorded it — the correction is a note, not
+        an eraser."""
         order, line = self._received(supplier, location, product)
         services.return_to_supplier(line, 10, reason="الشحنة كلها خاطئة")
 

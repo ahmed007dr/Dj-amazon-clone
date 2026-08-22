@@ -69,7 +69,8 @@ class TestCategoryTree:
         assert node.path.endswith("/painkillers")
 
     def test_moving_a_category_rebuilds_descendant_paths(self, admin_client):
-        """Moving a category changes the path of everything beneath it — ignoring that orphans descendants."""
+        """Moving a category changes the path of everything beneath it — ignoring that orphans
+        descendants."""
         a = Category.objects.create(name_ar="أ", name_en="A")
         b = Category.objects.create(name_ar="ب", name_en="B")
         child = Category.objects.create(name_ar="ج", name_en="C", parent=a)
@@ -109,7 +110,8 @@ class TestCategoryTree:
         assert response.status_code == 400
 
     def test_slug_and_path_are_computed_not_accepted(self, admin_client):
-        """Accepting them from the client means a tree written by someone who does not know its rules."""
+        """Accepting them from the client means a tree written by someone who does not know its
+        rules."""
         response = admin_client.post(
             reverse("v1:catalog:admin-categories"),
             {"name_ar": "فئة", "name_en": "Cat", "slug": "hacked", "path": "hacked", "depth": 9},
@@ -122,7 +124,8 @@ class TestCategoryTree:
         assert node.depth == 0
 
     def test_the_list_includes_categories_hidden_from_the_menu(self, admin_client):
-        """`show_in_menu` is a display classification, not a permission — and the admin manages everything."""
+        """`show_in_menu` is a display classification, not a permission — and the admin manages
+        everything."""
         Category.objects.create(name_ar="مخفية", name_en="Hidden", show_in_menu=False)
 
         response = admin_client.get(reverse("v1:catalog:admin-categories"))

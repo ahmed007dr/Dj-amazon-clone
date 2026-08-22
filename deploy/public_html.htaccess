@@ -1,12 +1,12 @@
 # ═══════════════════════════════════════════════════════════
 #  ⇒  /home/medboxne/public_html/.htaccess
 #
-#  جذر الموقع الذي يزوره الإنسان — يخدم بناء الواجهة (web/dist)
-#  ولا يمرّ عليه Django إطلاقًا. الخادم على api.med-box.net.
+#  The site root a human visits — it serves the frontend build (web/dist)
+#  and Django never touches it. The server lives at api.med-box.net.
 #
-#  ⚠️  الترتيب هنا مقصود: HTTPS ← منع الخاص ← الملفات الحقيقية ← SPA.
-#      قاعدة SPA تبتلع كل ما لم تلتقطه القواعد قبلها، فأي قاعدة
-#      توضع بعدها لا تُنفَّذ أبدًا.
+#  ⚠️  The order here is deliberate: HTTPS ← block private ← real files ← SPA.
+#      The SPA rule swallows everything the preceding rules did not catch, so any
+#      rule placed after it never runs.
 # ═══════════════════════════════════════════════════════════
 
 Options -Indexes
@@ -14,73 +14,73 @@ Options -Indexes
 RewriteEngine On
 
 
-# ── ١. إجبار HTTPS ─────────────────────────────────────────
-# ⚠️  Django يفرض HTTPS على نطاقه وحده (SECURE_SSL_REDIRECT في prod.py).
-#     هذا النطاق ملفات ثابتة لا يمرّ بـ Django، فلا شيء يفرضه عليه سوى هنا.
+# ── 1. Force HTTPS ─────────────────────────────────────────
+# ⚠️  Django enforces HTTPS on its own domain alone (SECURE_SSL_REDIRECT in prod.py).
+#     This domain is static files that never pass through Django, so nothing enforces it but here.
 #
-# ⚠️  والشرطان لأن LiteSpeed خلف موازن أحمال قد لا يضبط %{HTTPS}:
-#     الاعتماد على واحد فقط يُنتج إمّا حلقة إعادة توجيه لا تنتهي
-#     وإمّا موقعًا يبقى على http بصمت.
+# ⚠️  And two conditions, because LiteSpeed behind a load balancer may not set %{HTTPS}:
+#     relying on one alone produces either an endless redirect loop
+#     or a site that silently stays on http.
 RewriteCond %{HTTPS} !=on
 RewriteCond %{HTTP:X-Forwarded-Proto} !=https
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 
-# ── ٢. الميديا الخاصة — ممنوعة ─────────────────────────────
-# ⚠️  **هذا الحاجز الوحيد.** MEDIA_ROOT لم يُفصل بعد إلى عام وخاص
-#     (config/settings/base.py:442 غير قابل للتجاوز بمتغيّر بيئة)،
-#     فمجلد الميديا كامل يصل إلى هنا عبر وصلة رمزية — بما فيه:
+# ── 2. Private media — blocked ─────────────────────────────
+# ⚠️  **This is the only barrier.** MEDIA_ROOT has not yet been split into public and private
+#     (config/settings/base.py:442 is not overridable by an environment variable),
+#     so the entire media directory reaches here through a symbolic link — including:
 #
-#         private/customer-documents/   تراخيص الصيدليات ووثائق التحقق
-#         private/expense-attachments/  فواتير باسم المؤجّر ومبلغه
-#         mail/inbound/                 مرفقات البريد الوارد
+#         private/customer-documents/   pharmacy licences and verification documents
+#         private/expense-attachments/  invoices bearing the landlord's name and amount
+#         mail/inbound/                 inbound mail attachments
 #
-#     تقديمها الشرعي يمرّ عبر Django بتوقيع عمره ٥ دقائق وفحص ملكية
-#     (customers/api.py:133) الذي يقرأ من القرص مباشرة — فمنع المسار
-#     هنا لا يكسر التحميل السليم، ويقطع المسار المباشر وحده.
+#     Their legitimate serving goes through Django with a 5-minute signature and an
+#     ownership check (customers/api.py:133) that reads straight from disk — so blocking
+#     the path here does not break a sound download, and cuts off the direct path alone.
 #
-# ⚠️  و404 لا 403: الثاني يؤكّد أن الملف موجود.
+# ⚠️  And 404, not 403: the latter confirms the file exists.
 RedirectMatch 404 ^/media/private/
 RedirectMatch 404 ^/media/mail/
 
 
-# ── ٣. لا تنفيذ داخل مجلد الرفع ────────────────────────────
-# ⚠️  مجلد يرفع إليه المستخدمون وهو تحت جذر الويب = تنفيذ عن بُعد
-#     إن نجح رفع ملف ينتهي بامتداد ينفّذه الخادم. الفحص في
-#     core/files.py يقصر الأنواع على قائمة سماح، وهذه الطبقة الثانية:
-#     حتى لو مرّ ملف، يُقدَّم نصًّا ولا يُنفَّذ.
+# ── 3. No execution inside the upload directory ────────────
+# ⚠️  A directory users upload into that sits under the web root = remote execution
+#     if a file ending in an extension the server executes is uploaded successfully. The check in
+#     core/files.py restricts the types to an allow-list, and this is the second layer:
+#     even if a file gets through, it is served as text and never executed.
 #
-# ⚠️  <Directory> **لا يعمل داخل .htaccess** — إنه توجيه إعداد خادم،
-#     ووضعه هنا يُسقط الموقع كله بخطأ 500. تعطيل المحرّك داخل مجلد
-#     الميديا مكانه deploy/media.htaccess الذي يوضع في ذلك المجلد نفسه.
+# ⚠️  <Directory> **does not work inside .htaccess** — it is a server configuration directive,
+#     and putting it here brings the whole site down with a 500. Disabling the engine inside the
+#     media directory belongs in deploy/media.htaccess, which goes in that directory itself.
 <FilesMatch "\.(php|phtml|php[0-9]|pl|py|cgi|sh|lua)$">
     Require all denied
 </FilesMatch>
 
 
-# ── ٤. الملفات الموجودة فعلًا تُخدم كما هي ─────────────────
-# ⚠️  /media وصلة رمزية إلى /home/medboxne/med-box/media، و/static
-#     ناتج collectstatic. استثناؤهما هنا يمنع قاعدة SPA من ابتلاعهما
-#     وإرجاع index.html بدل الصورة — وهو العطل الذي يظهر كصور مكسورة
-#     في كل صفحة بينما الخادم يردّ 200.
+# ── 4. Files that actually exist are served as they are ────
+# ⚠️  /media is a symbolic link to /home/medboxne/med-box/media, and /static
+#     is the output of collectstatic. Excluding them here stops the SPA rule swallowing them
+#     and returning index.html instead of the image — the fault that appears as broken images
+#     on every page while the server answers 200.
 RewriteCond %{REQUEST_URI} ^/(media|static)/ [OR]
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
 
-# ── ٥. مسارات الواجهة أحادية الصفحة ────────────────────────
-# ⚠️  React Router يوجّه في المتصفح، والخادم لا يعرف /cart ولا /orders.
-#     بدون هذا السطر يعمل التنقّل داخل التطبيق ويفشل تحديث الصفحة
-#     أو فتح الرابط مباشرة بـ404 — عطل يظهر عند المستخدم لا عند المطوّر.
+# ── 5. Single-page application routes ──────────────────────
+# ⚠️  React Router routes in the browser, and the server knows neither /cart nor /orders.
+#     Without this line, navigation inside the application works and refreshing the page
+#     or opening the link directly fails with a 404 — a fault that shows for the user, not the developer.
 RewriteRule ^ /index.html [L]
 
 
-# ── ٦. التخزين المؤقّت ─────────────────────────────────────
-# ⚠️  index.html بلا تخزين، والأصول بأقصاه.
-#     Vite يبني أسماء الأصول ببصمة محتواها (app-4f2a9c.js)، فتغيّر
-#     المحتوى يغيّر الاسم — سنة كاملة آمنة. أمّا index.html فهو الذي
-#     يحمل أسماء الأصول الجديدة، وتخزينه يعني نشرًا لا يصل الزائر أبدًا.
+# ── 6. Caching ─────────────────────────────────────────────
+# ⚠️  index.html with no caching, and the assets with the maximum.
+#     Vite builds the asset names with a fingerprint of their content (app-4f2a9c.js), so changing
+#     the content changes the name — a full year is safe. index.html, by contrast, is what
+#     carries the new asset names, and caching it means a deployment the visitor never receives.
 <IfModule mod_expires.c>
     ExpiresActive On
     ExpiresByType text/css                 "access plus 1 year"
@@ -99,19 +99,19 @@ RewriteRule ^ /index.html [L]
 </FilesMatch>
 
 
-# ── ٧. ترويسات أمان ────────────────────────────────────────
-# ⚠️  نظيرها في Django يغطّي نطاق الخادم وحده — هذا نطاق مختلف
-#     يخدمه Apache، فلا تصله إعدادات prod.py.
+# ── 7. Security headers ────────────────────────────────────
+# ⚠️  Their counterpart in Django covers the server's domain alone — this is a different domain
+#     served by Apache, so prod.py's settings never reach it.
 <IfModule mod_headers.c>
     Header always set X-Content-Type-Options "nosniff"
     Header always set Referrer-Policy "same-origin"
     Header always set X-Frame-Options "DENY"
-    # سنة واحدة — مطابقة لـ SECURE_HSTS_SECONDS في prod.py
+    # One year — matching SECURE_HSTS_SECONDS in prod.py
     Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
 </IfModule>
 
 
-# ── ٨. الضغط ───────────────────────────────────────────────
+# ── 8. Compression ─────────────────────────────────────────
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/html text/css text/plain
     AddOutputFilterByType DEFLATE application/javascript application/json

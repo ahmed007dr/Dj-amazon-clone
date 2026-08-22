@@ -362,7 +362,7 @@ class AdminCategorySerializer(serializers.ModelSerializer):
         return obj.products.count()
 
     def get_path_label(self, obj) -> str:
-        """"Medicines ← Painkillers" — for display in a flat select list."""
+        """ "Medicines ← Painkillers" — for display in a flat select list."""
         parts, node, guard = [], obj, 0
         while node is not None and guard < 8:
             parts.append(node.name_ar)

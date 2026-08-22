@@ -248,7 +248,8 @@ register(BankTransferAdapter)
 #
 #      The two adapters import `register` and `PaymentAdapter` from here;
 #      importing them at the top before those are defined raises `ImportError`
-#      at Django startup — a failure that surfaces as an obscure import error rather than its real cause.
+#      at Django startup — a failure that surfaces as an obscure import error rather than its real
+#      cause.
 #
 #  ⚠️  And they have not been tested against a real account yet.
 #      See the full warning in `payments/gateways/__init__.py`.

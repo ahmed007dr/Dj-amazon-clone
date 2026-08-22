@@ -552,7 +552,8 @@ class TestAPI:
         assert response.data is None
 
     def test_a_draft_target_is_hidden_from_the_rep(self, rep):
-        """A number not yet approved is one the rep builds an expectation on, and it then changes."""
+        """A number not yet approved is one the rep builds an expectation on, and it then
+        changes."""
         make_target(rep, "10000.00", status=TargetStatus.DRAFT)
 
         response = client_for(rep.user).get(reverse("v1:targets:me"))

@@ -351,7 +351,8 @@ class TestAddingProviders:
 
     def test_provider_with_transactions_cannot_be_deleted(self, admin_client, providers, db):
         """
-        ⚠️  Deleting it leaves historical transactions with no reference, so every financial report breaks.
+        ⚠️  Deleting it leaves historical transactions with no reference, so every financial report
+            breaks.
         """
         from payments.models import PaymentTransaction
 

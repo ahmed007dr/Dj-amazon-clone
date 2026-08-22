@@ -395,7 +395,8 @@ class StockMovement(models.Model):
     )
     quantity = models.PositiveIntegerField(_("الكمية"))
 
-    #: A snapshot of the balance after the movement — it allows reviewing the log without recomputing
+    #: A snapshot of the balance after the movement — it allows reviewing the log without
+    #:     recomputing
     balance_after = models.IntegerField(_("الرصيد بعد الحركة"), default=0)
 
     unit_cost = MoneyField(
@@ -430,7 +431,8 @@ class StockMovement(models.Model):
         #     Two movements recorded in the same microsecond (a sale consuming
         #     two batches, say) leave `-created_at` alone with an unstable
         #     ordering — differing from one query to the next. And in a log that
-        #     the stock count and cost calculation are built on, unstable ordering is a defect, not a nuisance.
+        #     the stock count and cost calculation are built on, unstable ordering is a defect, not
+        #     a nuisance.
         ordering = ["-created_at", "-id"]
         indexes = [
             models.Index(fields=["product", "location", "-created_at"]),

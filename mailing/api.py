@@ -343,7 +343,8 @@ class TemplatePreviewAPI(APIView):
                 "subject": render_text(subject, SAMPLE_CONTEXT),
                 "body": render_text(body, SAMPLE_CONTEXT),
                 # ⚠️  An unknown variable is shown explicitly here rather than passing
-                #     through in the text, where the editor sees it as "a strange word" and ignores it.
+                #     through in the text, where the editor sees it as "a strange word" and ignores
+                #     it.
                 "unknown_variables": sorted(
                     (placeholders(subject) | placeholders(body)) - template.variables
                 ),

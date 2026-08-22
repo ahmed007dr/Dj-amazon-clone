@@ -451,7 +451,8 @@ class POSProductSearchAPI(generics.ListAPIView):
     pagination_class = None
 
     #: ⚠️  A hard cap: the cashier types two characters and gets thousands of rows
-    #:     back with the customer standing there. Twenty is enough to choose from and keeps the response instant.
+    #:     back with the customer standing there. Twenty is enough to choose from and keeps the
+    #:     response instant.
     LIMIT = 20
 
     def get_queryset(self):

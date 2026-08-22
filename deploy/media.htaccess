@@ -1,31 +1,32 @@
 # ═══════════════════════════════════════════════════════════
 #  ⇒  /home/medboxne/med-box/media/.htaccess
 #
-#  ⚠️  يوضع في **مجلد الميديا نفسه**، لا في public_html.
+#  ⚠️  This goes in **the media directory itself**, not in public_html.
 #
-#      المجلد يصل إلى جذر الويب عبر وصلة رمزية، ووضع الحماية في
-#      طرف الوصلة لا في هدفها يجعلها تسقط لحظة تغيّر طريقة التقديم —
-#      نقل الميديا إلى CDN، أو إضافة نطاق فرعي ثانٍ يشير إلى المجلد.
-#      هنا تلازم الملفاتِ نفسَها أينما قُدِّمت.
+#      The directory reaches the web root through a symbolic link, and putting
+#      the protection at the link rather than at its target makes it fall away
+#      the moment the serving method changes — moving media to a CDN, or adding
+#      a second subdomain pointing at the directory. Here it stays with the
+#      files themselves wherever they are served from.
 #
-#  ⚠️  وهذه **طبقة ثانية**، لا الطبقة الأولى.
+#  ⚠️  And this is **a second layer**, not the first.
 #
-#      الفصل الحقيقي هو ألّا يكون private/ تحت جذر الويب أصلًا —
-#      ويحتاج جعل MEDIA_ROOT قابلًا للتجاوز بمتغيّر بيئة
-#      (config/settings/base.py:442). ما دام ذلك لم يُنفَّذ، هذا الملف
-#      وقواعد public_html هما كل ما يفصل وثائق العملاء عن العلن.
-#      ملف واحد يُحذف سهوًا أثناء رفع بـ FTP يفتحها كلها.
+#      The real separation is for private/ not to be under the web root at all —
+#      which requires making MEDIA_ROOT overridable by an environment variable
+#      (config/settings/base.py:442). As long as that is not done, this file
+#      and the public_html rules are all that separates customer documents from the public.
+#      A single file deleted by accident during an FTP upload opens all of them.
 # ═══════════════════════════════════════════════════════════
 
-# ── لا فهرسة للمجلدات ──────────────────────────────────────
-# بدونها يعرض الخادم قائمة بكل ملف في المجلد لمن يطلب مساره
+# ── No directory indexing ──────────────────────────────────
+# Without it the server lists every file in the directory to whoever requests its path
 Options -Indexes
 
 
-# ── لا تنفيذ — مهما كان الامتداد ───────────────────────────
-# ⚠️  مجلد يرفع إليه المستخدمون: ملف ينتهي بامتداد ينفّذه الخادم
-#     يعني تنفيذًا عن بُعد. core/files.py يقصر الأنواع على قائمة
-#     سماح عند الرفع، وهذه الطبقة التي تصمد لو مرّ شيء منها.
+# ── No execution — whatever the extension ──────────────────
+# ⚠️  A directory users upload into: a file ending in an extension the server
+#     executes means remote execution. core/files.py restricts the types to an
+#     allow-list at upload, and this is the layer that holds if something gets through.
 Options -ExecCGI
 RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .php8 .pl .py .cgi .sh .lua
 RemoveType .php .phtml .php3 .php4 .php5 .php7 .php8 .pl .py .cgi .sh .lua
@@ -38,22 +39,23 @@ RemoveType .php .phtml .php3 .php4 .php5 .php7 .php8 .pl .py .cgi .sh .lua
 </IfModule>
 
 
-# ── المسارات الخاصة — ممنوعة بالمسار المباشر ───────────────
-# ⚠️  الاصطلاح موجود في الكود بالفعل: customers/models.py:24 و
-#     finance/models.py:29 يكتبان تحت private/ صراحةً.
-#     mail/ ليس تحته لكنه بالحساسية نفسها (mailing/models.py:567).
+# ── Private paths — blocked by direct path ─────────────────
+# ⚠️  The convention already exists in the code: customers/models.py:24 and
+#     finance/models.py:29 write under private/ explicitly.
+#     mail/ is not beneath it but is equally sensitive (mailing/models.py:567).
 #
-#     تقديمها الشرعي عبر Django يقرأ من القرص (FileResponse) لا عبر
-#     هذا المسار — فالمنع هنا لا يكسر شيئًا.
+#     Their legitimate serving through Django reads from disk (FileResponse) rather
+#     than through this path — so blocking here breaks nothing.
 RedirectMatch 404 ^/media/private/
 RedirectMatch 404 ^/media/mail/
 
 
-# ── تخزين الميديا العامة ───────────────────────────────────
-# ⚠️  يسري على العام وحده: المسارات الخاصة رُدَّت بـ404 في القاعدة
-#     أعلاه فلا تصل إلى هنا أصلًا. ولو وصلت يومًا — بحذف تلك القاعدة —
-#     فـ public هنا يعني أن ذاكرة وسيطة مشتركة تحتفظ بالملف بعد
-#     انتهاء التوقيع. القاعدتان مرتبطتان: لا تُحذف الأولى وتبقى هذه.
+# ── Public media caching ───────────────────────────────────
+# ⚠️  This applies to the public paths alone: the private paths were answered with
+#     404 by the rule above, so they never reach here. And were they to one day —
+#     if that rule were deleted — `public` here would mean a shared intermediate
+#     cache keeps the file after the signature expires. The two rules are linked:
+#     do not delete the first and leave this one.
 <IfModule mod_headers.c>
     <FilesMatch "\.(pdf|jpe?g|png|webp)$">
         Header set Cache-Control "public, max-age=2592000"

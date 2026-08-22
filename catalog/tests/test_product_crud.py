@@ -274,7 +274,7 @@ class TestFormOptions:
         assert str(hidden.pk) in ids
 
     def test_category_label_shows_the_full_path(self, admin_client, category):
-        """"Tablets" alone is ambiguous when it exists under both "Medicines" and "Supplements"."""
+        """ "Tablets" alone is ambiguous when it exists under both "Medicines" and "Supplements"."""
         child = Category.objects.create(name_ar="شاش", name_en="Gauze", parent=category)
 
         response = admin_client.get(reverse("v1:catalog:admin-product-options"))
@@ -295,13 +295,13 @@ class TestFormOptions:
         assert {"public", "students", "professionals", "pharmacy_only"} <= codes
 
     def test_the_default_policy_comes_first(self, admin_client, policies):
-        """"For everyone" is the right choice for most products — and burying it
+        """ "For everyone" is the right choice for most products — and burying it
         mid-list makes the admin restrict a public product unintentionally."""
         response = admin_client.get(reverse("v1:catalog:admin-product-options"))
         assert response.data["access_policies"][0]["is_default"] is True
 
     def test_each_policy_carries_its_conditions_not_just_a_name(self, admin_client, policies):
-        """"Verified professionals" alone does not say that an unverified doctor is blocked."""
+        """ "Verified professionals" alone does not say that an unverified doctor is blocked."""
         response = admin_client.get(reverse("v1:catalog:admin-product-options"))
         professionals = next(
             row for row in response.data["access_policies"] if row["code"] == "professionals"
@@ -403,7 +403,8 @@ class TestAudience:
         assert {row["sku"] for row in public.data["results"]} == {"NEW-001"}
 
     def test_the_policy_can_be_tightened_after_creation(self, admin_client, category, policies):
-        """Discovering that a restricted product was published to everyone must be fixable in one click."""
+        """Discovering that a restricted product was published to everyone must be fixable in one
+        click."""
         admin_client.post(reverse("v1:catalog:admin-products"), draft(category), format="json")
         product = Product.objects.get(sku="NEW-001")
 

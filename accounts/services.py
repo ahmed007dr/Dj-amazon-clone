@@ -227,7 +227,8 @@ def close_session(session: UserSession, *, revoked: bool = False) -> UserSession
     session.save(update_fields=["logout_at", "revoked_at", "duration_seconds"])
 
     # ⚠️  Logging out drops the heartbeat — otherwise the departed user stays
-    #     "online" until the window expires, so the admin sees five people connected when three have left.
+    #     "online" until the window expires, so the admin sees five people connected when three have
+    #     left.
     #     The condition is deliberate: a second device still open means its owner is online.
     if not UserSession.objects.filter(user_id=session.user_id, logout_at__isnull=True).exists():
         drop_presence(session.user_id)
@@ -249,7 +250,8 @@ def close_all_sessions(user: User, *, revoked: bool = False) -> int:
 
 PRESENCE_KEY = "presence:live"
 
-#: The heartbeat is not written on every request — once every half minute is enough for the five-minute window.
+#: The heartbeat is not written on every request — once every half minute is enough for the
+#:     five-minute window.
 PRESENCE_HEARTBEAT = timedelta(seconds=30)
 
 #: The same record serves anonymous visitors in `analytics` — see `core.presence`.

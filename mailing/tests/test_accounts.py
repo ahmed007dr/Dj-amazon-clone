@@ -79,7 +79,8 @@ class TestResolution:
         assert services.resolve_account() is None
 
     def test_inbound_only_account_does_not_send(self):
-        """A receiving account is not a sending account — conflating them sends mail out of the support inbox."""
+        """A receiving account is not a sending account — conflating them sends mail out of the
+        support inbox."""
         make_account(
             code="support",
             direction=MailDirection.INBOUND,
@@ -213,7 +214,8 @@ class TestValidation:
         assert "imap_host" in exc.value.error_dict
 
     def test_only_one_default_account(self):
-        """"Which account is the default?" is a question with one answer — enforced by a constraint, not a screen."""
+        """ "Which account is the default?" is a question with one answer
+        — enforced by a constraint, not a screen."""
         from django.db.utils import IntegrityError
 
         make_account(code="first", is_default=True)

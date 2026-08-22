@@ -154,7 +154,8 @@ def create_from_cart(
     #
     #     When every line fails (stock ran out · the product was discontinued),
     #     `snapshot.lines` becomes empty — so putting the empty check first
-    #     tells the customer "your cart is empty" while it is full and the real cause is entirely different.
+    #     tells the customer "your cart is empty" while it is full and the real cause is entirely
+    #     different.
     if snapshot.has_issues:
         first = snapshot.issues[0]
         raise BusinessError(
@@ -416,7 +417,8 @@ def orders_for(customer):
 #
 #      The two functions below are the point of sale's entry into the same
 #      order model — not a parallel one. `pos` calls them and never knows
-#      `Order` directly, and `orders` knows nothing at all about `pos`: its inputs are items and numbers.
+#      `Order` directly, and `orders` knows nothing at all about `pos`: its inputs are items and
+#      numbers.
 #
 #      The alternative (a separate `POSOrder`) means two sales reports, two
 #      stock figures and two sources of truth — and the first accounting

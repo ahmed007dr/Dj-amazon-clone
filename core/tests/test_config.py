@@ -48,7 +48,8 @@ class TestDerivedDomain:
             assert settings.MEDIA_ORIGIN == settings.API_ORIGIN
 
     def test_language_matches_the_shared_default(self):
-        """A server in Arabic and a frontend in English is a contradiction visible on the first load."""
+        """A server in Arabic and a frontend in English is a contradiction visible on the first
+        load."""
         assert settings.LANGUAGE_CODE == settings.PUBLIC_DEFAULT_LOCALE
 
 

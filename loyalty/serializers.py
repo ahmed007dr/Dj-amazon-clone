@@ -164,7 +164,8 @@ class PointsEntrySerializer(serializers.ModelSerializer):
 
 
 class AdminPointsEntrySerializer(PointsEntrySerializer):
-    """⚠️  The name of whoever recorded the adjustment is shown to the admin alone — never to the customer."""
+    """⚠️  The name of whoever recorded the adjustment is shown to the admin alone — never to the
+    customer."""
 
     customer_name = serializers.CharField(source="customer.display_name_ar", read_only=True)
     recorded_by_name = serializers.CharField(

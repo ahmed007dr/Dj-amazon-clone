@@ -52,11 +52,13 @@ PROVIDERS = [
         #     Split payment (half cash and half by card) is a daily occurrence
         #     at the counter. Without a gateway accepting `CARD` on the `POS`
         #     channel, half the sale was refused with "payment method unavailable" —
-        #     and the cashier recorded it as two sales, breaking the receipt and the return together.
+        #     and the cashier recorded it as two sales, breaking the receipt and the return
+        #     together.
         #
         # ⚠️  And `adapter_key="cash"` is deliberate: the terminal is operated by hand
         #     and prints its own receipt. The system records that the amount was
-        #     collected and contacts no payment network — and therefore **it does not enter the drawer** either.
+        #     collected and contacts no payment network — and therefore **it does not enter the
+        #     drawer** either.
         "code": "pos-card",
         "adapter_key": "cash",
         "name_ar": "بطاقة على الطرفية",
@@ -85,7 +87,8 @@ PROVIDERS = [
     # ⚠️  Seeded disabled and in test mode deliberately.
     #
     #     Enabling them with no keys makes a customer choose one and then have
-    #     their payment fail; and production mode with no testing collects real money on the first attempt.
+    #     their payment fail; and production mode with no testing collects real money on the first
+    #     attempt.
     #     The admin adds the keys from the panel and then enables them.
     {
         "code": "paymob",

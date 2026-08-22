@@ -23,7 +23,8 @@ SMTP_SECRET = "sup3r-secret-smtp-key"
 
 
 def _model(label: str, name: str):
-    """⚠️  `apps.get_model`, not `import` — `mailing` is forbidden from importing a business domain."""
+    """⚠️  `apps.get_model`, not `import` — `mailing` is forbidden from importing a business
+    domain."""
     return apps.get_model(label, name)
 
 
@@ -237,7 +238,8 @@ class TestRoutingAPI:
         assert rows["password_reset"]["source"] == "default"
 
     def test_security_route_to_marketing_is_refused_by_the_api(self, admin_client, db):
-        """The firewall is enforced in the API as in the admin panel — not two copies of the rule."""
+        """The firewall is enforced in the API as in the admin panel — not two copies of the
+        rule."""
         from mailing.purposes import MailPurpose
 
         promo = EmailAccount.objects.create(

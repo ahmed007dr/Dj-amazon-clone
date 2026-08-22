@@ -144,7 +144,8 @@ def record_visit(*, ip: str | None, user_agent: str, authenticated: bool) -> Non
         _bump(_key("known" if authenticated else "guest", bucket, device))
 
     # ⚠️  Registered users are not added here: their heartbeat happens in the
-    #     authentication layer where **who they are** is known, and counting them twice inflates "online now".
+    #     authentication layer where **who they are** is known, and counting them twice inflates
+    #     "online now".
     if not authenticated:
         visitors.touch(identity)
 

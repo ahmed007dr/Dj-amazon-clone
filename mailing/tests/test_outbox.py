@@ -287,7 +287,8 @@ class TestClaiming:
         assert len(django_mail.outbox) == 1
 
     def test_a_live_claim_is_left_alone(self, console_account):
-        """A live claim held by another worker is not seized — or the duplication returns by the other door."""
+        """A live claim held by another worker is not seized — or the duplication returns by the
+        other door."""
         message = queue()
         OutboundMessage.objects.filter(pk=message.pk).update(
             status=DeliveryState.SENDING,

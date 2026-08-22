@@ -255,7 +255,8 @@ class TestLiveControl:
         assert response.status_code == 409
 
     def test_new_profile_is_born_with_both_palettes(self, admin_client):
-        """A profile with no palettes means an identity with no colours — activating it blanks the site."""
+        """A profile with no palettes means an identity with no colours — activating it blanks the
+        site."""
         response = admin_client.post(
             reverse("v1:branding:profiles"),
             {"code": "winter", "name_ar": "شتاء", "name_en": "Winter"},
@@ -312,7 +313,7 @@ class TestLiveControl:
 
 @pytest.mark.django_db
 def test_only_one_profile_can_be_active(profile):
-    """"What are the system's colours?" must not depend on query ordering."""
+    """ "What are the system's colours?" must not depend on query ordering."""
     from django.db.utils import IntegrityError
 
     with pytest.raises(IntegrityError):

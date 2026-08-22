@@ -105,7 +105,8 @@ def _receive_once(product, quantity, unit_cost, days, location, *, variant=None,
         return False
 
     if quantity <= 0:
-        # Zero quantity = a deliberately out-of-stock item: the balance record is created with no batch
+        # Zero quantity = a deliberately out-of-stock item: the balance record is created with no
+        # batch
         get_or_create_stock(product, location=location, variant=variant)
         return False
 

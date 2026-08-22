@@ -63,7 +63,8 @@ def seed(users: dict) -> dict:
     #
     #     Giving one to an employee account — as genuinely happened with
     #     `warehouse@dev.local`, who is a warehouse employee rather than a
-    #     warehouse — creates a meaningless row, and every B2B endpoint answers it with 403 because the account type does not match.
+    #     warehouse — creates a meaningless row, and every B2B endpoint answers it with 403 because
+    #     the account type does not match.
     from accounts.models import AccountType
 
     trade_types = {

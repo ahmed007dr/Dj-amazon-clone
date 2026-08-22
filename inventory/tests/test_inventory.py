@@ -136,7 +136,8 @@ class TestOverselling:
 @pytest.mark.django_db
 class TestReservationLifecycle:
     def test_reserve_reduces_available_not_physical(self, stocked, location):
-        """A reservation does not take the goods off the shelf — it stops them being sold to anyone else."""
+        """A reservation does not take the goods off the shelf — it stops them being sold to anyone
+        else."""
         services.reserve(stocked, 30, location=location)
 
         stock = Stock.objects.get(product=stocked, location=location)
@@ -364,7 +365,8 @@ class TestMovementLedger:
         assert MovementType.ADJUSTMENT_UP in types
 
     def test_movements_are_append_only(self, stocked):
-        """Corrections go through an offsetting movement, not an edit — or the log becomes corrupt."""
+        """Corrections go through an offsetting movement, not an edit — or the log becomes
+        corrupt."""
         movement = StockMovement.objects.filter(product=stocked).first()
         movement.quantity = 999
 
@@ -787,7 +789,8 @@ class TestStockCount:
             services.apply_count(count)
 
     def test_a_completed_count_cannot_be_cancelled(self, stocked, location):
-        """⚠️  Its discrepancies have become movements — cancelling it leaves a balance adjusted by a cancelled session."""
+        """⚠️  Its discrepancies have become movements — cancelling it leaves a balance adjusted by
+        a cancelled session."""
         count = services.open_count(location)
         services.snapshot_count(count)
         services.apply_count(count)

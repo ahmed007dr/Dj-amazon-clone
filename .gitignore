@@ -1,15 +1,15 @@
 # ═══════════════════════════════════════════════════════════
-#  الأسرار — لا يُرفع أي منها إطلاقًا
+#  Secrets — none of these is ever committed
 # ═══════════════════════════════════════════════════════════
 .env
 .env.*
 !.env.example
-# ⚠️  النماذج تُستثنى **واحدًا واحدًا**.
+# ⚠️  The templates are excluded **one by one**.
 #
-#     `.env.*` أعلاه يبتلع كل ما يبدأ بـ `.env.` — بما فيه ملفات
-#     النماذج. ونموذج غير مرفوع يعني أن أول مطوّر جديد لا يعرف
-#     بوجود المتغيّر أصلًا: يستنسخ المستودع فيجد إعدادًا ناقصًا بلا
-#     أي إشارة إلى ما ينقصه.
+#     `.env.*` above swallows everything starting with `.env.` — including the
+#     template files. And an uncommitted template means the first new developer
+#     does not even know the variable exists: they clone the repository and find
+#     an incomplete configuration with no indication of what is missing.
 !.env.public.example
 *.pem
 *.key
@@ -19,7 +19,7 @@ credentials.json
 service-account*.json
 
 # ═══════════════════════════════════════════════════════════
-#  قواعد البيانات
+#  Databases
 # ═══════════════════════════════════════════════════════════
 *.sqlite3
 *.sqlite3-journal
@@ -29,14 +29,14 @@ service-account*.json
 db.sqlite3
 
 # ═══════════════════════════════════════════════════════════
-#  ملفات المستخدمين المرفوعة والملفات الثابتة المجمّعة
+#  User uploads and collected static files
 # ═══════════════════════════════════════════════════════════
 /media/
 /staticfiles/
 /static_root/
 
 # ═══════════════════════════════════════════════════════════
-#  قالب Greeny الأصلي — مصدر خارجي، لا ينتمي للمستودع
+#  The original Greeny template — an external source, not part of the repository
 # ═══════════════════════════════════════════════════════════
 /full-temp/
 
@@ -70,7 +70,7 @@ MANIFEST
 pip-log.txt
 pip-delete-this-directory.txt
 
-# البيئات الافتراضية
+# Virtual environments
 .venv/
 venv/
 ENV/
@@ -80,7 +80,7 @@ venv.bak/
 .python-version
 
 # ═══════════════════════════════════════════════════════════
-#  الاختبارات والتغطية
+#  Tests and coverage
 # ═══════════════════════════════════════════════════════════
 htmlcov/
 .tox/
@@ -97,7 +97,7 @@ coverage.xml
 cover/
 
 # ═══════════════════════════════════════════════════════════
-#  أدوات الجودة
+#  Quality tooling
 # ═══════════════════════════════════════════════════════════
 .ruff_cache/
 .mypy_cache/
@@ -114,11 +114,11 @@ local_settings.py
 celerybeat-schedule
 celerybeat.pid
 
-# ملفات الترجمة المُصرَّفة (تُبنى وقت النشر)
+# Compiled translation files (built at deploy time)
 *.mo
 
 # ═══════════════════════════════════════════════════════════
-#  الفرونت إند — React / Vite / Node
+#  Frontend — React / Vite / Node
 # ═══════════════════════════════════════════════════════════
 node_modules/
 web/dist/
@@ -134,7 +134,7 @@ pnpm-debug.log*
 .pnpm-store/
 
 # ═══════════════════════════════════════════════════════════
-#  المحررات وأنظمة التشغيل
+#  Editors and operating systems
 # ═══════════════════════════════════════════════════════════
 .vscode/
 !.vscode/extensions.json
@@ -148,7 +148,7 @@ Thumbs.db
 desktop.ini
 
 # ═══════════════════════════════════════════════════════════
-#  مؤقتات
+#  Temporaries
 # ═══════════════════════════════════════════════════════════
 tmp/
 temp/

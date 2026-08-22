@@ -58,7 +58,8 @@ class LoyaltyProgram(BaseModel):
     #: ⚠️  Redemption is a switch separate from earning.
     #:
     #:     Disabling the programme while changing the rules must not stop the
-    #:     customer redeeming what they earned — or their balance is held for no reason they understand.
+    #:     customer redeeming what they earned — or their balance is held for no reason they
+    #:     understand.
     redemption_enabled = models.BooleanField(_("الاستبدال مفعّل"), default=True)
 
     account_types = models.JSONField(
@@ -93,7 +94,8 @@ class LoyaltyProgram(BaseModel):
     #: ⚠️  Earning is on the goods, not on tax and shipping.
     #:
     #:     Tax is collected for the state and we do not own it, and shipping is paid
-    #:     to the carrier. Rewarding the customer on them rewards them on what we did not profit from.
+    #:     to the carrier. Rewarding the customer on them rewards them on what we did not profit
+    #:     from.
     earns_on_tax = models.BooleanField(_("الكسب على الضريبة"), default=False)
     earns_on_shipping = models.BooleanField(_("الكسب على الشحن"), default=False)
 

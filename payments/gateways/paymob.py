@@ -294,7 +294,8 @@ class PaymobAdapter(PaymentAdapter):
         return WebhookEnvelope(
             # ⚠️  The transaction id, not the order id: a failed payment attempt
             #     and then a successful one on the same order are two different
-            #     events, and merging them under one id makes the second look like a repeat and be discarded.
+            #     events, and merging them under one id makes the second look like a repeat and be
+            #     discarded.
             event_id=str(obj["id"]),
             event_type=str(payload.get("type") or "TRANSACTION"),
             outcome=self._outcome(obj),

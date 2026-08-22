@@ -119,7 +119,8 @@ class TestReceive:
         assert "unit_cost" in response.data["fields"]
 
     def test_location_may_be_omitted(self, admin_client, product, location):
-        """Most businesses have one warehouse — forcing them to choose it is a step with no decision."""
+        """Most businesses have one warehouse — forcing them to choose it is a step with no
+        decision."""
         response = admin_client.post(
             reverse("v1:inventory:receive"),
             {"product": str(product.pk), "quantity": 5, "unit_cost": "3.00"},
@@ -154,7 +155,8 @@ class TestAdjust:
         assert services.available_quantity(product, location) == 97
 
     def test_reason_is_required(self, admin_client, product, location):
-        """An adjustment with no reason is a hole in the stock count: the discrepancy appears a month later unexplained."""
+        """An adjustment with no reason is a hole in the stock count: the discrepancy appears a
+        month later unexplained."""
         services.receive(product, 10, Decimal("1.00"), location=location)
 
         response = admin_client.post(
@@ -289,7 +291,7 @@ class TestLogAndPermissions:
         assert {"RECEIPT", "ADJUSTMENT_DOWN", "DAMAGE"} <= kinds
 
     def test_the_log_records_who_did_it(self, admin_client, product, location):
-        """"Who changed the balance" is half the answer to "where did the fifty boxes go?"."""
+        """ "Who changed the balance" is half the answer to "where did the fifty boxes go?"."""
         admin_client.post(
             reverse("v1:inventory:receive"),
             {"product": str(product.pk), "quantity": 3, "unit_cost": "1.00"},
@@ -329,5 +331,6 @@ class TestLogAndPermissions:
         assert not StockMovement.objects.filter(product=product).exists()
 
     def test_customers_cannot_read_the_log(self, customer_client):
-        """The log reveals the volume of business and the turnover rate — a commercial figure that is not given away."""
+        """The log reveals the volume of business and the turnover rate — a commercial figure that
+        is not given away."""
         assert customer_client.get(reverse("v1:inventory:movements")).status_code == 403
