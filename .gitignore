@@ -17,6 +17,9 @@
 secrets/
 credentials.json
 service-account*.json
+*.zip
+src.zip
+
 
 # ═══════════════════════════════════════════════════════════
 #  Databases
