@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 
 import {
   downloadErrorFile,
@@ -11,6 +11,7 @@ import {
   type ImportJob,
   type ImportMode,
 } from '@/features/imports/adminApi';
+import { useImportJob } from '@/features/imports/adminApi';
 import { useImportRunner } from '@/features/imports/useImportRunner';
 import { ImportColumnGuide } from '@/portals/admin/components/ImportColumnGuide';
 import { ImportErrorTable } from '@/portals/admin/components/ImportErrorTable';
@@ -54,8 +55,22 @@ export function AdminImportPage() {
   const [mode, setMode] = useState<ImportMode>('CREATE_ONLY');
   const [duplicateOf, setDuplicateOf] = useState<ImportJob['duplicate_of']>(null);
 
+  // ⚠️  The page serves two entrances now.
+  //
+  //     Without an id it is the upload wizard, as before. With one it reopens an
+  //     existing run — which is what makes the runner's promise true from the
+  //     operator's side: the tab can be closed and the job picked back up, with
+  //     its progress, its error rows and its publish button all still reachable.
+  const { id: routeJobId } = useParams<{ id: string }>();
+  const existing = useImportJob(routeJobId ?? null);
+
   const runner = useImportRunner(null);
-  const job = runner.job;
+
+  // ⚠️  The runner's copy wins once it has one: it is the live result of the
+  //     chunk loop, while the query answer is a snapshot from before the last
+  //     chunk landed. Preferring the query here would make the progress bar
+  //     jump backwards between polls.
+  const job = runner.job ?? existing.data ?? null;
 
   const fail = (error: unknown) =>
     notify(isApiError(error) ? error.displayMessage : t('state.errorTitle'), 'danger');

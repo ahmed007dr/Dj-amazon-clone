@@ -2196,6 +2196,29 @@
       "PARTIAL": "Finished with errors",
       "FAILED": "Failed",
       "CANCELLED": "Cancelled"
-    }
+    },
+    "file": "File",
+    "result": "Result",
+    "noJobs": "No imports yet",
+    "newImport": "New import",
+    "historyTitle": "Import history",
+    "historySubtitle": "Every import — and the way back into a job left half-finished",
+    "history": "History"
+  },
+  "importStatus": {
+    "UPLOADED": "Uploaded",
+    "VALIDATING": "Checking",
+    "VALIDATED": "Ready to run",
+    "REJECTED": "Rejected",
+    "RUNNING": "Running",
+    "DONE": "Completed",
+    "PARTIAL": "Completed with errors",
+    "FAILED": "Failed",
+    "CANCELLED": "Cancelled"
+  },
+  "importMode": {
+    "CREATE_ONLY": "Create new only",
+    "UPDATE_ONLY": "Update existing only",
+    "UPSERT": "Create and update"
   }
 }

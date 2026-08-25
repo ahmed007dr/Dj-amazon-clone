@@ -2206,6 +2206,29 @@
       "PARTIAL": "اكتمل بأخطاء جزئية",
       "FAILED": "فشل",
       "CANCELLED": "ملغى"
-    }
+    },
+    "file": "الملف",
+    "result": "النتيجة",
+    "noJobs": "لا عمليات استيراد بعد",
+    "newImport": "استيراد جديد",
+    "historyTitle": "سجلّ الاستيراد",
+    "historySubtitle": "كل عملية استيراد — وطريق العودة إلى مهمة تُركت في منتصفها",
+    "history": "السجلّ"
+  },
+  "importStatus": {
+    "UPLOADED": "مرفوع",
+    "VALIDATING": "قيد الفحص",
+    "VALIDATED": "جاهز للتنفيذ",
+    "REJECTED": "مرفوض",
+    "RUNNING": "قيد التنفيذ",
+    "DONE": "اكتمل",
+    "PARTIAL": "اكتمل بأخطاء جزئية",
+    "FAILED": "فشل",
+    "CANCELLED": "ملغى"
+  },
+  "importMode": {
+    "CREATE_ONLY": "إضافة الجديد فقط",
+    "UPDATE_ONLY": "تحديث الموجود فقط",
+    "UPSERT": "إضافة وتحديث معًا"
   }
 }

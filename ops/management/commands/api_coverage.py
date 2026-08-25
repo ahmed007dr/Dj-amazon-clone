@@ -134,7 +134,19 @@ def _normalise(path: str) -> str:
 #     begins with a hole, not a slash. Four healthy endpoints were reported as
 #     gaps until this pattern was widened, and the suffix matching written to
 #     handle them never fired because the literal never reached it.
-_LITERAL = re.compile(r"""['"`]((?:/|\$\{[^}]*\})[A-Za-z0-9_\-./${}]*?/)['"`]""")
+#
+# ⚠️  The tail accepts anything that is not a quote or a newline, rather than an
+#     allow-list of path characters.
+#
+#     The allow-list omitted `!`, so `` `${base}/jobs/${jobId!}/` `` — TypeScript's
+#     non-null assertion inside a hole — was never captured, and two endpoints the
+#     frontend calls correctly were reported as gaps. An audit that invents
+#     findings is worse than no audit: it trains its reader to skim the list.
+#
+#     Over-capturing is the safe direction here: a hole becomes a wildcard and a
+#     literal made only of holes is rejected by `_CONCRETE` anyway.
+_LITERAL = re.compile(r"""['"`]((?:/|\$\{[^}]*\})[^'"`
+]*?/)['"`]""")
 
 
 #: At least one real resource name — a literal made only of holes identifies nothing.

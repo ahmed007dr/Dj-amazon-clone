@@ -95,7 +95,20 @@ export function ImportProgress({ job, phase }: { job: ImportJob; phase: RunnerPh
   );
 }
 
-function Count({ label, value, tone }: { label: string; value: number; tone?: 'danger' }) {
+// ⚠️  `| undefined` explicitly: the project builds with `exactOptionalPropertyTypes`,
+//     under which `tone?: 'danger'` means "may be absent" and **not** "may be
+//     undefined". The call site passes `cond ? 'danger' : undefined`, which is a
+//     present property holding undefined — a different thing, and rejected.
+//     `Field.tsx` states its optional props the same way.
+function Count({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: 'danger' | undefined;
+}) {
   return (
     <div className={`import-progress__count ${tone ? `import-progress__count--${tone}` : ''}`}>
       <dt>{label}</dt>

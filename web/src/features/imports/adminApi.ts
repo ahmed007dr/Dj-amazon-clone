@@ -120,6 +120,50 @@ export const useImportSpec = () =>
     staleTime: 5 * 60 * 1000,
   });
 
+/**
+ * The history of every import.
+ *
+ * ⚠️  **Without this the runner's own promise could not be kept.**
+ *
+ *     `useImportRunner` documents that closing the tab pauses rather than
+ *     loses — and it is true on the server: `imports/services.resume_abandoned`
+ *     runs under `run_periodic`. But the page held its job in component state
+ *     alone, so a closed tab left the operator with no way back to it: no
+ *     progress, no resume, no error file, and — worst — no publish, so drafts a
+ *     completed import had written stayed unpublished for good.
+ *
+ *     The endpoint answered correctly the whole time. Nothing asked it.
+ */
+export const useImportJobs = (page = 1, status = '') =>
+  useQuery({
+    queryKey: ['imports', 'jobs', page, status],
+    queryFn: () =>
+      http.get<PagedResponse<ImportJob>>(`${base}/jobs/`, {
+        params: { page, ...(status ? { status } : {}) },
+      }),
+    // ⚠️  Short: a job may be advancing in another tab, or being finished by
+    //     `run_periodic`, while this list is on screen.
+    staleTime: 10 * 1000,
+  });
+
+/**
+ * One job, by id — the way back into a run the tab was closed on.
+ *
+ * ⚠️  `refetchInterval` while the job is still owed a chunk.
+ *
+ *     Whoever opens this page is not necessarily the one driving the loop: the
+ *     work may be advancing in another tab or in `run_periodic`. Without a poll
+ *     the screen freezes at the progress it happened to load with, and reads as
+ *     a stalled import rather than one being finished elsewhere.
+ */
+export const useImportJob = (jobId: string | null) =>
+  useQuery({
+    queryKey: ['imports', 'job', jobId],
+    queryFn: () => http.get<ImportJob>(`${base}/jobs/${jobId!}/`),
+    enabled: Boolean(jobId),
+    refetchInterval: (query) => (query.state.data?.is_running ? 2000 : false),
+  });
+
 export const useImportErrors = (jobId: string | null, page = 1, sheet = '') =>
   useQuery({
     queryKey: ['imports', 'errors', jobId, page, sheet],
@@ -178,7 +222,15 @@ export const startExecution = (id: string) => http.post<ImportJob>(`${base}/jobs
 
 export const advanceImport = (id: string) => http.post<ImportJob>(`${base}/jobs/${id}/advance/`);
 
-export const cancelImport = (id: string) => http.post<ImportJob>(`${base}/jobs/${id}/cancel/`);
+/**
+ * ⚠️  The reason is sent, not dropped.
+ *
+ *     `CancelImportAPI` stores up to 500 characters of it. Cancelling without
+ *     one leaves a history of jobs that all say "cancelled" and none say why —
+ *     which is the question actually asked when someone reviews them later.
+ */
+export const cancelImport = (id: string, reason = '') =>
+  http.post<ImportJob>(`${base}/jobs/${id}/cancel/`, { reason });
 
 export const usePublishImport = () => {
   const queryClient = useQueryClient();

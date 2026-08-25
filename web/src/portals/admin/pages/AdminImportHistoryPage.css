@@ -1,0 +1,44 @@
+.import-history__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+}
+
+/* A job still owed a chunk — it may be advancing in another tab or in run_periodic */
+.import-history__live {
+  color: var(--color-info);
+  animation: import-history-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes import-history-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* ⚠️  Motion is disabled for anyone who asked for less of it: this dot conveys
+   "still working", and the same fact is already in the status badge beside it. */
+@media (prefers-reduced-motion: reduce) {
+  .import-history__live {
+    animation: none;
+  }
+}
+
+.import-history__counts {
+  display: inline-flex;
+  gap: var(--space-2, 0.5rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.import-history__counts .ok {
+  color: var(--color-success);
+}
+
+.import-history__counts .bad {
+  color: var(--color-danger);
+}
+
+.import-history__link {
+  color: inherit;
+  text-decoration: none;
+}

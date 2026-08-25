@@ -76,6 +76,11 @@ const AdminProductsPage = lazy(() =>
     default: module.AdminProductsPage,
   })),
 );
+const AdminImportHistoryPage = lazy(() =>
+  import('@/portals/admin/pages/AdminImportHistoryPage').then((module) => ({
+    default: module.AdminImportHistoryPage,
+  })),
+);
 const AdminImportPage = lazy(() =>
   import('@/portals/admin/pages/AdminImportPage').then((module) => ({
     default: module.AdminImportPage,
@@ -400,6 +405,29 @@ const router = createBrowserRouter([
       //     throws that away; a route survives, and can be linked to.
       {
         path: 'products/import',
+        element: (
+          <RequirePermission permission="catalog.change_product" screen="imports.title">
+            <Lazy>
+              <AdminImportPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'products/import/jobs',
+        element: (
+          <RequirePermission permission="catalog.change_product" screen="imports.title">
+            <Lazy>
+              <AdminImportHistoryPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        // ⚠️  Declared **after** `products/import/jobs` so the literal segment is
+        //     matched first — otherwise "jobs" is read as a job id and the
+        //     history page becomes unreachable.
+        path: 'products/import/:id',
         element: (
           <RequirePermission permission="catalog.change_product" screen="imports.title">
             <Lazy>
