@@ -94,6 +94,10 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
       // ⚠️  Reports first in the finance section: they are what gets opened daily,
       //     and the profit statement is read at closing.
       { to: '/admin/reports', key: 'reports.title', permission: 'finance.view_revenueentry' },
+      // ⚠️  `permission: null` on purpose — every dataset checks its own, and the
+      //     screen shows only what the account may take. Gating the link on the
+      //     finance permission would hide stock export from the warehouse.
+      { to: '/admin/exports', key: 'exports.navLabel', permission: null },
       // ⚠️  Load beside the reports rather than in "system": "when do people buy?"
       //     is a commercial question the shift rota and the offers are built on, not a setting.
       { to: '/admin/traffic', key: 'traffic.title', permission: 'finance.view_revenueentry' },

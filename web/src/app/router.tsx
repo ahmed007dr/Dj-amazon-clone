@@ -81,6 +81,11 @@ const AdminImportHistoryPage = lazy(() =>
     default: module.AdminImportHistoryPage,
   })),
 );
+const AdminExportsPage = lazy(() =>
+  import('@/portals/admin/pages/AdminExportsPage').then((module) => ({
+    default: module.AdminExportsPage,
+  })),
+);
 const AdminImportPage = lazy(() =>
   import('@/portals/admin/pages/AdminImportPage').then((module) => ({
     default: module.AdminImportPage,
@@ -605,6 +610,21 @@ const router = createBrowserRouter([
               <AdminReportsPage />
             </Lazy>
           </RequirePermission>
+        ),
+      },
+      // ⚠️  No `RequirePermission` wrapper, unlike every route around it.
+      //
+      //     Each dataset carries its own permission and the catalogue lists only
+      //     what the caller may take. Gating the page on one permission would
+      //     either lock out a warehouse keeper who may export the stock they
+      //     manage all day, or open the screen to anyone holding whichever
+      //     permission was picked. The empty state is a real answer.
+      {
+        path: 'exports',
+        element: (
+          <Lazy>
+            <AdminExportsPage />
+          </Lazy>
         ),
       },
       { path: 'traffic', element: <Lazy><AdminTrafficPage /></Lazy> },

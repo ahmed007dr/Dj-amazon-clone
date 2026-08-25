@@ -10,6 +10,7 @@ import {
   useRestoreProduct,
   type AdminProduct,
 } from '@/features/catalog/adminApi';
+import { ExportButton } from '@/portals/admin/components/ExportButton';
 import { ProductForm } from '@/portals/admin/components/ProductForm';
 import { ProductImagesPanel } from '@/portals/admin/components/ProductImagesPanel';
 import { useDebounced } from '@/shared/hooks/useDebounced';
@@ -205,6 +206,18 @@ export function AdminProductsPage() {
                 Adding ten thousand items one form at a time is not a thing
                 anyone does twice — the admin who needs this needs to find it
                 on the screen where they gave up. */}
+            {/* ⚠️  It carries the filters currently on screen — searching for a
+                brand and then exporting should give that brand, not the whole
+                catalogue. The `catalogue` dataset is the readable one; the
+                round-trip file lives on the export screen where its purpose
+                can be explained. */}
+            <ExportButton
+              dataset="catalogue"
+              size="md"
+              params={{
+                ...(active === 'false' ? { include_inactive: 'true' } : {}),
+              }}
+            />
             <Button variant="secondary" onClick={() => void navigate('/admin/products/import')}>
               {t('imports.action')}
             </Button>

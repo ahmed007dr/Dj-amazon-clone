@@ -30,6 +30,7 @@ import { Drawer } from '@/shared/ui/Drawer';
 import { FilterBar, FilterSearch, FilterSelect } from '@/shared/ui/FilterBar';
 import { Pagination } from '@/shared/ui/Pagination';
 import { StatusTabs } from '@/shared/ui/StatusTabs';
+import { ExportButton } from '@/portals/admin/components/ExportButton';
 import { ReservationsTab } from '@/portals/admin/components/ReservationsTab';
 import { useToast } from '@/shared/ui/useToast';
 import { formatDate, formatDateTime } from '@/shared/utils/format';
@@ -69,6 +70,24 @@ const MOVEMENT_ACTIONS: MovementAction[] = ['receive', 'adjust', 'transfer', 'da
  *     month — and its place is last.
  */
 type Tab = 'alerts' | 'stock' | 'batches' | 'movements' | 'counts' | 'reservations';
+
+/**
+ * Which tabs offer an inline export.
+ *
+ * ⚠️  `movements` is deliberately absent, and so are `counts` and `reservations`.
+ *
+ *     The movements dataset requires a period — the table grows without bound —
+ *     and this screen has no date pickers. A button here would either fail with
+ *     "choose a period", or invent one and hand back a file covering a different
+ *     range from the one on screen, which the `_meta` sheet would faithfully
+ *     record and nobody would read. Movements are exported from `/admin/exports`,
+ *     where the dates exist. Counts and reservations have no dataset at all.
+ */
+const EXPORTABLE_TABS: Partial<Record<Tab, string>> = {
+  alerts: 'stock-alerts',
+  stock: 'stock-levels',
+  batches: 'batches',
+};
 
 const ALERT_TONES = {
   LOW_STOCK: 'warning',
@@ -365,6 +384,12 @@ export function AdminInventoryPage() {
                 {t(`inventory.action_${item}`)}
               </Button>
             ))}
+            {EXPORTABLE_TABS[tab] ? (
+              <ExportButton
+                dataset={EXPORTABLE_TABS[tab]}
+                params={{ ...(location ? { location } : {}) }}
+              />
+            ) : null}
             <Button
               size="sm"
               variant="ghost"

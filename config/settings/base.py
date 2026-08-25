@@ -487,6 +487,14 @@ REST_FRAMEWORK = {
         #     The guard here is not the counter — it is `CanManageCatalog` plus a
         #     job that only its own owner may advance.
         "import_chunk": "1200/minute",
+        # ⚠️  Export is **tighter** than everything else, not looser.
+        #
+        #     One request can return fifty thousand rows of customers or
+        #     revenue. It is the most expensive query the panel can issue and
+        #     the most useful thing for someone quietly copying the business —
+        #     and unlike a list endpoint, there is no page size to hide behind.
+        #     Twenty a minute is generous for a human and useless for a script.
+        "export": "20/minute",
     },
 }
 

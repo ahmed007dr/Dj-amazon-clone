@@ -1,0 +1,108 @@
+.export-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.export-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.export-card__title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.export-card__tag {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-secondary);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.export-card__note,
+.export-card__filter-note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.export-card__filters {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.export-card__filter {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.export-card__filter-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.export-card__filter-label b {
+  color: var(--color-danger);
+}
+
+/* ⚠️  Inputs are sized by the grid, not by the browser default.
+       A `type="date"` left to itself is wider than its container in Chrome and
+       narrower in Firefox, so the cards in one row stop lining up. */
+.export-card__filter input[type='text'],
+.export-card__filter input[type='date'],
+.export-card__filter select {
+  inline-size: 100%;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.export-card__filter input[type='checkbox'],
+.export-card__contact input {
+  inline-size: 1.15rem;
+  block-size: 1.15rem;
+}
+
+/* ⚠️  Visually distinct from the ordinary filters, because it is not one.
+       Ticking it changes what leaves the company, not what the query returns —
+       and a switch that looks like "show inactive" gets ticked without reading. */
+.export-card__contact {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-3);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.export-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-block-start: auto;
+}
+
+.export-card__missing {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}

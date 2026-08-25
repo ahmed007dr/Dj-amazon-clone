@@ -2220,5 +2220,19 @@
     "CREATE_ONLY": "Create new only",
     "UPDATE_ONLY": "Update existing only",
     "UPSERT": "Create and update"
+  },
+  "exports": {
+    "navLabel": "Data export",
+    "action": "Export to Excel",
+    "title": "Data export",
+    "subtitle": "Take the rows out to Excel — to analyse, or to edit and upload back",
+    "limits": "Up to {{rows}} rows per file. If the result is larger the system tells you the count so you can narrow the filter.",
+    "download": "Download Excel",
+    "roundTrip": "Re-uploadable",
+    "roundTripHint": "Comes out with the import template's columns — edit it and upload on the import screen",
+    "includeContact": "Include email, phone and address — this is a contact-data export, and it is recorded against your name in the audit log",
+    "missingFilters": "Required first: {{fields}}",
+    "noneAvailable": "No datasets are available to your account",
+    "noneAvailableBody": "Each dataset needs its own domain permission. Ask your system administrator."
   }
 }
