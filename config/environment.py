@@ -41,8 +41,8 @@ The environment switch — development or production, decided on one line.
 #  ⇩⇩⇩  THE SWITCH  ⇩⇩⇩
 # ═══════════════════════════════════════════════════════════
 
-# IS_PRODUCTION = True    # production
-IS_PRODUCTION = False  # development
+IS_PRODUCTION = True    # production
+#IS_PRODUCTION = False  # development
 
 
 # ═══════════════════════════════════════════════════════════
