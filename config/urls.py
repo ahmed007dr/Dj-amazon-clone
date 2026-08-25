@@ -81,6 +81,11 @@ api_v1 = [
     path("commissions/", include("commissions.urls")),
     # ── Loyalty and referrals ──────────────────────────────
     path("loyalty/", include("loyalty.urls")),
+    # ── Bulk import ────────────────────────────────────────
+    # ⚠️  Not under `catalog/` even though the products are the payload: the same
+    #     file carries opening stock, which is `inventory`'s. A path owned by one
+    #     domain for a job that spans two is a lie about who owns it.
+    path("imports/", include("imports.urls")),
     # ── Suppliers and reporting ────────────────────────────
     path("suppliers/", include("suppliers.urls")),
     path("reports/", include("reporting.urls")),

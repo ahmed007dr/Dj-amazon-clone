@@ -52,7 +52,19 @@ export interface OnlineUser {
   email: string;
   full_name: string;
   account_type: AccountType;
-  last_activity: string;
+  /**
+   * ⚠️  `last_seen`, not `last_activity`.
+   *
+   *     The server answers this list with `AccountListSerializer`
+   *     (`administration/serializers.py`), whose field list has no
+   *     `last_activity` at all. The name here used to be that one, so every row
+   *     read `undefined`, handed it to `formatDateTime`, and the resulting
+   *     `.getTime()` on undefined took the whole page down through React
+   *     Router's error boundary — while the request itself returned 200.
+   *
+   *     Null is a real value: a user the presence table has never recorded.
+   */
+  last_seen: string | null;
 }
 
 /**

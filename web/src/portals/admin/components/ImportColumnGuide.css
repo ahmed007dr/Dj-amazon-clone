@@ -1,0 +1,113 @@
+.import-guide {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+}
+
+.import-guide__summary {
+  min-block-size: var(--touch-target);
+  padding: var(--space-3);
+  font-weight: 600;
+  cursor: pointer;
+  align-content: center;
+}
+
+.import-guide__limits {
+  margin: 0;
+  padding-inline: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.import-guide__sheet {
+  padding: var(--space-3);
+}
+
+.import-guide__sheet-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0 0 var(--space-2);
+  font-size: 1rem;
+}
+
+.import-guide__sheet-key,
+.import-guide__col-key {
+  direction: ltr;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.import-guide__tag {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.import-guide__tag--req {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.import-guide__tag--opt {
+  background: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.import-guide__tag--cond {
+  background: var(--color-warning);
+  color: #fff;
+}
+
+.import-guide__columns {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.import-guide__col {
+  padding: var(--space-3);
+  /* ⚠️  A start-edge border, not a left one. The panel is Arabic, and `left`
+         puts the marker on the far side of the text in right-to-left. */
+  border-inline-start: 3px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.import-guide__col--req {
+  border-inline-start-color: var(--color-primary);
+}
+
+.import-guide__col--cond {
+  border-inline-start-color: var(--color-warning);
+}
+
+.import-guide__col-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.import-guide__col-header {
+  font-weight: 600;
+}
+
+.import-guide__col-note,
+.import-guide__col-example {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.import-guide__col-example code {
+  direction: ltr;
+  unicode-bidi: isolate;
+}

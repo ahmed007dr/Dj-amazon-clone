@@ -104,6 +104,25 @@ export const previewPalette = (body: Partial<AdminPalette>) =>
     passes_aa: boolean;
   }>('/branding/admin/preview/', body);
 
+/**
+ * Create a new identity.
+ *
+ * ⚠️  **The screen could not create its own first profile until this existed.**
+ *
+ *     `AdminBrandingPage` stops at an empty state when the list is empty, and
+ *     the list starts empty on any installation that never ran the development
+ *     seed. The server accepted POST all along — nothing here called it — so the
+ *     panel was unusable and could not be repaired from inside itself.
+ *
+ * ⚠️  Only the three identifying fields are sent. The server creates both
+ *     palettes itself (`ProfileListCreateAPI.perform_create`), because a profile
+ *     without colours blanks the site the moment it is activated.
+ *
+ *     And it is created inactive: activating is a separate, deliberate step.
+ */
+export const createProfile = (body: { code: string; name_ar: string; name_en: string }) =>
+  http.post<AdminBrandProfile>('/branding/admin/profiles/', body);
+
 export const activateProfile = (id: string) =>
   http.post<AdminBrandProfile>(`/branding/admin/profiles/${id}/activate/`);
 
@@ -134,6 +153,10 @@ function useBrandingMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResu
 
 export function useBrandProfiles() {
   return useQuery({ queryKey: BRANDING_KEY, queryFn: listProfiles });
+}
+
+export function useCreateProfile() {
+  return useBrandingMutation(createProfile);
 }
 
 export function useUpdateProfile() {

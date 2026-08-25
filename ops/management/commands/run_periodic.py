@@ -37,6 +37,7 @@ from django.core.management.base import BaseCommand
 from accounts import services as account_services
 from analytics import services as analytics_services
 from cart import services as cart_services
+from imports import services as import_services
 from inventory import services as inventory_services
 from loyalty import services as loyalty_services
 from mailing import inbound as mail_inbound
@@ -73,6 +74,23 @@ JOBS: dict[str, tuple[str, str, Callable[[], int]]] = {
         "inventory",
         "تنبيهات قرب انتهاء الصلاحية",
         inventory_services.check_expiring_batches,
+    ),
+    # ⚠️  **A rescue, not the runner.**
+    #
+    #     A bulk import is driven chunk by chunk by the admin's own browser,
+    #     which is what makes the progress bar real. But a closed laptop at row
+    #     four thousand leaves a job stuck at `RUNNING` forever, with four
+    #     thousand products imported and six thousand not — the worst of the two
+    #     possible outcomes.
+    #
+    #     This advances such a job **one chunk per tick**, so a large import
+    #     finishes unattended over a few minutes. Running it to completion here
+    #     would make this command take minutes and hold up the mail queue behind
+    #     it, which is scheduled every few minutes for a reason.
+    "resume_imports": (
+        "imports",
+        "استئناف عمليات الاستيراد المتروكة",
+        import_services.resume_abandoned,
     ),
     "abandon_carts": (
         "cart",

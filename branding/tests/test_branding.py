@@ -9,8 +9,6 @@ Visual identity tests.
 """
 
 import pytest
-
-from core.testing import grant_all_domains
 from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.urls import reverse
@@ -19,6 +17,7 @@ from rest_framework.test import APIClient
 from branding import services
 from branding.contrast import contrast_ratio, passes_aa
 from branding.models import BrandProfile, DefaultMode, ThemeMode, ThemePalette
+from core.testing import grant_all_domains
 
 PASSWORD = "Str0ng-Test-Pass!23"
 
@@ -40,6 +39,17 @@ def _model(label: str, name: str):
 
 @pytest.fixture
 def profile(db):
+    # ⚠️  The default identity created by `branding.0002` is cleared first.
+    #
+    #     `unique_active_brand_profile` permits exactly one active profile, so a
+    #     migration-created active default collides with the one built here —
+    #     every test in this module failed with an IntegrityError that named the
+    #     constraint rather than the cause.
+    #
+    #     Deleting it also restores the precondition the assertions rely on: a
+    #     table holding only what the test put there.
+    BrandProfile.objects.all().delete()
+
     profile = BrandProfile.objects.create(
         code="test", name_ar="متجر", name_en="Store", is_active=True
     )
@@ -176,7 +186,15 @@ class TestPublicTheme:
         """
         ⚠️  A frontend with no colours paints a white page with black text — it
             looks like a fault rather than "the identity is not configured yet".
+
+        ⚠️  The condition is **created**, not assumed.
+
+            `branding.0002` ships a default identity, so a migrated database is
+            never empty. The guarantee under test is still real — an operator can
+            delete every profile — so the test now produces that state instead of
+            relying on the table happening to be bare.
         """
+        BrandProfile.objects.all().delete()
         assert not BrandProfile.objects.exists()
 
         payload = APIClient().get(reverse("v1:branding:theme")).data

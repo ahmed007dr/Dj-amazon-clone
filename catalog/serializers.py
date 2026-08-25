@@ -283,33 +283,28 @@ class AdminProductSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        ⚠️  Consistency of the regulatory fields.
+        ⚠️  Consistency of the regulatory fields — **through `catalog.rules`.**
 
-        A product marked `requires_prescription` while classified `OTC` is a
-        silent contradiction — one of the two fields is wrong, and the error
-        surfaces at the first regulatory review, not before.
+            The check used to be written out here, which made it a property of
+            this screen rather than of the catalogue: bulk import writes rows
+            with `bulk_create` and never touches a serializer, so the same
+            contradiction went straight into the database from a spreadsheet.
+            One function, both callers.
         """
-        from catalog.models import ProductKind, RegulatoryClass
+        from catalog import rules
 
         instance = self.instance
-        kind = attrs.get("kind", getattr(instance, "kind", None))
-        regulatory = attrs.get("regulatory_class", getattr(instance, "regulatory_class", None))
-        requires_rx = attrs.get(
-            "requires_prescription", getattr(instance, "requires_prescription", False)
+        errors = rules.regulatory_errors(
+            kind=attrs.get("kind", getattr(instance, "kind", None)),
+            regulatory_class=attrs.get(
+                "regulatory_class", getattr(instance, "regulatory_class", None)
+            ),
+            requires_prescription=attrs.get(
+                "requires_prescription", getattr(instance, "requires_prescription", False)
+            ),
         )
-
-        if requires_rx and regulatory in (
-            RegulatoryClass.OTC,
-            RegulatoryClass.NOT_APPLICABLE,
-        ):
-            raise serializers.ValidationError(
-                {"regulatory_class": ("منتج يتطلب وصفة لا يكون تصنيفه OTC أو «لا ينطبق»")}
-            )
-
-        if kind == ProductKind.MEDICINE and regulatory == RegulatoryClass.NOT_APPLICABLE:
-            raise serializers.ValidationError(
-                {"regulatory_class": "الدواء يجب أن يحمل تصنيفًا تنظيميًا"}
-            )
+        if errors:
+            raise serializers.ValidationError(errors)
 
         return attrs
 

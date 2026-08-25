@@ -1,0 +1,70 @@
+.track {
+  max-width: 46rem;
+  margin-inline: auto;
+}
+
+.track__form {
+  display: flex;
+  gap: var(--space-3, 0.75rem);
+  align-items: end;
+  margin-block-end: var(--space-5, 1.25rem);
+}
+
+.track__form .field {
+  flex: 1;
+}
+
+.track__result {
+  padding: var(--space-5, 1.25rem);
+}
+
+.track__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  margin-block-end: var(--space-4, 1rem);
+}
+
+.track__meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  margin-block-end: var(--space-5, 1.25rem);
+}
+
+.track__meta dt {
+  color: var(--color-text-muted);
+}
+
+.track__meta dd {
+  margin: 0;
+}
+
+/* The journey — most recent at the top */
+.track__events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3, 0.75rem);
+}
+
+.track__events li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  padding-block: var(--space-3, 0.75rem);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.track__when {
+  font-variant-numeric: tabular-nums;
+}
+
+.track__note {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-text-muted);
+}

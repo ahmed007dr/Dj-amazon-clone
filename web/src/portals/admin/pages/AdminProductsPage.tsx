@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import {
   listAdminProducts,
@@ -36,6 +36,7 @@ type Panel =
 
 export function AdminProductsPage() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const localized = useLocalized();
   const { notify } = useToast();
 
@@ -199,7 +200,16 @@ export function AdminProductsPage() {
         title={t('nav.products')}
         {...(query.data ? { description: t('admin.total', { count: query.data.count }) } : {})}
         actions={
-          <Button onClick={() => setPanel({ mode: 'create' })}>{t('products.create')}</Button>
+          <>
+            {/* ⚠️  Secondary, and beside "add" rather than buried in a menu.
+                Adding ten thousand items one form at a time is not a thing
+                anyone does twice — the admin who needs this needs to find it
+                on the screen where they gave up. */}
+            <Button variant="secondary" onClick={() => void navigate('/admin/products/import')}>
+              {t('imports.action')}
+            </Button>
+            <Button onClick={() => setPanel({ mode: 'create' })}>{t('products.create')}</Button>
+          </>
         }
       />
 

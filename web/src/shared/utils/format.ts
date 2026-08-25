@@ -32,7 +32,21 @@ export function formatNumber(value: number, locale: string): string {
   return new Intl.NumberFormat(locale).format(value);
 }
 
-export function formatDate(value: string | Date, locale: string): string {
+/**
+ * ⚠️  **Every formatter here accepts null and undefined.**
+ *
+ *     A nullable timestamp is ordinary — `last_seen` is null for a user who has
+ *     never been seen, `last_success_at` for a mail account that has never sent.
+ *     The signatures used to demand `string | Date`, so a null arrived as
+ *     `undefined`, reached `.getTime()` and threw — and because these run inside
+ *     `.map()` during render, one null row took down the **whole page** through
+ *     React Router's error boundary, not just its own cell.
+ *
+ *     They already returned '—' for an unparseable date. A missing date is the
+ *     same answer to the same question, so it is handled in the same place.
+ */
+export function formatDate(value: string | Date | null | undefined, locale: string): string {
+  if (value === null || value === undefined) return '—';
   const date = typeof value === 'string' ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return '—';
 
@@ -41,7 +55,11 @@ export function formatDate(value: string | Date, locale: string): string {
   }).format(date);
 }
 
-export function formatDateTime(value: string | Date, locale: string): string {
+export function formatDateTime(
+  value: string | Date | null | undefined,
+  locale: string,
+): string {
+  if (value === null || value === undefined) return '—';
   const date = typeof value === 'string' ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return '—';
 
@@ -52,8 +70,13 @@ export function formatDateTime(value: string | Date, locale: string): string {
 }
 
 /** "3 days ago" — in the correct locale and with no library. */
-export function formatRelative(value: string | Date, locale: string): string {
+export function formatRelative(
+  value: string | Date | null | undefined,
+  locale: string,
+): string {
+  if (value === null || value === undefined) return '—';
   const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return '—';
   const seconds = (date.getTime() - Date.now()) / 1000;
 
   const units: [Intl.RelativeTimeFormatUnit, number][] = [

@@ -30,6 +30,8 @@ import { ResetPasswordPage } from '@/portals/store/pages/ResetPasswordPage';
 import { VerifyEmailPage } from '@/portals/store/pages/VerifyEmailPage';
 import { OrderDetailPage } from '@/portals/store/pages/OrderDetailPage';
 import { OrdersPage } from '@/portals/store/pages/OrdersPage';
+import { ConfirmEmailChangePage } from '@/portals/store/pages/ConfirmEmailChangePage';
+import { TrackShipmentPage } from '@/portals/store/pages/TrackShipmentPage';
 import { ProductDetailPage } from '@/portals/store/pages/ProductDetailPage';
 import { ProductsPage } from '@/portals/store/pages/ProductsPage';
 import { Spinner } from '@/shared/ui/Spinner';
@@ -59,6 +61,11 @@ const AdminOrdersPage = lazy(() =>
     default: module.AdminOrdersPage,
   })),
 );
+const AdminShipmentsPage = lazy(() =>
+  import('@/portals/admin/pages/AdminShipmentsPage').then((module) => ({
+    default: module.AdminShipmentsPage,
+  })),
+);
 const AdminOrderDetailPage = lazy(() =>
   import('@/portals/admin/pages/AdminOrderDetailPage').then((module) => ({
     default: module.AdminOrderDetailPage,
@@ -67,6 +74,11 @@ const AdminOrderDetailPage = lazy(() =>
 const AdminProductsPage = lazy(() =>
   import('@/portals/admin/pages/AdminProductsPage').then((module) => ({
     default: module.AdminProductsPage,
+  })),
+);
+const AdminImportPage = lazy(() =>
+  import('@/portals/admin/pages/AdminImportPage').then((module) => ({
+    default: module.AdminImportPage,
   })),
 );
 const AdminInventoryPage = lazy(() =>
@@ -239,6 +251,10 @@ const router = createBrowserRouter([
       //     already sent — including links in mail that landed yesterday.
       { path: 'auth/verify-email', element: <VerifyEmailPage /> },
       { path: 'auth/reset-password', element: <ResetPasswordPage /> },
+      // ⚠️  The path is dictated by `accounts/api.py`, which emails
+      //     `frontend_url("/auth/confirm-email?token=…")`. Renaming it here
+      //     without changing that line kills every confirmation link already sent.
+      { path: 'auth/confirm-email', element: <ConfirmEmailChangePage /> },
       { path: 'auth/forgot-password', element: <ForgotPasswordPage /> },
 
       // ⚠️  The cart is **public**: a visitor shops before registering, and forcing
@@ -261,6 +277,13 @@ const router = createBrowserRouter([
             <OrdersPage />
           </RequireAuth>
         ),
+      },
+      {
+        // ⚠️  **Deliberately outside `RequireAuth`.** The person waiting for the
+        //     parcel is often not the buyer and holds only the number; a session
+        //     requirement locks out exactly the visitor this page is for.
+        path: 'track',
+        element: <TrackShipmentPage />,
       },
       {
         path: 'orders/:id',
@@ -351,11 +374,36 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: 'shipments',
+        element: (
+          <RequirePermission permission="shipping.change_shipment" screen="nav.shipments">
+            <Lazy>
+              <AdminShipmentsPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
         path: 'products',
         element: (
           <RequirePermission permission="catalog.change_product" screen="nav.products">
             <Lazy>
               <AdminProductsPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      // ⚠️  Its own route rather than a panel over the list.
+      //
+      //     A five-step import runs for minutes and holds a dry-run report the
+      //     admin reads carefully. A drawer closes on a click outside it and
+      //     throws that away; a route survives, and can be linked to.
+      {
+        path: 'products/import',
+        element: (
+          <RequirePermission permission="catalog.change_product" screen="imports.title">
+            <Lazy>
+              <AdminImportPage />
             </Lazy>
           </RequirePermission>
         ),

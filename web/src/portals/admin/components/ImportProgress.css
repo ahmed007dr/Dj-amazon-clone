@@ -1,0 +1,106 @@
+.import-progress {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.import-progress__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.import-progress__phase {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  /* ⚠️  The counts are digits either way, and Arabic-Indic numerals in a
+         right-to-left line put the slash on the wrong side of the pair.
+         Isolating the run keeps "4,000 / 10,000" reading as one unit. */
+  unicode-bidi: isolate;
+}
+
+.import-progress__bar {
+  block-size: 0.625rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.import-progress__fill {
+  display: block;
+  block-size: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  transition: inline-size 200ms ease;
+}
+
+/* ⚠️  The stripes move only while chunks are actually in flight.
+       A bar that keeps animating after the job stopped reads as "still
+       working", which is the one thing it must never say. */
+.import-progress__fill--live {
+  background-image: linear-gradient(
+    115deg,
+    rgb(255 255 255 / 22%) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgb(255 255 255 / 22%) 50%,
+    rgb(255 255 255 / 22%) 75%,
+    transparent 75%
+  );
+  background-size: 1.25rem 1.25rem;
+  animation: import-progress-stripes 900ms linear infinite;
+}
+
+@keyframes import-progress-stripes {
+  to {
+    background-position: 1.25rem 0;
+  }
+}
+
+/* ⚠️  Motion is a preference the operating system carries, and a striped bar
+       animating for four minutes is exactly the case it exists for. */
+@media (prefers-reduced-motion: reduce) {
+  .import-progress__fill {
+    transition: none;
+  }
+
+  .import-progress__fill--live {
+    background-image: none;
+    animation: none;
+  }
+}
+
+.import-progress__counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.import-progress__count {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.import-progress__count dt {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.import-progress__count dd {
+  margin: var(--space-1) 0 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  unicode-bidi: isolate;
+}
+
+.import-progress__count--danger {
+  border-color: var(--color-danger);
+}
+
+.import-progress__count--danger dd {
+  color: var(--color-danger);
+}

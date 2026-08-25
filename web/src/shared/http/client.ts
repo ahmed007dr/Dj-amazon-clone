@@ -58,11 +58,24 @@ async function parse(response: Response): Promise<unknown> {
   }
 }
 
-async function request<T>(
+/**
+ * The raw exchange — headers, the token, the 401 refresh, network failure.
+ *
+ * ⚠️  Extracted so that **downloading a file goes through the same door as
+ *     everything else.**
+ *
+ *     The template and the error report are behind `CanManageCatalog`, which
+ *     means they need the bearer token — and an `<a href>` or `window.open`
+ *     carries no token, so both used to answer 401 in a new tab the user could
+ *     not even read. Copying the header logic into a second function would have
+ *     meant a session refresh that works for JSON and silently does not for
+ *     downloads.
+ */
+async function send(
   method: string,
   path: string,
   options: RequestOptions = {},
-): Promise<T> {
+): Promise<Response> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
     // ⚠️  The language on every request: the server translates error messages into it.
@@ -108,15 +121,89 @@ async function request<T>(
 
   if (response.status === 401 && !options.skipAuthRefresh) {
     const retried = await onUnauthorized();
-    if (retried) return request<T>(method, path, { ...options, skipAuthRefresh: true });
+    if (retried) return send(method, path, { ...options, skipAuthRefresh: true });
   }
 
+  return response;
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
+  const response = await send(method, path, options);
   const payload = await parse(response);
 
   if (!response.ok) {
     throw new ApiError(response.status, (payload ?? {}));
   }
   return payload as T;
+}
+
+export interface DownloadedFile {
+  blob: Blob;
+  /** From `Content-Disposition`, falling back to the last path segment. */
+  filename: string;
+}
+
+/**
+ * A file the server generates for one signed-in user.
+ *
+ * ⚠️  An error is still **JSON**, and it must be read as such.
+ *
+ *     A failed download returns the ordinary error envelope, not a spreadsheet.
+ *     Handing the caller a `Blob` containing `{"code":"NOT_FOUND"}` and letting
+ *     the browser save it as `report.xlsx` produces a corrupt file the admin
+ *     takes to be a bug in the export.
+ */
+async function download(path: string, options: RequestOptions = {}): Promise<DownloadedFile> {
+  const response = await send('GET', path, options);
+
+  if (!response.ok) {
+    const payload = await parse(response);
+    throw new ApiError(response.status, payload ?? {});
+  }
+
+  return {
+    blob: await response.blob(),
+    filename: filenameFrom(response.headers.get('Content-Disposition'), path),
+  };
+}
+
+function filenameFrom(disposition: string | null, path: string): string {
+  // ⚠️  `filename*=UTF-8''…` is read before plain `filename=`. The server sends
+  //     both, and the plain one is the mangled spelling of an Arabic name.
+  const encoded = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      /* a malformed header is not worth failing a download over */
+    }
+  }
+
+  const plain = disposition?.match(/filename="?([^";]+)"?/i)?.[1];
+  return plain ?? path.split('/').filter(Boolean).pop() ?? 'download';
+}
+
+/**
+ * Hand the file to the browser.
+ *
+ * ⚠️  The object URL is revoked, and not revoking it is a real leak: the blob
+ *     stays in memory for the life of the document, and an admin who downloads
+ *     an error report a dozen times while fixing a sheet is holding a dozen
+ *     copies of it.
+ */
+export function saveFile({ blob, filename }: DownloadedFile): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 export const http = {
@@ -128,4 +215,5 @@ export const http = {
   put: <T>(path: string, body?: unknown, options?: RequestOptions) =>
     request<T>('PUT', path, { ...options, body }),
   delete: <T>(path: string, options?: RequestOptions) => request<T>('DELETE', path, options),
+  download,
 };

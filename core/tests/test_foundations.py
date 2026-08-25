@@ -100,6 +100,16 @@ INTERNAL_BIGINT_MODELS = {
     #     here is that the id **is never looked up**: no path takes it, and no
     #     endpoint accepts it. And the reader is a cashier on their own shift, not a stranger.
     ("pos", "CashMovement"),
+    # An import row that failed: written in bulk, thousands at a time, and read
+    # only as a block belonging to one job.
+    #
+    # ⚠️  Its id appears in the `/imports/jobs/{id}/errors/` list, and — like
+    #     `CashMovement` above — that is acceptable because **nothing ever looks
+    #     it up**: no path takes it, no endpoint accepts it, and the correction
+    #     loop runs on the downloaded workbook rather than on individual rows.
+    #     A UUID here would cost sixteen bytes a row on the one table designed
+    #     to hold tens of thousands of them and be deleted whole.
+    ("imports", "ImportRowError"),
 }
 
 #: Models with a natural key — the key itself is the meaning, not a sequential number.

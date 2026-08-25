@@ -13,6 +13,7 @@ import { ColorField } from '@/features/branding/components/ColorField';
 import { ContrastReport } from '@/features/branding/components/ContrastReport';
 import { BrandAssetsPanel } from '@/portals/admin/components/BrandAssetsPanel';
 import { BrandIdentityForm } from '@/portals/admin/components/BrandIdentityForm';
+import { BrandProfileCreate } from '@/portals/admin/components/BrandProfileCreate';
 import { useDebounced } from '@/shared/hooks/useDebounced';
 import { isApiError } from '@/shared/http';
 import { PageHeader } from '@/shared/layouts/PageHeader';
@@ -127,7 +128,18 @@ export function AdminBrandingPage() {
 
   if (profiles.isPending) return <Spinner />;
   if (!profile || !palette || !draft) {
-    return <Alert tone="warning">{t('admin.noBrandProfile')}</Alert>;
+    // ⚠️  The empty state carries the way out of itself.
+    //
+    //     It used to be the alert alone: a screen that reports it has nothing to
+    //     show and offers no means of creating it. The only remaining route was
+    //     Django's admin — which is precisely the second control surface this
+    //     panel exists to replace.
+    return (
+      <>
+        <Alert tone="warning">{t('admin.noBrandProfile')}</Alert>
+        <BrandProfileCreate onCreated={setSelectedId} />
+      </>
+    );
   }
 
   const contrast = preview.data?.contrast ?? palette.contrast;
@@ -158,6 +170,8 @@ export function AdminBrandingPage() {
                 ))}
               </select>
             ) : null}
+
+            <BrandProfileCreate onCreated={setSelectedId} />
 
             {profile.is_active ? (
               <Badge tone="success">{t('branding.activeProfile')}</Badge>

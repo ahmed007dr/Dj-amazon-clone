@@ -11,8 +11,6 @@ Uploading identity assets from the panel.
 """
 
 import pytest
-
-from core.testing import grant_all_domains
 from django.apps import apps
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
@@ -20,6 +18,7 @@ from rest_framework.test import APIClient
 
 from branding.models import BrandProfile, ThemeMode, ThemePalette
 from conftest import real_png_bytes
+from core.testing import grant_all_domains
 
 PASSWORD = "Str0ng-Test-Pass!23"
 
@@ -32,6 +31,11 @@ def _model(label: str, name: str):
 
 @pytest.fixture
 def profile(db):
+    # ⚠️  See the note in `test_branding.py`: only one profile may be active, and
+    #     `branding.0002` creates one. Clearing first keeps this fixture the sole
+    #     author of the table's contents.
+    BrandProfile.objects.all().delete()
+
     profile = BrandProfile.objects.create(
         code="assets", name_ar="متجر", name_en="Store", is_active=True
     )

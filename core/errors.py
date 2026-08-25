@@ -69,6 +69,14 @@ class ErrorCode:
     PAYMENT_GATEWAY_ERROR = "PAYMENT_GATEWAY_ERROR"
     PAYMENT_METHOD_UNAVAILABLE = "PAYMENT_METHOD_UNAVAILABLE"
 
+    # ── Bulk import ────────────────────────────────────────
+    IMPORT_FILE_UNREADABLE = "IMPORT_FILE_UNREADABLE"
+    IMPORT_SHEET_MISSING = "IMPORT_SHEET_MISSING"
+    IMPORT_COLUMN_MISSING = "IMPORT_COLUMN_MISSING"
+    IMPORT_TOO_MANY_ROWS = "IMPORT_TOO_MANY_ROWS"
+    IMPORT_ALREADY_RUNNING = "IMPORT_ALREADY_RUNNING"
+    IMPORT_NOT_VALIDATED = "IMPORT_NOT_VALIDATED"
+
     # ── General ────────────────────────────────────────────
     NOT_FOUND = "NOT_FOUND"
     CONFLICT = "CONFLICT"
@@ -105,6 +113,12 @@ ERROR_MESSAGES = {
     ErrorCode.PAYMENT_FAILED: _("فشلت عملية الدفع"),
     ErrorCode.PAYMENT_GATEWAY_ERROR: _("خطأ في بوابة الدفع"),
     ErrorCode.PAYMENT_METHOD_UNAVAILABLE: _("طريقة الدفع غير متاحة"),
+    ErrorCode.IMPORT_FILE_UNREADABLE: _("تعذّرت قراءة الملف — تأكد أنه بصيغة xlsx"),
+    ErrorCode.IMPORT_SHEET_MISSING: _("الملف لا يحتوي على الورقة المطلوبة"),
+    ErrorCode.IMPORT_COLUMN_MISSING: _("أعمدة إلزامية ناقصة في الملف"),
+    ErrorCode.IMPORT_TOO_MANY_ROWS: _("عدد الصفوف يتجاوز الحد المسموح لملف واحد"),
+    ErrorCode.IMPORT_ALREADY_RUNNING: _("هذه الوظيفة قيد التنفيذ بالفعل"),
+    ErrorCode.IMPORT_NOT_VALIDATED: _("يجب تشغيل الفحص الجاف قبل التنفيذ"),
     ErrorCode.NOT_FOUND: _("غير موجود"),
     ErrorCode.CONFLICT: _("تعارض في البيانات"),
     ErrorCode.RATE_LIMIT_EXCEEDED: _("عدد كبير من المحاولات — يرجى الانتظار"),

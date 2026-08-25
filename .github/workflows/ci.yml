@@ -55,6 +55,12 @@ jobs:
       - name: لا migrations منسية
         run: python manage.py makemigrations --check --dry-run
 
+      # ⚠️  نقطة يوفّرها الخادم ولا تصل إليها الواجهة لا تكسر اختبارًا ولا تكتب
+      #     سطرًا في سجل — تُكتشف يوم يحتاجها مشغّل فلا يجدها. هذه الخطوة هي
+      #     الشيء الوحيد الذي يجعلها مرئية قبل ذلك اليوم.
+      - name: تغطية الواجهة للواجهة البرمجية
+        run: python manage.py api_coverage --strict
+
       # ═══ Tests ═══
       - name: pytest
         run: pytest -q

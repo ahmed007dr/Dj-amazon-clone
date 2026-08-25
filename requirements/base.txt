@@ -66,6 +66,19 @@ whitenoise==6.7.0
 # ── Media ──────────────────────────────────────────────────
 Pillow==11.2.1
 
+# ── Spreadsheets — bulk catalogue import ───────────────────
+# ⚠️  It reads and writes `.xlsx`, and it is used in `read_only=True` mode alone.
+#
+#     The ordinary mode builds every cell of the workbook as an object before
+#     the first row is read: a 10,000-row sheet with forty columns is hundreds
+#     of megabytes of Python objects on a shared host with a hard memory cap.
+#     `read_only=True` streams the rows instead — see imports/reader.py.
+#
+# ⚠️  And **no pandas.** It would arrive with numpy for work that is a loop over
+#     rows, and its `float64` inference silently turns a price into a binary
+#     float — which core/money.py forbids in nine words.
+openpyxl==3.1.5
+
 # ── Translation ────────────────────────────────────────────
 # ⚠️  A build tool that production nonetheless needs — so it stays here, not in `dev.txt`.
 #

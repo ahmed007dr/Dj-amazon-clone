@@ -1,0 +1,180 @@
+.admin-import__back {
+  display: inline-block;
+  margin-block-end: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+/* ⚠️  A numbered list, not a row of divs. The steps are ordered content, and a
+       screen reader announcing "list, 4 items" carries the structure the
+       numbered circles convey visually. */
+.admin-import__steps {
+  display: grid;
+  gap: var(--space-4);
+  margin: var(--space-6) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-import__step {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ⚠️  A step not yet reached is dimmed, never hidden.
+       The admin needs to see that publishing exists **before** they run the
+       import — it is the difference between "the import did nothing to my
+       storefront" being a surprise and being the plan. */
+.admin-import__step--pending {
+  opacity: 0.55;
+}
+
+.admin-import__step--active {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.admin-import__step-head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.admin-import__step-num {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: 700;
+}
+
+.admin-import__step--pending .admin-import__step-num {
+  background: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.admin-import__step--done .admin-import__step-num {
+  background: var(--color-success);
+}
+
+.admin-import__step-title {
+  margin: 0;
+  font-size: 1.0625rem;
+}
+
+.admin-import__step-body {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.admin-import__step-content {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-start: var(--space-4);
+  /* ⚠️  Indented to the text, not to the number, so the content lines up with
+         the title rather than with the circle beside it. */
+  padding-inline-start: calc(2rem + var(--space-3));
+}
+
+@media (max-width: 40rem) {
+  .admin-import__step-content {
+    padding-inline-start: 0;
+  }
+}
+
+/* ── Upload ──────────────────────────────────────────────── */
+
+.admin-import__upload {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* ⚠️  The native input is kept in the DOM and visually replaced, not hidden
+       with `display: none` — a hidden input is unreachable by keyboard, and
+       choosing a file becomes impossible without a mouse. */
+.admin-import__file {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  min-block-size: var(--touch-target);
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.admin-import__file:focus-within {
+  border-color: var(--color-primary);
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.admin-import__file span {
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.admin-import__modes {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.admin-import__modes legend {
+  padding-inline: var(--space-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.admin-import__mode {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  min-block-size: var(--touch-target);
+  align-content: center;
+  cursor: pointer;
+}
+
+.admin-import__mode input {
+  margin-block-start: 0.3rem;
+}
+
+/* ── Confirmation and notes ──────────────────────────────── */
+
+.admin-import__confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.admin-import__note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.admin-import__publish {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+}
+
+.admin-import__review {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}

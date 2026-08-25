@@ -94,6 +94,30 @@ export const revokeSession = (id: number) =>
  *     be moved to an email its owner does not control — the fastest way to steal
  *     an account from an open session.
  */
+/**
+ * Step two — the link that arrives at the **new** address.
+ *
+ * ⚠️  This call did not exist, so the flow ended halfway: the request was sent,
+ *     the email arrived, and clicking its link opened a page the router did not
+ *     know. The address never changed and nothing said why.
+ *
+ * ⚠️  `skipAuthRefresh` because the caller is not signed in here.
+ *
+ *     The link is opened wherever the new mailbox is read — often another
+ *     browser, often another device. A 401 retry would try to refresh a session
+ *     that does not exist and turn a working confirmation into an auth error.
+ *
+ * ⚠️  And the server ends every session on success: the email **is** the
+ *     identifier, so the credentials that existed a moment ago no longer name
+ *     this account. Signing in again is the correct outcome, not a failure.
+ */
+export const confirmEmailChange = (token: string) =>
+  http.post<{ message: string }>(
+    '/auth/email/change/confirm/',
+    { token },
+    { skipAuthRefresh: true },
+  );
+
 export const requestEmailChange = (newEmail: string, currentPassword: string) =>
   http.post<void>('/auth/email/change/', {
     new_email: newEmail,

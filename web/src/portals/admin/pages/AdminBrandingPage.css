@@ -125,3 +125,20 @@
   justify-content: space-between;
   margin-block-end: var(--space-4);
 }
+
+/* ── Creating an identity ─────────────────────────────────
+   The form replaces the button in place rather than opening a modal: it is
+   three fields, and a dialog for three fields is ceremony that costs a
+   keystroke to dismiss. */
+.brand-profile-create {
+  display: grid;
+  gap: var(--space-3, 0.75rem);
+  padding: var(--space-4, 1rem);
+  margin-block-start: var(--space-3, 0.75rem);
+  max-width: 28rem;
+}
+
+.brand-profile-create__actions {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+}

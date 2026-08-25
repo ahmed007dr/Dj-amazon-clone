@@ -38,7 +38,14 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
     key: 'commerce',
     links: [
       { to: '/admin/orders', key: 'nav.orders', permission: 'orders.change_order' },
+      // ⚠️  Directly under orders: a shipment is the tail of an order, and the
+      //     operator moving parcels through the day works the two together.
+      { to: '/admin/shipments', key: 'nav.shipments', permission: 'shipping.change_shipment' },
       { to: '/admin/products', key: 'nav.products', permission: 'catalog.change_product' },
+      // ⚠️  Beneath products, not beside "system settings": bulk import is how a
+      //     catalogue is built and how a price list lands every week — it is
+      //     product work, not configuration done once.
+      { to: '/admin/products/import', key: 'imports.navLabel', permission: 'catalog.change_product' },
       // ⚠️  Under products rather than in "system": the category is mandatory on a
       //     product, so it is a step in adding an item rather than a setting configured once.
       { to: '/admin/reference', key: 'nav.reference', permission: 'catalog.change_product' },

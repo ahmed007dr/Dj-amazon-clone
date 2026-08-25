@@ -82,7 +82,7 @@ root_packages = [
     "reviews", "promotions", "cart", "orders", "payments",
     "academic", "notifications", "devtools", "ops", "seo", "pos", "finance", "b2b",
     "employees", "targets", "commissions", "suppliers", "reporting", "loyalty",
-    "analytics",
+    "analytics", "imports",
 ]
 
 [[tool.importlinter.contracts]]
@@ -120,6 +120,20 @@ layers = [
     #     filters both through `access` — siblings on the same layer, neither
     #     importing the other.
     "ops | seo",
+    # ⚠️  `imports` **below `ops`, not beside it** — and the difference is not cosmetic.
+    #
+    #     One uploaded sheet creates a `catalog.Product` and receives its opening
+    #     stock through `inventory.services.receive`, and `inventory` sits above
+    #     `catalog`. So the importer belongs in neither: putting it in `catalog`
+    #     makes it import the layer above it, and putting it in `inventory` makes
+    #     stock own a spreadsheet parser.
+    #
+    #     Beside `ops` was the first attempt, and `import-linter` rejected it in
+    #     one line: siblings do not import each other, and `run_periodic` has to
+    #     call `imports.services.resume_abandoned` to rescue a job whose browser
+    #     went away. A layer down states the real relationship — `ops` is the
+    #     runner, `imports` is one of the things it runs.
+    "imports",
     # ⚠️  `commissions` sits **above both `targets` and `finance`**.
     #
     #     Commission on profit needs `finance.COGSEntry` — the cost computed from

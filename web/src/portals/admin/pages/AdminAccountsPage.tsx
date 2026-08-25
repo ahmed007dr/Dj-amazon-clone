@@ -185,7 +185,7 @@ export function AdminAccountsPage() {
                 <strong>{user.full_name || user.email}</strong>
                 <span className="muted">{t(`accountType.${user.account_type}`)}</span>
                 <span className="muted">
-                  {formatDateTime(user.last_activity, i18n.language)}
+                  {formatDateTime(user.last_seen, i18n.language)}
                 </span>
               </li>
             ))}

@@ -1,0 +1,40 @@
+.import-errors {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-start: var(--space-3);
+}
+
+.import-errors__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.import-errors__filter {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.import-errors__filter.is-active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+/* ⚠️  The offending value is truncated on screen and kept whole in `title`.
+       A pasted cell can be a paragraph, and one bad row must not push the
+       message column off the table — the message is what the admin is reading. */
+.import-errors__value {
+  display: inline-block;
+  max-inline-size: 14rem;
+  direction: ltr;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}

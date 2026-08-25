@@ -279,6 +279,15 @@ LOCAL_APPS = [
     # ⚠️  `suppliers` above `inventory` and `catalog`: receiving creates a batch
     #     through `inventory.services.receive`, never by writing directly.
     "suppliers",
+    # ⚠️  `imports` beside `ops` and `seo` — above every business domain.
+    #
+    #     Bulk import writes a product through `catalog` and its opening stock
+    #     through `inventory.services.receive`, and `inventory` sits **above**
+    #     `catalog`. So the code cannot live in either: `catalog` importing
+    #     `inventory` inverts the direction, and `inventory` importing an
+    #     importer makes stock know about spreadsheets. Its place is the layer
+    #     that already exists for exactly this — cross-domain work nobody imports.
+    "imports",
     # ⚠️  `reporting` **reads and never writes** — no models, no migrations.
     #     The top layer: it knows everyone and nobody knows it.
     "reporting",
@@ -467,6 +476,17 @@ REST_FRAMEWORK = {
         #     paid. Keeping it apart from `anon` also stops a busy gateway from
         #     consuming the visitor quota and taking store browsing down with it.
         "webhook": "600/minute",
+        # ⚠️  Bulk import — a **higher** scope than `user`, deliberately.
+        #
+        #     The chunk endpoint is called in a loop by the admin's own browser:
+        #     ten thousand rows at five hundred a call is twenty requests in a
+        #     few seconds, and they land on top of whatever else that admin is
+        #     doing. Under the 300/minute user scope a large import throttled
+        #     itself halfway through and looked like a server fault.
+        #
+        #     The guard here is not the counter — it is `CanManageCatalog` plus a
+        #     job that only its own owner may advance.
+        "import_chunk": "1200/minute",
     },
 }
 
@@ -564,6 +584,32 @@ STATICFILES_DIRS = [BASE_DIR / "static", BASE_DIR / "web" / "dist"]
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+
+# ═══════════════════════════════════════════════════════════
+#  Upload limits
+# ═══════════════════════════════════════════════════════════
+# ⚠️  **Both values were left at Django's defaults, and the pair of them is a trap.**
+#
+#     `DATA_UPLOAD_MAX_MEMORY_SIZE` defaults to 2.5 MB and rejects the **whole
+#     request** above it — a bulk catalogue sheet of ten thousand rows is larger
+#     than that, and the admin got a bare 400 with nothing in any log explaining
+#     which of the two limits fired.
+#
+#     `FILE_UPLOAD_MAX_MEMORY_SIZE` is a different thing entirely: it is the
+#     point at which Django stops holding the upload in RAM and spills it to a
+#     temporary file. It rejects nothing. Keeping it small is what protects a
+#     shared host's memory, so it stays at the default while the first is raised.
+#
+# ⚠️  And the real ceiling for an import file is enforced in `imports/`, not here.
+#     This setting only decides whether the request is allowed to arrive at all;
+#     a limit expressed in a message the admin can read belongs beside the rule.
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("DATA_UPLOAD_MAX_MEMORY_SIZE", default=32 * 1024 * 1024)
+FILE_UPLOAD_MAX_MEMORY_SIZE = env.int("FILE_UPLOAD_MAX_MEMORY_SIZE", default=2 * 1024 * 1024)
+
+# ⚠️  A sheet with forty columns and three sheets exceeds the default 1,000 fields
+#     the moment a row is posted back as form data. Raised for the same reason.
+DATA_UPLOAD_MAX_NUMBER_FIELDS = env.int("DATA_UPLOAD_MAX_NUMBER_FIELDS", default=5000)
 
 
 # ═══════════════════════════════════════════════════════════
