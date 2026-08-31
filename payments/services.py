@@ -169,8 +169,27 @@ def capture(payment: PaymentTransaction) -> PaymentTransaction:
 
     For cash on delivery: called when the order is actually delivered — marking
     it captured before that means phantom revenue in the reports.
+
+    ⚠️  **It announces, exactly as the webhook path does.**
+
+        `_announce` used to be called from the inbound-event path alone, so a
+        capture that came through a gateway marked the order paid and a capture
+        entered by hand did not. Cash on delivery has no inbound event by
+        definition — it is *the* method that reaches this function — so the one
+        payment method the shop actually uses was the one whose orders stayed
+        unpaid for ever. The courier collected the money, the admin pressed
+        capture, the transaction read `CAPTURED`, and the order still read
+        "awaiting payment" with nothing to explain the contradiction.
+
+        A capture is a capture whatever announced it, and one place decides what
+        follows from it.
     """
     if payment.status == TransactionStatus.CAPTURED:
+        # ⚠️  Idempotent and **silent**: no second announcement.
+        #
+        #     Two presses of the button, or a delivery recorded after a manual
+        #     capture, must not emit `payment_captured` twice — the listeners
+        #     credit loyalty points and write finance entries off it.
         return payment
 
     if payment.status != TransactionStatus.AUTHORIZED:
@@ -183,6 +202,8 @@ def capture(payment: PaymentTransaction) -> PaymentTransaction:
     payment.status = TransactionStatus.CAPTURED
     payment.captured_at = timezone.now()
     payment.save(update_fields=["status", "captured_at"])
+
+    _announce(payment, TransactionStatus.CAPTURED)
     return payment
 
 

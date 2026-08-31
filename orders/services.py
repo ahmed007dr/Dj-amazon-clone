@@ -303,7 +303,76 @@ def transition(order: Order, to_status: str, *, note: str = "", actor=None) -> O
     if to_status == OrderStatus.SHIPPED:
         _commit_reservations(order)
 
+    # ⚠️  Delivery **is** the collection for cash on delivery.
+    if to_status == OrderStatus.DELIVERED:
+        _collect_on_delivery(order)
+
     return order
+
+
+def _collect_on_delivery(order: Order) -> int:
+    """
+    Capture the order's cash-on-delivery transactions once it has been handed over.
+
+    ⚠️  **Cash on delivery is the only method captured here.**
+
+        A card is captured by its gateway's inbound event, and doing it again
+        from this side records a collection the gateway never made. Cash on
+        delivery has no such event by construction: the money changes hands at
+        the door, and the courier's confirmation of delivery is the only signal
+        that it did.
+
+    ⚠️  And the capture was left as **a second manual step** until now.
+
+        `charge()` recorded the transaction as `AUTHORIZED` — correctly, since
+        nothing had been collected yet — and every screen offering to capture it
+        sat in the admin panel. So an order that was delivered and paid for in
+        cash stayed "awaiting payment" until somebody remembered to open
+        payments and press a button, and the revenue reports counted whatever
+        was remembered rather than whatever was sold.
+
+        The person who knows the money arrived is the one marking the order
+        delivered. This is where it belongs.
+
+    ⚠️  A failure here **does not undo the delivery.**
+
+        The goods are with the customer whatever the payment record says.
+        Raising would roll the transition back and leave a delivered order
+        reading "shipped" — a lie about the physical world to protect the
+        consistency of a number. The error is logged, the manual capture in the
+        admin panel remains, and it is still idempotent.
+    """
+    from payments import services as payment_services
+    from payments.models import PaymentMethodKind, TransactionStatus
+
+    captured = 0
+
+    for payment in payment_services.transactions_for(REFERENCE_TYPE, order.pk):
+        if payment.method != PaymentMethodKind.CASH_ON_DELIVERY:
+            continue
+        if payment.status != TransactionStatus.AUTHORIZED:
+            continue
+
+        try:
+            payment_services.capture(payment)
+        except BusinessError:
+            logger.exception(
+                "تعذّر تحصيل معاملة %s للطلب %s عند التسليم",
+                payment.reference,
+                order.number,
+            )
+            continue
+
+        captured += 1
+
+    if captured:
+        # ⚠️  `payment_captured` marked the order paid through a **different**
+        #     instance of it — the listener loads it by id. Without this the
+        #     caller returns the object it already held, still reading
+        #     "awaiting payment" on the very response that collected the money.
+        order.refresh_from_db(fields=["payment_status"])
+
+    return captured
 
 
 def _commit_reservations(order: Order) -> int:

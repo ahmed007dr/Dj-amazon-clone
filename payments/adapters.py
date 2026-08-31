@@ -100,6 +100,23 @@ class PaymentAdapter(ABC):
     #: Registered under this in `PaymentProvider.adapter_key`
     key: str = ""
 
+    #: The credential names this adapter cannot work without.
+    #:
+    #: ⚠️  **The empty default is the correct one, and it is the whole point.**
+    #:
+    #:     Whether a gateway needs keys is a property of **the adapter**, and only
+    #:     the adapter knows it. The admin panel used to infer it from the data
+    #:     instead — "no credentials stored, therefore credentials are missing" —
+    #:     which is true of Paymob and nonsense for cash on delivery: there is no
+    #:     key to hand a courier. So the moment anyone disabled cash on delivery,
+    #:     the panel decided it was unconfigured, hid its enable button and asked
+    #:     for keys that do not exist — locking the shop out of the one payment
+    #:     method it actually uses, with no way back except the Django admin.
+    #:
+    #:     Declaring it here states the truth once, in the only place that holds
+    #:     it, and both the API and the panel read the same answer.
+    required_credentials: tuple[str, ...] = ()
+
     def __init__(self, credentials: dict, *, sandbox: bool = True):
         self.credentials = credentials
         self.sandbox = sandbox
@@ -158,6 +175,9 @@ class CashOnDeliveryAdapter(PaymentAdapter):
 
     key = "cash_on_delivery"
 
+    #: ⚠️  Nothing to configure — the courier is the gateway.
+    required_credentials = ()
+
     def charge(self, *, amount, currency, reference, metadata):
         return ChargeResult(
             success=True,
@@ -179,6 +199,8 @@ class CashAdapter(PaymentAdapter):
 
     key = "cash"
 
+    required_credentials = ()
+
     def charge(self, *, amount, currency, reference, metadata):
         return ChargeResult(
             success=True,
@@ -198,6 +220,10 @@ class BankTransferAdapter(PaymentAdapter):
     """Bank transfer — confirmed by hand after reviewing the account."""
 
     key = "bank_transfer"
+
+    #: ⚠️  The account number belongs on the invoice, not in a secret store —
+    #:     the transfer is reviewed by a human reading the bank statement.
+    required_credentials = ()
 
     def charge(self, *, amount, currency, reference, metadata):
         return ChargeResult(
@@ -234,6 +260,19 @@ def get_adapter_class(key: str) -> type[PaymentAdapter] | None:
 
 def available_adapters() -> list[str]:
     return sorted(_REGISTRY)
+
+
+def required_credentials(key: str) -> tuple[str, ...]:
+    """
+    The credential names the adapter behind `key` cannot work without.
+
+    An unknown adapter returns `()` — a gateway pointing at an adapter that does
+    not exist is a separate fault, reported separately (`adapter_exists`), and
+    inventing missing keys for it would bury that under a message about
+    credentials.
+    """
+    adapter_class = _REGISTRY.get(key)
+    return tuple(adapter_class.required_credentials) if adapter_class is not None else ()
 
 
 register(CashOnDeliveryAdapter)

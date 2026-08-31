@@ -86,6 +86,12 @@ BILLING_PLACEHOLDER = "NA"
 class PaymobAdapter(PaymentAdapter):
     key = "paymob"
 
+    #: ⚠️  All four, and the panel refuses to enable the gateway without them.
+    #:
+    #:     Three of four is not "nearly configured": the payment fails at whichever
+    #:     step needs the fourth, after the customer has entered their card.
+    required_credentials = ("api_key", "integration_id", "iframe_id", "hmac_secret")
+
     # ── Credentials ────────────────────────────────────────
 
     def _credential(self, name: str) -> str:

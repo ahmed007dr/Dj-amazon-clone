@@ -229,6 +229,197 @@ class TestToggleControl:
         assert entry.changes["is_active"]["new"] is False
         assert entry.changes["reason"] == "تعليق مؤقت"
 
+    def test_a_keyless_gateway_can_always_be_reenabled(self, admin_client, providers):
+        """
+        ⚠️  **The regression this class exists for.**
+
+            Cash on delivery needs no credentials — there is no key to hand a
+            courier. The panel judged "configured" by "does it have credentials
+            stored?", so the moment anyone disabled it, it decided the gateway was
+            unconfigured, hid its enable button and demanded keys that do not
+            exist. The shop's default payment method could be turned off from the
+            panel and only turned back on from the Django admin.
+
+            Whether keys are needed is the adapter's answer, not the row's.
+        """
+        url = reverse("v1:payments:provider-toggle", args=[providers["cod"].pk])
+
+        assert admin_client.post(url, {"is_active": False}, format="json").status_code == 200
+        assert admin_client.post(url, {"is_active": True}, format="json").status_code == 200
+
+        providers["cod"].refresh_from_db()
+        assert providers["cod"].is_active
+        assert providers["cod"].missing_credentials() == []
+
+    def test_every_keyless_gateway_reports_it_can_be_enabled(self, admin_client, providers):
+        response = admin_client.get(reverse("v1:payments:providers"))
+        by_code = {row["code"]: row for row in response.data}
+
+        for code in ("cod", "cash", "pos-card", "bank"):
+            assert by_code[code]["required_credentials"] == [], code
+            assert by_code[code]["missing_credentials"] == [], code
+            assert by_code[code]["can_enable"] is True, code
+
+    def test_an_external_gateway_without_its_keys_cannot_be_enabled(self, admin_client, providers):
+        """
+        ⚠️  The server refuses it — the panel hiding a button was never the barrier.
+
+            A direct call to the endpoint bypassed the screen entirely and enabled
+            a keyless Paymob, so a customer chose card payment and it failed after
+            they had entered their details.
+        """
+        response = admin_client.post(
+            reverse("v1:payments:provider-toggle", args=[providers["paymob"].pk]),
+            {"is_active": True},
+            format="json",
+        )
+
+        assert response.status_code == 409
+        providers["paymob"].refresh_from_db()
+        assert not providers["paymob"].is_active
+
+    def test_the_refusal_names_the_missing_keys(self, admin_client, providers):
+        """
+        ⚠️  "Configure it first" sends the admin back to a panel that already
+            looks complete to them. The names say which fields, and which mode.
+        """
+        response = admin_client.post(
+            reverse("v1:payments:provider-toggle", args=[providers["fawry"].pk]),
+            {"is_active": True},
+            format="json",
+        )
+
+        assert response.status_code == 409
+        detail = str(response.data)
+        assert "merchant_code" in detail
+        assert "secure_key" in detail
+
+    def test_an_external_gateway_enables_once_its_keys_are_present(self, admin_client, providers):
+        fawry = providers["fawry"]
+        for key in ("merchant_code", "secure_key"):
+            ProviderCredential.objects.create(
+                provider=fawry, key=key, value=f"value-{key}", is_sandbox=fawry.is_sandbox
+            )
+
+        assert fawry.missing_credentials() == []
+
+        response = admin_client.post(
+            reverse("v1:payments:provider-toggle", args=[fawry.pk]),
+            {"is_active": True},
+            format="json",
+        )
+
+        assert response.status_code == 200
+        fawry.refresh_from_db()
+        assert fawry.is_active
+
+    def test_sandbox_keys_do_not_count_for_production(self, admin_client, providers):
+        """
+        ⚠️  A gateway tested in sandbox and switched to production **has**
+            credentials — the wrong ones. Counting them enables a gateway
+            authenticating against an account holding no money.
+        """
+        fawry = providers["fawry"]
+        for key in ("merchant_code", "secure_key"):
+            ProviderCredential.objects.create(
+                provider=fawry, key=key, value=f"sandbox-{key}", is_sandbox=True
+            )
+
+        fawry.is_sandbox = False
+        fawry.save(update_fields=["is_sandbox"])
+
+        assert set(fawry.missing_credentials()) == {"merchant_code", "secure_key"}
+
+        response = admin_client.post(
+            reverse("v1:payments:provider-toggle", args=[fawry.pk]),
+            {"is_active": True},
+            format="json",
+        )
+        assert response.status_code == 409
+
+    def test_the_panel_can_take_a_gateway_from_created_to_enabled(self, admin_client, providers):
+        """
+        ⚠️  **The whole journey, over the endpoints the panel actually calls.**
+
+            Create ← add the keys ← enable. Until now the middle step had no
+            screen at all: the panel refused the third step and told the admin to
+            finish the second one in the Django admin. These are the three
+            requests the credentials editor makes, in order.
+        """
+        fawry = providers["fawry"]
+
+        # 1 — it refuses while the keys are missing, and says which
+        refused = admin_client.post(
+            reverse("v1:payments:provider-toggle", args=[fawry.pk]),
+            {"is_active": True},
+            format="json",
+        )
+        assert refused.status_code == 409
+
+        # 2 — the keys go in through the panel's own endpoint
+        for key in ("merchant_code", "secure_key"):
+            created = admin_client.post(
+                reverse("v1:payments:provider-credentials", args=[fawry.pk]),
+                {"key": key, "value": f"secret-{key}", "is_sandbox": fawry.is_sandbox},
+                format="json",
+            )
+            assert created.status_code == 201
+            # ⚠️  The value never comes back — not even to the admin who just sent it
+            assert "value" not in created.data
+            assert created.data["masked_value"].startswith("•")
+
+        # 3 — and now it enables
+        enabled = admin_client.post(
+            reverse("v1:payments:provider-toggle", args=[fawry.pk]),
+            {"is_active": True},
+            format="json",
+        )
+        assert enabled.status_code == 200
+        assert enabled.data["missing_credentials"] == []
+        assert enabled.data["can_enable"] is True
+
+    def test_deleting_a_key_blocks_enabling_again(self, admin_client, providers):
+        """
+        ⚠️  The card must go back to demanding it.
+
+            A key deleted by mistake and a gateway still reporting itself complete
+            means the failure surfaces on a customer's payment instead of on the
+            screen that caused it.
+        """
+        fawry = providers["fawry"]
+        for key in ("merchant_code", "secure_key"):
+            ProviderCredential.objects.create(
+                provider=fawry, key=key, value="x", is_sandbox=fawry.is_sandbox
+            )
+
+        credential = fawry.credentials.get(key="secure_key")
+        response = admin_client.delete(
+            reverse(
+                "v1:payments:provider-credential-detail",
+                args=[fawry.pk, credential.pk],
+            )
+        )
+        assert response.status_code == 204
+
+        fawry.refresh_from_db()
+        assert fawry.missing_credentials() == ["secure_key"]
+
+    def test_the_adapter_list_publishes_what_each_one_requires(self, admin_client):
+        """The creation form reads this to say what a gateway will need before it exists."""
+        response = admin_client.get(reverse("v1:payments:adapters"))
+
+        requirements = response.data["adapter_requirements"]
+        assert requirements["cash_on_delivery"] == []
+        assert requirements["cash"] == []
+        assert requirements["bank_transfer"] == []
+        assert set(requirements["fawry"]) == {"merchant_code", "secure_key"}
+        assert set(requirements["paymob"]) == {
+            "api_key",
+            "integration_id",
+            "iframe_id",
+            "hmac_secret",
+        }
+
     def test_customer_cannot_toggle(self, providers):
         customer = User.objects.create_user(email="customer@test.local", password=PASSWORD)
         customer.is_active = True

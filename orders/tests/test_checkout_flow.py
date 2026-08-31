@@ -369,3 +369,168 @@ class TestCheckoutRevalidation:
         )
         assert response.status_code == 400
         assert response.data["code"] == "CART_EMPTY"
+
+
+# ═══════════════════════════════════════════════════════════
+#  Cash on delivery — collection happens at the door
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.django_db
+class TestCashOnDeliveryCollection:
+    """
+    ⚠️  Cash on delivery is the shop's default method and the one with no inbound
+        event — nothing tells the system the money arrived except the delivery
+        itself. These tests guard the two links that were missing between them.
+    """
+
+    def place_order(self, client, product):
+        client.post(
+            reverse("v1:cart:lines"),
+            {"product": str(product.pk), "quantity": 1},
+            format="json",
+        )
+        response = client.post(
+            reverse("v1:orders:checkout"),
+            {"address": ADDRESS, "payment_method": "COD"},
+            format="json",
+        )
+        assert response.status_code == 201
+
+        from orders.models import Order
+
+        return Order.objects.get(pk=response.data["order"]["id"])
+
+    def test_checkout_authorises_without_collecting(self, client, product, payment_provider):
+        """
+        ⚠️  `AUTHORIZED`, never `CAPTURED`.
+
+            Nothing has been collected at checkout — the courier has not left yet.
+            Capturing here puts revenue that may never arrive into every report.
+        """
+        from orders.models import PaymentStatus
+        from payments.models import PaymentTransaction, TransactionStatus
+
+        order = self.place_order(client, product)
+
+        payment = PaymentTransaction.objects.get(reference_id=str(order.pk))
+        assert payment.status == TransactionStatus.AUTHORIZED
+        assert order.payment_status != PaymentStatus.PAID
+
+    def test_delivery_captures_and_marks_the_order_paid(self, client, product, payment_provider):
+        """
+        ⚠️  **The gap this closes.**
+
+            The courier collected the cash, the goods were handed over, and the
+            order stayed "awaiting payment" until somebody remembered to open the
+            payments screen and press capture. The revenue reports counted what
+            was remembered rather than what was sold.
+        """
+        from orders import services as order_services
+        from orders.models import OrderStatus, PaymentStatus
+        from payments.models import PaymentTransaction, TransactionStatus
+
+        order = self.place_order(client, product)
+
+        for status in (OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED):
+            order = order_services.transition(order, status)
+
+        order = order_services.transition(order, OrderStatus.DELIVERED)
+
+        payment = PaymentTransaction.objects.get(reference_id=str(order.pk))
+        assert payment.status == TransactionStatus.CAPTURED
+        assert payment.captured_at is not None
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PAID
+
+    def test_a_manual_capture_also_marks_the_order_paid(self, client, product, payment_provider):
+        """
+        ⚠️  `capture()` announces wherever it is called from.
+
+            It used to announce from the webhook path alone, so a capture entered
+            by hand changed the transaction and told nobody — and cash on delivery
+            has no webhook by construction.
+        """
+        from orders.models import PaymentStatus
+        from payments import services as payment_services
+        from payments.models import PaymentTransaction
+
+        order = self.place_order(client, product)
+        payment_services.capture(PaymentTransaction.objects.get(reference_id=str(order.pk)))
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PAID
+
+    def test_capturing_twice_announces_once(self, client, product, payment_provider):
+        """
+        ⚠️  A delivery recorded after a manual capture must not announce again —
+            the listeners write finance entries and loyalty points off it.
+        """
+        from payments import services as payment_services
+        from payments.events import payment_captured
+        from payments.models import PaymentTransaction
+
+        order = self.place_order(client, product)
+        payment = PaymentTransaction.objects.get(reference_id=str(order.pk))
+
+        received = []
+
+        def listener(sender, payment, **kwargs):
+            received.append(payment.reference)
+
+        payment_captured.connect(listener, weak=False)
+        try:
+            payment_services.capture(payment)
+            payment_services.capture(payment)
+        finally:
+            payment_captured.disconnect(listener)
+
+        assert len(received) == 1
+
+    def test_delivery_does_not_capture_a_card_payment(self, client, product, db):
+        """
+        ⚠️  A card is captured by its gateway's inbound event.
+
+            Capturing it from this side records a collection the gateway never
+            made — the order reads paid and the money is nowhere.
+        """
+        from orders import services as order_services
+        from orders.models import OrderStatus
+        from payments.models import (
+            PaymentMethodKind,
+            PaymentProvider,
+            PaymentTransaction,
+            TransactionStatus,
+        )
+
+        PaymentProvider.objects.create(
+            code="card-test",
+            adapter_key="cash",
+            name_ar="بطاقة",
+            name_en="Card",
+            supported_methods=[PaymentMethodKind.CARD],
+            is_active=True,
+        )
+
+        client.post(
+            reverse("v1:cart:lines"),
+            {"product": str(product.pk), "quantity": 1},
+            format="json",
+        )
+        response = client.post(
+            reverse("v1:orders:checkout"),
+            {"address": ADDRESS, "payment_method": "CARD"},
+            format="json",
+        )
+        assert response.status_code == 201
+
+        from orders.models import Order
+
+        order = Order.objects.get(pk=response.data["order"]["id"])
+        for status in (OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED):
+            order = order_services.transition(order, status)
+        order_services.transition(order, OrderStatus.DELIVERED)
+
+        payment = PaymentTransaction.objects.get(reference_id=str(order.pk))
+        assert payment.status == TransactionStatus.AUTHORIZED

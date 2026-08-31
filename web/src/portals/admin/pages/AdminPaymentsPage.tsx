@@ -7,8 +7,10 @@ import {
   toggleProvider,
   useDeleteProvider,
   useReorderProviders,
+  PROVIDERS_KEY,
   type PaymentProvider,
 } from '@/features/payments/adminApi';
+import { ProviderCredentials } from '@/portals/admin/components/ProviderCredentials';
 import { ProviderForm } from '@/portals/admin/components/ProviderForm';
 import { Drawer } from '@/shared/ui/Drawer';
 import { isApiError } from '@/shared/http';
@@ -24,7 +26,9 @@ import { useToast } from '@/shared/ui/useToast';
 
 import './AdminPaymentsPage.css';
 
-const KEY = ['admin', 'payment-providers'] as const;
+// ⚠️  Shared with the mutations rather than declared twice — the two copies had
+//     already drifted apart, and every gateway mutation refreshed nothing.
+const KEY = PROVIDERS_KEY;
 
 /**
  * Payment gateways.
@@ -203,9 +207,28 @@ function GatewayCard({
 }) {
   const { t } = useTranslation();
 
-  // ⚠️  An external gateway with no keys is not enabled — the server refuses,
-  //     and hiding the button prevents an attempt doomed to fail.
-  const blocked = !provider.is_active && !provider.is_configured && provider.credential_keys.length === 0;
+  // ⚠️  **The server decides this, and this screen only renders the decision.**
+  //
+  //     The rule used to be computed here as "disabled, and nothing stored, so it
+  //     needs keys" — which is true of Paymob and false of every gateway that
+  //     needs no keys at all. Cash on delivery is the extreme case and the one
+  //     that mattered: the shop's default method, needing no credentials by
+  //     construction. Disabling it once made this screen hide its enable button
+  //     and ask for keys that do not exist for a courier, and the only way to
+  //     turn the shop's payments back on was the Django admin.
+  //
+  //     `can_enable` is the same computation `ToggleProviderAPI` refuses by, so
+  //     the button and the endpoint cannot disagree about the same gateway.
+  const blocked = !provider.is_active && !provider.can_enable;
+  const missing = provider.missing_credentials;
+
+  // ⚠️  Open by default when something is missing.
+  //
+  //     A gateway that cannot be enabled until a key is entered should not hide
+  //     the field behind a click — the card states the obstacle and the remedy in
+  //     the same glance. A configured gateway keeps it folded: its secrets are
+  //     not something to leave on screen.
+  const [showKeys, setShowKeys] = useState(missing.length > 0);
 
   return (
     <article className={`gateway surface ${provider.is_active ? 'is-active' : ''}`}>
@@ -261,9 +284,14 @@ function GatewayCard({
         </div>
       </dl>
 
-      {blocked ? (
-        <Alert tone="warning">{t('admin.needsCredentials')}</Alert>
-      ) : (
+      {blocked && missing.length === 0 ? (
+        // ⚠️  Blocked with nothing missing means the adapter itself is gone —
+        //     a different fault with a different fix, and saying "add the keys"
+        //     for it sends the admin to look for keys that would change nothing.
+        <Alert tone="danger">{t('admin.adapterMissing')}</Alert>
+      ) : null}
+
+      {blocked && missing.length > 0 ? null : (
         <div className="gateway__action">
           <input
             className="gateway__reason"
@@ -284,6 +312,16 @@ function GatewayCard({
           </Button>
         </div>
       )}
+
+      {provider.required_credentials.length > 0 ? (
+        showKeys ? (
+          <ProviderCredentials provider={provider} />
+        ) : (
+          <Button size="sm" variant="ghost" onClick={() => setShowKeys(true)}>
+            {t('admin.manageCredentials')}
+          </Button>
+        )
+      ) : null}
 
       <footer className="gateway__manage">
         {onMoveUp ? (

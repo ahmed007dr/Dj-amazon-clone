@@ -53,6 +53,24 @@ class PublicCatalogMixin(PreviewAwareMixin, PolicyAwareQuerySetMixin):
 
 
 class ProductListAPI(PublicCatalogMixin, generics.ListAPIView):
+    """
+    ⚠️  **What has run out does not appear here at all.**
+
+        Not greyed out and not marked "unavailable" — absent, and absent from
+        the count and the pagination with it. Filtering in the serializer would
+        have read the row and then hidden it: the count stays wrong, a page of
+        twenty returns eleven, and the customer paging through sees the gaps.
+
+    ⚠️  **And there is no parameter that brings them back.**
+
+        An `in_stock=false` switch on an `AllowAny` endpoint is not an
+        exception to the rule, it is the rule deleted: anyone appending it to
+        the URL sees exactly what we undertook to hide. Whoever needs the full
+        catalogue — restocking, an export, an audit — goes through
+        `admin/products/`, which is behind `CanManageCatalog` and filters
+        nothing by design.
+    """
+
     serializer_class = s.ProductListSerializer
 
     def get_base_queryset(self):
@@ -60,6 +78,8 @@ class ProductListAPI(PublicCatalogMixin, generics.ListAPIView):
         #     overriding the latter silently disables policy filtering.
         queryset = selectors.product_base_queryset().filter(is_active=True)
         params = self.request.query_params
+
+        queryset = selectors.in_stock_only(queryset)
 
         if term := params.get("search"):
             queryset = queryset.filter(

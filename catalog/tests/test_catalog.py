@@ -10,6 +10,7 @@ Catalogue tests.
 from decimal import Decimal
 
 import pytest
+from django.apps import apps
 from django.urls import reverse
 from rest_framework.test import APIClient
 
@@ -18,6 +19,34 @@ from accounts.models import AccountType, User, VerificationStatus
 from catalog.models import Brand, Category, Product, ProductKind
 
 PASSWORD = "Str0ng-Test-Pass!23"
+
+
+def stock(product, location, physical=10, reserved=0):
+    """
+    Put the product on the shelf.
+
+    ⚠️  **A product with no stock row does not appear in the public catalogue at
+        all** — that is the rule these lists are filtered by, not an accident of
+        the fixture.
+
+        So every product a listing test expects to see has to be stocked first.
+        Without it the test asserts on an empty page and reports a policy failure
+        for a stock reason, which is the most misleading kind of red.
+
+    ⚠️  And the row is written through `apps.get_model`, not by importing `inventory`.
+
+        `inventory` sits **above** `catalog` in the layer diagram, so a test in
+        this package importing it breaks the same contract the production code
+        obeys — and a contract the tests are exempt from is not a contract. The
+        same reason `administration` is reached this way at the top of
+        `test_product_crud.py`.
+    """
+    stock_model = apps.get_model("inventory", "Stock")
+    row, _created = stock_model.objects.get_or_create(product=product, location=location)
+    row.quantity_physical = physical
+    row.quantity_reserved = reserved
+    row.save(update_fields=["quantity_physical", "quantity_reserved"])
+    return product
 
 
 def make_user(email, account_type=AccountType.STUDENT, *, verified=False):
@@ -48,8 +77,15 @@ def category(db):
 
 
 @pytest.fixture
-def catalog(policies, category):
-    """Two products: one public and one restricted to pharmacies."""
+def location(db):
+    return apps.get_model("inventory", "StockLocation").objects.create(
+        code="main", name_ar="الرئيسي", name_en="Main", is_default=True
+    )
+
+
+@pytest.fixture
+def catalog(policies, category, location):
+    """Two products: one public and one restricted to pharmacies — both in stock."""
     public = Product.objects.create(
         sku="PUB-001",
         name_ar="قفازات",
@@ -68,6 +104,10 @@ def catalog(policies, category):
         access_policy=policies["pharmacy_only"],
         regulatory_class="OTC",
     )
+
+    stock(public, location)
+    stock(restricted, location)
+
     return {"public": public, "restricted": restricted}
 
 
@@ -149,7 +189,7 @@ class TestPolicyFiltering:
 @pytest.mark.django_db
 class TestNoNPlusOne:
     def test_product_list_query_count_is_constant(
-        self, policies, category, django_assert_max_num_queries
+        self, policies, category, location, django_assert_max_num_queries
     ):
         """
         ⚠️  The legacy model put `avg_rate` and `reviews_count` on `Product` as
@@ -159,14 +199,17 @@ class TestNoNPlusOne:
         """
         brand = Brand.objects.create(name_ar="براند", name_en="Brand")
         for i in range(30):
-            Product.objects.create(
-                sku=f"P-{i:03d}",
-                name_ar=f"منتج {i}",
-                name_en=f"Product {i}",
-                category=category,
-                brand=brand,
-                base_price=Decimal("10.00"),
-                access_policy=policies["public"],
+            stock(
+                Product.objects.create(
+                    sku=f"P-{i:03d}",
+                    name_ar=f"منتج {i}",
+                    name_en=f"Product {i}",
+                    category=category,
+                    brand=brand,
+                    base_price=Decimal("10.00"),
+                    access_policy=policies["public"],
+                ),
+                location,
             )
 
         client = APIClient()
@@ -230,18 +273,21 @@ class TestCategoryTree:
         assert leaf.path.startswith(f"{second.slug}/")
         assert leaf.depth == 2
 
-    def test_products_include_descendant_categories(self, policies):
+    def test_products_include_descendant_categories(self, policies, location):
         """Opening a parent category shows the products beneath it."""
         root = Category.objects.create(name_ar="مستلزمات", name_en="Supplies")
         child = Category.objects.create(name_ar="قفازات", name_en="Gloves", parent=root)
 
-        Product.objects.create(
-            sku="DEEP-001",
-            name_ar="قفاز",
-            name_en="Glove",
-            category=child,
-            base_price=Decimal("5.00"),
-            access_policy=policies["public"],
+        stock(
+            Product.objects.create(
+                sku="DEEP-001",
+                name_ar="قفاز",
+                name_en="Glove",
+                category=child,
+                base_price=Decimal("5.00"),
+                access_policy=policies["public"],
+            ),
+            location,
         )
 
         response = APIClient().get(reverse("v1:catalog:products"), {"category": root.slug})
@@ -328,3 +374,149 @@ class TestDomainBoundaries:
         assert "price" not in actual
         assert "final_price" not in actual
         assert "base_price" in actual  # a reference for the engine, not a final price
+
+
+# ═══════════════════════════════════════════════════════════
+#  Stock visibility — zero available means absent, not greyed out
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.django_db
+class TestStockVisibility:
+    """
+    ⚠️  The requirement: an item whose available quantity is zero does not appear.
+
+        Not disabled and not marked "unavailable" — **absent**, and absent from
+        the count and the pagination with it. Offering a card that cannot be
+        bought costs the customer two clicks and an error, and costs the listing
+        the meaning it is supposed to have.
+    """
+
+    def out_of_stock(self, category, policies, sku="GONE-001"):
+        return Product.objects.create(
+            sku=sku,
+            name_ar="نفد",
+            name_en="Gone",
+            category=category,
+            base_price=Decimal("30.00"),
+            access_policy=policies["public"],
+        )
+
+    def skus(self, response):
+        return {row["sku"] for row in response.data["results"]}
+
+    def test_a_product_with_no_stock_row_does_not_appear(self, catalog, category, policies):
+        """
+        ⚠️  Never received is not "unknown" — it is zero.
+
+            A product created in the admin form has no stock row at all, which is
+            the most common way for one to have none.
+        """
+        self.out_of_stock(category, policies)
+
+        assert self.skus(APIClient().get(reverse("v1:catalog:products"))) == {"PUB-001"}
+
+    def test_a_product_whose_stock_ran_out_disappears(self, catalog, location):
+        """The whole quantity is sold, and the card goes with it."""
+        stock(catalog["public"], location, physical=0)
+
+        assert self.skus(APIClient().get(reverse("v1:catalog:products"))) == set()
+
+    def test_receiving_stock_brings_it_straight_back(self, catalog, location, category, policies):
+        """
+        ⚠️  **The other half of the rule, and the one that gets forgotten.**
+
+            Hiding what ran out is worthless if restocking does not undo it. The
+            listing is a query, never a cached set, so the item is back on the
+            next request — not when a cache happens to expire.
+        """
+        gone = self.out_of_stock(category, policies)
+        assert "GONE-001" not in self.skus(APIClient().get(reverse("v1:catalog:products")))
+
+        stock(gone, location, physical=4)
+
+        assert "GONE-001" in self.skus(APIClient().get(reverse("v1:catalog:products")))
+
+    def test_reserved_stock_does_not_count_as_available(self, catalog, location):
+        """
+        ⚠️  Ten in the warehouse with ten in other people's carts is zero available.
+
+            Physical quantity is what the shelf holds; available is what may still
+            be sold. Listing by the first oversells by exactly the reservations.
+        """
+        stock(catalog["public"], location, physical=10, reserved=10)
+
+        assert self.skus(APIClient().get(reverse("v1:catalog:products"))) == set()
+
+    def test_a_search_cannot_surface_what_ran_out(self, catalog, category, policies):
+        """The filter is on the queryset, so no parameter reaches around it."""
+        self.out_of_stock(category, policies)
+
+        response = APIClient().get(reverse("v1:catalog:products"), {"search": "نفد"})
+        assert response.data["results"] == []
+
+    def test_the_page_is_not_short(self, catalog, category, policies):
+        """
+        ⚠️  Filtering in the serializer would read the row and then hide it, and
+            the page would come back one item shorter than it should be.
+
+            The list is cursor-paginated, so the symptom is not a wrong count but
+            a page that quietly loses rows — harder to notice and worse to debug.
+            Filtering in the queryset means the page is full of what qualifies.
+        """
+        self.out_of_stock(category, policies)
+
+        response = APIClient().get(reverse("v1:catalog:products"))
+        assert self.skus(response) == {"PUB-001"}
+        assert response.data["next"] is None
+
+    def test_the_product_page_still_opens_and_says_so(self, catalog, location):
+        """
+        ⚠️  Hidden from the **lists**, not deleted from the web.
+
+            A saved link, a shared one and a search result all point at this page.
+            Returning 404 breaks every one of them to express something the page
+            can simply say — and the badge says it, with the button disabled.
+        """
+        stock(catalog["public"], location, physical=0)
+
+        response = APIClient().get(
+            reverse("v1:catalog:product-detail", args=[catalog["public"].slug])
+        )
+        assert response.status_code == 200
+
+    def test_availability_answers_zero_rather_than_nothing(self, catalog, category, policies):
+        """
+        ⚠️  A product with no stock row used to be **missing from the response**,
+            and the storefront reads a missing key as "not loaded yet" — so the
+            badge stayed hidden and the button stayed enabled on exactly the
+            products that have never had a single unit.
+        """
+        gone = self.out_of_stock(category, policies)
+
+        response = APIClient().get(reverse("v1:inventory:availability"), {"products": str(gone.pk)})
+
+        assert response.status_code == 200
+        assert response.data[str(gone.pk)]["is_available"] is False
+        assert response.data[str(gone.pk)]["available"] == 0
+
+    def test_the_admin_list_still_shows_everything(self, catalog, category, policies):
+        """
+        ⚠️  Whoever restocks has to see what ran out.
+
+            Applying the storefront's rule to the admin panel hides precisely the
+            products that need attention — and there would be no screen left that
+            shows them.
+        """
+        from core.testing import grant_all_domains
+
+        self.out_of_stock(category, policies)
+
+        admin = make_user("admin@test.local", AccountType.ADMIN)
+        grant_all_domains(admin)
+
+        client = APIClient()
+        client.force_authenticate(user=admin)
+
+        response = client.get(reverse("v1:catalog:admin-products"))
+        assert "GONE-001" in {row["sku"] for row in response.data["results"]}

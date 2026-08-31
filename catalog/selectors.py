@@ -14,6 +14,7 @@ from django.db.models import Prefetch, Q
 
 from access.services import accessible_filter
 from catalog.models import Category, Product, ProductImage, ProductVariant
+from core.visibility import product_visibility_filter
 
 
 def product_base_queryset():
@@ -37,12 +38,46 @@ def product_base_queryset():
     )
 
 
-def published_products(user=None):
-    """The published products available to this user."""
+def in_stock_only(queryset, **context):
+    """
+    Drop the products whose available quantity is zero.
+
+    ⚠️  The filter comes from **`core.visibility`, not from `inventory`**.
+
+        `inventory` sits above `catalog` in the layer diagram, so importing it
+        here inverts the direction and `import-linter` rejects it. `inventory`
+        registers its filter at start-up and the catalogue asks the registry for
+        whatever was registered — see `core/visibility.py` for why the
+        indirection is the point rather than a workaround.
+
+    ⚠️  And it is a **query** every time, never a cached list.
+
+        The admin receives a shipment and the item must return to the storefront
+        on the next request. Caching the set of what is in stock means a product
+        that arrived this morning stays hidden until something expires the entry
+        — and the person who received it has no way to tell why.
+    """
+    return queryset.filter(product_visibility_filter(**context))
+
+
+def published_products(user=None, *, include_out_of_stock: bool = False, **context):
+    """
+    The published products available to this user.
+
+    ⚠️  **Out of stock is out of the list by default.**
+
+        A card offering an item that cannot be bought costs the customer two
+        clicks and an error message, and it costs the shop the trust that the
+        listing means anything. `include_out_of_stock=True` is for the paths
+        that must see everything — the admin panel, and reporting.
+    """
     queryset = product_base_queryset().filter(is_active=True)
 
     if user is not None:
         queryset = queryset.filter(accessible_filter(user))
+
+    if not include_out_of_stock:
+        queryset = in_stock_only(queryset, **context)
 
     return queryset
 

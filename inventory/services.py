@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import F, Q, Sum, Value
+from django.db.models import Exists, F, OuterRef, Q, Sum, Value
 from django.db.models.functions import Greatest
 from django.utils import timezone
 
@@ -86,6 +86,19 @@ def availability_for(product_ids, location=None) -> dict:
 
         The catalogue calls it once per page, not once per product. Evaluating
         each row separately means twenty queries on a page of twenty products.
+
+    ⚠️  **Every requested id comes back, including the ones with no stock row at
+        all.**
+
+        The earlier form built the result from the rows it found, so a product
+        that had never been received simply had no key in the response — and the
+        storefront reads a missing key as "the data has not arrived yet", not as
+        "there is none". The badge stayed hidden and the add-to-cart button
+        stayed enabled on precisely the products that have never had a single
+        unit: the answer "we do not know" was returned for a question we know
+        the answer to.
+
+        No stock row is not the absence of an answer. It is zero.
     """
     queryset = Stock.objects.filter(product_id__in=product_ids)
     if location is not None:
@@ -118,6 +131,9 @@ def availability_for(product_ids, location=None) -> dict:
         entry["total"] += available
         entry["locations"][row["location__code"]] = available
 
+    for product_id in product_ids:
+        result.setdefault(str(product_id), {"total": 0, "locations": {}})
+
     return {
         product_id: Availability(
             product_id=product_id,
@@ -149,6 +165,60 @@ def available_quantity(product, location=None, variant=None) -> int:
         - (totals["damaged"] or 0)
         - (totals["expired"] or 0),
     )
+
+
+# ═══════════════════════════════════════════════════════════
+#  Catalogue visibility — "does any of it exist?"
+# ═══════════════════════════════════════════════════════════
+
+#: The name the filter is registered under in `core.visibility`
+IN_STOCK_FILTER = "inventory.in_stock"
+
+
+def in_stock_filter(*, location=None, field: str = "pk") -> Q:
+    """
+    A ready-made filter excluding products whose available quantity is zero.
+
+        Product.objects.filter(inventory.services.in_stock_filter())
+
+    ⚠️  `Exists`, not an aggregate — and the difference is the whole point.
+
+        Summing per product means a `GROUP BY` over every stock row in the
+        store on every catalogue page. `Exists` stops the database at the
+        **first** row that satisfies the condition, and it composes into the
+        query rather than replacing it: the count stays right and pagination
+        does not yield short pages.
+
+    ⚠️  And "any row above zero" is the same answer as "the total is above zero".
+
+        `Stock.available` floors each row at zero (a damaged surplus in one
+        branch does not eat another branch's stock), so the total is a sum of
+        non-negative terms — it exceeds zero exactly when one term does. The
+        cheap check and the expensive one agree, so we take the cheap one.
+
+    ⚠️  `location=None` means **every sellable, active location** — deliberately
+        the same set `availability_for` reports on.
+
+        A quarantine or a damaged-goods store is not sellable; counting it makes
+        the storefront advertise stock that cannot be sold. The counter passes
+        its own register's location instead: an item sitting in another branch
+        is not on the shelf in front of the cashier.
+    """
+    rows = Stock.objects.filter(**{"product": OuterRef(field)})
+
+    if location is not None:
+        rows = rows.filter(location=location)
+    else:
+        rows = rows.filter(location__is_sellable=True, location__is_active=True)
+
+    rows = rows.annotate(
+        _available=F("quantity_physical")
+        - F("quantity_reserved")
+        - F("quantity_damaged")
+        - F("quantity_expired")
+    ).filter(_available__gt=0)
+
+    return Q(Exists(rows))
 
 
 # ═══════════════════════════════════════════════════════════

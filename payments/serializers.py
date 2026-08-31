@@ -52,6 +52,9 @@ class PaymentProviderSerializer(serializers.ModelSerializer):
     credential_keys = serializers.SerializerMethodField()
     is_configured = serializers.SerializerMethodField()
     adapter_exists = serializers.SerializerMethodField()
+    required_credentials = serializers.SerializerMethodField()
+    missing_credentials = serializers.SerializerMethodField()
+    can_enable = serializers.SerializerMethodField()
 
     class Meta:
         model = PaymentProvider
@@ -72,6 +75,9 @@ class PaymentProviderSerializer(serializers.ModelSerializer):
             "is_active",
             "is_configured",
             "credential_keys",
+            "required_credentials",
+            "missing_credentials",
+            "can_enable",
         ]
         read_only_fields = ["id"]
 
@@ -81,6 +87,30 @@ class PaymentProviderSerializer(serializers.ModelSerializer):
 
     def get_is_configured(self, obj) -> bool:
         return obj.credentials.filter(is_sandbox=obj.is_sandbox).exists()
+
+    def get_required_credentials(self, obj) -> list:
+        """The names the adapter declares it cannot work without — empty for most."""
+        from payments.adapters import required_credentials
+
+        return list(required_credentials(obj.adapter_key))
+
+    def get_missing_credentials(self, obj) -> list:
+        return obj.missing_credentials()
+
+    def get_can_enable(self, obj) -> bool:
+        """
+        ⚠️  **The server's answer, not the panel's guess.**
+
+            The panel decided this for itself and got it wrong for every gateway
+            that needs no keys: cash on delivery, cash at the counter, the card
+            terminal, bank transfer. Disabling any of them made its enable
+            button vanish behind "add the keys first" — keys that do not exist
+            for those adapters — and the only way back was the Django admin.
+
+            One computation, sent to whoever asks. `ToggleProviderAPI` enforces
+            the same rule, so the button and the endpoint cannot disagree.
+        """
+        return obj.adapter_key in available_adapters() and not obj.missing_credentials()
 
     def get_adapter_exists(self, obj) -> bool:
         """

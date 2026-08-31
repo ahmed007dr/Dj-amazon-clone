@@ -14,6 +14,7 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from catalog import selectors as catalog_selectors
 from catalog.models import Product, ProductVariant
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
@@ -444,6 +445,22 @@ class POSProductSearchAPI(generics.ListAPIView):
         not a protection.
 
     ⚠️  And `CanOperatePOS` is the real barrier — no customer reaches it.
+
+    ⚠️  **What has run out of this register's location does not appear.**
+
+        Not out of the shop's stock — out of **this** location's. An item sitting
+        in another branch is not on the shelf in front of the cashier, and
+        offering it produces the one failure a counter cannot absorb: the item is
+        added, the customer is told the price, and the sale is refused with
+        "insufficient stock" while the queue waits.
+
+    ⚠️  And with no open shift there is no location to judge by — so nothing is
+        filtered rather than everything.
+
+        Guessing a location here means a cashier who has not opened their shift
+        seeing another branch's stock as though it were theirs. Showing the
+        unfiltered catalogue is the honest answer to a question we cannot yet
+        ask, and `/checkout/` refuses the sale without a shift anyway.
     """
 
     permission_classes = [CanOperatePOS]
@@ -455,10 +472,22 @@ class POSProductSearchAPI(generics.ListAPIView):
     #:     response instant.
     LIMIT = 20
 
+    def register_location(self):
+        """The location of the shift the cashier has open — `None` when there is none."""
+        session = (
+            POSSession.objects.filter(cashier=self.request.user, status=SessionStatus.OPEN)
+            .select_related("register", "register__location")
+            .first()
+        )
+        return session.register.location if session is not None else None
+
     def get_queryset(self):
         term = (self.request.query_params.get("search") or "").strip()
 
         queryset = Product.objects.filter(is_active=True).select_related("category")
+
+        if (location := self.register_location()) is not None:
+            queryset = catalog_selectors.in_stock_only(queryset, location=location)
 
         if not term:
             # ⚠️  With no search we return the featured items rather than everything — a useful

@@ -90,6 +90,35 @@ class PaymentProvider(BilingualNameMixin, BaseModel):
         mode = " [تجريبي]" if self.is_sandbox else ""
         return f"{self.name_ar}{mode}"
 
+    def missing_credentials(self) -> list[str]:
+        """
+        The keys this gateway's adapter needs and does not have, for the mode it is in.
+
+        ⚠️  **Asked of the adapter, never inferred from the row.**
+
+            "It has no credentials stored, so it is unconfigured" is true of
+            Paymob and false of cash on delivery — there is no key to give a
+            courier. The panel inferred it that way and locked the shop out of
+            its own default payment method the first time anyone disabled it.
+            See `PaymentAdapter.required_credentials`.
+
+        ⚠️  And per mode: sandbox keys are not production keys.
+
+            A gateway tested in sandbox and then switched to production has
+            credentials — the wrong ones. Counting them means enabling a gateway
+            that authenticates against an account holding no money.
+        """
+        from payments.adapters import required_credentials
+
+        required = required_credentials(self.adapter_key)
+        if not required:
+            return []
+
+        present = set(
+            self.credentials.filter(is_sandbox=self.is_sandbox).values_list("key", flat=True)
+        )
+        return [key for key in required if key not in present]
+
     def supports(self, *, method: str, currency: str, channel: str, amount) -> bool:
         if self.supported_methods and method not in self.supported_methods:
             return False

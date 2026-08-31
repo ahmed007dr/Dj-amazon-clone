@@ -620,6 +620,71 @@ class TestProductSearch:
 
         assert [row["sku"] for row in response.data] == ["POS-1"]
 
+    def test_an_item_out_of_this_register_s_stock_is_not_offered(
+        self, cashier_client, product, session, location
+    ):
+        """
+        ⚠️  The one failure a counter cannot absorb.
+
+            The item is added, the customer is told the price, and the sale is
+            refused with "insufficient stock" while the queue waits. Not offering
+            what cannot be sold moves that discovery before the conversation
+            instead of after it.
+        """
+        inventory_services.adjust(product, -100, reason="نفدت من الفرع", location=location)
+
+        response = cashier_client.get(reverse("v1:pos:products"), {"search": "صن"})
+
+        assert response.status_code == 200
+        assert response.data == []
+
+    def test_another_branch_s_stock_does_not_count(
+        self, cashier_client, product, session, location
+    ):
+        """
+        ⚠️  **This register's location, not the shop's total.**
+
+            An item sitting in another branch is not on the shelf in front of this
+            cashier. Filtering by the company-wide total offers them something
+            they cannot physically hand over.
+        """
+        other = StockLocation.objects.create(
+            code="branch-2",
+            name_ar="فرع ٢",
+            name_en="Branch 2",
+            kind=LocationKind.BRANCH,
+            is_sellable=True,
+        )
+        inventory_services.adjust(product, -100, reason="نفدت من الفرع", location=location)
+        inventory_services.receive(product, 50, Decimal("30.00"), location=other)
+
+        response = cashier_client.get(reverse("v1:pos:products"), {"search": "صن"})
+        assert response.data == []
+
+    def test_with_no_open_shift_nothing_is_filtered(self, cashier_client, product, location):
+        """
+        ⚠️  No shift means no location to judge by — so we filter nothing rather
+            than guess one.
+
+            Guessing shows a cashier another branch's stock as though it were
+            theirs, and `/checkout/` refuses the sale without a shift anyway.
+        """
+        inventory_services.adjust(product, -100, reason="نفدت", location=location)
+
+        response = cashier_client.get(reverse("v1:pos:products"), {"search": "صن"})
+        assert [row["sku"] for row in response.data] == ["POS-1"]
+
+    def test_receiving_stock_returns_it_to_the_search(
+        self, cashier_client, product, session, location
+    ):
+        inventory_services.adjust(product, -100, reason="نفدت", location=location)
+        assert cashier_client.get(reverse("v1:pos:products"), {"search": "صن"}).data == []
+
+        inventory_services.receive(product, 5, Decimal("30.00"), location=location)
+
+        response = cashier_client.get(reverse("v1:pos:products"), {"search": "صن"})
+        assert [row["sku"] for row in response.data] == ["POS-1"]
+
     def test_restricted_products_are_visible_to_the_cashier(self, cashier_client, product):
         """
         ⚠️  **No policy filtering — and that is deliberate.**

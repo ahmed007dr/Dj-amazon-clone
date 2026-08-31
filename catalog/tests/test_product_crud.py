@@ -13,8 +13,6 @@ Creating, deleting and restoring products from the admin portal.
 from decimal import Decimal
 
 import pytest
-
-from core.testing import grant_all_domains
 from django.apps import apps
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -22,15 +20,47 @@ from rest_framework.test import APIClient
 from access.models import AccessPolicy
 from accounts.models import AccountType, User
 from catalog.models import Category, Product, ProductKind
+from core.testing import grant_all_domains
 
 PASSWORD = "Str0ng-Test-Pass!23"
 
 pytestmark = pytest.mark.django_db
 
 
+def stock(sku, location, quantity=10):
+    """
+    Put a just-created product on the shelf.
+
+    ⚠️  Creating a product does **not** publish it to the storefront — stocking
+        it does.
+
+        The public list hides anything whose available quantity is zero, and a
+        product created through the admin form has no stock row at all until
+        somebody receives a shipment of it. These tests are about the access
+        policy, so they have to satisfy the stock rule explicitly rather than
+        assert on an empty page and blame the policy for it.
+
+    ⚠️  Through `apps.get_model`, for the reason given at the top of this file:
+        `inventory` is a layer above `catalog`, and the tests obey the same
+        contract the code does.
+    """
+    product = Product.objects.get(sku=sku)
+    apps.get_model("inventory", "Stock").objects.create(
+        product=product, location=location, quantity_physical=quantity
+    )
+    return product
+
+
 @pytest.fixture
 def category(db):
     return Category.objects.create(name_ar="مستلزمات", name_en="Supplies")
+
+
+@pytest.fixture
+def location(db):
+    return apps.get_model("inventory", "StockLocation").objects.create(
+        code="main", name_ar="الرئيسي", name_en="Main", is_default=True
+    )
 
 
 @pytest.fixture
@@ -345,7 +375,9 @@ class TestAudience:
         assert response.status_code == 201
         assert Product.objects.get(sku="NEW-001").access_policy_id == policies["pharmacy_only"].pk
 
-    def test_a_restricted_product_is_invisible_to_guests(self, admin_client, category, policies):
+    def test_a_restricted_product_is_invisible_to_guests(
+        self, admin_client, category, policies, location
+    ):
         """
         ⚠️  Filtering in the queryset, not in the presentation: a restricted
             product appears in no results, in no count, and does not open by direct link.
@@ -361,12 +393,17 @@ class TestAudience:
             format="json",
         )
 
+        stock("RX-1", location)
+        stock("OPEN-1", location)
+
         public = APIClient().get(reverse("v1:catalog:products"))
         skus = {row["sku"] for row in public.data["results"]}
 
         assert skus == {"OPEN-1"}
 
-    def test_a_verified_pharmacy_sees_what_a_guest_cannot(self, admin_client, category, policies):
+    def test_a_verified_pharmacy_sees_what_a_guest_cannot(
+        self, admin_client, category, policies, location
+    ):
         from accounts.models import VerificationStatus
 
         admin_client.post(
@@ -374,6 +411,7 @@ class TestAudience:
             draft(category, sku="PH-1", access_policy=str(policies["pharmacy_only"].pk)),
             format="json",
         )
+        stock("PH-1", location)
 
         pharmacy = User.objects.create_user(
             email="ph@test.local", password=PASSWORD, account_type=AccountType.PHARMACY
@@ -388,7 +426,9 @@ class TestAudience:
         response = client.get(reverse("v1:catalog:products"))
         assert {row["sku"] for row in response.data["results"]} == {"PH-1"}
 
-    def test_omitting_the_policy_falls_back_to_the_default(self, admin_client, category, policies):
+    def test_omitting_the_policy_falls_back_to_the_default(
+        self, admin_client, category, policies, location
+    ):
         """
         ⚠️  A product with no explicit policy inherits the default — which is
             why the default is shown **by name** in the form rather than as "no selection".
@@ -397,6 +437,8 @@ class TestAudience:
 
         product = Product.objects.get(sku="NEW-001")
         assert product.access_policy_id is None
+
+        stock("NEW-001", location)
 
         # and a visitor sees it because the default is "public"
         public = APIClient().get(reverse("v1:catalog:products"))

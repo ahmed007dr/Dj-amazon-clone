@@ -65,6 +65,8 @@ def _money(amount: Decimal) -> str:
 class FawryAdapter(PaymentAdapter):
     key = "fawry"
 
+    required_credentials = ("merchant_code", "secure_key")
+
     @property
     def base_url(self) -> str:
         return SANDBOX_BASE if self.sandbox else LIVE_BASE

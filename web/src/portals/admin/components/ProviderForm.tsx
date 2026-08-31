@@ -113,6 +113,7 @@ export function ProviderForm({
   };
 
   const errorFor = (key: string) => (fieldErrors[key] ? { error: fieldErrors[key] } : {});
+  const requires = data.adapter_requirements[form.adapter_key] ?? [];
   const ready = form.name_ar.trim() !== '' && form.adapter_key !== '' &&
     (Boolean(provider) || form.code.trim() !== '');
 
@@ -168,6 +169,17 @@ export function ProviderForm({
           </span>
         ) : null}
       </label>
+
+      {/* ⚠️  What this adapter will require, said **before** the gateway is created.
+          The sequence is create ← add keys ← enable, and learning at the third
+          step which four fields the second one needed means going back twice. */}
+      {form.adapter_key ? (
+        <p className="pricing-form__hint">
+          {requires.length > 0
+            ? t('admin.adapterRequires', { keys: requires.join(' · ') })
+            : t('admin.noCredentialsNeeded')}
+        </p>
+      ) : null}
 
       {/* ⚠️  Empty = every method. Stated explicitly, or emptiness is read as a block. */}
       <fieldset className="pricing-form__types">

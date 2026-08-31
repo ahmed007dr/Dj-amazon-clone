@@ -22,7 +22,7 @@ from core.models.audit import AuditAction, AuditLog
 from core.permissions import CanManagePayments
 from payments import serializers as s
 from payments import services
-from payments.adapters import available_adapters
+from payments.adapters import available_adapters, required_credentials
 from payments.models import (
     PaymentMethodKind,
     PaymentProvider,
@@ -119,6 +119,12 @@ class AdapterListAPI(APIView):
 
         A new adapter means new code; a **gateway**, by contrast, is data the
         admin configures with no developer.
+
+    ⚠️  Each one reports **the keys it requires**, so the admin knows what a
+        gateway will need before creating it rather than after failing to enable it.
+
+        `adapters` stays a flat list of names beside it: the panel's dropdown
+        reads it, and changing its shape would have been a needless break.
     """
 
     permission_classes = [CanManagePayments]
@@ -127,6 +133,9 @@ class AdapterListAPI(APIView):
         return Response(
             {
                 "adapters": available_adapters(),
+                "adapter_requirements": {
+                    key: list(required_credentials(key)) for key in available_adapters()
+                },
                 "methods": [
                     {"value": value, "label_ar": METHOD_LABELS.get(value, (value,))[0]}
                     for value in PaymentMethodKind.values
@@ -202,6 +211,18 @@ class ToggleProviderAPI(APIView):
     ⚠️  And the system is never left with no enabled gateway — disabling the
         last one means a store that accepts no orders, discovered through a
         customer complaint.
+
+    ⚠️  **Enabling a gateway whose adapter still lacks its keys is refused here.**
+
+        The admin panel used to be the only thing standing in the way, and it
+        judged by the wrong rule: "no credentials stored" rather than "the
+        adapter asked for credentials". So it blocked cash on delivery, which
+        needs none, and would have let a keyless Paymob through the moment
+        anyone called the endpoint directly — wrong in both directions at once.
+
+        The rule belongs on the server: the adapter declares what it needs, this
+        endpoint refuses without it, and the panel renders the same answer
+        instead of computing its own.
     """
 
     permission_classes = [CanManagePayments]
@@ -217,7 +238,27 @@ class ToggleProviderAPI(APIView):
         if provider is None:
             raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
 
-        if not data["is_active"]:
+        if data["is_active"]:
+            if provider.adapter_key not in available_adapters():
+                raise BusinessError(
+                    ErrorCode.CONFLICT,
+                    detail=f"محوّل غير معروف: {provider.adapter_key}",
+                    status_code=409,
+                )
+
+            if missing := provider.missing_credentials():
+                # ⚠️  The message **names the missing keys**.
+                #
+                #     "Configure the gateway first" sends the admin looking through a
+                #     panel that already looks complete to them. The names say which
+                #     four fields, and which mode they belong to.
+                mode = "التجريبي" if provider.is_sandbox else "الإنتاج"
+                raise BusinessError(
+                    ErrorCode.CONFLICT,
+                    detail=(f"مفاتيح ناقصة للوضع {mode}: {' · '.join(missing)}"),
+                    status_code=409,
+                )
+        else:
             remaining = PaymentProvider.objects.filter(is_active=True).exclude(pk=pk).count()
             if remaining == 0:
                 raise BusinessError(

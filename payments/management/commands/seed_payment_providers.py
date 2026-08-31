@@ -14,6 +14,7 @@ Re-runnable — it updates and does not duplicate.
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from payments.adapters import required_credentials
 from payments.models import PaymentMethodKind, PaymentProvider
 
 #: Channels
@@ -118,11 +119,20 @@ PROVIDERS = [
     },
 ]
 
-#: The keys each external gateway requires — shown in the setup instructions
-REQUIRED_CREDENTIALS = {
-    "paymob": ["api_key", "integration_id", "iframe_id", "hmac_secret"],
-    "fawry": ["merchant_code", "secure_key"],
-}
+
+#: The keys each gateway requires — **read from its adapter, not repeated here.**
+#:
+#: ⚠️  This dictionary used to hold its own copy of the list, and a copy of a fact
+#:     is a second place for it to be wrong. `PaymentAdapter.required_credentials`
+#:     is what the API refuses an enable by; a seed instruction listing something
+#:     else would send the admin to add a key nothing checks for, and leave out
+#:     the one that actually blocks them.
+def _required_credentials() -> dict[str, list[str]]:
+    return {
+        spec["code"]: list(required_credentials(spec["adapter_key"]))
+        for spec in PROVIDERS
+        if required_credentials(spec["adapter_key"])
+    }
 
 
 class Command(BaseCommand):
@@ -156,14 +166,15 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f"بوابات الدفع: {created} جديدة · {updated} محدَّثة"))
 
+        requirements = _required_credentials()
         pending = PaymentProvider.objects.filter(
-            code__in=REQUIRED_CREDENTIALS, is_active=False
+            code__in=requirements, is_active=False
         ).values_list("code", flat=True)
 
         if pending:
             self.stdout.write("\nبوابات خارجية موقوفة بانتظار المفاتيح:")
             for code in pending:
-                keys = " · ".join(REQUIRED_CREDENTIALS[code])
+                keys = " · ".join(requirements[code])
                 self.stdout.write(f"  {code:8} ← {keys}")
 
             self.stdout.write(

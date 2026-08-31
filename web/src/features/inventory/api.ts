@@ -193,13 +193,29 @@ export interface DamageBody {
  *     Receiving changes the balance, the batches and the movements, and may
  *     resolve an open alert. Invalidating one list leaves the screen showing an
  *     "out of stock" alert beside the quantity just received.
+ *
+ * ⚠️  **And the catalogue with it — the listing itself now depends on stock.**
+ *
+ *     A product whose available quantity is zero is not in the storefront list
+ *     at all, so receiving a shipment does not merely change a number on a card:
+ *     it puts the card back. Invalidating `inventory` alone left the catalogue
+ *     serving its two-minute cache, so the person who had just received the
+ *     goods opened the shop, did not find them, and had no way to tell whether
+ *     the receipt had failed or the page was stale.
+ *
+ *     Two minutes is the right staleness for a name and a price. It is the
+ *     wrong staleness for "does this exist?", and this is the moment we know the
+ *     answer changed.
  */
 function useInventoryMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: run,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      void queryClient.invalidateQueries({ queryKey: ['catalog'] });
+    },
   });
 }
 

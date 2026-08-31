@@ -29,6 +29,25 @@ export interface PaymentProvider {
   is_configured: boolean;
   /** The names of the configured keys — never their values. */
   credential_keys: string[];
+  /**
+   * ⚠️  The keys **this adapter** declares it cannot work without — empty for most.
+   *
+   *     Cash on delivery, cash at the counter, the card terminal and bank
+   *     transfer all require none: there is no key to hand a courier.
+   */
+  required_credentials: string[];
+  /** Of those, the ones still missing for the mode the gateway is in. */
+  missing_credentials: string[];
+  /**
+   * ⚠️  **Whether the server will accept enabling it — computed there, not here.**
+   *
+   *     This screen used to work it out for itself from "are there any stored
+   *     credentials?", which is the wrong question. It is true of Paymob and
+   *     nonsense for cash on delivery, so disabling cash on delivery hid its own
+   *     enable button behind a demand for keys that do not exist — and the only
+   *     way back was the Django admin.
+   */
+  can_enable: boolean;
 }
 
 export interface ProviderCredential {
@@ -200,6 +219,11 @@ export function useRefundTransaction() {
 export interface AdapterOptions {
   /** The names of the adapters registered in the code — the admin chooses from them */
   adapters: string[];
+  /**
+   * ⚠️  What each adapter **requires**, so the form can say so before the gateway
+   *     is created rather than after it refuses to enable.
+   */
+  adapter_requirements: Record<string, string[]>;
   methods: { value: string; label_ar: string }[];
 }
 
@@ -217,12 +241,27 @@ export function useAdapterOptions(enabled = true) {
   });
 }
 
+/**
+ * ⚠️  The key is `['admin', 'payment-providers']` — **the one the lists actually use.**
+ *
+ *     It read `['admin', 'payments']`, which prefix-matches nothing: the gateway
+ *     list, the dashboard tile and the transactions panel all subscribe under
+ *     `payment-providers`. So creating, deleting and reordering a gateway
+ *     succeeded on the server and refreshed no screen — the row stayed where it
+ *     was until the page was reloaded by hand, which reads as "the button did
+ *     nothing" and invites a second press.
+ */
+export const PROVIDERS_KEY = ['admin', 'payment-providers'] as const;
+
+export const credentialsKey = (providerId: string) =>
+  [...PROVIDERS_KEY, providerId, 'credentials'] as const;
+
 function useProviderMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: run,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: PROVIDERS_KEY }),
   });
 }
 
@@ -259,11 +298,52 @@ export function useReorderProviders() {
   );
 }
 
-export function useDeleteCredential() {
-  return useProviderMutation(
-    ({ providerId, credentialId }: { providerId: string; credentialId: string }) =>
-      http.delete<void>(
-        `/payments/admin/providers/${providerId}/credentials/${credentialId}/`,
-      ),
-  );
+/**
+ * The keys stored for one gateway — names and masked values, never the values.
+ *
+ * ⚠️  Fetched **only when the section is open**.
+ *
+ *     A page showing six gateways would otherwise fire six requests for panels
+ *     nobody expanded, on a screen already loading the gateway list itself.
+ */
+export function useProviderCredentials(providerId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: credentialsKey(providerId),
+    queryFn: () => listCredentials(providerId),
+    enabled,
+  });
+}
+
+/**
+ * ⚠️  Invalidates **both** the credential list and the gateway list.
+ *
+ *     Adding the last missing key is what flips `can_enable` from false to true,
+ *     and that flag lives on the gateway row, not on the credential. Refreshing
+ *     only the keys leaves the card still saying "missing credentials" beside the
+ *     key just entered — and the admin adds it a second time.
+ */
+export function useAddCredential(providerId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ key, value, isSandbox }: { key: string; value: string; isSandbox: boolean }) =>
+      addCredential(providerId, key, value, isSandbox),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: credentialsKey(providerId) });
+      void queryClient.invalidateQueries({ queryKey: PROVIDERS_KEY });
+    },
+  });
+}
+
+export function useDeleteCredential(providerId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (credentialId: string) =>
+      http.delete<void>(`/payments/admin/providers/${providerId}/credentials/${credentialId}/`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: credentialsKey(providerId) });
+      void queryClient.invalidateQueries({ queryKey: PROVIDERS_KEY });
+    },
+  });
 }
