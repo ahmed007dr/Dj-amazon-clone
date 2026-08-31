@@ -1,0 +1,16 @@
+.shipping-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  justify-content: flex-end;
+}
+
+/* ⚠️  The unassigned governorates are named inside the warning, not counted.
+       "٥ محافظات بلا منطقة" tells the admin a number; naming them tells them
+       which zone to go and edit. */
+.shipping-unassigned {
+  display: block;
+  margin-block-start: var(--space-1);
+  font-size: 0.8125rem;
+  opacity: 0.85;
+}

@@ -3,8 +3,8 @@
 #  ⇩⇩⇩  THE SWITCH  ⇩⇩⇩
 # ═══════════════════════════════════════════════════════════
 
-#IS_PRODUCTION = True    # production
-IS_PRODUCTION = False  # development
+IS_PRODUCTION = True    # production
+#IS_PRODUCTION = False  # development
 
 
 # ═══════════════════════════════════════════════════════════
@@ -21,16 +21,9 @@ DEVELOPMENT = {
     #: Empty = media follows the API server
     "MEDIA_ORIGIN": "",
     "DEFAULT_LOCALE": "ar",
-    # ⚠️  `localhost` and `127.0.0.1` are the same machine and two different
-    #     hosts to the browser. A developer who opens one while the setting
-    #     names the other gets 400 with nothing in the Django log.
-    #
-    #     A LAN address belongs here too when testing from a real phone on the
-    #     same Wi-Fi — the phone cannot reach `127.0.0.1`.
+    
     "EXTRA_HOSTS": ["localhost", "127.0.0.1", "[::1]"],
-    # ⚠️  Vite moves to the next free port when 5173 is taken, and the browser
-    #     then blocks every response while the server reports 200 — the error
-    #     surfaces in the browser console, never in the Django log.
+    
     "EXTRA_ORIGINS": [
         "http://localhost:5174",
         "http://127.0.0.1:5174",

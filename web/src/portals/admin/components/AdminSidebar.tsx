@@ -41,6 +41,12 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
       // ⚠️  Directly under orders: a shipment is the tail of an order, and the
       //     operator moving parcels through the day works the two together.
       { to: '/admin/shipments', key: 'nav.shipments', permission: 'shipping.change_shipment' },
+      // ⚠️  Beside the shipments rather than in "system", for the same reason
+      //     pricing sits under the catalogue: the delivery fee is a commercial
+      //     decision revisited whenever a zone starts costing more — not a
+      //     setting configured once at launch. And the person who sees the
+      //     deliveries fail is the person who has to change it.
+      { to: '/admin/shipping', key: 'shipping.setupNav', permission: 'shipping.change_shipment' },
       { to: '/admin/products', key: 'nav.products', permission: 'catalog.change_product' },
       // ⚠️  Beneath products, not beside "system settings": bulk import is how a
       //     catalogue is built and how a price list lands every week — it is

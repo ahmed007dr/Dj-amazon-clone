@@ -66,6 +66,13 @@ const AdminShipmentsPage = lazy(() =>
     default: module.AdminShipmentsPage,
   })),
 );
+// ⚠️  A separate screen from the shipments one, on the same permission: that
+//     screen moves parcels through the day, this one sets what a delivery costs.
+const AdminShippingPage = lazy(() =>
+  import('@/portals/admin/pages/AdminShippingPage').then((module) => ({
+    default: module.AdminShippingPage,
+  })),
+);
 const AdminOrderDetailPage = lazy(() =>
   import('@/portals/admin/pages/AdminOrderDetailPage').then((module) => ({
     default: module.AdminOrderDetailPage,
@@ -389,6 +396,16 @@ const router = createBrowserRouter([
           <RequirePermission permission="shipping.change_shipment" screen="nav.shipments">
             <Lazy>
               <AdminShipmentsPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'shipping',
+        element: (
+          <RequirePermission permission="shipping.change_shipment" screen="shipping.setupTitle">
+            <Lazy>
+              <AdminShippingPage />
             </Lazy>
           </RequirePermission>
         ),

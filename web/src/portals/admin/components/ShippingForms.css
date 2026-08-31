@@ -1,0 +1,136 @@
+.shipping-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.shipping-form__row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 40rem) {
+  .shipping-form__row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.shipping-form__select {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.shipping-form__select select {
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.shipping-form__error {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-danger);
+}
+
+.shipping-form__hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.shipping-form__pair {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.shipping-form__check {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  min-block-size: var(--touch-target);
+  padding: var(--space-2);
+  margin-inline-start: calc(var(--space-2) * -1);
+  font-size: 0.9375rem;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.shipping-form__check input {
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
+  margin-block-start: 0.2rem;
+  flex: none;
+}
+
+.shipping-form__check small {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* ⚠️  A grid rather than a column: twenty-seven governorates in one list is a
+   scroll the admin loses their place in, and the whole point of the picker is
+   seeing at a glance what is left unassigned. */
+.shipping-form__governorates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: var(--space-1);
+  padding: var(--space-3);
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.shipping-form__governorates legend {
+  padding-inline: var(--space-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.shipping-form__governorates > .shipping-form__hint,
+.shipping-form__governorates > .shipping-form__error {
+  grid-column: 1 / -1;
+}
+
+.shipping-form__gov {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.9375rem;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.shipping-form__gov:hover {
+  background: var(--color-surface-alt, transparent);
+}
+
+.shipping-form__gov code {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  direction: ltr;
+}
+
+/* ⚠️  Dimmed, not hidden: a governorate the admin cannot find is a governorate
+   they create a second zone for. */
+.shipping-form__gov.is-taken {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.shipping-form__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-block-start: var(--space-2);
+}

@@ -12,6 +12,7 @@ Stock locations, shipping zones and their fees.
 from decimal import Decimal
 
 from inventory.models import LocationKind, StockLocation
+from shipping.governorates import GOVERNORATE_SET
 from shipping.models import ShippingMethod, ShippingRate, ShippingZone
 
 LOCATIONS = [
@@ -156,6 +157,20 @@ RATES = [
 
 
 def seed():
+    # ⚠️  The zone names are checked against the reference list **before anything
+    #     is written**, not left to be discovered.
+    #
+    #     `ShippingZone.for_governorate` matches literally, so a governorate
+    #     misspelled here seeds a zone that covers nothing: those addresses fall
+    #     to the default zone at the remote-area fee, the checkout completes, and
+    #     no test anywhere fails. This list and `shipping/governorates.py` used to
+    #     be kept in step by a comment asking whoever edits one to edit the other.
+    unknown = sorted(
+        {name for spec in ZONES for name in spec["governorates"] if name not in GOVERNORATE_SET}
+    )
+    if unknown:
+        raise ValueError("محافظات خارج القائمة المرجعية في بذرة الشحن: " + "، ".join(unknown))
+
     locations = {}
     for spec in LOCATIONS:
         payload = dict(spec)
