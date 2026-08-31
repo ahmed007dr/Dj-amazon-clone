@@ -14,6 +14,9 @@ urlpatterns = [
     path("locations/<uuid:pk>/", api.StockLocationDetailAPI.as_view(), name="location-detail"),
     # Balances and batches
     path("stock/", api.StockListAPI.as_view(), name="stock"),
+    # ⚠️  Beside the balances, not inside them: `stock/` lists rows and these
+    #     products have none — see `UnstockedProductListAPI`.
+    path("unstocked/", api.UnstockedProductListAPI.as_view(), name="unstocked"),
     path("stock/<int:pk>/", api.StockDetailAPI.as_view(), name="stock-detail"),
     path("batches/", api.BatchListAPI.as_view(), name="batches"),
     # The log and alerts

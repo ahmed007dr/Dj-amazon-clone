@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
+import { useCan } from '@/features/auth/useCan';
 import type { AdminProduct } from '@/features/catalog/adminApi';
 import {
   useAdjustStock,
@@ -54,10 +56,32 @@ export function StockMovementForm({
   const { notify } = useToast();
   const localized = useLocalized();
 
+  // ⚠️  **Managing locations is a different permission from managing stock.**
+  //
+  //     `inventory.change_stock` opens this form; `inventory.change_stocklocation`
+  //     opens the screen that fixes it. Someone holding only the first is blocked
+  //     by a message pointing at a screen their sidebar does not show and their
+  //     account cannot open — so the link is offered only to whoever can act on
+  //     it, and everyone else is told to ask, which is the real next step.
+  const can = useCan();
+  const canManageLocations = can('inventory.change_stocklocation');
+
   const receive = useReceiveStock();
   const adjust = useAdjustStock();
   const transfer = useTransferStock();
   const damage = useMarkDamaged();
+
+  // ⚠️  The usable locations — a deactivated one is not somewhere stock can go.
+  const usable = locations.filter((row) => row.is_active);
+
+  // ⚠️  **Whether a fallback exists at all**, and the form changes shape on it.
+  //
+  //     Leaving `location` empty makes the server fall back to its default. That
+  //     is a convenience when a default exists and a trap when none does: the
+  //     field showed the placeholder "الموقع الافتراضي", which reads as a chosen
+  //     value rather than an empty one, the submit button stayed enabled, and the
+  //     refusal arrived from the server naming a concept the admin never picked.
+  const hasDefault = defaultLocation(locations) !== '';
 
   const [product, setProduct] = useState<AdminProduct | null>(null);
   const [location, setLocation] = useState(() => defaultLocation(locations));
@@ -159,16 +183,53 @@ export function StockMovementForm({
     positiveCount &&
     (action !== 'receive' || unitCost !== '') &&
     (action !== 'transfer' || (location !== '' && toLocation !== '' && location !== toLocation)) &&
+    // ⚠️  With no default to fall back on, the location stops being optional.
+    (hasDefault || location !== '') &&
     (!needsReason || reason.trim().length >= 3);
 
-  const locationOptions = locations.map((row) => ({
+  const locationOptions = usable.map((row) => ({
     value: row.id,
     label: `${row.code} — ${localized(row, 'name')}`,
   }));
 
+  // ⚠️  No location at all is not a form to be filled in more carefully — there is
+  //     nowhere for the stock to go. Saying so, and where to fix it, beats an
+  //     empty dropdown above a button that fails.
+  if (usable.length === 0) {
+    return (
+      <div className="stock-form">
+        <Alert tone="warning">
+          {/* ⚠️  A link, not the screen's name.
+              Naming it was worse than useless: the locations live under a
+              different sidebar section from inventory, behind a different
+              permission — so the message named a screen the reader may not be
+              shown, under a label that says nothing about stock. */}
+          {t('inventory.noLocations')}{' '}
+          {canManageLocations ? (
+            <Link to="/admin/settings">{t('inventory.manageLocations')}</Link>
+          ) : (
+            t('inventory.askAnAdmin')
+          )}
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="stock-form">
       <p className="stock-form__intro">{t(`inventory.intro_${action}`)}</p>
+
+      {/* ⚠️  Stated once, at the top: every field below behaves differently without it. */}
+      {hasDefault ? null : (
+        <Alert tone="info">
+          {t('inventory.noDefaultLocation')}{' '}
+          {canManageLocations ? (
+            <Link to="/admin/settings">{t('inventory.manageLocations')}</Link>
+          ) : (
+            t('inventory.askAnAdmin')
+          )}
+        </Alert>
+      )}
 
       <ProductPicker
         value={product}
@@ -201,7 +262,12 @@ export function StockMovementForm({
           value={location}
           onChange={setLocation}
           options={locationOptions}
-          placeholder={t('inventory.defaultLocation')}
+          // ⚠️  The placeholder tells the truth about what an empty value means:
+          //     with a default it is "fall back to it", without one it is "not
+          //     chosen yet" — and a select with no empty option would *display*
+          //     the first location while holding no value, which is the same lie
+          //     in a new place.
+          placeholder={hasDefault ? t('inventory.defaultLocation') : t('common.choose')}
           {...(fieldErrors.location ? { error: fieldErrors.location } : {})}
         />
       )}
@@ -319,7 +385,14 @@ export function StockMovementForm({
  *     every movement is a step with no decision in it.
  */
 function defaultLocation(locations: StockLocation[]): string {
-  return locations.find((row) => row.is_default)?.id ?? '';
+  // ⚠️  `is_active` too — the server's `get_default()` requires it.
+  //
+  //     A location can carry the default tick and be switched off, and the
+  //     settings screen goes on showing the tick. Matching on the flag alone
+  //     preselected nothing while the field still read "the default location",
+  //     and the movement was refused with "there is no default location" — a
+  //     server contradicting a screen the admin was looking at.
+  return locations.find((row) => row.is_default && row.is_active)?.id ?? '';
 }
 
 function Select({

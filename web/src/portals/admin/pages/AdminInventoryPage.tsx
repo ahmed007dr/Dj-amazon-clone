@@ -7,11 +7,13 @@ import {
   listLocations,
   listMovements,
   listStock,
+  listUnstocked,
   runMaintenance,
   useUpdateStockThresholds,
   type Stock,
   type StockAlert,
   type StockMovement,
+  type UnstockedProduct,
 } from '@/features/inventory/api';
 import { BatchesTab } from '@/portals/admin/components/BatchesTab';
 import { StockCountsTab } from '@/portals/admin/components/StockCountsTab';
@@ -24,6 +26,7 @@ import { isApiError } from '@/shared/http/errors';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
+import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Drawer } from '@/shared/ui/Drawer';
@@ -33,7 +36,7 @@ import { StatusTabs } from '@/shared/ui/StatusTabs';
 import { ExportButton } from '@/portals/admin/components/ExportButton';
 import { ReservationsTab } from '@/portals/admin/components/ReservationsTab';
 import { useToast } from '@/shared/ui/useToast';
-import { formatDate, formatDateTime } from '@/shared/utils/format';
+import { formatDate, formatDateTime, formatMoney } from '@/shared/utils/format';
 
 import './AdminInventoryPage.css';
 
@@ -69,7 +72,14 @@ const MOVEMENT_ACTIONS: MovementAction[] = ['receive', 'adjust', 'transfer', 'da
  *     what is close to expiring. The stock count, by contrast, is opened once a
  *     month — and its place is last.
  */
-type Tab = 'alerts' | 'stock' | 'batches' | 'movements' | 'counts' | 'reservations';
+type Tab =
+  | 'alerts'
+  | 'stock'
+  | 'unstocked'
+  | 'batches'
+  | 'movements'
+  | 'counts'
+  | 'reservations';
 
 /**
  * Which tabs offer an inline export.
@@ -121,6 +131,9 @@ export function AdminInventoryPage() {
   const [search, setSearch] = useState('');
   const [location, setLocation] = useState('');
   const [status, setStatus] = useState('');
+  // ⚠️  Off by default: "never received" and "received then sold out" are
+  //     different problems, and merging them hides which is which.
+  const [includeZero, setIncludeZero] = useState(false);
   const [movementType, setMovementType] = useState('');
   const [page, setPage] = useState(1);
 
@@ -152,6 +165,24 @@ export function AdminInventoryPage() {
         page,
       }),
     enabled: tab === 'stock',
+    staleTime: 30 * 1000,
+  });
+
+  // ⚠️  The products with no stock row at all — the balances list cannot show them.
+  //
+  //     It pages over `Stock` rows and these have none, so they fall outside its
+  //     search and its `status=out` filter alike. Since the storefront hides
+  //     whatever has zero available, this is the only screen that can explain why
+  //     a product is missing from the shop.
+  const unstocked = useQuery({
+    queryKey: ['inventory', 'unstocked', debouncedSearch, includeZero, page],
+    queryFn: () =>
+      listUnstocked({
+        ...(debouncedSearch ? { search: debouncedSearch } : {}),
+        ...(includeZero ? { include_zero: 'true' } : {}),
+        page,
+      }),
+    enabled: tab === 'unstocked',
     staleTime: 30 * 1000,
   });
 
@@ -215,6 +246,36 @@ export function AdminInventoryPage() {
       key: 'created',
       header: t('admin.createdAt'),
       render: (alert) => formatDate(alert.created_at, i18n.language),
+    },
+  ];
+
+  const unstockedColumns: Column<UnstockedProduct>[] = [
+    {
+      key: 'product',
+      header: t('catalog.product'),
+      render: (row) => (
+        <span>
+          <code style={{ direction: 'ltr' }}>{row.sku}</code> — {localized(row, 'name')}
+        </span>
+      ),
+    },
+    {
+      key: 'price',
+      header: t('catalog.price'),
+      align: 'end',
+      render: (row) => formatMoney(row.base_price, i18n.language),
+    },
+    {
+      key: 'action',
+      header: '',
+      align: 'end',
+      // ⚠️  The remedy sits on the row. Seeing the list and then hunting for the
+      //     product again in the receive form is the same search done twice.
+      render: () => (
+        <Button size="sm" variant="ghost" onClick={() => setAction('receive')}>
+          {t('inventory.action_receive')}
+        </Button>
+      ),
     },
   ];
 
@@ -408,6 +469,9 @@ export function AdminInventoryPage() {
         options={[
           { value: 'alerts', label: t('admin.alerts'), ...(alerts.data ? { count: alerts.data.count } : {}) },
           { value: 'stock', label: t('admin.stockLevels') },
+          // ⚠️  Beside the balances, because it is the question the balances
+          //     cannot answer — not a filter inside them.
+          { value: 'unstocked', label: t('inventory.unstocked') },
           { value: 'batches', label: t('inventory.batches') },
           { value: 'movements', label: t('inventory.movements') },
           { value: 'counts', label: t('inventory.counts') },
@@ -464,6 +528,39 @@ export function AdminInventoryPage() {
             ]}
             onChange={(next) => {
               setStatus(next);
+              setPage(1);
+            }}
+          />
+        </FilterBar>
+      ) : null}
+
+      {tab === 'unstocked' ? (
+        <FilterBar
+          hasFilters={Boolean(search || includeZero)}
+          onClear={() => {
+            setSearch('');
+            setIncludeZero(false);
+            setPage(1);
+          }}
+        >
+          <FilterSearch
+            value={search}
+            onChange={(next) => {
+              setSearch(next);
+              setPage(1);
+            }}
+            placeholder={t('admin.searchBySku')}
+          />
+
+          <FilterSelect
+            value={includeZero ? 'all' : 'never'}
+            label={t('inventory.unstockedScope')}
+            options={[
+              { value: 'never', label: t('inventory.neverReceived') },
+              { value: 'all', label: t('inventory.allUnsellable') },
+            ]}
+            onChange={(next) => {
+              setIncludeZero(next === 'all');
               setPage(1);
             }}
           />
@@ -548,6 +645,35 @@ export function AdminInventoryPage() {
           />
           {alerts.data ? (
             <Pagination page={alerts.data.page} pages={alerts.data.pages} onChange={setPage} />
+          ) : null}
+        </>
+      ) : tab === 'unstocked' ? (
+        <>
+          {/* ⚠️  The count is the point of this screen — it is the size of the
+              gap between the catalogue and what a customer can actually buy. */}
+          {unstocked.data ? (
+            <Alert tone={unstocked.data.count > 0 ? 'warning' : 'success'}>
+              {unstocked.data.count > 0
+                ? t('inventory.unstockedCount', { count: unstocked.data.count })
+                : t('inventory.allStocked')}
+            </Alert>
+          ) : null}
+
+          <DataTable
+            columns={unstockedColumns}
+            rows={unstocked.data?.results ?? []}
+            rowKey={(row) => row.id}
+            isLoading={unstocked.isPending}
+            error={unstocked.error}
+            emptyTitle={t('inventory.allStocked')}
+            emptyBody={t('inventory.allStockedBody')}
+          />
+          {unstocked.data ? (
+            <Pagination
+              page={unstocked.data.page}
+              pages={unstocked.data.pages}
+              onChange={setPage}
+            />
           ) : null}
         </>
       ) : (

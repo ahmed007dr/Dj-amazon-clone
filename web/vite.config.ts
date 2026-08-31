@@ -4,58 +4,12 @@ import { fileURLToPath, URL } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-/**
- * ⚠️  **No environment file inside `web/`, and none beside it either.**
- *
- *     Configuration comes from `../config/environment.py` — the very same file
- *     Django reads. (ADR-73 · ADR-74)
- *
- *     There used to be a `web/.env` holding `VITE_API_BASE_URL` while `src/.env`
- *     held `CORS_ALLOWED_ORIGINS` and `FRONTEND_BASE_URL`: the same domain
- *     written in four shapes across two files. Switching environment in one and
- *     forgetting the other produces a **silent** failure — the browser blocks
- *     the response and nothing appears in the server log.
- *
- *     That source was `.env.public` until the switch moved into
- *     `config/environment.py`. Parsing Python from a bundler is unusual; reading
- *     a *second* copy of the domain would be worse. The frontend must be built
- *     for the same environment the server runs, and one file is how that is
- *     guaranteed rather than remembered.
- */
-
-/**
- * Reading the shared configuration out of `config/environment.py`.
- *
- * ⚠️  **By explicit name, never by scanning a directory.**
- *
- *     Vite's `loadEnv` would have read `../.env.production` too — the secrets
- *     file: the secret key, the database password and the encryption key for
- *     payment gateway credentials. It only exports prefixed values, true, but
- *     opening the secrets file inside the tool that builds the browser bundle is
- *     risk with no upside: one wrong prefix ships all of it to every visitor.
- *
- * ⚠️  And the file this reads **cannot** hold a secret by construction: it is
- *     committed to Git, which is exactly why the secrets were never put in it.
- */
-
 /** `IS_PRODUCTION = True` — a commented line does not match, `^` sees to that. */
 const SWITCH = /^\s*IS_PRODUCTION\s*=\s*(True|False)\b/m;
 
 /** Only `"KEY": "value"` pairs. List values (EXTRA_*) are for Django alone. */
 const ENTRY = /^\s*"([A-Z_]+)"\s*:\s*"([^"]*)"/gm;
 
-/**
- * The two blocks, as literal patterns rather than one built from a string.
- *
- * ⚠️  A template literal would eat the escapes: `\s` inside `` `...` `` is not a
- *     whitespace class, it is the letter `s`. The regex then matches nothing and
- *     the build fails with "block not found" while the block is plainly there.
- *
- * ⚠️  `^\}` with the multiline flag — the closing brace of the block sits at
- *     column 0, while the `]` of the nested lists never does. Matching braces
- *     properly would mean writing a parser; anchoring to the layout the file
- *     already has is enough, and it fails loudly rather than quietly if broken.
- */
 const BLOCKS = {
   PRODUCTION: /^PRODUCTION\s*=\s*\{([\s\S]*?)^\}/m,
   DEVELOPMENT: /^DEVELOPMENT\s*=\s*\{([\s\S]*?)^\}/m,

@@ -67,6 +67,39 @@ export const listStock = (params: {
   page?: number;
 }) => http.get<PagedResponse<Stock>>('/inventory/stock/', { params: { ...params } });
 
+/**
+ * A product with **no stock row at all** — never received.
+ *
+ * ⚠️  Deliberately not shaped like `Stock`.
+ *
+ *     There are no quantities to report, and sending zeros in their place would
+ *     claim the product was received and sold out — a different fact with a
+ *     different remedy.
+ */
+export interface UnstockedProduct {
+  id: string;
+  sku: string;
+  name_ar: string;
+  name_en: string;
+  base_price: string;
+  is_active: boolean;
+}
+
+/**
+ * ⚠️  A separate endpoint because `/inventory/stock/` **cannot** answer this.
+ *
+ *     It pages over stock rows, and these products have none: they appear in no
+ *     page of it, no `status=out` filter and no SKU search there. On a catalogue
+ *     imported without opening balances that is most of it — invisible to
+ *     customers, and invisible on the screen an admin opens to find out why.
+ */
+export const listUnstocked = (params: {
+  search?: string;
+  include_zero?: string;
+  include_inactive?: string;
+  page?: number;
+}) => http.get<PagedResponse<UnstockedProduct>>('/inventory/unstocked/', { params: { ...params } });
+
 export const listAlerts = (params: { type?: string; resolved?: string; page?: number }) =>
   http.get<PagedResponse<StockAlert>>('/inventory/alerts/', { params: { ...params } });
 

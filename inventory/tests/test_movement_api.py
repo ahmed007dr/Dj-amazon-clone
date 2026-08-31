@@ -334,3 +334,148 @@ class TestLogAndPermissions:
         """The log reveals the volume of business and the turnover rate — a commercial figure that
         is not given away."""
         assert customer_client.get(reverse("v1:inventory:movements")).status_code == 403
+
+
+# ═══════════════════════════════════════════════════════════
+#  Products that have never been received
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.django_db
+class TestUnstockedProducts:
+    """
+    ⚠️  The balances screen lists `Stock` rows, so a product with none appears in
+        no page of it, no `status=out` filter and no SKU search there.
+
+        Since the storefront hides whatever has zero available, that left the
+        products a customer cannot see also invisible on the one screen an admin
+        would open to ask why.
+    """
+
+    def make(self, sku, **overrides):
+        category = Category.objects.filter(name_ar="فئة").first() or Category.objects.create(
+            name_ar="فئة", name_en="Category"
+        )
+        return Product.objects.create(
+            sku=sku, name_ar=f"صنف {sku}", name_en=f"Item {sku}", category=category, **overrides
+        )
+
+    def skus(self, response):
+        return {row["sku"] for row in response.data["results"]}
+
+    def test_it_lists_products_with_no_stock_row(self, admin_client, product, location):
+        self.make("NONE-1")
+        services.receive(product, 5, Decimal("3.00"), location=location)
+
+        response = admin_client.get(reverse("v1:inventory:unstocked"))
+
+        assert response.status_code == 200
+        assert self.skus(response) == {"NONE-1"}
+
+    def test_a_row_reading_zero_is_not_listed_by_default(self, admin_client, product, location):
+        """
+        ⚠️  Never received and sold out are different problems.
+
+            One is reordered, the other has never been received once — merging
+            them by default hides which of the two the admin is looking at.
+        """
+        services.receive(product, 5, Decimal("3.00"), location=location)
+        services.adjust(product, -5, reason="بيع الكمية", location=location)
+
+        response = admin_client.get(reverse("v1:inventory:unstocked"))
+        assert self.skus(response) == set()
+
+    def test_include_zero_merges_them(self, admin_client, product, location):
+        services.receive(product, 5, Decimal("3.00"), location=location)
+        services.adjust(product, -5, reason="بيع الكمية", location=location)
+        self.make("NONE-1")
+
+        response = admin_client.get(reverse("v1:inventory:unstocked"), {"include_zero": "true"})
+        assert self.skus(response) == {"MOV-001", "NONE-1"}
+
+    def test_it_agrees_with_what_the_storefront_hides(self, admin_client, product, location):
+        """
+        ⚠️  **The two answers come from the same filter, so they cannot disagree.**
+
+            An admin screen reporting "everything is stocked" while the shop shows
+            nothing is the failure mode this guards: whatever `include_zero`
+            lists is exactly the complement of what the catalogue publishes.
+        """
+        from catalog import selectors
+
+        services.receive(product, 5, Decimal("3.00"), location=location)
+        self.make("NONE-1")
+        self.make("NONE-2")
+
+        hidden = admin_client.get(reverse("v1:inventory:unstocked"), {"include_zero": "true"}).data[
+            "count"
+        ]
+        visible = selectors.in_stock_only(Product.objects.filter(is_active=True)).count()
+
+        assert hidden + visible == Product.objects.filter(is_active=True).count()
+
+    def test_inactive_products_are_excluded_by_default(self, admin_client):
+        self.make("OFF-1", is_active=False)
+
+        assert self.skus(admin_client.get(reverse("v1:inventory:unstocked"))) == set()
+
+        response = admin_client.get(reverse("v1:inventory:unstocked"), {"include_inactive": "true"})
+        assert self.skus(response) == {"OFF-1"}
+
+    def test_search_matches_sku_and_name(self, admin_client):
+        self.make("FIND-1")
+        self.make("OTHER-1")
+
+        assert self.skus(
+            admin_client.get(reverse("v1:inventory:unstocked"), {"search": "FIND"})
+        ) == {"FIND-1"}
+        assert self.skus(
+            admin_client.get(reverse("v1:inventory:unstocked"), {"search": "صنف OTHER-1"})
+        ) == {"OTHER-1"}
+
+    def test_a_customer_cannot_read_it(self, customer_client):
+        self.make("NONE-1")
+
+        assert customer_client.get(reverse("v1:inventory:unstocked")).status_code == 403
+
+
+@pytest.mark.django_db
+class TestDefaultLocationMissing:
+    def test_the_refusal_names_the_fix_instead_of_reporting_a_crash(self, product, db):
+        """
+        ⚠️  It raised `INTERNAL_ERROR` — "حدث خطأ غير متوقع" — for a state the
+            admin creates and the admin fixes.
+
+            That sent them looking for a bug in a situation their own settings
+            screen resolves in one click, and named neither the screen nor the
+            setting.
+        """
+        from core.errors import BusinessError, ErrorCode
+
+        assert StockLocation.get_default() is None
+
+        with pytest.raises(BusinessError) as caught:
+            services.receive(product, 5, Decimal("3.00"))
+
+        assert caught.value.code == ErrorCode.VALIDATION_ERROR
+
+        # ⚠️  **The screen's name as the interface actually spells it.**
+        #
+        #     The first version of this message said "المواقع المخزنية" while the
+        #     sidebar and the tab both read "مواقع التخزين" — so it directed the
+        #     admin to a label that exists nowhere, and they searched the panel
+        #     for a screen they were already being pointed at. A message naming a
+        #     screen is only as good as the name matching.
+        detail = str(caught.value.error_detail)
+        assert "مواقع التخزين" in detail
+
+    def test_a_deactivated_default_is_no_default(self, product, location):
+        """
+        ⚠️  `get_default()` requires `is_active`, and the settings screen goes on
+            showing the default tick on a location that has been switched off —
+            so the server denies a default the admin can plainly see marked.
+        """
+        location.is_active = False
+        location.save(update_fields=["is_active"])
+
+        assert StockLocation.get_default() is None

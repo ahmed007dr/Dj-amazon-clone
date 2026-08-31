@@ -68,9 +68,31 @@ class Availability:
 
 
 def get_or_create_stock(product, location=None, variant=None) -> Stock:
+    """
+    ⚠️  **A missing default location is a configuration state, not a crash.**
+
+        This raised `INTERNAL_ERROR` — "حدث خطأ غير متوقع" — for a condition the
+        admin creates and the admin fixes: no location is flagged default, or the
+        one that is has been deactivated (`get_default` requires `is_active`, so
+        a location still showing the default tick in settings stops being the
+        default the moment it is switched off).
+
+        Reporting it as an internal error sends the admin to look for a bug in a
+        situation their own settings screen can resolve in one click, and tells
+        them nothing about which screen. The message now names the fix.
+
+    ⚠️  And the constraint on the model guarantees **at most** one default, never
+        at least one. There is no database state to lean on here.
+    """
     location = location or StockLocation.get_default()
     if location is None:
-        raise BusinessError(ErrorCode.INTERNAL_ERROR, detail="لا يوجد موقع مخزني افتراضي")
+        raise BusinessError(
+            ErrorCode.VALIDATION_ERROR,
+            detail=(
+                "لا يوجد موقع تخزين افتراضي — حدّد الموقع في النموذج، "
+                "أو عيّن موقعًا افتراضيًا مفعّلًا من: إعدادات مرجعية ← مواقع التخزين"
+            ),
+        )
 
     stock, _created = Stock.objects.get_or_create(
         product=product, variant=variant, location=location

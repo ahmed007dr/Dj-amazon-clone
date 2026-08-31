@@ -1,48 +1,10 @@
-"""
-The environment switch — development or production, decided on one line.
-
-    IS_PRODUCTION = True   →  development
-    IS_PRODUCTION = True    →  production
-
-⚠️  **This file carries no secret and never will.**
-
-    It is committed to Git, so anything written here is public to everyone with
-    repository access. Passwords, keys and connection strings live in
-    `.env.development` / `.env.production`, which are never committed.
-
-⚠️  **One line, three consequences.** The switch below decides all of:
-
-        1. which settings module boots   (`config.settings.dev` / `.prod`)
-        2. which secrets file is read    (`.env.development` / `.env.production`)
-        3. which domain both sides use   (the blocks below)
-
-    They used to be three independent decisions — a settings module chosen by an
-    environment variable, a secrets file chosen by filename, and a domain chosen
-    by editing `.env.public`. Three switches means a deployment where two agree
-    and the third does not: production settings reading development secrets, or
-    a frontend built for one domain talking to a server answering on another.
-    Neither writes a line to any log.
-
-⚠️  **The frontend reads this very file.**
-
-    `web/vite.config.ts` parses it directly, so the domain is written once for
-    Django and Vite alike. See ADR-73 · ADR-74 — the principle is unchanged,
-    only its source moved here from `.env.public`.
-
-⚠️  And the values below are **defaults, not commands**.
-
-    Every one stays overridable by a real environment variable
-    (`PUBLIC_SITE_DOMAIN`, `DJANGO_ALLOWED_HOSTS`, …) for the cases outside the
-    pattern: a second domain, a CDN, a load balancer forwarding an internal
-    host. See `config/settings/base.py`.
-"""
 
 # ═══════════════════════════════════════════════════════════
 #  ⇩⇩⇩  THE SWITCH  ⇩⇩⇩
 # ═══════════════════════════════════════════════════════════
 
-IS_PRODUCTION = True    # production
-#IS_PRODUCTION = False  # development
+#IS_PRODUCTION = True    # production
+IS_PRODUCTION = False  # development
 
 
 # ═══════════════════════════════════════════════════════════

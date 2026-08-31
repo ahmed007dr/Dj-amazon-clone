@@ -2,6 +2,7 @@
 
 from rest_framework import serializers
 
+from core.money import MONEY_DECIMAL_PLACES, MONEY_MAX_DIGITS
 from inventory.models import (
     Batch,
     Stock,
@@ -29,6 +30,28 @@ class StockLocationSerializer(serializers.ModelSerializer):
             "is_sellable",
             "is_active",
         ]
+
+
+class UnstockedProductSerializer(serializers.Serializer):
+    """
+    A product that has **no stock row at all**.
+
+    ⚠️  Not a `Stock` with zero in it — the absence of one.
+
+        `StockSerializer` cannot express this: every field it carries belongs to a
+        row that does not exist. Sending zeros in their place would say "received
+        and sold out", which is a different fact with a different remedy — that
+        one is reordered, this one has never been received.
+    """
+
+    id = serializers.UUIDField(read_only=True)
+    sku = serializers.CharField(read_only=True)
+    name_ar = serializers.CharField(read_only=True)
+    name_en = serializers.CharField(read_only=True)
+    base_price = serializers.DecimalField(
+        max_digits=MONEY_MAX_DIGITS, decimal_places=MONEY_DECIMAL_PLACES, read_only=True
+    )
+    is_active = serializers.BooleanField(read_only=True)
 
 
 class StockSerializer(serializers.ModelSerializer):

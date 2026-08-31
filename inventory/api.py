@@ -117,6 +117,57 @@ class StockListAPI(generics.ListAPIView):
         return queryset.order_by("product__sku")
 
 
+class UnstockedProductListAPI(generics.ListAPIView):
+    """
+    The products that have **no stock row at all**.
+
+    ⚠️  **`StockListAPI` structurally cannot answer this.**
+
+        It lists `Stock` rows, and these products have none — so they appear in no
+        page of it, no `status=out` filter and no SKU search. The balances screen
+        answers "what do I hold?"; nothing answered "what have I never
+        received?", and on a catalogue imported without its opening balances that
+        is the overwhelming majority of it.
+
+        The gap matters more now that the storefront hides whatever has zero
+        available: these products are invisible to customers **and** invisible on
+        the screen an admin would open to find out why.
+
+    ⚠️  And "no row" is kept distinct from "a row reading zero".
+
+        Both are unbuyable and they are not the same problem: one is reordered,
+        the other has never been received once. `?include_zero=true` merges them
+        for whoever wants the single "cannot be sold" list.
+    """
+
+    permission_classes = [CanManageInventory]
+    serializer_class = s.UnstockedProductSerializer
+    pagination_class = AdminPageNumberPagination
+
+    def get_queryset(self):
+        params = self.request.query_params
+
+        queryset = Product.objects.all()
+        if params.get("include_inactive") != "true":
+            queryset = queryset.filter(is_active=True)
+
+        if params.get("include_zero") == "true":
+            # ⚠️  Everything unsellable — expressed through the same filter the
+            #     storefront hides by, so the two answers cannot disagree.
+            queryset = queryset.exclude(services.in_stock_filter())
+        else:
+            queryset = queryset.filter(stock_records__isnull=True)
+
+        if search := params.get("search"):
+            queryset = queryset.filter(
+                Q(sku__icontains=search)
+                | Q(name_ar__icontains=search)
+                | Q(name_en__icontains=search)
+            )
+
+        return queryset.order_by("sku")
+
+
 class StockDetailAPI(generics.RetrieveUpdateAPIView):
     """Editing the alert thresholds only — quantities are never edited by hand."""
 

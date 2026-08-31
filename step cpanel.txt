@@ -3,6 +3,29 @@
 ٣. ارفع الكود                 → /home/medboxne/med-box
 ٤. ارفع web/dist              → /home/medboxne/public_html
 ٥. اعمل .env.production        على السيرفر
-٦. migrate · collectstatic · pybabel
-٧. touch tmp/restart.txt
-٨. ارجّع السويتش False         عندك عشان تكمل شغل
+٦. ثبّت الاعتمادات             pip install -r requirements/base.txt
+٧. migrate · collectstatic · pybabel
+٨. touch tmp/restart.txt
+٩. ارجّع السويتش False         عندك عشان تكمل شغل
+١٠. أعد تشغيل خادم الواجهة     cd web && npm run dev
+
+
+⚠️  الخطوة ٦ — بدونها أي اعتماد جديد لا يصل السيرفر أبدًا.
+
+    الاعتمادات معلَنة في requirements/base.txt، وكانت هذه القائمة تقفز
+    من رفع الكود إلى migrate مباشرةً. فظهر ModuleNotFoundError: openpyxl
+    — وهو لا يكسر شاشة الاستيراد وحدها: السلسلة
+    config/urls.py ← imports/api.py ← openpyxl على مسار الـ URLconf الجذري،
+    فغياب مكتبة جداول بيانات يُسقط المتجر والسلة والدفع معًا،
+    برسالة تشير إلى openpyxl في مكان لا علاقة له بما يستخدمه العميل.
+
+
+⚠️  الخطوة ١٠ — الواجهة لا تلتقط قلب السويتش وهي شغّالة.
+
+    web/vite.config.ts يقرأ IS_PRODUCTION من config/environment.py
+    ويخبز VITE_API_BASE_URL **عند الإقلاع مرة واحدة**. فإرجاع السويتش
+    في الخطوة ٩ لا يغيّر خادمًا يعمل: يظل يخدم https://med-box.net/api/v1
+    بينما أنت على localhost:5173.
+
+    والعَرَض يضلّل تمامًا — «تحقّق من اتصالك بالإنترنت» —
+    فتفحص الشبكة وخادم Django وكلاهما سليم.
