@@ -20,6 +20,7 @@ from django.utils import timezone
 
 from access.services import evaluate
 from cart.models import Cart, CartLine, CartStatus
+from catalog import selectors as catalog_selectors
 from core.errors import BusinessError, ErrorCode
 from core.money import ZERO
 from inventory import services as inventory_services
@@ -290,6 +291,11 @@ def revalidate(
             "product__access_policy",
             "product__tax_class",
             "variant",
+        ).prefetch_related(
+            # ⚠️  The thumbnail the cart draws — without it `primary_images` is
+            #     missing on the product and every line falls back to the
+            #     placeholder glyph, which reads as "the image was deleted".
+            catalog_selectors.primary_image_prefetch("product__"),
         )
     )
 

@@ -53,7 +53,7 @@ export const getAdminOrder = (id: string) => http.get<AdminOrder>(`/orders/admin
  *     a button appears and fails.
  */
 export const transitionOrder = (id: string, status: OrderStatus, note = '') =>
-  http.post<AdminOrder>(`/orders/admin/${id}/transition/`, { to_status: status, note });
+  http.post<AdminOrder>(`/orders/admin/${id}/transition/`, { status, note });
 
 export const completeOrder = (id: string) =>
   http.post<AdminOrder>(`/orders/admin/${id}/complete/`);

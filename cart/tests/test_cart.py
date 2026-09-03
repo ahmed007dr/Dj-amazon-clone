@@ -171,6 +171,33 @@ class TestStockChecks:
 
 @pytest.mark.django_db
 class TestRevalidation:
+    def test_line_carries_the_product_thumbnail(self, cart, product, user):
+        """
+        ⚠️  `primary_images` is a `Prefetch(to_attr=...)` — it **does not exist**
+            on the product unless the queryset asked for it, and the serializer's
+            `getattr(..., None)` then reads as "this product has no image".
+
+            The failure is silent: no error, every cart line just falls back to
+            the placeholder glyph. This test is the only thing that catches it.
+        """
+        from django.core.files.base import ContentFile
+
+        from cart.serializers import CartSnapshotSerializer
+        from catalog.models import ProductImage
+
+        image = ProductImage(product=product, is_primary=True)
+        image.image.save("primary.jpg", ContentFile(b"not-really-a-jpeg"), save=True)
+
+        services.add_line(cart, product, 1, user=user)
+        snapshot = services.revalidate(cart)
+
+        assert getattr(snapshot.lines[0][0][0], "primary_images", None), (
+            "revalidate() must prefetch the primary image onto the product"
+        )
+
+        line = CartSnapshotSerializer(snapshot).data["lines"][0]
+        assert line["image"] == image.image.url
+
     def test_clean_cart_is_checkoutable(self, cart, product, user):
         services.add_line(cart, product, 2, user=user)
         snapshot = services.revalidate(cart)

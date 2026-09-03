@@ -29,9 +29,11 @@ export function HomePage() {
       </section>
 
       <section>
-        <div className="row-between">
+        <div className="home-section__header">
           <h2 className="home-section__title">{t('catalog.title')}</h2>
-          <Link to="/products">{t('common.more')}</Link>
+          <Link to="/products" className="home-section__link">
+            {t('common.more')}
+          </Link>
         </div>
 
         <ProductGrid

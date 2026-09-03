@@ -31,8 +31,41 @@
   text-decoration: none;
 }
 
-.home-section__title {
+/*
+  The section header — title on one side, "more" on the other.
+
+  ⚠️  The block margin lives on the header, **not on the `h2` inside it**.
+
+      A margin on a flex item is part of the flex line, so `align-items: center`
+      would centre the link against the heading's *margin box* — the link then
+      sits a few pixels above the heading's text and reads as misaligned. Baseline
+      alignment puts the two words on the same line whatever the heading's size.
+*/
+.home-section__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
   margin-block: var(--space-6) var(--space-4);
+}
+
+.home-section__title {
   font-size: 1.25rem;
   font-weight: 700;
+}
+
+/*
+  ⚠️  A bare inline link is a ~15px tall touch target on a phone.
+
+      The negative inline margin keeps the padding from pushing the word away
+      from the screen edge, so the row still lines up with the grid below it.
+*/
+.home-section__link {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-2);
+  margin-inline-end: calc(var(--space-2) * -1);
+  font-weight: 600;
 }

@@ -17,6 +17,25 @@ from catalog.models import Category, Product, ProductImage, ProductVariant
 from core.visibility import product_visibility_filter
 
 
+def primary_image_prefetch(prefix: str = "") -> Prefetch:
+    """
+    The prefetch that fills `product.primary_images` — the attribute every
+    serializer reads to render a thumbnail.
+
+    ⚠️  `to_attr` means the attribute simply **does not exist** without this
+        prefetch, and `getattr(product, "primary_images", None)` then reads as
+        "this product has no image" instead of "nobody loaded them". Any
+        queryset whose products get serialised must apply it — `prefix` lets a
+        caller reach the products through a relation, e.g. `"product__"` from a
+        cart line.
+    """
+    return Prefetch(
+        f"{prefix}images",
+        queryset=ProductImage.objects.filter(is_primary=True),
+        to_attr="primary_images",
+    )
+
+
 def product_base_queryset():
     """
     The shared base — it loads everything the product card displays in one go.
@@ -24,8 +43,6 @@ def product_base_queryset():
     `rating` comes from `reviews.ProductRating` through `select_related` — which
     is what replaced the legacy properties that queried per row.
     """
-    primary_images = ProductImage.objects.filter(is_primary=True)
-
     return Product.objects.select_related(
         "category",
         "brand",
@@ -34,7 +51,7 @@ def product_base_queryset():
         "tax_class",
         "rating",
     ).prefetch_related(
-        Prefetch("images", queryset=primary_images, to_attr="primary_images"),
+        primary_image_prefetch(),
     )
 
 
