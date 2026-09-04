@@ -18,6 +18,7 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from catalog import watermark
 from catalog.models import Product, ProductImage
 from catalog.serializers import ProductImageSerializer
 from core.errors import BusinessError, ErrorCode
@@ -30,6 +31,20 @@ from core.permissions import CanManageCatalog
 #:     on a phone, and makes the list query drag rows that are never displayed.
 #:     Eight is enough for any medical product.
 MAX_IMAGES_PER_PRODUCT = 8
+
+
+def _watermark_if_present(serializer) -> None:
+    """
+    ⚠️  Runs on the **validated** file, after `validate_upload` has already
+        rejected anything that is not really an image — never on raw input.
+    """
+    uploaded = serializer.validated_data.get("image")
+    if uploaded is None:
+        return
+
+    marked = watermark.apply(uploaded)
+    if marked is not None:
+        serializer.validated_data["image"] = marked
 
 
 class ProductImageListCreateAPI(generics.ListCreateAPIView):
@@ -61,6 +76,8 @@ class ProductImageListCreateAPI(generics.ListCreateAPIView):
         #     list — and the admin, seeing their images uploaded, cannot work out why.
         is_first = existing == 0
 
+        _watermark_if_present(serializer)
+
         image = serializer.save(
             product=product,
             display_order=existing * 10,
@@ -83,6 +100,13 @@ class ProductImageDetailAPI(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         # ⚠️  Filtered by product — no deleting another product's image by guessing its id
         return ProductImage.objects.filter(product_id=self.kwargs["pk"])
+
+    def perform_update(self, serializer):
+        # ⚠️  Only when the request actually replaces the file — most updates
+        #     here are just the alt text, and re-watermarking an unchanged
+        #     image would stack a second mark on top of the first.
+        _watermark_if_present(serializer)
+        serializer.save()
 
     @transaction.atomic
     def perform_destroy(self, instance):

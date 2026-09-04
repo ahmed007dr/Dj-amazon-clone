@@ -337,3 +337,44 @@ class TestStorage:
         image = ProductImage.objects.get(product=product)
 
         assert "internal-pricing-sheet" not in image.image.name
+
+
+# ═══════════════════════════════════════════════════════════
+#  Watermark
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.django_db
+class TestWatermark:
+    def test_stored_image_differs_from_the_upload(self, admin_client, product):
+        """
+        ⚠️  **The mark is applied, not merely attempted.**
+
+            `catalog.watermark.apply` fails silently by design (a missing logo
+            must never block an upload) — which means a wiring mistake fails
+            silently too. Comparing bytes is what would actually catch one.
+        """
+        raw = real_png_bytes()
+        response = admin_client.post(
+            images_url(product),
+            {"image": upload("photo.png", raw, "image/png"), "alt_text_ar": "صورة"},
+            format="multipart",
+        )
+
+        assert response.status_code == 201, response.data
+        image = ProductImage.objects.get(product=product)
+
+        assert image.image.read() != raw
+
+    def test_missing_brand_logo_still_stamps_the_domain(self, admin_client, product):
+        """
+        ⚠️  No `BrandProfile` (or one with no logo) is the normal state on day
+            one — refusing the photo, or skipping the mark outright, over a
+            missing asset would be the wrong failure mode either way.
+        """
+        response = post_image(admin_client, product)
+
+        assert response.status_code == 201, response.data
+        image = ProductImage.objects.get(product=product)
+
+        assert image.image.read() != real_png_bytes()
