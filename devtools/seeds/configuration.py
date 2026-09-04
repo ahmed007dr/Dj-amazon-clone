@@ -38,15 +38,6 @@ SETTINGS = [
         "تغييره يغيّر معنى كل سعر مُدخَل — راجع قوائم الأسعار بعده.",
     ),
     (
-        "tax.default_class",
-        "standard",
-        SettingValueType.STRING,
-        SettingGroup.TAX,
-        "الفئة الضريبية الافتراضية",
-        "Default tax class",
-        "تُطبَّق على المنتج الذي لم تُحدَّد فئته.",
-    ),
-    (
         "tax.rounding",
         "line",
         SettingValueType.STRING,

@@ -83,17 +83,26 @@ class TaxSettingsSerializer(serializers.Serializer):
         It does not touch orders already issued: every line carries the rate
         recorded at the time of sale (ADR-30), and recomputing them from today's
         setting would falsify the record.
+
+    ⚠️  `default_class` is **read-only here** — informational, not configurable
+        on this form.
+
+        It used to be a second, independently-editable copy of "the default tax
+        class", stored under its own `SystemSetting` key and validated against
+        `TaxClass` on every save. The actual default used in pricing
+        (`TaxClass.get_default()`, `pricing.services`) has never read that copy —
+        it reads `TaxClass.is_default` directly, set by "Make Default" on the
+        class table below. The two drifted the moment either changed without the
+        other, and once the stored copy pointed at a class that no longer existed
+        or was deactivated, *every* save of this form failed on a field the form
+        does not even show an input for. Deriving it from `TaxClass.get_default()`
+        on every read removes the second copy instead of trying to keep it synced.
     """
 
     enabled = serializers.BooleanField()
     prices_include_tax = serializers.BooleanField()
-    default_class = serializers.CharField(max_length=50)
+    default_class = serializers.CharField(read_only=True)
     rounding = serializers.ChoiceField(choices=["line", "total"])
-
-    def validate_default_class(self, value: str) -> str:
-        if not TaxClass.objects.filter(code=value, is_active=True).exists():
-            raise serializers.ValidationError("فئة ضريبية غير موجودة أو غير مفعّلة")
-        return value
 
     def save(self, **kwargs):
         data = self.validated_data
@@ -104,7 +113,6 @@ class TaxSettingsSerializer(serializers.Serializer):
                 "Prices include tax",
                 "BOOL",
             ),
-            "default_class": ("الفئة الافتراضية", "Default tax class", "STRING"),
             "rounding": ("تقريب الضريبة", "Tax rounding", "STRING"),
         }
 
@@ -118,13 +126,14 @@ class TaxSettingsSerializer(serializers.Serializer):
                 label_ar=label_ar,
                 label_en=label_en,
             )
-        return data
+        return self.current()
 
     @staticmethod
     def current() -> dict:
+        default = TaxClass.get_default()
         return {
             "enabled": bool(SystemSetting.get("tax.enabled", default=True)),
             "prices_include_tax": bool(SystemSetting.get("tax.prices_include_tax", default=False)),
-            "default_class": SystemSetting.get("tax.default_class", default="standard"),
+            "default_class": default.code if default else "",
             "rounding": SystemSetting.get("tax.rounding", default="line"),
         }

@@ -90,9 +90,14 @@ class TaxClass(BilingualNameMixin, BaseModel):
 #
 #   tax.enabled                 is the tax system enabled?
 #   tax.prices_include_tax      are displayed prices tax-inclusive?
-#   tax.default_class           the default class code
 #   tax.rounding                'line' per line · 'total' on the total
 #   tax.number_required_for     the account types that require a tax number
+#
+#   ⚠️  There is no `tax.default_class` setting — the default class is
+#       `TaxClass.is_default` on the model itself (`TaxClass.get_default()`),
+#       set by "Make Default" on the class table. A second, independently
+#       edited copy of the same fact under a `SystemSetting` key used to live
+#       here; the two drifted, and pricing was never the one reading it.
 #
 # ═══════════════════════════════════════════════════════════
 
@@ -102,7 +107,6 @@ class TaxSettings:
 
     ENABLED = "tax.enabled"
     PRICES_INCLUDE_TAX = "tax.prices_include_tax"
-    DEFAULT_CLASS = "tax.default_class"
     ROUNDING = "tax.rounding"
     NUMBER_REQUIRED_FOR = "tax.number_required_for"
 
