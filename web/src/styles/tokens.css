@@ -79,11 +79,50 @@
 }
 
 /*
-  ⚠️  The default dark-mode palette.
+  ⚠️  The default dark-mode palette — declared **twice**.
 
-      It is replaced entirely from `branding` at boot. Its presence here
-      prevents a white flash before the response arrives on a dark screen.
+      `ThemeProvider` fetches `branding` before it can call `applyTheme()`, and
+      until that response lands, `data-theme` is unset. A visitor on a dark
+      phone who is that one round-trip away from the real palette does not see
+      "no theme yet" — they see whichever half of `:root` is active, which
+      without a media-query mirror is unconditionally the **light** one, brand
+      colours included. On a slow connection that flash is not a flicker, it is
+      several seconds of the wrong theme.
+
+      So the same values live under `@media (prefers-color-scheme: dark)` —
+      matched the instant CSS parses, no JS required — **and** under
+      `:root[data-theme='dark']` for `applyTheme()` to set explicitly once
+      `branding` answers (its `default_mode` may say `DARK` on a light system,
+      or the visitor may have picked a preference the OS disagrees with — the
+      media query alone cannot know either). `:not([data-theme='light'])` on
+      the media block is what lets the explicit attribute — light or dark —
+      outrank the guess once it exists; two matching attribute selectors would
+      tie on specificity and the media query would win on source order instead.
 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-primary: #66bb6a;
+    --color-on-primary: #0b1f10;
+    --color-secondary: #4db6ac;
+    --color-accent: #ffca28;
+
+    --color-success: #66bb6a;
+    --color-warning: #ffa726;
+    --color-danger: #ef5350;
+    --color-info: #42a5f5;
+
+    --color-bg: #12161a;
+    --color-surface: #1b2127;
+    --color-border: #2b333b;
+    --color-text: #eef2f6;
+    --color-text-muted: #9aa7b4;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow-md: 0 2px 8px rgb(0 0 0 / 45%);
+    --shadow-lg: 0 8px 24px rgb(0 0 0 / 55%);
+  }
+}
+
 :root[data-theme='dark'] {
   --color-primary: #66bb6a;
   --color-on-primary: #0b1f10;

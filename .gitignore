@@ -19,7 +19,7 @@ credentials.json
 service-account*.json
 *.zip
 src.zip
-
+/full-temp
 
 # ═══════════════════════════════════════════════════════════
 #  Databases

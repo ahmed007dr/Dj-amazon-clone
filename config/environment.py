@@ -3,8 +3,8 @@
 #  ⇩⇩⇩  THE SWITCH  ⇩⇩⇩
 # ═══════════════════════════════════════════════════════════
 
-IS_PRODUCTION = True    # production
-#IS_PRODUCTION = False  # development
+#IS_PRODUCTION = True    # production
+IS_PRODUCTION = False  # development
 
 
 # ═══════════════════════════════════════════════════════════
