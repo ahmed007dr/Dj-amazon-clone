@@ -29,22 +29,29 @@ export function Modal({
 }) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useLockBodyScroll(open);
 
+  // ⚠️  Depends only on `open`, not `onClose`: callers pass a fresh
+  //     `onClose` closure on every render, and re-running this effect on
+  //     every render calls `.focus()` on the panel again — yanking focus
+  //     away from whatever the user is typing into. `onCloseRef` keeps the
+  //     Escape handler current without that.
   useEffect(() => {
     if (!open) return;
 
     panelRef.current?.focus();
 
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
