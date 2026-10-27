@@ -87,6 +87,11 @@ VARIANT_BATCHES = [
     ("SCR-SET-M-BLU", 55, "300.00", None, "main"),
     ("SCR-SET-L-BLU", 48, "300.00", None, "main"),
     ("SCR-SET-M-GRN", 30, "300.00", None, "main"),
+    # The colour showcase (SCR-TOP): stock lives on each colour's variant, and the
+    # burgundy is deliberately empty so the storefront shows a sold-out swatch
+    ("SCR-TOP-BLUE", 60, "150.00", None, "main"),
+    ("SCR-TOP-GREEN", 25, "160.00", None, "main"),
+    ("SCR-TOP-BURGUNDY", 0, "150.00", None, "main"),
 ]
 
 

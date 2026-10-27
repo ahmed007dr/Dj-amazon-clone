@@ -19,6 +19,7 @@ Row validation — the dry run, and the same code the real run uses.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -244,6 +245,76 @@ def _choice(
 #: Which value key a column writes into, where the two differ.
 _PRODUCT_VALUE_KEY = {"category_path": "category_id"}
 _VARIANT_VALUE_KEY = {"parent_sku": "product_id"}
+
+#: Exactly `ProductColor`'s validator, restated so a bad cell is reported on its row
+_HEX_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def _colour_cells(
+    row: Row, columns: dict[str, spec.Column], sheet: str, sku: str, errors: list[RowError]
+) -> dict | None:
+    """
+    The colour a variants-sheet row describes, or `None` when it names none.
+
+    * a name in **one** language is copied to the other — a sheet typed in Arabic
+      alone is still a valid colour;
+    * a hex or a price with **no name** is an error: it would describe a colour
+      nobody can find again;
+    * `#` is optional in the cell (a spreadsheet eats it more often than not).
+    """
+    name_ar = str(row.get("color_name_ar") or "").strip()
+    name_en = str(row.get("color_name_en") or "").strip()
+    raw_hex = str(row.get("color_hex") or "").strip()
+    price = row.get("price_override")
+
+    if not (name_ar or name_en):
+        if raw_hex or price is not None:
+            errors.append(
+                RowError(
+                    sheet=sheet,
+                    row_number=row.number,
+                    column=columns["color_name_ar"].header,
+                    message="لون أو سعر لون بلا اسم — اكتب اسم اللون",
+                    identifier=sku,
+                )
+            )
+        return None
+
+    hex_value = ""
+    if raw_hex:
+        hex_value = raw_hex if raw_hex.startswith("#") else f"#{raw_hex}"
+        if not _HEX_PATTERN.match(hex_value):
+            errors.append(
+                RowError(
+                    sheet=sheet,
+                    row_number=row.number,
+                    column=columns["color_hex"].header,
+                    value=raw_hex[:20],
+                    message="اللون يُكتب بصيغة #RRGGBB، مثل #1E40AF",
+                    identifier=sku,
+                )
+            )
+            hex_value = ""
+
+    if price is not None and Decimal(str(price)) < 0:
+        errors.append(
+            RowError(
+                sheet=sheet,
+                row_number=row.number,
+                column=columns["price_override"].header,
+                value=str(price),
+                message="سعر اللون لا يكون سالبًا",
+                identifier=sku,
+            )
+        )
+        price = None
+
+    return {
+        "name_ar": name_ar or name_en,
+        "name_en": name_en or name_ar,
+        "hex": hex_value.upper(),
+        "price_override": None if price is None else Decimal(str(price)),
+    }
 
 
 def _drop_blank_mandatories(row: Row, sheet: str, values: dict, value_key: dict) -> None:
@@ -544,8 +615,14 @@ def validate_stock(
     *,
     known_skus: dict[str, object],
     known_variant_skus: dict[str, object],
+    variant_parents: dict[str, str] | None = None,
+    offers_variants: set[str] | None = None,
 ) -> SheetResult:
     """
+    `variant_parents` maps a variant SKU to its product's SKU, and `offers_variants`
+    is the set of product SKUs that have a sellable variant — both from the database,
+    so a variant declared by this very file (not yet written) is simply not checked.
+
     ⚠️  A stock row names a product that may not exist **yet** — it is created by
         the products sheet in an earlier phase of the same job.
 
@@ -591,6 +668,31 @@ def validate_stock(
                         identifier=sku,
                     )
                 )
+            elif (variant_parents or {}).get(variant_sku, sku) != sku:
+                # ⚠️  The variant must be this product's. Receiving "blue" stock into
+                #     another product's blue would sit on the wrong product's shelf.
+                errors.append(
+                    RowError(
+                        sheet=sheet,
+                        row_number=row.number,
+                        column=columns["variant_sku"].header,
+                        value=variant_sku,
+                        message="هذه النسخة تخص منتجًا آخر",
+                        identifier=sku,
+                    )
+                )
+        elif sku in (offers_variants or set()):
+            # ⚠️  Stock on "no variant" for a product that offers colours or sizes is
+            #     unsellable — the cart insists on a variant — and would sit unnoticed.
+            errors.append(
+                RowError(
+                    sheet=sheet,
+                    row_number=row.number,
+                    column=columns["variant_sku"].header,
+                    message="هذا المنتج له ألوان أو نسخ — حدّد رمز النسخة التي يُضاف إليها الرصيد",
+                    identifier=sku,
+                )
+            )
 
         quantity = row.get("quantity")
         if quantity is not None and int(quantity) <= 0:
@@ -692,6 +794,7 @@ def validate_variants(
     sheet = spec.Sheet.VARIANTS
     columns = spec.column_map(sheet)
     result = SheetResult()
+    seen_colors: dict[tuple, tuple] = {}
 
     for row in rows:
         parent_sku = str(row.get("parent_sku") or "").strip()
@@ -742,6 +845,31 @@ def validate_variants(
                     )
                 )
 
+        color_cells = _colour_cells(row, columns, sheet, sku, errors)
+
+        # ⚠️  One colour, one description: the same colour on two sizes of the same
+        #     product must not carry two hexes or two prices. The first row wins as
+        #     the reference and the later disagreeing row is reported — which of the
+        #     two the admin meant is theirs to say.
+        if color_cells is not None and parent_sku:
+            key = (parent_sku, color_cells["name_en"].casefold())
+            seen = seen_colors.setdefault(key, (row.number, color_cells))
+            if seen[0] != row.number:
+                earlier = seen[1]
+                for field, label in (("hex", "color_hex"), ("price_override", "price_override")):
+                    now, before = color_cells[field], earlier[field]
+                    if now not in ("", None) and before not in ("", None) and now != before:
+                        errors.append(
+                            RowError(
+                                sheet=sheet,
+                                row_number=row.number,
+                                column=columns[label].header,
+                                value=str(now),
+                                message=f"يخالف الصف {seen[0]} لنفس اللون",
+                                identifier=sku,
+                            )
+                        )
+
         if errors:
             result.errors.extend(errors)
             continue
@@ -756,6 +884,9 @@ def validate_variants(
             "weight_grams": row.get("weight_grams"),
             "attributes": row.values.get("attributes") or {},
         }
+        # ⚠️  Kept apart from the `ProductVariant` columns: `imports.services` turns it
+        #     into a `ProductColor` and writes only the id onto the variant.
+        variant_values["color_cells"] = color_cells
 
         if action == "UPDATE":
             _drop_blank_mandatories(row, sheet, variant_values, _VARIANT_VALUE_KEY)

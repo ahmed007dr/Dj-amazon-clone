@@ -39,9 +39,7 @@ from orders.throttles import GuestCheckoutThrottle, GuestLookupThrottle, GuestTo
 logger = logging.getLogger(__name__)
 
 #: What "find my order" always answers — matched or not (no enumeration).
-LOOKUP_DETAIL = (
-    "إن طابقت البيانات طلبًا لدينا فسنرسل رابط التتبع إلى البريد المسجّل عليه خلال دقائق."
-)
+LOOKUP_DETAIL = "إن طابقت البيانات طلبًا لدينا فسنرسل رابط التتبع إلى البريد المسجّل عليه خلال دقائق."
 
 
 class _GuestView(APIView):
@@ -83,16 +81,13 @@ class GuestCheckoutAPI(_GuestView):
             )
 
         if not guest.verify_captcha(data.pop("captcha_token", ""), request):
-            raise BusinessError(
-                ErrorCode.VALIDATION_ERROR, detail="فشل التحقق الأمني — حاول مجددًا"
-            )
+            raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="فشل التحقق الأمني — حاول مجددًا")
 
         session_key = cart_services.normalise_session_key(request.META.get(GUEST_HEADER, ""))
         cart = cart_services.get_active_cart(session_key=session_key)
 
-        idempotency_key = (
-            request.headers.get("Idempotency-Key", "").strip()
-            or data.pop("idempotency_key", "")
+        idempotency_key = request.headers.get("Idempotency-Key", "").strip() or data.pop(
+            "idempotency_key", ""
         )
         data.pop("idempotency_key", None)
         data.pop("payment_method", None)  # COD is not a choice

@@ -861,3 +861,46 @@ class TestAttachmentDownload:
 
         assert isinstance(attachment, InboundAttachment)
         assert attachment.content_type == "image/png"
+
+
+# ═══════════════════════════════════════════════════════════
+#  Replying in the right language
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.django_db
+class TestReplyLanguage:
+    def test_the_reply_carries_its_language_into_the_queue(self, account):
+        message = stored(account, 1)
+
+        outbound = services.reply(message, body="Your order is on its way", language="en")
+
+        assert outbound.language == "en"
+
+    def test_it_defaults_to_arabic(self, account):
+        assert services.reply(stored(account, 1), body="طلبك في الطريق").language == "ar"
+
+    def test_the_endpoint_passes_it_on(self, admin_client, account):
+        message = stored(account, 1)
+
+        response = admin_client.post(
+            reverse("v1:mailing:inbox-reply", args=[message.pk]),
+            {"body": "Thank you", "language": "en"},
+            format="json",
+        )
+
+        assert response.status_code == 201
+        from mailing.models import OutboundMessage
+
+        assert OutboundMessage.objects.get(pk=response.data["outbound_id"]).language == "en"
+
+    def test_an_unknown_language_is_refused(self, admin_client, account):
+        message = stored(account, 1)
+
+        response = admin_client.post(
+            reverse("v1:mailing:inbox-reply", args=[message.pk]),
+            {"body": "Bonjour", "language": "fr"},
+            format="json",
+        )
+
+        assert response.status_code == 400

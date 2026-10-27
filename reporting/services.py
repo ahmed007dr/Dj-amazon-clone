@@ -34,6 +34,7 @@ from django.utils import timezone
 
 from core.errors import BusinessError, ErrorCode
 from core.money import ZERO, quantize
+from orders import guest as guest_services
 
 #: ⚠️  `unit_price × quantity` mixes `Decimal` with an integer.
 #
@@ -136,7 +137,9 @@ def sales_summary(start: date, end: date) -> SalesSummary:
         net_sales=quantize(gross - returns_total),
         # ⚠️  A division-by-zero guard — a period with no orders is a normal state
         average_order=quantize(gross / count) if count else ZERO,
-        customers_count=sold.values("customer").distinct().count(),
+        # ⚠️  Buyers we can tell apart — accounts and guest emails, never the NULL
+        #     group (see `orders.guest.count_distinct_buyers`).
+        customers_count=guest_services.count_distinct_buyers(sold),
     )
 
 
@@ -482,7 +485,9 @@ def customer_behaviour(start: date, end: date, limit: int = 20) -> dict:
         first_order_at__date__gte=start, first_order_at__date__lte=end
     ).count()
 
-    returning = sold.values("customer").annotate(orders=Count("id")).filter(orders__gt=1).count()
+    # ⚠️  Accounts *and* guests (by email), and never the NULL group: a counter
+    #     sale or a guest order used to add one phantom "customer" to these figures.
+    returning = guest_services.count_returning_buyers(sold)
 
     top = (
         CustomerProfile.objects.filter(orders__in=sold)
@@ -493,7 +498,12 @@ def customer_behaviour(start: date, end: date, limit: int = 20) -> dict:
     return {
         "new_customers": new_customers,
         "returning_customers": returning,
-        "active_customers": sold.values("customer").distinct().count(),
+        "active_customers": guest_services.count_distinct_buyers(sold),
+        # Of those, how many bought without an account (a subset, shown separately)
+        "guest_customers": sold.filter(guest_services.guest_orders_q())
+        .values("contact_email")
+        .distinct()
+        .count(),
         "top_customers": [
             {
                 "customer": str(profile.pk),

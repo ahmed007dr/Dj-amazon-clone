@@ -14,10 +14,11 @@ Orders admin panel.
 """
 
 from django.contrib import admin
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from core.admin import DomainModelAdmin, LogAdmin, ReadOnlyDomainAdmin
-from orders.models import Order, OrderLine, OrderStatusHistory
+from orders.models import Order, OrderChannel, OrderLine, OrderStatusHistory
 from orders.services import cancel, complete, mark_paid
 
 
@@ -51,24 +52,56 @@ class OrderStatusHistoryInline(admin.TabularInline):
         return False
 
 
+class GuestOrderFilter(admin.SimpleListFilter):
+    """
+    Guest orders — placed without an account, confirmed by the owner by phone.
+
+    ⚠️  The same definition as `Order.is_guest` and the API's `?guest=` filter:
+        channel ONLINE, no customer, a contact email.
+    """
+
+    title = _("نوع المشتري")
+    parameter_name = "buyer"
+
+    def lookups(self, request, model_admin):
+        return (("guest", _("زائر بلا حساب")), ("member", _("صاحب حساب")))
+
+    def queryset(self, request, queryset):
+        guests = Q(customer__isnull=True, channel=OrderChannel.ONLINE) & ~Q(contact_email="")
+        if self.value() == "guest":
+            return queryset.filter(guests)
+        if self.value() == "member":
+            return queryset.filter(customer__isnull=False)
+        return queryset
+
+
 @admin.register(Order)
 class OrderAdmin(DomainModelAdmin):
     list_display = (
         "number",
         "created_at",
-        "customer",
+        "buyer",
         "status",
         "payment_status",
         "channel",
         "grand_total",
         "currency",
     )
-    list_filter = ("status", "payment_status", "channel", "currency", "created_at", "governorate")
+    list_filter = (
+        "status",
+        "payment_status",
+        "channel",
+        GuestOrderFilter,
+        "currency",
+        "created_at",
+        "governorate",
+    )
     list_select_related = ("customer", "location")
     search_fields = (
         "number",
         "customer__customer_number",
         "customer__user__email",
+        "contact_email",
         "recipient_name",
         "recipient_phone",
         "coupon_code",
@@ -89,6 +122,9 @@ class OrderAdmin(DomainModelAdmin):
         "payment_status",
         "channel",
         "customer",
+        "contact_email",
+        "contact_language",
+        "claimed_at",
         "created_by",
         "currency",
         "subtotal",
@@ -107,6 +143,10 @@ class OrderAdmin(DomainModelAdmin):
 
     fieldsets = (
         (None, {"fields": ("id", "number", "customer", "status", "payment_status", "channel")}),
+        (
+            _("الزائر (طلب بلا حساب)"),
+            {"fields": ("contact_email", "contact_language", "claimed_at")},
+        ),
         (
             _("الإسناد"),
             {"fields": ("location", "created_by", "owner_employee", "commission_employee")},
@@ -157,6 +197,15 @@ class OrderAdmin(DomainModelAdmin):
             },
         ),
     )
+
+    @admin.display(description=_("المشتري"))
+    def buyer(self, obj):
+        """The account — or, for a guest, who they said they were."""
+        if obj.customer_id is not None:
+            return obj.customer
+        if obj.is_guest:
+            return f"{_('زائر')}: {obj.recipient_name or obj.contact_email}"
+        return "—"  # a counter sale
 
     @admin.action(description=_("تعليم المحدد كمدفوع"))
     def mark_paid_selected(self, request, queryset):

@@ -22,145 +22,27 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from access.models import AccessPolicy
 from accounts.models import AccountType, User
 from cart.models import Cart, CartLine, CartStatus
-from catalog.models import Category, Product
-from core.models.tax import TaxClass
 from customers.models import CustomerProfile
 from inventory import services as inventory_services
 from orders import guest, services
 from orders.models import Order, OrderChannel, OrderStatus
-from payments.models import PaymentMethodKind, PaymentProvider, PaymentTransaction
-from shipping.models import ShippingMethod, ShippingRate, ShippingZone
+from orders.tests.guest_support import (
+    FORM,
+    PASSWORD,
+    SESSION,
+    add_to_cart,
+    available,
+    checkout,
+    guest_client,
+    make_product,
+    place,
+)
+from payments.models import PaymentMethodKind, PaymentTransaction
+from shipping.models import ShippingMethod
 
-SESSION = "3f1c2b0e-8a52-4a0e-9f43-5b2e0c6a1d01"
-PASSWORD = "Str0ng-Test-Pass!23"
-
-FORM = {
-    "recipient_name": "أحمد محمود",
-    "phone": "01001234567",
-    "email": "Ahmed.Buyer@Example.com",
-    "governorate": "القاهرة",
-    "city": "مدينة نصر",
-    "street": "١٢ شارع التسعين، الدور الثالث",
-    "shipping_method_code": "standard",
-    "customer_note": "اتصل قبل الوصول",
-    "language": "en",
-}
-
-
-# ═══════════════════════════════════════════════════════════
-#  World
-# ═══════════════════════════════════════════════════════════
-
-
-@pytest.fixture
-def location(db):
-    return apps.get_model("inventory", "StockLocation").objects.create(
-        code="main", name_ar="الرئيسي", name_en="Main", is_default=True
-    )
-
-
-@pytest.fixture
-def policies(db):
-    from django.core.management import call_command
-
-    call_command("seed_access_policies", verbosity=0)
-    return {p.code: p for p in AccessPolicy.objects.all()}
-
-
-@pytest.fixture
-def tax_class(db):
-    return TaxClass.objects.create(
-        name_ar="قياسي", name_en="Standard", code="standard", rate=Decimal("14.00"), is_default=True
-    )
-
-
-@pytest.fixture
-def shipping(db):
-    zone = ShippingZone.objects.create(
-        code="cairo", name_ar="القاهرة", name_en="Cairo", governorates=["القاهرة", "الجيزة"]
-    )
-    method = ShippingMethod.objects.create(code="standard", name_ar="عادي", name_en="Standard")
-    ShippingRate.objects.create(zone=zone, method=method, base_fee=Decimal("30.00"))
-    return method
-
-
-@pytest.fixture
-def cod(db):
-    return PaymentProvider.objects.create(
-        code="cod",
-        adapter_key="cash_on_delivery",
-        name_ar="دفع عند الاستلام",
-        name_en="Cash on delivery",
-        supported_methods=[PaymentMethodKind.CASH_ON_DELIVERY],
-        is_active=True,
-    )
-
-
-@pytest.fixture
-def category(db):
-    return Category.objects.create(name_ar="فئة", name_en="Category")
-
-
-def make_product(sku, category, policy, location, tax_class, stock=50):
-    product = Product.objects.create(
-        sku=sku,
-        name_ar=f"منتج {sku}",
-        name_en=f"Product {sku}",
-        category=category,
-        base_price=Decimal("100.00"),
-        tax_class=tax_class,
-        access_policy=policy,
-    )
-    inventory_services.receive(product, stock, Decimal("60.00"), location=location)
-    return product
-
-
-@pytest.fixture
-def product(category, policies, location, tax_class):
-    return make_product("G-001", category, policies["public"], location, tax_class)
-
-
-@pytest.fixture
-def world(product, shipping, cod):
-    """A sellable public product, a shipping method and a COD gateway."""
-    return product
-
-
-def guest_client(session=SESSION):
-    client = APIClient()
-    client.credentials(HTTP_X_CART_SESSION=session)
-    return client
-
-
-def add_to_cart(client, product, quantity=1):
-    response = client.post(
-        reverse("v1:cart:lines"),
-        {"product": str(product.pk), "quantity": quantity},
-        format="json",
-    )
-    assert response.status_code == 201, response.data
-    return response
-
-
-def checkout(client, **overrides):
-    body = {**FORM, **overrides}
-    body = {k: v for k, v in body.items() if v is not None}
-    return client.post(reverse("v1:orders:guest-checkout"), body, format="json")
-
-
-def place(product, session=SESSION, quantity=1, **overrides):
-    """Add to a guest cart and check out — returns (client, response)."""
-    client = guest_client(session)
-    add_to_cart(client, product, quantity)
-    return client, checkout(client, **overrides)
-
-
-def available(product):
-    return inventory_services.available_quantity(product)
-
+pytest_plugins = ["orders.tests.guest_support"]
 
 # ═══════════════════════════════════════════════════════════
 #  The happy path
@@ -203,9 +85,7 @@ class TestPlacingAnOrder:
         _, response = place(world)
         order = Order.objects.get(number=response.data["order_number"])
 
-        payment = PaymentTransaction.objects.get(
-            reference_type="order", reference_id=str(order.pk)
-        )
+        payment = PaymentTransaction.objects.get(reference_type="order", reference_id=str(order.pk))
         assert payment.method == PaymentMethodKind.CASH_ON_DELIVERY
         assert payment.amount == order.grand_total
         assert payment.customer is None
@@ -389,9 +269,7 @@ class TestValidation:
         explicit = checkout(client, payment_method="COD")
         assert explicit.status_code == 201
 
-    @pytest.mark.parametrize(
-        "field", ["address_id", "address", "coupon", "coupon_code", "credit"]
-    )
+    @pytest.mark.parametrize("field", ["address_id", "address", "coupon", "coupon_code", "credit"])
     def test_account_only_fields_are_rejected_not_ignored(self, world, field):
         _, response = place(world, **{field: "x"})
         assert response.status_code == 400
@@ -698,7 +576,9 @@ class TestThrottling:
         """
         client = guest_client()
         add_to_cart(client, world)
-        client.credentials(HTTP_X_CART_SESSION=SESSION, HTTP_AUTHORIZATION="Bearer expired.or.garbage")
+        client.credentials(
+            HTTP_X_CART_SESSION=SESSION, HTTP_AUTHORIZATION="Bearer expired.or.garbage"
+        )
 
         assert checkout(client).status_code == 201
 
@@ -715,10 +595,16 @@ class TestIdempotency:
         add_to_cart(client, world)
 
         first = client.post(
-            reverse("v1:orders:guest-checkout"), FORM, format="json", HTTP_IDEMPOTENCY_KEY="try-0001"
+            reverse("v1:orders:guest-checkout"),
+            FORM,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="try-0001",
         )
         retry = client.post(
-            reverse("v1:orders:guest-checkout"), FORM, format="json", HTTP_IDEMPOTENCY_KEY="try-0001"
+            reverse("v1:orders:guest-checkout"),
+            FORM,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="try-0001",
         )
 
         assert first.status_code == 201
@@ -760,7 +646,9 @@ class TestIdempotency:
 
         theirs = guest_client("aa1c2b0e-8a52-4a0e-9f43-5b2e0c6a0001")
         add_to_cart(theirs, world)
-        other = checkout(theirs, idempotency_key="shared-key", email="other@x.com", phone="01155556666")
+        other = checkout(
+            theirs, idempotency_key="shared-key", email="other@x.com", phone="01155556666"
+        )
 
         assert other.status_code == 201
         assert other.data["order_number"] != first.data["order_number"]
@@ -868,8 +756,9 @@ class TestTrackingLink:
         assert "التسعين" not in text  # the street
         assert "اتصل قبل الوصول" not in text  # the customer note
         assert detail(token).data["phone_masked"] == "010******67"
-        assert detail(token).data["email_masked"] == "a***r@example.com" or "***" in (
-            detail(token).data["email_masked"]
+        assert (
+            detail(token).data["email_masked"] == "a***r@example.com"
+            or "***" in (detail(token).data["email_masked"])
         )
         for forbidden in ("recipient_phone", "contact_email", "street", "customer_note", "id"):
             assert forbidden not in detail(token).data
@@ -921,7 +810,8 @@ class TestTrackingLink:
         """A signed value minted for some other purpose can never open an order."""
         _, order = placed
         foreign = signing.dumps(
-            {"o": str(order.pk), "e": guest._email_digest(order.contact_email)}, salt="something.else"
+            {"o": str(order.pk), "e": guest._email_digest(order.contact_email)},
+            salt="something.else",
         )
         assert detail(foreign).status_code == 404
 
@@ -939,7 +829,9 @@ class TestTrackingLink:
         member = User.objects.create_user(email="m@test.local", password=PASSWORD)
         profile = CustomerProfile.objects.create(user=member)
         order = Order.objects.create(customer=profile, channel=OrderChannel.ONLINE)
-        forged = signing.dumps({"o": str(order.pk), "e": guest._email_digest("")}, salt=guest.TOKEN_SALT)
+        forged = signing.dumps(
+            {"o": str(order.pk), "e": guest._email_digest("")}, salt=guest.TOKEN_SALT
+        )
 
         assert detail(forged).status_code == 404
 

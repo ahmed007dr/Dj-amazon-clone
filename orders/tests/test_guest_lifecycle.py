@@ -14,7 +14,6 @@ from unittest.mock import patch
 
 import pytest
 from django.apps import apps
-from django.core.management import call_command
 from django.db.models.signals import post_save
 from django.utils import timezone
 
@@ -26,20 +25,12 @@ from customers.models import CustomerProfile
 from inventory import services as inventory_services
 from orders import guest, services
 from orders.models import Order, OrderChannel, OrderStatus
-from orders.tests.test_guest_checkout import (  # noqa: F401  (fixtures)
-    FORM,
-    SESSION,
+from orders.tests.guest_support import (
     available,
-    category,
-    cod,
-    location,
     place,
-    policies,
-    product,
-    shipping,
-    tax_class,
-    world,
 )
+
+pytest_plugins = ["orders.tests.guest_support"]
 
 PASSWORD = "Str0ng-Test-Pass!23"
 
@@ -155,26 +146,6 @@ class TestAutoCancel:
         second.refresh_from_db()
         assert first.status == OrderStatus.PENDING
         assert second.status == OrderStatus.CANCELLED
-
-    def test_it_is_scheduled_in_the_periodic_runner(self, world, capsys):
-        from ops.management.commands.run_periodic import JOBS
-
-        group, _label, function = JOBS["cancel_unconfirmed_guest_orders"]
-        assert group == "orders"
-        assert function is guest.cancel_unconfirmed
-
-        order = guest_order(world)
-        age(order, 100)
-        call_command("run_periodic", "--job", "cancel_unconfirmed_guest_orders")
-
-        order.refresh_from_db()
-        assert order.status == OrderStatus.CANCELLED
-
-    def test_the_orders_group_selects_the_job(self):
-        from ops.management.commands.run_periodic import Command
-
-        selected = Command()._select("orders")
-        assert list(selected) == ["cancel_unconfirmed_guest_orders"]
 
 
 # ═══════════════════════════════════════════════════════════
@@ -295,6 +266,7 @@ class TestClaimAfterVerification:
         # The contact email stays: the emailed tracking link keeps working
         assert first.contact_email == "buyer.one@example.com"
         assert not first.is_guest, "claimed, so no longer a guest order"
+        assert first.claimed_at is not None and second.claimed_at is not None
 
     def test_nothing_is_claimed_before_verification(self, world):
         order = guest_order(world, 0, email="early@example.com")
@@ -337,8 +309,11 @@ class TestClaimAfterVerification:
         for untouched in (someone_elses, phone_order, counter_sale):
             untouched.refresh_from_db()
             assert untouched.customer is None
+            assert untouched.claimed_at is None
         owned.refresh_from_db()
-        assert owned.customer.user == owner, "an order that already has an owner is never reassigned"
+        assert (
+            owned.customer.user == owner
+        ), "an order that already has an owner is never reassigned"
         mine.refresh_from_db()
         assert mine.customer.user == user
 

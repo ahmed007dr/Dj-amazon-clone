@@ -29,10 +29,12 @@ import logging
 from datetime import timedelta
 
 from django.db import transaction
+from django.db.models import Max
 from django.utils import timezone
 from django.utils.text import slugify
 
-from catalog.models import Product, ProductVariant
+from catalog import selectors as catalog_selectors
+from catalog.models import Product, ProductColor, ProductVariant
 from core.errors import BusinessError, ErrorCode
 from core.identifiers import random_code
 from core.models.audit import AuditAction, AuditLog
@@ -801,6 +803,72 @@ def _update_products(job, clean_rows, existing: dict) -> int:
 # ═══════════════════════════════════════════════════════════
 
 
+def _resolve_variant_colors(clean_rows) -> dict:
+    """
+    Find or create the `ProductColor` each variants-sheet row describes, per product.
+
+    Mutates the rows: `color_cells` is replaced by `color_id` (or dropped when the row
+    names no colour), so `ProductVariant(**row.values)` stays valid. Returns `{id: color}`.
+
+    ⚠️  A colour is matched **by name inside its product**, case-insensitively, so the
+        same colour typed on three sizes is one colour — and a re-import updates it
+        rather than minting a second "Blue".
+
+    ⚠️  A blank hex or price means "leave it" — the sheet cannot say "clear the price";
+        that is a deliberate act in the admin panel. A new colour with no hex gets the
+        neutral grey, to be set in the panel.
+    """
+    cache: dict[tuple, ProductColor] = {}
+    resolved: dict = {}
+
+    for row in clean_rows:
+        cells = row.values.pop("color_cells", None)
+        if not cells:
+            continue
+
+        product_id = row.values["product_id"]
+        key = (product_id, cells["name_en"].casefold())
+
+        color = cache.get(key)
+        if color is None:
+            color = (
+                ProductColor.objects.filter(product_id=product_id, name_en__iexact=cells["name_en"])
+                .order_by("created_at")
+                .first()
+                or ProductColor.objects.filter(
+                    product_id=product_id, name_ar__iexact=cells["name_ar"]
+                ).first()
+            )
+            if color is None:
+                top = ProductColor.objects.filter(product_id=product_id).aggregate(
+                    top=Max("display_order")
+                )["top"]
+                color = ProductColor.objects.create(
+                    product_id=product_id,
+                    name_ar=cells["name_ar"],
+                    name_en=cells["name_en"],
+                    hex=cells["hex"] or "#9CA3AF",
+                    price_override=cells["price_override"],
+                    display_order=0 if top is None else top + 10,
+                )
+            else:
+                changed = []
+                if cells["hex"] and color.hex != cells["hex"]:
+                    color.hex = cells["hex"]
+                    changed.append("hex")
+                if cells["price_override"] is not None and color.price_override != cells["price_override"]:
+                    color.price_override = cells["price_override"]
+                    changed.append("price_override")
+                if changed:
+                    color.save(update_fields=[*changed, "updated_at"])
+            cache[key] = color
+
+        row.values["color_id"] = color.pk
+        resolved[color.pk] = color
+
+    return resolved
+
+
 def _chunk_variants(job, rows, *, dry_run: bool) -> None:
     parent_skus = {str(row.get("parent_sku") or "").strip() for row in rows}
     variant_skus = {str(row.get("sku") or "").strip() for row in rows}
@@ -843,6 +911,10 @@ def _chunk_variants(job, rows, *, dry_run: bool) -> None:
     updates = [row for row in result.clean if row.action == "UPDATE"]
 
     with transaction.atomic():
+        # ⚠️  Colours first: a variant row only carries the colour's id. The cells
+        #     are popped so the remaining values are exactly `ProductVariant` columns.
+        colors = _resolve_variant_colors(result.clean)
+
         if creates:
             ProductVariant.objects.bulk_create(
                 [ProductVariant(**row.values) for row in creates],
@@ -852,7 +924,9 @@ def _chunk_variants(job, rows, *, dry_run: bool) -> None:
         updated = 0
         if updates:
             present = _present(job, spec.Sheet.VARIANTS)
-            fields = sorted(present - {"sku", "parent_sku"})
+            fields = sorted(present - {"sku", "parent_sku"} - set(spec.VARIANT_COLOR_KEYS))
+            if any(row.values.get("color_id") for row in updates):
+                fields.append("color")
             by_sku = {
                 variant.sku: variant
                 for variant in ProductVariant.all_objects.filter(
@@ -865,7 +939,11 @@ def _chunk_variants(job, rows, *, dry_run: bool) -> None:
                 if variant is None:
                     continue
                 for attribute in fields:
-                    if attribute in row.values:
+                    if attribute == "color":
+                        # Only when the row named a colour — a blank leaves the variant's alone
+                        if row.values.get("color_id"):
+                            variant.color = colors.get(row.values["color_id"])
+                    elif attribute in row.values:
                         setattr(variant, attribute, row.values[attribute])
                 changed.append(variant)
             if changed and fields:
@@ -917,8 +995,23 @@ def _chunk_stock(job, rows, data, *, dry_run: bool) -> None:
         for sku in _file_variant_skus(job) & variant_skus:
             known_variants.setdefault(sku, None)
 
+    variant_parents = dict(
+        ProductVariant.objects.filter(sku__in=variant_skus).values_list("sku", "product__sku")
+    )
+    offering = catalog_selectors.products_offering_variants(
+        [product_id for product_id in known.values() if product_id is not None]
+    )
+    offers_variants = {
+        sku for sku, product_id in known.items() if product_id is not None and str(product_id) in offering
+    }
+
     result = validators.validate_stock(
-        rows, data, known_skus=known, known_variant_skus=known_variants
+        rows,
+        data,
+        known_skus=known,
+        known_variant_skus=known_variants,
+        variant_parents=variant_parents,
+        offers_variants=offers_variants,
     )
     _record_errors(job, result.errors)
 

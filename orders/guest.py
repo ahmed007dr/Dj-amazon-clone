@@ -41,8 +41,8 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core import signing
-from django.core.exceptions import ValidationError
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone, translation
@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
 #: A different salt from every other `signing` use in the project, and versioned:
 #: a token minted for one purpose can never be replayed as another, and rotating
 #: the version invalidates every link in circulation at once.
-TOKEN_SALT = "orders.guest-order-link.v1"
+TOKEN_SALT = "orders.guest-order-link.v1"  # noqa: S105  (a salt, not a secret)
 
 SUPPORTED_LANGUAGES = ("ar", "en")
 
@@ -97,6 +97,29 @@ def normalise_phone(raw) -> str:
         text = "+" + text[2:]
     match = _EGYPT_MOBILE.match(text)
     return f"+20{match.group(1)}" if match else ""
+
+
+_PHONE_LIKE = re.compile(r"^[+\d\s\-().]+$")
+
+
+def phone_search_terms(text: str) -> list[str]:
+    """
+    What to look for in stored (canonical) phones when staff type a number.
+
+    `01001234567` never appears inside `+201001234567`, but `1001234567` does —
+    so a phone-looking search also tries the digits without their leading zero.
+    A search that is not phone-like (an order number, a name) adds nothing here,
+    so `ORD-2026-…` does not match every phone containing "2026".
+    """
+    typed = str(text or "").translate(_DIGITS).strip()
+    if not typed or not _PHONE_LIKE.match(typed):
+        return []
+
+    terms = [typed]
+    digits = re.sub(r"\D", "", typed)
+    if len(digits) >= 4:
+        terms.append(digits.lstrip("0"))
+    return list(dict.fromkeys(term for term in terms if term))
 
 
 def mask_phone(phone: str) -> str:
@@ -583,11 +606,16 @@ def claim_orders(user) -> int:
         The loyalty listener awards points on *any* save of an order that is
         COMPLETED/DELIVERED, so `order.save()` here would have paid points for a
         purchase made as a guest — retroactively, and for every old order at
-        once. `update()` attaches the owner without that. (An order still in
-        flight when claimed is a different case: it is now a member's order and
-        earns points normally if it completes — the same as if they had been
-        signed in when they bought.) Customer statistics (`total_orders`,
-        tiers) likewise only count orders completed *after* the claim.
+        once. `update()` attaches the owner without that. Customer statistics
+        (`total_orders`, tiers) likewise are not back-filled.
+
+        ⚠️  **Residual, and why `claimed_at` exists.** `update()` only avoids the
+        award *at claim time*. The loyalty listener awards on any later save of a
+        DELIVERED/COMPLETED order that has a customer — so a claimed order that is
+        saved again (completed, annotated in the panel) would still be credited
+        then. Owner decision: no loyalty or referral for guests. The guard belongs
+        in `loyalty` (outside this package): skip an order whose `claimed_at` is
+        set. `claimed_at` is stamped here for exactly that purpose.
     """
     if not getattr(user, "email_verified_at", None):
         return 0
@@ -617,8 +645,9 @@ def claim_orders(user) -> int:
         claimed = list(
             Order.objects.filter(pk__in=ids, customer__isnull=True).values_list("number", flat=True)
         )
+        now = timezone.now()
         updated = Order.objects.filter(pk__in=ids, customer__isnull=True).update(
-            customer=profile, updated_at=timezone.now()
+            customer=profile, claimed_at=now, updated_at=now
         )
         if updated:
             AuditLog.objects.create(
@@ -629,3 +658,54 @@ def claim_orders(user) -> int:
             )
 
     return updated
+
+
+# ═══════════════════════════════════════════════════════════
+#  Counting buyers (reports, targets)
+# ═══════════════════════════════════════════════════════════
+#
+#  ⚠️  `values("customer").distinct().count()` counts the NULL group as **one**
+#      customer. Every counter sale and every guest order — however many, from
+#      however many strangers — added exactly 1 to "customers", and an employee's
+#      CUSTOMER_COUNT target was met by the same phantom.
+#
+#      The unit used here is a **buyer we can tell apart**:
+#        * an account            → one per account
+#        * a guest               → one per email address (case-insensitively)
+#        * a counter sale        → nobody: no identity was taken, so it is not counted
+#      A guest who later claims their orders becomes an account and is counted once.
+
+
+def guest_orders_q() -> Q:
+    """The definition of a guest order, as a query: ONLINE · no account · an email."""
+    return Q(customer__isnull=True, channel=OrderChannel.ONLINE) & ~Q(contact_email="")
+
+
+def _guest_emails(orders):
+    from django.db.models.functions import Lower
+
+    return orders.filter(guest_orders_q()).annotate(_buyer_email=Lower("contact_email"))
+
+
+def count_distinct_buyers(orders) -> int:
+    """Distinct accounts plus distinct guest emails among `orders`."""
+    accounts = orders.filter(customer__isnull=False).values("customer").distinct().count()
+    guests = _guest_emails(orders).values("_buyer_email").distinct().count()
+    return accounts + guests
+
+
+def count_returning_buyers(orders) -> int:
+    """Buyers (accounts or guest emails) with more than one order in `orders`."""
+    from django.db.models import Count
+
+    accounts = (
+        orders.filter(customer__isnull=False)
+        .values("customer")
+        .annotate(n=Count("id"))
+        .filter(n__gt=1)
+        .count()
+    )
+    guests = (
+        _guest_emails(orders).values("_buyer_email").annotate(n=Count("id")).filter(n__gt=1).count()
+    )
+    return accounts + guests

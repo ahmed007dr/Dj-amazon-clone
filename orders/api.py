@@ -5,6 +5,7 @@ Order and checkout endpoints.
 """
 
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -15,6 +16,7 @@ from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.permissions import CanManageOrders
 from customers import services as customer_services
+from orders import guest as guest_services
 from orders import serializers as s
 from orders import services
 from orders.models import Order
@@ -163,14 +165,28 @@ class AdminOrderListAPI(generics.ListAPIView):
             if value := params.get(field):
                 queryset = queryset.filter(**{field: value})
 
-        if search := params.get("search"):
-            from django.db.models import Q
+        # ⚠️  "Guest orders only" (`?guest=true`) / "members only" (`?guest=false`).
+        #     The owner confirms each guest order by phone, so this is the list
+        #     they work from.
+        if (guest_filter := params.get("guest")) in ("true", "false"):
+            guest_orders = Q(customer__isnull=True, channel="ONLINE") & ~Q(contact_email="")
+            queryset = queryset.filter(guest_orders if guest_filter == "true" else ~guest_orders)
 
-            queryset = queryset.filter(
+        if search := params.get("search"):
+            search = search.strip()
+            matches = (
                 Q(number__icontains=search)
                 | Q(customer__user__email__icontains=search)
-                | Q(recipient_phone__icontains=search)
+                # A guest has no account: the email they left, and the name they gave
+                | Q(contact_email__icontains=search)
+                | Q(recipient_name__icontains=search)
             )
+            # ⚠️  Phones are stored canonical (`+201001234567`) but typed in many
+            #     ways (`01001234567`, `0100 123 4567`); a plain `icontains` of the
+            #     local form never matches the canonical one.
+            for term in guest_services.phone_search_terms(search):
+                matches |= Q(recipient_phone__icontains=term)
+            queryset = queryset.filter(matches)
 
         return queryset.order_by("-created_at")
 

@@ -155,7 +155,7 @@ export function MailTemplatesTab() {
                   )
                 }
               >
-                {t('action.save')}
+                {t('common.save')}
               </Button>
 
               {editing.is_overridden ? (

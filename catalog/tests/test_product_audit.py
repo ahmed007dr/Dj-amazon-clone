@@ -22,6 +22,7 @@ from rest_framework.test import APIClient
 from accounts.models import AccountType, User
 from catalog import audit
 from catalog.models import Category, Product, ProductKind
+from conftest import png_upload
 from core.models.audit import AuditAction, AuditLog
 from core.testing import grant_all_domains
 
@@ -331,6 +332,61 @@ class TestAuditEntries:
         assert entry.object_id == str(product.pk)
         assert entry.object_repr == "لون منتج H-1"
         assert entry.ip_address is None
+
+
+class TestImageEntries:
+    def test_image_upload_and_delete_appear_on_the_products_history(self, alice, category):
+        """
+        ⚠️  Image entries used to carry only a text label, so they could never be
+            attached to one product's timeline.
+        """
+        body = create_as(alice, category)
+        client = client_for(alice)
+
+        upload = client.post(
+            reverse("v1:catalog:admin-product-images", args=[body["id"]]),
+            {"image": png_upload("a.png")},
+            format="multipart",
+        )
+        assert upload.status_code == 201, upload.content
+        client.delete(
+            reverse("v1:catalog:admin-product-image-detail", args=[body["id"], upload.json()["id"]])
+        )
+
+        rows = history(alice, body["id"]).json()["results"]
+        images = [row for row in rows if row["object_repr"].startswith("صورة منتج")]
+
+        assert [row["action"] for row in images] == ["DELETE", "CREATE"]
+        assert all("image_id" in row["changes"] for row in images)
+        assert all(row["actor"]["email"] == "alice@test.local" for row in images)
+
+
+class TestBackfillCommand:
+    def test_fills_missing_authors_from_legacy_create_entries_only(self, alice, bob, category):
+        from django.core.management import call_command
+
+        legacy = Product.objects.create(sku="BF-1", name_ar="ا", name_en="a", category=category)
+        unknown = Product.objects.create(sku="BF-2", name_ar="ب", name_en="b", category=category)
+        stamped = Product.objects.create(
+            sku="BF-3", name_ar="ج", name_en="c", category=category, created_by=bob
+        )
+        for sku, actor in (("BF-1", alice), ("BF-3", alice)):
+            AuditLog.objects.create(
+                actor=actor, action=AuditAction.CREATE, object_repr=f"منتج {sku}"
+            )
+
+        call_command("backfill_product_audit", "--dry-run", verbosity=0)
+        legacy.refresh_from_db()
+        assert legacy.created_by_id is None  # a dry run writes nothing
+
+        call_command("backfill_product_audit", verbosity=0)
+        for product in (legacy, unknown, stamped):
+            product.refresh_from_db()
+
+        assert legacy.created_by_id == alice.pk
+        assert legacy.updated_by_id == alice.pk
+        assert unknown.created_by_id is None  # no evidence, no guess
+        assert stamped.created_by_id == bob.pk  # never overwritten
 
 
 # ═══════════════════════════════════════════════════════════

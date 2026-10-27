@@ -409,7 +409,51 @@ VARIANT_COLUMNS: list[Column] = [
         example="size=M;color=blue",
         note="أزواج مفصولة بفاصلة منقوطة",
     ),
+    # ── The colour this variant belongs to ─────────────────
+    #
+    # ⚠️  Four columns describe the *colour*, repeated on each of its variants.
+    #     The colour is found (or created) per product by its name, so the same
+    #     colour on three sizes is typed three times and stays one colour.
+    #     Never filled from `attributes` — see `ProductVariant.color`.
+    _c(
+        key="color_name_ar",
+        header="اسم اللون بالعربية",
+        max_length=200,
+        width=20,
+        example="أزرق",
+        note="اتركه فارغًا لنسخة بلا لون (مقاس مثلًا). اللون يُطابَق بالاسم داخل المنتج",
+    ),
+    _c(
+        key="color_name_en",
+        header="اسم اللون بالإنجليزية",
+        max_length=200,
+        width=20,
+        example="Blue",
+        note="إن كتبتَ لغة واحدة نُسخت إلى الأخرى",
+    ),
+    _c(
+        key="color_hex",
+        header="لون العرض",
+        max_length=7,
+        width=14,
+        example="#1E40AF",
+        note="#RRGGBB — يظهر دائرة ملوّنة في المتجر. فارغ = لا يُغيَّر لونٌ موجود",
+    ),
+    _c(
+        key="price_override",
+        header="سعر اللون",
+        kind=Kind.MONEY,
+        width=14,
+        example="120.00",
+        note="سعر خاص بهذا اللون يحلّ محل سعر المنتج. فارغ = لا يُغيَّر. قوائم الأسعار تتقدّم عليه",
+    ),
 ]
+
+#: The variants-sheet columns that describe the **colour**, not the variant row.
+#
+# ⚠️  They never reach `ProductVariant`; `imports.services` resolves them to a
+#     `ProductColor` and writes only its id onto the variant.
+VARIANT_COLOR_KEYS = ("color_name_ar", "color_name_en", "color_hex", "price_override")
 
 
 SHEETS: dict[str, list[Column]] = {

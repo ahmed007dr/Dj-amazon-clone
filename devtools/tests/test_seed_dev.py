@@ -262,3 +262,54 @@ class TestSeededData:
 
         for bundle in StudyBundle.objects.all():
             assert bundle.items.exists(), bundle.slug
+
+
+@pytest.mark.django_db
+class TestSeededColors:
+    """The colour showcase: SCR-TOP has swatches with a price, a sold-out one, and variants."""
+
+    def test_the_showcase_product_has_three_colours_each_with_one_variant(self, seeded):
+        from catalog.models import ProductColor
+
+        product = Product.objects.get(sku="SCR-TOP")
+        colors = {color.name_en: color for color in ProductColor.objects.filter(product=product)}
+
+        assert set(colors) == {"Blue", "Green", "Burgundy"}
+        for color in colors.values():
+            assert color.variants.count() == 1, "كل لون بنسخة واحدة تحمل مخزونه"
+            assert color.hex.startswith("#")
+
+    def test_one_colour_has_its_own_price_and_the_others_use_the_products(self, seeded):
+        from catalog.models import ProductColor
+        from pricing import services as pricing_services
+
+        product = Product.objects.get(sku="SCR-TOP")
+        green = ProductColor.objects.get(product=product, name_en="Green")
+        blue = ProductColor.objects.get(product=product, name_en="Blue")
+
+        assert green.price_override == Decimal("300.00")
+        assert blue.price_override is None
+        assert pricing_services.price_for(
+            product, 1, variant=green.variants.get()
+        ).unit_price == Decimal("300.00")
+        assert pricing_services.price_for(
+            product, 1, variant=blue.variants.get()
+        ).unit_price == Decimal("280.00")
+
+    def test_one_colour_is_out_of_stock_while_the_product_is_not(self, seeded):
+        from catalog.models import ProductColor
+        from inventory import services as inventory_services
+
+        product = Product.objects.get(sku="SCR-TOP")
+        burgundy = ProductColor.objects.get(product=product, name_en="Burgundy").variants.get()
+        blue = ProductColor.objects.get(product=product, name_en="Blue").variants.get()
+
+        assert inventory_services.available_quantity(product, variant=burgundy) == 0
+        assert inventory_services.available_quantity(product, variant=blue) > 0
+
+    def test_the_old_free_text_product_is_left_alone(self, seeded):
+        """SCR-SET keeps its size×colour variants with no `ProductColor` — see the seed note."""
+        from catalog.models import ProductColor, ProductVariant
+
+        assert not ProductColor.objects.filter(product__sku="SCR-SET").exists()
+        assert ProductVariant.objects.filter(product__sku="SCR-SET", color__isnull=True).count() == 3

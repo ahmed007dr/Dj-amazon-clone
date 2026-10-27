@@ -177,7 +177,7 @@ export function MailRoutingTab() {
                   })
                 }
               >
-                {t('action.delete')}
+                {t('common.delete')}
               </Button>
             </li>
           ))}

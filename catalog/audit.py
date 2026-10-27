@@ -161,7 +161,7 @@ def entries_for_update(changes: dict[str, Any]) -> list[tuple[str, dict[str, Any
 
 
 def log_update(request, product: Product, before: dict[str, Any]) -> list[AuditLog]:
-    """Diff `product` against the `before` snapshot and log what really changed (no-ops: nothing)."""
+    """Diff `product` against the `before` snapshot; log what really changed (no-op: nothing)."""
     changes = diff(before, snapshot(product))
     return [
         log_product_change(request, product, action, part)

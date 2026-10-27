@@ -14,12 +14,14 @@ The catalogue: manufacturers · brands · category tree · products and their va
 from decimal import Decimal
 
 from access.models import AccessPolicy
+from catalog import colors as color_services
 from catalog.models import (
     Brand,
     Category,
     DosageForm,
     Manufacturer,
     Product,
+    ProductColor,
     ProductKind,
     ProductVariant,
     RegulatoryClass,
@@ -360,6 +362,29 @@ PRODUCTS = [
         ],
     },
     {
+        # ⚠️  The colour showcase: a swatch each, one with its **own price** (the green is
+        #     dearer than the base 280), one deliberately **out of stock** (the burgundy, see
+        #     `seeds/stock.py`) so the sold-out swatch has something to show.
+        #
+        #     SCR-SET above is kept as it was — free-text `color` attributes on size
+        #     variants, no `ProductColor` — because that is exactly what an old import
+        #     leaves behind, and the storefront must keep serving it.
+        "sku": "SCR-TOP",
+        "name_ar": "قميص سكراب طبي",
+        "name_en": "Medical scrub top",
+        "kind": ProductKind.APPAREL,
+        "category": "apparel",
+        "brand": "campus",
+        "base_price": "280.00",
+        "weight_grams": 300,
+        #: (Arabic, English, hex, the colour's own price or None)
+        "colors": [
+            ("أزرق", "Blue", "#1E40AF", None),
+            ("أخضر", "Green", "#15803D", "300.00"),
+            ("خمري", "Burgundy", "#7F1D1D", None),
+        ],
+    },
+    {
         "sku": "DIS-KIT",
         "name_ar": "حقيبة أدوات التشريح",
         "name_en": "Dissection kit",
@@ -441,6 +466,7 @@ def seed():
         payload = dict(spec)
         sku = payload.pop("sku")
         variant_specs = payload.pop("variants", [])
+        color_specs = payload.pop("colors", [])
 
         # References are resolved first — mixing a string and an object in the same dict
         # depends on an evaluation order that is hard to follow when reading
@@ -475,6 +501,23 @@ def seed():
                 },
             )
             variants[variant_sku] = variant
+
+        # Colours go through the same service as the admin panel, so each gets its
+        # variant (and its SKU) exactly as it would there. Idempotent by colour name.
+        for order, (color_ar, color_en, color_hex, color_price) in enumerate(color_specs):
+            color, _created = ProductColor.objects.update_or_create(
+                product=product,
+                name_en=color_en,
+                defaults={
+                    "name_ar": color_ar,
+                    "hex": color_hex,
+                    "price_override": Decimal(color_price) if color_price else None,
+                    "display_order": order * 10,
+                    "is_active": True,
+                },
+            )
+            variant = color_services.ensure_variant(color)
+            variants[variant.sku] = variant
 
     return {
         "manufacturers": manufacturers,

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
+  inboundAddressOf,
+  useMailAccounts,
   useSaveMailAccount,
   type EmailAccount,
   type MailDirection,
@@ -34,6 +36,7 @@ export function MailAccountForm({
   const { t } = useTranslation();
   const { notify } = useToast();
   const save = useSaveMailAccount();
+  const accounts = useMailAccounts();
 
   const [form, setForm] = useState({
     code: account?.code ?? '',
@@ -51,6 +54,7 @@ export function MailAccountForm({
     reply_to: account?.reply_to ?? '',
     imap_host: account?.imap_host ?? '',
     imap_port: account?.imap_port ?? 993,
+    imap_security: (account?.imap_security ?? 'SSL'),
     imap_username: account?.imap_username ?? '',
     imap_folder: account?.imap_folder ?? 'INBOX',
     priority: account?.priority ?? 0,
@@ -70,6 +74,12 @@ export function MailAccountForm({
 
   const receives = form.direction === 'IN' || form.direction === 'BOTH';
   const sends = form.direction === 'OUT' || form.direction === 'BOTH';
+
+  // ⚠️  Replies to system mail go to the sender address - `noreply@`, which nobody reads - unless
+  //     "reply to" says otherwise. Only an outbound-only account has the gap: on a BOTH account
+  //     the sender *is* the mailbox that gets pulled. If an inbound mailbox exists, offer it.
+  const replyToGap = form.direction === 'OUT' && form.reply_to.trim() === '';
+  const replyToSuggestion = inboundAddressOf(accounts.data ?? [], account?.id);
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -220,6 +230,25 @@ export function MailAccountForm({
         />
       </div>
 
+      {replyToGap ? (
+        <Alert tone="warning">
+          <p className="mail-form__alert-text">
+            {t('mail.replyToMissing', { address: form.from_email || '…' })}
+          </p>
+          {replyToSuggestion ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                set('reply_to', replyToSuggestion);
+              }}
+            >
+              {t('mail.replyToUse', { address: replyToSuggestion })}
+            </Button>
+          ) : null}
+        </Alert>
+      ) : null}
+
       <div className="mail-form__row">
         <Field
           label={t('mail.fromNameAr')}
@@ -249,6 +278,19 @@ export function MailAccountForm({
               onChange={(event) => set('imap_port', Number(event.target.value))}
             />
           </div>
+          <label className="mail-form__select">
+            <span>{t('mail.security')}</span>
+            <select
+              value={form.imap_security}
+              onChange={(event) => {
+                set('imap_security', event.target.value as MailSecurity);
+              }}
+            >
+              <option value="SSL">SSL/TLS</option>
+              <option value="TLS">STARTTLS</option>
+              <option value="NONE">{t('mail.securityNone')}</option>
+            </select>
+          </label>
           <div className="mail-form__row">
             <Field
               label={t('mail.imapUsername')}
@@ -319,7 +361,7 @@ export function MailAccountForm({
       ) : null}
 
       <Button type="submit" loading={save.isPending} block>
-        {t('action.save')}
+        {t('common.save')}
       </Button>
     </form>
   );

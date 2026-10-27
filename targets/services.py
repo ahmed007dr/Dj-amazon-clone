@@ -22,6 +22,7 @@ from django.db.models.functions import Coalesce
 
 from core.errors import BusinessError, ErrorCode
 from core.money import ZERO, quantize
+from orders import guest as guest_services
 from targets.models import MonthlyTarget, TargetStatus, TargetType
 
 
@@ -107,7 +108,9 @@ def measure(target: MonthlyTarget) -> Achievement:
     net = quantize(gross - returns_total)
 
     orders_count = sold.count()
-    customers_count = sold.values("customer").distinct().count()
+    # ⚠️  Accounts and guest emails, never the NULL group — which counted every
+    #     counter sale and guest order together as a single "customer".
+    customers_count = guest_services.count_distinct_buyers(sold)
     profit = _gross_profit(sold, returned)
 
     achieved = {

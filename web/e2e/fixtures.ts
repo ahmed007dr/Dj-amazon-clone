@@ -31,10 +31,19 @@ async function gotoAdminAcademic(page: Page) {
   await page.getByRole('menuitem', { name: /admin/i }).click();
   await page.waitForLoadState('networkidle');
   await settle(page);
-  await page.getByRole('link', { name: /academic tree/i }).click();
+  // ⚠️  The sidebar link is "Academic & student requests" (it was "Academic tree"),
+  //     and may carry a pending-count badge after the label — hence no end anchor.
+  await page.getByRole('link', { name: /academic & student requests/i }).click();
   await page.waitForLoadState('networkidle');
   await settle(page);
-  await page.getByRole('tab', { name: /universities/i }).waitFor();
+
+  // ⚠️  The page opens on "Verification requests" now, not "Universities".
+  //     Every spec in focus-retention.spec.ts assumes the tree tabs, so land on the
+  //     first of them explicitly instead of relying on whichever tab is the default.
+  await page.getByRole('tab', { name: /verification requests/i }).waitFor();
+  await page.getByRole('tab', { name: /universities/i }).click();
+  await settle(page);
+  await page.getByRole('button', { name: /add university/i }).first().waitFor();
 }
 
 export const test = base.extend<{ ownerPage: Page }>({

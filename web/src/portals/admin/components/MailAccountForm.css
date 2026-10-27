@@ -18,6 +18,10 @@
   }
 }
 
+.mail-form__alert-text {
+  margin: 0 0 var(--space-2);
+}
+
 .mail-form__select {
   display: flex;
   flex-direction: column;

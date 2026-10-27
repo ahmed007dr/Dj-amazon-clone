@@ -62,6 +62,7 @@ _PRODUCT_SOURCE = {
 _IMPORT_KIND = {
     "base_price": Kind.MONEY,
     "price_adjustment": Kind.MONEY,
+    "price_override": Kind.MONEY,
     "weight_grams": Kind.INT,
     "requires_prescription": Kind.BOOL,
     "is_active": Kind.BOOL,
@@ -226,8 +227,24 @@ register(
 # ═══════════════════════════════════════════════════════════
 
 
+#: Variants-sheet column key → how to read it off a `ProductVariant` row.
+#
+# ⚠️  Built from `import_spec.VARIANT_COLUMNS`, never hand-listed: the row used to be a
+#     fixed tuple while the header came from the spec, so the day a column was added
+#     the two silently fell out of step — every value shifted under the wrong heading
+#     in a file the importer would then reject, or worse, accept. The colour columns
+#     read through the `color` relation.
+_VARIANT_SOURCE = {
+    "parent_sku": "product__sku",
+    "color_name_ar": "color__name_ar",
+    "color_name_en": "color__name_en",
+    "color_hex": "color__hex",
+    "price_override": "color__price_override",
+}
+
+
 def _variant_qs(filters: dict):
-    queryset = ProductVariant.objects.select_related("product")
+    queryset = ProductVariant.objects.select_related("product", "color")
     if filters.get("include_inactive") != "true":
         queryset = queryset.filter(is_active=True)
     if sku := filters.get("parent_sku"):
@@ -236,26 +253,27 @@ def _variant_qs(filters: dict):
 
 
 def _variant_rows(filters: dict, include_contact: bool):
+    keys = [column.key for column in import_spec.VARIANT_COLUMNS]
+    fields = [_VARIANT_SOURCE.get(key, key) for key in keys]
+    attributes_at = keys.index("attributes")
+    # A variant with no colour exports blank colour cells, which re-import as "no colour"
+    colour_at = [
+        i for i, key in enumerate(keys) if key in ("color_name_ar", "color_name_en", "color_hex")
+    ]
+
     for row in (
-        _variant_qs(filters)
-        .values_list(
-            "product__sku",
-            "sku",
-            "name_ar",
-            "name_en",
-            "barcode",
-            "price_adjustment",
-            "weight_grams",
-            "attributes",
-        )
-        .iterator(chunk_size=_common.CHUNK)
+        _variant_qs(filters).values_list(*fields).iterator(chunk_size=_common.CHUNK)
     ):
         # ⚠️  The attributes go back out in the exact `size=M;color=blue` syntax
         #     the importer parses. A JSON blob in the cell would be unreadable
         #     to the admin and unparseable on re-upload.
-        attributes = row[7] or {}
-        rendered = ";".join(f"{key}={value}" for key, value in attributes.items())
-        yield (*row[:7], rendered)
+        values = list(row)
+        attributes = values[attributes_at] or {}
+        values[attributes_at] = ";".join(f"{key}={value}" for key, value in attributes.items())
+        for index in colour_at:
+            if values[index] is None:
+                values[index] = ""
+        yield tuple(values)
 
 
 register(

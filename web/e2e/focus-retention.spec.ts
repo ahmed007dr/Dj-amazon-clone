@@ -12,6 +12,11 @@ import { expect, gotoAdminAcademic, settle, test } from './fixtures';
  * Left uncaught, this reduces to "type one character, lose focus, click
  * back in" for every input inside every Drawer/Modal in the app — it isn't
  * specific to Academic, it's the fix's blast radius.
+ *
+ * The Academic page now opens on "Verification requests", so every spec below
+ * starts from `gotoAdminAcademic`, which clicks the "Universities" tab itself;
+ * the specs that need another tab (faculties, departments, bundles) click it
+ * explicitly. None of them relies on which tab is the default.
  */
 
 const SAMPLE = 'Ahmed Mohamed 12345';

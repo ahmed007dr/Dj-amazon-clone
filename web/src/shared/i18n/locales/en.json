@@ -2215,7 +2215,6 @@
     "previewEmailTitle": "As the customer will see it",
     "replyLanguage": "Message language",
     "replyToMissing": "No “Reply-to” address: customers who reply to mail from this account will write to {{address}}, which nobody may read.",
-    "replyToSuggestHint": "This is the inbox the mail is pulled from.",
     "replyToUse": "Use {{address}}",
     "testImap": "Test IMAP",
     "verifySkipped": "Receive-only account — there is no SMTP to test. Use “Test IMAP”.",

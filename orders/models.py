@@ -213,6 +213,11 @@ class Order(BaseModel):
         blank=True,
         help_text=_("لغة رسائل الزائر — لا حساب له يحمل تفضيلًا"),
     )
+    #: When an account took ownership of this guest order (see `orders.guest.claim_orders`).
+    #: Empty for every order that was never a guest order, and for guest orders still
+    #: unclaimed. It is also the marker a points programme needs to tell "bought as a
+    #: guest" from "bought as a member": the order's `customer` is set either way.
+    claimed_at = models.DateTimeField(_("تاريخ ربطه بحساب"), null=True, blank=True)
     #: A hash of (cart session + the client's `Idempotency-Key`) — never the raw key.
     checkout_key = models.CharField(
         _("مفتاح منع تكرار الطلب"), max_length=64, blank=True, editable=False
@@ -256,8 +261,10 @@ class Order(BaseModel):
         ⚠️  Once an order is claimed `customer` is set and this turns False, but
             `contact_email` stays — the emailed tracking link keeps working.
         """
-        return (
-            self.customer_id is None and self.channel == OrderChannel.ONLINE and bool(self.contact_email)
+        return bool(
+            self.customer_id is None
+            and self.channel == OrderChannel.ONLINE
+            and self.contact_email
         )
 
     @property

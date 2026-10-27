@@ -188,8 +188,15 @@ class OrderDetailSerializer(OrderListSerializer):
 class AdminOrderSerializer(OrderDetailSerializer):
     """The admin version — it exposes the attribution and the internal notes."""
 
-    customer_email = serializers.EmailField(source="customer.user.email", read_only=True)
-    customer_number = serializers.CharField(source="customer.customer_number", read_only=True)
+    # ⚠️  Method fields, not `source="customer.user.email"`.
+    #
+    #     That source raises for an order with no customer, and DRF answers a
+    #     failed read-only source by *dropping the key* — so the admin screens,
+    #     which print `customer_email`, rendered nothing for guest orders and
+    #     counter sales alike, with no error anywhere.
+    customer_email = serializers.SerializerMethodField()
+    customer_number = serializers.SerializerMethodField()
+    is_guest = serializers.BooleanField(read_only=True)
 
     class Meta(OrderDetailSerializer.Meta):
         fields = [
@@ -197,6 +204,12 @@ class AdminOrderSerializer(OrderDetailSerializer):
             "customer",
             "customer_email",
             "customer_number",
+            # A guest order: no account, but a contact address and language, and
+            # the moment an account (once verified) took it over, if one did.
+            "is_guest",
+            "contact_email",
+            "contact_language",
+            "claimed_at",
             "location",
             "created_by",
             "owner_employee",
@@ -204,6 +217,16 @@ class AdminOrderSerializer(OrderDetailSerializer):
             "internal_note",
         ]
         read_only_fields = fields
+
+    def get_customer_email(self, obj) -> str:
+        """The account's email — or, for a guest, the address they left at checkout."""
+        if obj.customer_id is not None:
+            return obj.customer.user.email
+        return obj.contact_email
+
+    def get_customer_number(self, obj) -> str:
+        """`CUS-…` for an account; empty for a guest or a counter sale (there is no number)."""
+        return obj.customer.customer_number if obj.customer_id is not None else ""
 
 
 # ═══════════════════════════════════════════════════════════

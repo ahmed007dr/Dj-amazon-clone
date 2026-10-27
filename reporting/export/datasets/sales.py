@@ -66,16 +66,34 @@ def _order_columns(include_contact: bool) -> list[Column]:
         Column("المدينة", width=16),
         Column("تاريخ التأكيد", Kind.DATETIME),
         Column("تاريخ الإتمام", Kind.DATETIME),
+        # ⚠️  Always present, never sensitive: without it a guest order is just a
+        #     row whose "customer number" is blank — indistinguishable from a
+        #     counter sale — and the sales split by buyer type cannot be made.
+        Column("نوع المشتري", width=14),
     ]
     if include_contact:
         # ⚠️  The recipient's name and phone are on the **order**, not only on
         #     the customer — a counter sale has no customer record at all. Same
         #     gate, same reason.
+        #
+        #     And a guest's email lives on the order too (`contact_email`): it is
+        #     the one thing in this file that is a mailing list entry, so it sits
+        #     behind exactly the same gate as the phone.
         columns += [
             Column("المستلم", width=24, sensitive=True),
             Column("هاتف المستلم", width=18, sensitive=True),
+            Column("بريد الزائر", width=28, sensitive=True),
         ]
     return columns
+
+
+def _buyer_kind(channel: str, customer_id, contact_email: str) -> str:
+    """An account · a guest (no account, left an email) · nobody identified (a counter sale)."""
+    if customer_id is not None:
+        return "حساب"
+    if channel == OrderChannel.ONLINE and contact_email:
+        return "زائر"
+    return "بلا هوية"
 
 
 def _order_rows(filters: dict, include_contact: bool):
@@ -98,17 +116,24 @@ def _order_rows(filters: dict, include_contact: bool):
         "city",
         "confirmed_at",
         "completed_at",
+        # Read to classify the buyer; only echoed back out behind the contact gate
+        "customer_id",
+        "contact_email",
     )
     if include_contact:
         fields += ("recipient_name", "recipient_phone")
 
     for row in _order_qs(filters).values_list(*fields).iterator(chunk_size=_common.CHUNK):
+        customer_id, contact_email = row[18], row[19]
         yield (
             *row[:2],
             _common.labelled(row[2], OrderStatus.choices),
             _common.labelled(row[3], PaymentStatus.choices),
             _common.labelled(row[4], OrderChannel.choices),
-            *row[5:],
+            *row[5:18],
+            _buyer_kind(row[4], customer_id, contact_email),
+            *row[20:],
+            *((contact_email,) if include_contact else ()),
         )
 
 

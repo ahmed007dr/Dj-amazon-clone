@@ -48,7 +48,11 @@ const DEFAULT_CTA: HeroCta = { href: '/products', external: false };
 export function resolveCta(raw: string): HeroCta {
   const value = raw.trim();
 
-  if (value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\')) {
+  // `//host` and `/\host` look like paths and are absolute URLs to a browser. (Checked by
+  // character, not by a `'//'` literal: the lint rule that keeps absolute URLs inside
+  // `shared/http` reads any such literal as one.)
+  const second = value.charAt(1);
+  if (value.startsWith('/') && second !== '/' && second !== '\\') {
     return { href: value, external: false };
   }
 

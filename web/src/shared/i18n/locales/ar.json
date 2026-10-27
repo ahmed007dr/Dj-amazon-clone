@@ -2229,7 +2229,6 @@
     "previewEmailTitle": "كما سيصل للعميل",
     "replyLanguage": "لغة الرسالة",
     "replyToMissing": "لا عنوان «الردّ إلى»: ردود العملاء على رسائل هذا الحساب ستذهب إلى {{address}}، وقد لا يقرؤه أحد.",
-    "replyToSuggestHint": "هذا هو صندوق الوارد الذي يُسحب منه البريد.",
     "replyToUse": "استخدم {{address}}",
     "testImap": "اختبار IMAP",
     "verifySkipped": "حساب استقبال فقط — لا يوجد SMTP لاختباره. استخدم «اختبار IMAP».",

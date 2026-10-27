@@ -27,6 +27,13 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name="order",
+            name="claimed_at",
+            field=models.DateTimeField(
+                blank=True, null=True, verbose_name="تاريخ ربطه بحساب"
+            ),
+        ),
+        migrations.AddField(
+            model_name="order",
             name="contact_email",
             field=models.EmailField(
                 blank=True,

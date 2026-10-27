@@ -40,9 +40,11 @@ def _object_repr(product: Product) -> str:
 
 def _annotated(queryset):
     """The colour rows with what the admin list shows, in a fixed handful of queries."""
+    # ⚠️  An explicit `order_by`: an aggregate annotation drops `Meta.ordering`, and the
+    #     swatches would come back in whatever order the database felt like.
     return queryset.annotate(
         image_count=Count("images", filter=Q(images__deleted_at__isnull=True), distinct=True)
-    ).prefetch_related(
+    ).order_by("display_order", "created_at").prefetch_related(
         Prefetch(
             "images",
             queryset=ProductImage.objects.filter(is_primary=True),
