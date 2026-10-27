@@ -53,6 +53,18 @@
   background-position: 0 0, 0 8px, 8px -8px, -8px 0;
 }
 
+/* ⚠️  The home banners are 1920×800-ish: in a 15rem tile they would be a 7rem-high
+       sliver. They span two columns when there is room, and stay one on a phone. */
+@media (min-width: 40rem) {
+  .asset-tile--wide {
+    grid-column: span 2;
+  }
+}
+
+.asset-tile--wide .asset-tile__preview {
+  block-size: 11rem;
+}
+
 /* The dark-mode logo is usually white — showing it on a light background makes it look missing */
 .asset-tile__preview.is-dark {
   background-color: #1b1f23;

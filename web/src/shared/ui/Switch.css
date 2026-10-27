@@ -1,0 +1,139 @@
+.switch {
+  --switch-track-w: 2.75rem;
+  --switch-track-h: 1.5rem;
+  --switch-gap: 0.1875rem;
+  --switch-thumb: calc(var(--switch-track-h) - 2 * var(--switch-gap));
+
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+
+  min-block-size: var(--touch-target);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.switch__icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--color-text-muted);
+}
+
+.switch__text {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 0.125rem;
+  min-inline-size: 0;
+}
+
+.switch__label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  font-weight: 600;
+}
+
+.switch__desc {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* ⚠️  The real input stays in the DOM and in the accessibility tree, stretched
+   over the row but invisible. `display: none` or `visibility: hidden` would
+   remove it from the keyboard order entirely. */
+.switch__input {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.switch__track {
+  position: relative;
+  flex: 0 0 auto;
+  inline-size: var(--switch-track-w);
+  block-size: var(--switch-track-h);
+
+  background: color-mix(in srgb, var(--color-text) 28%, transparent);
+  border-radius: var(--radius-pill);
+  transition: background-color var(--transition);
+}
+
+.switch__thumb {
+  position: absolute;
+  inset-block-start: var(--switch-gap);
+  /* ⚠️  Logical: the "off" position is the start edge, the "on" position the end edge */
+  inset-inline-start: var(--switch-gap);
+  inline-size: var(--switch-thumb);
+  block-size: var(--switch-thumb);
+
+  background: var(--color-surface);
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  transition: inset-inline-start var(--transition);
+}
+
+.switch.is-on .switch__track {
+  background: var(--color-primary);
+}
+
+.switch.is-on .switch__thumb {
+  inset-inline-start: calc(100% - var(--switch-thumb) - var(--switch-gap));
+  background: var(--color-on-primary);
+}
+
+/* The platform's focus ring, moved onto the visible stand-in for the input */
+.switch__input:focus-visible ~ .switch__track {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ⚠️  Disabled is dimmed and shows the not-allowed cursor — but is not hidden:
+   a locked "on" switch is information (this is always on), not clutter. */
+.switch.is-disabled {
+  cursor: not-allowed;
+}
+
+.switch.is-disabled .switch__track,
+.switch.is-disabled .switch__icon {
+  opacity: 0.6;
+}
+
+/* Loading: a ring spins inside the thumb, the row keeps its place */
+.switch.is-loading {
+  cursor: progress;
+}
+
+.switch.is-loading .switch__thumb::after {
+  content: '';
+  position: absolute;
+  inset: 0.2rem;
+  border: 2px solid color-mix(in srgb, currentcolor 25%, transparent);
+  border-block-start-color: var(--color-primary);
+  border-radius: 50%;
+  animation: switch-spin 700ms linear infinite;
+}
+
+@keyframes switch-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch__track,
+  .switch__thumb {
+    transition: none;
+  }
+
+  .switch.is-loading .switch__thumb::after {
+    animation: none;
+    border-color: var(--color-primary);
+  }
+}

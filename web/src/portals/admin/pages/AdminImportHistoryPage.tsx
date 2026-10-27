@@ -1,12 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
 
 import { useImportJobs, type ImportJob, type ImportStatus } from '@/features/imports/adminApi';
-import { PageHeader } from '@/shared/layouts/PageHeader';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
 import { Badge } from '@/shared/ui/Badge';
-import { Button } from '@/shared/ui/Button';
 import { Pagination } from '@/shared/ui/Pagination';
 import { StatusTabs } from '@/shared/ui/StatusTabs';
 import { formatDateTime } from '@/shared/utils/format';
@@ -38,7 +35,10 @@ const TONE: Record<ImportStatus, 'neutral' | 'info' | 'success' | 'warning' | 'd
 };
 
 /**
- * Every import that has ever run.
+ * Every import that has ever run — the "Jobs" tab of `AdminImportHubPage`.
+ *
+ * ⚠️  A panel: the hub owns the page header, and clicking a row hands the job to
+ *     the hub (`onOpen`), which shows it in the Import tab.
  *
  * ⚠️  **This is the way back into a job**, and until it existed there was none.
  *
@@ -50,9 +50,8 @@ const TONE: Record<ImportStatus, 'neutral' | 'info' | 'success' | 'warning' | 'd
  * ⚠️  And it answers the question no wizard can: *what was imported last week,
  *     and by which file?* A one-shot screen has no memory by construction.
  */
-export function AdminImportHistoryPage() {
+export function AdminImportJobsPanel({ onOpen }: { onOpen: (jobId: string) => void }) {
   const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
 
   const [status, setStatus] = useState<'' | ImportStatus>('');
   const [page, setPage] = useState(1);
@@ -109,19 +108,8 @@ export function AdminImportHistoryPage() {
 
   return (
     <>
-      <PageHeader
-        title={t('imports.historyTitle')}
-        description={t('imports.historySubtitle')}
-        actions={
-          <Button variant="secondary">
-            <Link to="/admin/products/import" className="import-history__link">
-              {t('imports.newImport')}
-            </Link>
-          </Button>
-        }
-      />
-
       <StatusTabs
+        label={t('admin.status')}
         options={STATUSES.map((value) => ({
           value,
           label: value ? t(`importStatus.${value}`) : t('common.all'),
@@ -140,7 +128,9 @@ export function AdminImportHistoryPage() {
         rowKey={(job) => job.id}
         isLoading={jobs.isPending}
         error={jobs.error}
-        onRowClick={(job) => void navigate(`/admin/products/import/${job.id}`)}
+        onRowClick={(job) => {
+          onOpen(job.id);
+        }}
         emptyTitle={t('imports.noJobs')}
       />
 

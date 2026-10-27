@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from academic.models import (
     BundleItem,
+    BundleKind,
     Department,
     Faculty,
     StudentProfile,
@@ -72,30 +73,101 @@ class BundleItemSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class StudyBundleSerializer(serializers.ModelSerializer):
-    items = BundleItemSerializer(many=True, read_only=True)
+#: Declared once so the two bundle contracts cannot drift apart
+_BUNDLE_FIELDS = [
+    "id",
+    "slug",
+    "name_ar",
+    "name_en",
+    "description_ar",
+    "description_en",
+    "kind",
+    "academic_year",
+    "image",
+    "faculty",
+    "faculty_name_ar",
+    "faculty_name_en",
+    "university",
+    "university_name_ar",
+    "university_name_en",
+    "department",
+    "department_name_ar",
+    "department_name_en",
+]
+
+
+class _BundleSerializer(serializers.ModelSerializer):
+    """
+    What every public bundle contract shares — including **where it belongs**.
+
+    ⚠️  The faculty and university are part of the bundle now.
+
+        Bundles are public and unfiltered by the visitor's own profile, so a
+        card has to say whose bundle it is: "Year 2 essentials" with no faculty
+        beside it is meaningless once a Pharmacy and a Medicine bundle sit in
+        the same list. Names come from the `select_related` of the queryset —
+        a view that forgets it pays one query per card.
+    """
+
     item_count = serializers.SerializerMethodField()
 
-    class Meta:
-        model = StudyBundle
-        fields = [
-            "id",
-            "slug",
-            "name_ar",
-            "name_en",
-            "description_ar",
-            "description_en",
-            "kind",
-            "academic_year",
-            "image",
-            "items",
-            "item_count",
-        ]
-        read_only_fields = fields
+    faculty_name_ar = serializers.CharField(source="faculty.name_ar", read_only=True)
+    faculty_name_en = serializers.CharField(source="faculty.name_en", read_only=True)
+    university = serializers.UUIDField(source="faculty.university_id", read_only=True)
+    university_name_ar = serializers.CharField(source="faculty.university.name_ar", read_only=True)
+    university_name_en = serializers.CharField(source="faculty.university.name_en", read_only=True)
+    department_name_ar = serializers.CharField(
+        source="department.name_ar", read_only=True, default=None
+    )
+    department_name_en = serializers.CharField(
+        source="department.name_en", read_only=True, default=None
+    )
 
     def get_item_count(self, obj) -> int:
         # Read from the prefetch — no extra query
         return len(obj.items.all())
+
+
+class StudyBundleSerializer(_BundleSerializer):
+    items = BundleItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = StudyBundle
+        fields = [*_BUNDLE_FIELDS, "items", "item_count"]
+        read_only_fields = fields
+
+
+class BundleListSerializer(_BundleSerializer):
+    """
+    The bundles list — a card, not a page.
+
+    ⚠️  **No `items`.** The full list of every bundle with every product inside
+        it is the detail page's payload, repeated for each card; the card only
+        shows how many items there are.
+    """
+
+    class Meta:
+        model = StudyBundle
+        fields = [*_BUNDLE_FIELDS, "item_count"]
+        read_only_fields = fields
+
+
+class BundleFilterSerializer(serializers.Serializer):
+    """
+    The public bundle filters — validated, never trusted.
+
+    ⚠️  A malformed value is a `400`, not a `500` and not "no filter".
+
+        `?faculty=abc` reaching the ORM raises a `ValidationError` deep inside a
+        queryset, and silently ignoring it would show the visitor every faculty's
+        bundles under a filter they believe is applied.
+    """
+
+    university = serializers.UUIDField(required=False)
+    faculty = serializers.UUIDField(required=False)
+    department = serializers.UUIDField(required=False)
+    academic_year = serializers.IntegerField(required=False, min_value=1, max_value=10)
+    kind = serializers.ChoiceField(required=False, choices=BundleKind.choices)
 
 
 class StudentProfileSerializer(serializers.ModelSerializer):
@@ -122,6 +194,50 @@ class StudentProfileSerializer(serializers.ModelSerializer):
         ]
         # ⚠️  Verification is set by the admin after approving the student ID, not by the student
         read_only_fields = ["id", "is_verified"]
+
+
+class AdminStudentProfileSerializer(StudentProfileSerializer):
+    """
+    The admin list of students — adds **who** the student is.
+
+    ⚠️  Name, email and phone are for the admin screen only.
+
+        The base contract is what a student receives about themselves, and it is
+        also what the registration and account screens read. Putting contact data
+        there would leak it into every response that reuses the base; extending it
+        here keeps it behind `CanManageAcademic`.
+    """
+
+    user_id = serializers.UUIDField(read_only=True)
+    user_name = serializers.CharField(source="user.full_name", read_only=True)
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    user_phone = serializers.CharField(source="user.phone", read_only=True)
+    #: The account's authoritative state — `is_verified` above is only its mirror
+    verification_status = serializers.CharField(source="user.verification_status", read_only=True)
+
+    class Meta(StudentProfileSerializer.Meta):
+        fields = [
+            *StudentProfileSerializer.Meta.fields,
+            "user_id",
+            "user_name",
+            "user_email",
+            "user_phone",
+            "verification_status",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
+class AdminStudentFilterSerializer(serializers.Serializer):
+    """The admin student list filters — validated for the same reason as the public ones."""
+
+    university = serializers.UUIDField(required=False)
+    faculty = serializers.UUIDField(required=False)
+    academic_year = serializers.IntegerField(required=False, min_value=1, max_value=10)
+    # ⚠️  Not a `BooleanField`: on a query string DRF reads an absent checkbox
+    #     as `False`, which would silently filter the list to unverified students.
+    verified = serializers.ChoiceField(required=False, choices=["true", "false"])
+    search = serializers.CharField(required=False, max_length=100)
 
 
 class CreateStudentProfileSerializer(serializers.Serializer):

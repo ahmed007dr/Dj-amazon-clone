@@ -9,9 +9,11 @@ import {
   useProductFormOptions,
   useRestoreProduct,
   type AdminProduct,
+  type AuditUser,
 } from '@/features/catalog/adminApi';
 import { ExportButton } from '@/portals/admin/components/ExportButton';
 import { ProductForm } from '@/portals/admin/components/ProductForm';
+import { ProductHistoryPanel } from '@/portals/admin/components/ProductHistoryPanel';
 import { ProductImagesPanel } from '@/portals/admin/components/ProductImagesPanel';
 import { useDebounced } from '@/shared/hooks/useDebounced';
 import { isApiError } from '@/shared/http/errors';
@@ -25,7 +27,7 @@ import { FilterBar, FilterSearch, FilterSelect } from '@/shared/ui/FilterBar';
 import { Modal } from '@/shared/ui/Modal';
 import { Pagination } from '@/shared/ui/Pagination';
 import { useToast } from '@/shared/ui/useToast';
-import { formatMoney } from '@/shared/utils/format';
+import { formatDateTime, formatMoney } from '@/shared/utils/format';
 
 import './AdminProductsPage.css';
 
@@ -33,7 +35,8 @@ import './AdminProductsPage.css';
 type Panel =
   | { mode: 'create' }
   | { mode: 'edit'; product: AdminProduct }
-  | { mode: 'images'; product: AdminProduct };
+  | { mode: 'images'; product: AdminProduct }
+  | { mode: 'history'; product: AdminProduct };
 
 export function AdminProductsPage() {
   const { t, i18n } = useTranslation();
@@ -44,6 +47,8 @@ export function AdminProductsPage() {
   const [search, setSearch] = useState('');
   const [active, setActive] = useState('');
   const [showDeleted, setShowDeleted] = useState('');
+  // '' = newest added first (the server default); '-updated_at' = recently modified first.
+  const [ordering, setOrdering] = useState('');
   const [page, setPage] = useState(1);
 
   // ⚠️  A panel, not a route.
@@ -62,12 +67,13 @@ export function AdminProductsPage() {
   const debouncedSearch = useDebounced(search);
 
   const query = useQuery({
-    queryKey: ['admin', 'products', debouncedSearch, active, showDeleted, page],
+    queryKey: ['admin', 'products', debouncedSearch, active, showDeleted, ordering, page],
     queryFn: () =>
       listAdminProducts({
         ...(debouncedSearch ? { search: debouncedSearch } : {}),
         ...(active ? { is_active: active } : {}),
         ...(showDeleted ? { include_deleted: showDeleted } : {}),
+        ...(ordering ? { ordering } : {}),
         page,
       }),
     staleTime: 60 * 1000,
@@ -100,6 +106,13 @@ export function AdminProductsPage() {
       onError: fail,
     });
   };
+
+  const auditCell = (who: AuditUser | null | undefined, when: string) => (
+    <div className="admin-products__audit">
+      <strong title={who?.email}>{who?.name ?? '—'}</strong>
+      <span className="muted">{formatDateTime(when, i18n.language)}</span>
+    </div>
+  );
 
   const columns: Column<AdminProduct>[] = [
     {
@@ -144,28 +157,53 @@ export function AdminProductsPage() {
         ),
     },
     {
+      // ⚠️  Who and when, in one cell each — a name without a date (or the reverse)
+      //     answers half of "who touched this and when?". `—` for products that
+      //     predate the audit columns: showing nobody is honest, guessing is not.
+      key: 'created',
+      header: t('products.addedBy'),
+      secondary: true,
+      render: (product) => auditCell(product.created_by, product.created_at),
+    },
+    {
+      key: 'modified',
+      header: t('products.modifiedBy'),
+      secondary: true,
+      render: (product) => auditCell(product.updated_by, product.updated_at),
+    },
+    {
       key: 'actions',
       header: t('admin.actions'),
       align: 'end',
       render: (product) =>
-        // ⚠️  A deleted one shows **restore alone**.
+        // ⚠️  A deleted one shows **restore alone** (and its history, which is where
+        //     "who deleted it" is answered).
         //
         //     Editing a deleted product or uploading its images is wasted work: nobody
         //     sees it while it is deleted. The first step is to bring it back.
         product.deleted_at ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            loading={restore.isPending}
-            onClick={() =>
-              restore.mutate(product.id, {
-                onSuccess: () => notify(t('products.restored'), 'success'),
-                onError: fail,
-              })
-            }
-          >
-            {t('products.restore')}
-          </Button>
+          <span className="admin-products__actions">
+            <Button
+              size="sm"
+              variant="ghost"
+              loading={restore.isPending}
+              onClick={() =>
+                restore.mutate(product.id, {
+                  onSuccess: () => notify(t('products.restored'), 'success'),
+                  onError: fail,
+                })
+              }
+            >
+              {t('products.restore')}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setPanel({ mode: 'history', product })}
+            >
+              {t('products.history.open')}
+            </Button>
+          </span>
         ) : (
           <span className="admin-products__actions">
             <Button size="sm" variant="ghost" onClick={() => setPanel({ mode: 'edit', product })}>
@@ -178,6 +216,13 @@ export function AdminProductsPage() {
             >
               {t('images.manage')}
             </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setPanel({ mode: 'history', product })}
+            >
+              {t('products.history.open')}
+            </Button>
             <Button size="sm" variant="ghost" onClick={() => setPendingDelete(product)}>
               {t('common.delete')}
             </Button>
@@ -186,14 +231,16 @@ export function AdminProductsPage() {
     },
   ];
 
-  const hasFilters = Boolean(search || active || showDeleted);
+  const hasFilters = Boolean(search || active || showDeleted || ordering);
 
   const panelTitle =
     panel?.mode === 'create'
       ? t('products.create')
-      : panel
-        ? localized(panel.product, 'name')
-        : '';
+      : panel?.mode === 'history'
+        ? `${t('products.history.title')} · ${localized(panel.product, 'name')}`
+        : panel
+          ? localized(panel.product, 'name')
+          : '';
 
   return (
     <>
@@ -232,6 +279,7 @@ export function AdminProductsPage() {
           setSearch('');
           setActive('');
           setShowDeleted('');
+          setOrdering('');
           setPage(1);
         }}
       >
@@ -266,6 +314,22 @@ export function AdminProductsPage() {
             setPage(1);
           }}
         />
+
+        {/* ⚠️  "Recently modified" answers "what did the team touch today?" without
+            opening each product; the default stays newest-added-first. */}
+        <FilterSelect
+          value={ordering}
+          label={t('products.sortBy')}
+          options={[
+            { value: '-updated_at', label: t('products.sortRecentlyModified') },
+            { value: 'updated_at', label: t('products.sortLeastRecentlyModified') },
+            { value: 'created_at', label: t('products.sortOldestAdded') },
+          ]}
+          onChange={(next) => {
+            setOrdering(next);
+            setPage(1);
+          }}
+        />
       </FilterBar>
 
       <DataTable
@@ -287,6 +351,10 @@ export function AdminProductsPage() {
             and shows the previous product's images for a moment when the next one opens. */}
         {panel?.mode === 'images' ? (
           <ProductImagesPanel key={panel.product.id} productId={panel.product.id} />
+        ) : null}
+
+        {panel?.mode === 'history' ? (
+          <ProductHistoryPanel key={panel.product.id} productId={panel.product.id} />
         ) : null}
 
         {panel?.mode === 'create' ? (

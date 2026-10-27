@@ -21,6 +21,11 @@ urlpatterns = [
     path("expenses/", api.ExpenseListCreateAPI.as_view(), name="expenses"),
     path("expenses/<uuid:pk>/", api.ExpenseDetailAPI.as_view(), name="expense-detail"),
     path(
+        "expenses/<uuid:pk>/attachment/",
+        api.ExpenseAttachmentAPI.as_view(),
+        name="expense-attachment",
+    ),
+    path(
         "expenses/<uuid:pk>/decision/",
         api.ExpenseDecisionAPI.as_view(),
         name="expense-decision",

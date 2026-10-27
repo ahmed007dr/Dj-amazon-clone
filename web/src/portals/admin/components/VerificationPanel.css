@@ -1,0 +1,31 @@
+/* ⚠️  The status tabs sit directly on the filters and the table: the counts in the
+   tabs are what tell the reviewer whether there is anything left to do. */
+.verification__filters {
+  margin-block: var(--space-3);
+}
+
+.verification__bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-block-end: var(--space-3);
+}
+
+.verification__check {
+  inline-size: 1.15rem;
+  block-size: 1.15rem;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.verification__reason {
+  max-inline-size: 22rem;
+  font-size: 0.8125rem;
+  white-space: normal;
+}
+
+.verification__reviewer {
+  font-size: 0.75rem;
+}

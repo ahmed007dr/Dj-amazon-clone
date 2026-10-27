@@ -86,6 +86,19 @@ class Cart(BaseModel):
                 condition=models.Q(status="ACTIVE", deleted_at__isnull=True),
                 name="unique_active_cart_per_user",
             ),
+            # ⚠️  And one active cart per guest key.
+            #
+            #     Two simultaneous first requests from a browser (a double tap,
+            #     or a page firing two cart calls on load) each found no cart and
+            #     each created one — after which `.first()` returned whichever
+            #     the database liked, so the items the customer added seemed to
+            #     vanish at random. Guest checkout makes that a lost sale rather
+            #     than an annoyance. `get_active_cart` re-reads on the conflict.
+            models.UniqueConstraint(
+                fields=["session_key"],
+                condition=models.Q(status="ACTIVE", deleted_at__isnull=True, session_key__gt=""),
+                name="unique_active_cart_per_session",
+            ),
         ]
         indexes = [
             models.Index(fields=["status", "-last_activity_at"]),

@@ -33,6 +33,11 @@ urlpatterns = [
     path("admin/staff/", api.AdminEmployeeListAPI.as_view(), name="admin-staff"),
     path("admin/staff/<uuid:pk>/", api.AdminEmployeeDetailAPI.as_view(), name="admin-staff-detail"),
     path(
+        "admin/staff/<uuid:pk>/resend-invite/",
+        api.AdminResendInviteAPI.as_view(),
+        name="admin-staff-resend-invite",
+    ),
+    path(
         "admin/staff/<uuid:pk>/performance/",
         api.AdminEmployeePerformanceAPI.as_view(),
         name="admin-performance",

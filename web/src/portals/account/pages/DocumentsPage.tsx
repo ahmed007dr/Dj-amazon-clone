@@ -1,34 +1,65 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
   DOCUMENT_TYPES,
   deleteDocument,
-  getSignedUrl,
+  documentFileName,
+  fetchDocumentFile,
   listDocuments,
+  previewKindOf,
   uploadDocument,
+  type DocumentPreviewKind,
   type DocumentType,
 } from '@/features/customers/documents';
-import { isApiError } from '@/shared/http';
+import { isApiError, saveFile, type DownloadedFile } from '@/shared/http';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
+import { Modal } from '@/shared/ui/Modal';
 import { Spinner } from '@/shared/ui/Spinner';
 import { StateMessage } from '@/shared/ui/StateMessage';
+import { useToast } from '@/shared/ui/useToast';
 import { formatDate } from '@/shared/utils/format';
 
 import './DocumentsPage.css';
 
 const KEY = ['customers', 'documents'] as const;
 
+/** A document that has been fetched and is showing in the preview. */
+interface Preview {
+  title: string;
+  file: DownloadedFile;
+  /** An object URL for the blob — revoked when the preview closes. */
+  url: string;
+  kind: DocumentPreviewKind;
+}
+
 export function DocumentsPage() {
   const { t, i18n } = useTranslation();
+  const { notify } = useToast();
   const queryClient = useQueryClient();
 
   const [type, setType] = useState<DocumentType>('NATIONAL_ID');
   const [error, setError] = useState<string | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
+  const [preview, setPreview] = useState<Preview | null>(null);
+
+  const fail = (cause: unknown) =>
+    notify(isApiError(cause) ? cause.displayMessage : t('state.errorTitle'), 'danger');
+
+  // ⚠️  The object URL is revoked whenever the preview changes or goes away
+  //     (including leaving the page). A blob URL pins the whole file in memory
+  //     until the document unloads, and an ID card is not something to leave lying around.
+  useEffect(() => {
+    if (!preview) return;
+    const { url } = preview;
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [preview]);
 
   const { data: documents = [], isPending } = useQuery({ queryKey: KEY, queryFn: listDocuments });
 
@@ -43,6 +74,7 @@ export function DocumentsPage() {
   const remove = useMutation({
     mutationFn: deleteDocument,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: KEY }),
+    onError: fail,
   });
 
   function handleFile(event: ChangeEvent<HTMLInputElement>) {
@@ -56,11 +88,32 @@ export function DocumentsPage() {
     event.target.value = '';
   }
 
-  async function openDocument(id: string) {
-    // ⚠️  The URL is requested on open rather than stored: it is valid for minutes,
-    //     and a stored one expires before the user presses it.
-    const { url } = await getSignedUrl(id);
-    window.open(url, '_blank', 'noopener');
+  /**
+   * ⚠️  Fetched with the bearer token and shown **in the page** — never
+   *     `window.open(signedUrl)`.
+   *
+   *     A new tab sends no `Authorization` header and the access token lives in
+   *     memory only, so the download endpoint (which requires it, on top of the
+   *     signature) answered `AUTHENTICATION_REQUIRED`. Opening it after an
+   *     `await` is also exactly what popup blockers refuse. See
+   *     `fetchDocumentFile`.
+   */
+  async function openDocument(id: string, title: string) {
+    setOpening(id);
+    try {
+      const file = await fetchDocumentFile(id);
+      setPreview({
+        title,
+        // The server's filename cannot be read cross-origin (see `fetchDocumentFile`)
+        file: { blob: file.blob, filename: documentFileName(title, file.blob) },
+        url: URL.createObjectURL(file.blob),
+        kind: previewKindOf(file.blob),
+      });
+    } catch (cause) {
+      fail(cause);
+    } finally {
+      setOpening(null);
+    }
   }
 
   if (isPending) return <Spinner />;
@@ -137,8 +190,9 @@ export function DocumentsPage() {
                 <Button
                   variant="ghost"
                   size="sm"
+                  loading={opening === document.id}
                   onClick={() => {
-                    void openDocument(document.id);
+                    void openDocument(document.id, t(`documentType.${document.document_type}`));
                   }}
                 >
                   {t('account.viewDocument')}
@@ -150,6 +204,7 @@ export function DocumentsPage() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    loading={remove.isPending && remove.variables === document.id}
                     onClick={() => {
                       remove.mutate(document.id);
                     }}
@@ -162,6 +217,46 @@ export function DocumentsPage() {
           ))}
         </ul>
       )}
+
+      {/* ⚠️  The modal renders nothing while closed, so the iframe/img does not
+          exist (and cannot keep decoding the file) once the preview is dismissed. */}
+      <Modal
+        open={preview !== null}
+        size="lg"
+        title={preview?.title ?? ''}
+        onClose={() => {
+          setPreview(null);
+        }}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (preview) saveFile(preview.file);
+              }}
+            >
+              {t('account.downloadDocument')}
+            </Button>
+            <Button
+              onClick={() => {
+                setPreview(null);
+              }}
+            >
+              {t('common.close')}
+            </Button>
+          </>
+        }
+      >
+        {preview?.kind === 'image' ? (
+          <img className="doc-preview__image" src={preview.url} alt={preview.title} />
+        ) : null}
+        {preview?.kind === 'pdf' ? (
+          <iframe className="doc-preview__frame" src={preview.url} title={preview.title} />
+        ) : null}
+        {preview?.kind === 'none' ? (
+          <p className="muted">{t('account.documentNoPreview')}</p>
+        ) : null}
+      </Modal>
     </>
   );
 }

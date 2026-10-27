@@ -12,6 +12,8 @@ Finance services.
 from __future__ import annotations
 
 import logging
+import os
+import re
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -33,6 +35,21 @@ from finance.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def attachment_filename(expense: Expense) -> str:
+    """
+    The name a downloaded invoice is saved under — `expense-2026-03-01-INV-77.pdf`.
+
+    ⚠️  Built from the expense, **not from the stored path**: the stored name is a
+        random token (so the file is unguessable on disk) and means nothing to the
+        person saving it. Only the extension is kept, and the reference is reduced
+        to safe characters because it ends up in a `Content-Disposition` header.
+    """
+    stored = expense.attachment.name if expense.attachment else ""
+    extension = os.path.splitext(stored)[1].lower()[:10]
+    label = re.sub(r"[^\w\-]+", "-", expense.reference or "", flags=re.UNICODE).strip("-")
+    return f"expense-{expense.incurred_on.isoformat()}-{label or str(expense.pk)[:8]}{extension}"
 
 
 def _money_sum(queryset, field: str) -> Decimal:

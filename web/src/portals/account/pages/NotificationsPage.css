@@ -67,48 +67,43 @@ a.notification__link:hover .notification__title {
   cursor: pointer;
 }
 
-.notifications__preferences {
-  margin-block-start: var(--space-8);
+/* ⚠️  Pills, deliberately unlike the underlined page tabs above them. */
+.notifications-filter {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+  border-radius: var(--radius-pill);
 }
 
-.notifications__subtitle {
-  font-size: 1.0625rem;
-  font-weight: 700;
+.notifications-filter__option {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-4);
+
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+
+  background: none;
+  border: 0;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition:
+    color var(--transition),
+    background-color var(--transition);
 }
 
-.preferences {
-  display: grid;
-  gap: var(--space-2);
-  margin-block-start: var(--space-4);
-  list-style: none;
+.notifications-filter__option:hover {
+  color: var(--color-text);
 }
 
-.preference {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+.notifications-filter__option.is-active {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
 }
 
-.preference__labels {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: baseline;
-  font-size: 0.9375rem;
-}
-
-.preference__switch {
+.notifications__more {
   display: grid;
   place-items: center;
-  min-inline-size: var(--touch-target);
-  min-block-size: var(--touch-target);
-  cursor: pointer;
-}
-
-.preference__switch input {
-  inline-size: 1.15rem;
-  block-size: 1.15rem;
-  accent-color: var(--color-primary);
+  margin-block-start: var(--space-4);
 }

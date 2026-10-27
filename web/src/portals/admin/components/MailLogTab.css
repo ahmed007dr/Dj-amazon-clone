@@ -86,3 +86,37 @@
   font-weight: 400;
   resize: vertical;
 }
+
+/* ⚠️  A button that reads as a link: the attachment is behind the session, so it cannot be a
+       plain `href` - but it should still look like the thing to click. */
+.log__download {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font: inherit;
+  text-align: start;
+  text-decoration: underline;
+  cursor: pointer;
+  word-break: break-all;
+}
+
+.log__download:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.log__field--inline {
+  flex-direction: row;
+  align-items: center;
+}
+
+.log__field--inline select {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 400;
+}

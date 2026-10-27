@@ -20,9 +20,11 @@ from decimal import Decimal
 from django.db.models import Q
 from django.utils import timezone
 
+from accounts.models import AccountType
+from core import features
 from core.models.tax import TaxClass, TaxSettings
 from core.money import ZERO, apply_rate, quantize
-from pricing.models import DiscountKind, PriceList, PriceOverride, PriceRule
+from pricing.models import DiscountKind, PriceList, PriceListKind, PriceOverride, PriceRule
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +124,28 @@ class PricedCart:
 # ═══════════════════════════════════════════════════════════
 
 
+def _student_prices_withheld(user) -> bool:
+    """
+    Is this user kept off the student price lists until their ID card is approved?
+
+    ⚠️  Only while the owner has the switch **on**, and only for a student account.
+
+        With the switch off, student prices follow the account type alone — exactly
+        as before the verification workflow existed. With it on, a student whose
+        card has not been approved pays the ordinary price: a list for verified
+        students that anyone can reach by ticking "I am a student" is not a list
+        for students.
+
+        The cheap checks come first, so the setting is read only for the one
+        kind of user it can affect.
+    """
+    return (
+        getattr(user, "account_type", None) == AccountType.STUDENT
+        and not getattr(user, "is_verified", False)
+        and features.student_verification_enforced()
+    )
+
+
 def resolve_price_list(user=None) -> PriceList | None:
     """
     The price list applying to this user.
@@ -137,6 +161,10 @@ def resolve_price_list(user=None) -> PriceList | None:
         Q(valid_to__isnull=True) | Q(valid_to__gte=today)
     )
 
+    if user is not None and _student_prices_withheld(user):
+        # Falls through to the default list, as for any account no list matches
+        candidates = candidates.exclude(kind=PriceListKind.STUDENT)
+
     account_type = getattr(user, "account_type", None) if user else None
 
     if account_type:
@@ -151,43 +179,124 @@ def resolve_price_list(user=None) -> PriceList | None:
     return candidates.filter(is_default=True).first()
 
 
-def _rule_for(price_list, product, variant, quantity: int) -> PriceRule | None:
+def _most_specific(ordered, variant):
+    """
+    From rows already in priority order, the one that applies to `variant`:
+    a row written for **that variant** first, otherwise the product-level row.
+
+    ⚠️  The fallback is the point.
+
+        These lookups used to match the variant *exactly*, so `variant=None` rows
+        (the ones every price list and promotion is written with) never applied to
+        a line that carried a variant. The same item cost less as a plain product
+        than as its size M — and a store that added colours would have seen every
+        coloured line quietly drop out of its promotions.
+    """
+    if variant is not None:
+        for row in ordered:
+            if row.variant_id == variant.pk:
+                return row
+    for row in ordered:
+        if row.variant_id is None:
+            return row
+    return None
+
+
+def _color_of(variant):
+    """
+    The variant's colour, or `None`.
+
+    ⚠️  Read through the relation's `color_id` first so a plain variant (the
+        common case: sizes) costs no query. A caller that already holds the
+        colour — the cart and the counter `select_related("variant__color")` —
+        pays none for a coloured one either.
+    """
+    if variant is None or getattr(variant, "color_id", None) is None:
+        return None
+    color = variant.color
+    return None if color.deleted_at is not None else color
+
+
+def _rule_for(price_list, product, variant, quantity: int, *, book=None) -> PriceRule | None:
     """
     The price rule applying to this quantity.
 
     Ordered descending by minimum quantity — the first match wins, so the
-    highest satisfied tier is the one applied.
+    highest satisfied tier is the one applied. For a variant line its own rules
+    are tried first, then the product's (see `_most_specific`).
     """
     if price_list is None:
         return None
+    if book is not None:
+        return book.rule(variant, quantity)
 
-    return (
-        PriceRule.objects.filter(
-            price_list=price_list,
-            product=product,
-            variant=variant,
-            is_active=True,
-            min_quantity__lte=quantity,
-        )
-        .order_by("-min_quantity")
-        .first()
+    queryset = PriceRule.objects.filter(
+        price_list=price_list,
+        product=product,
+        is_active=True,
+        min_quantity__lte=quantity,
+    )
+    if variant is None:
+        return queryset.filter(variant__isnull=True).order_by("-min_quantity").first()
+
+    return _most_specific(
+        list(queryset.filter(Q(variant=variant) | Q(variant__isnull=True)).order_by("-min_quantity")),
+        variant,
     )
 
 
-def _override_for(product, variant, price_list) -> PriceOverride | None:
+def _active_overrides(product, price_list):
     now = timezone.now()
     return (
-        PriceOverride.objects.filter(
-            product=product,
-            variant=variant,
-            is_active=True,
-            starts_at__lte=now,
-        )
+        PriceOverride.objects.filter(product=product, is_active=True, starts_at__lte=now)
         .filter(Q(ends_at__isnull=True) | Q(ends_at__gt=now))
         .filter(Q(price_list__isnull=True) | Q(price_list=price_list))
         .order_by("-starts_at")
-        .first()
     )
+
+
+def _override_for(product, variant, price_list, *, book=None) -> PriceOverride | None:
+    if book is not None:
+        return book.override(variant)
+
+    queryset = _active_overrides(product, price_list)
+    if variant is None:
+        return queryset.filter(variant__isnull=True).first()
+
+    return _most_specific(list(queryset.filter(Q(variant=variant) | Q(variant__isnull=True))), variant)
+
+
+class PriceBook:
+    """
+    Every row `price_for` would query for **one product**, loaded once.
+
+    ⚠️  For the page that prices many variants of the same product — a colour
+        picker shows one price per swatch. Calling `price_for` per swatch costs
+        four or five queries each; the book is a fixed three whatever the number
+        of colours, and it answers with the very same selection rules
+        (`_most_specific`), so the two paths cannot disagree.
+    """
+
+    def __init__(self, product, price_list: PriceList | None):
+        self.product = product
+        self.price_list = price_list
+        self._rules = (
+            list(
+                PriceRule.objects.filter(
+                    price_list=price_list, product=product, is_active=True
+                ).order_by("-min_quantity")
+            )
+            if price_list is not None
+            else []
+        )
+        self._overrides = list(_active_overrides(product, price_list))
+        self.tax = _tax_rate_for(product)
+
+    def rule(self, variant, quantity: int) -> PriceRule | None:
+        return _most_specific([r for r in self._rules if r.min_quantity <= quantity], variant)
+
+    def override(self, variant) -> PriceOverride | None:
+        return _most_specific(self._overrides, variant)
 
 
 def _tax_rate_for(product) -> tuple[Decimal, str]:
@@ -250,15 +359,26 @@ def price_for(
     user=None,
     variant=None,
     price_list: PriceList | None = None,
+    book: PriceBook | None = None,
 ) -> PricedLine:
     """
     The price of a single line.
 
     The order:
-        1. the applicable list price (or `base_price` as a reference)
+        1. the applicable list price — a price-list / student rule —
+           otherwise the **colour's own price**, otherwise `base_price`
         2. + the variant difference
         3. − the promotional discount
         4. + tax on the net
+
+    ⚠️  A price-list rule beats the colour price, not the other way round.
+
+        The owner's decision: a student on the student list pays the student price
+        for any colour. The colour price is the *shop's* price for that colour —
+        what a customer on no special list pays instead of the product's.
+
+    `book` is for callers pricing many variants of one product (see `PriceBook`);
+    the result is identical to the unbatched call.
     """
     if quantity < 1:
         quantity = 1
@@ -266,10 +386,14 @@ def price_for(
     price_list = price_list or resolve_price_list(user)
 
     # 1 — the base price
-    rule = _rule_for(price_list, product, variant, quantity)
+    rule = _rule_for(price_list, product, variant, quantity, book=book)
+    color = _color_of(variant)
     if rule is not None:
         unit_price = rule.unit_price
         applied = ("price_rule",)
+    elif color is not None and color.price_override is not None:
+        unit_price = color.price_override
+        applied = ("color_price",)
     else:
         unit_price = product.base_price
         applied = ("base_price",)
@@ -283,7 +407,7 @@ def price_for(
 
     # 3 — the promotional discount
     discount_amount = ZERO
-    override = _override_for(product, variant, price_list)
+    override = _override_for(product, variant, price_list, book=book)
     if override is not None:
         if override.discount_kind == DiscountKind.PERCENTAGE:
             per_unit = apply_rate(unit_price, override.discount_value)
@@ -294,7 +418,7 @@ def price_for(
         applied = (*applied, "price_override")
 
     # 4 — tax on the net after the discount
-    tax_rate, tax_class_code = _tax_rate_for(product)
+    tax_rate, tax_class_code = book.tax if book is not None else _tax_rate_for(product)
     net = quantize(unit_price * quantity - discount_amount)
     tax_amount = apply_rate(net, tax_rate) if tax_rate else ZERO
 

@@ -1,3 +1,16 @@
+/* The identity card and the form are siblings inside one tab panel, so the panel
+   carries the gap the page's own grid used to give them. */
+.profile__panel {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* The card brings its own top margin for the old stacked layout; as the only
+   thing in its tab it would only add a stray gap under the tab bar. */
+.profile__panel > .customer-card {
+  margin-block-start: 0;
+}
+
 .profile__identity {
   display: grid;
   gap: var(--space-3);

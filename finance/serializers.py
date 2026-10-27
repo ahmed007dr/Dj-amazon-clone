@@ -8,6 +8,7 @@ Finance contracts.
 from rest_framework import serializers
 
 from core.money import MONEY_DECIMAL_PLACES, MONEY_MAX_DIGITS
+from finance import services
 from finance.models import Expense, ExpenseCategory, ExpenseStatus, FiscalPeriod
 
 
@@ -47,6 +48,16 @@ class ExpenseSerializer(serializers.ModelSerializer):
         source="approved_by.email", read_only=True, default=None
     )
 
+    # ⚠️  The stored file is **never** exposed as a URL.
+    #
+    #     `attachment` is a path under `private/`, which the media route refuses to
+    #     serve — so the old link was dead — and publishing a path would also tell a
+    #     reader exactly where the file sits on disk. It stays writable (upload) but
+    #     is `write_only`; reading goes through the authenticated, audited
+    #     `expenses/<id>/attachment/` endpoint, announced by these two fields.
+    has_attachment = serializers.SerializerMethodField()
+    attachment_name = serializers.SerializerMethodField()
+
     class Meta:
         model = Expense
         fields = [
@@ -59,6 +70,8 @@ class ExpenseSerializer(serializers.ModelSerializer):
             "vendor_name",
             "reference",
             "attachment",
+            "has_attachment",
+            "attachment_name",
             "payment_mean",
             "status",
             "entered_by_email",
@@ -82,6 +95,14 @@ class ExpenseSerializer(serializers.ModelSerializer):
             "rejection_reason",
             "created_at",
         ]
+
+        extra_kwargs = {"attachment": {"write_only": True}}
+
+    def get_has_attachment(self, obj) -> bool:
+        return bool(obj.attachment)
+
+    def get_attachment_name(self, obj) -> str | None:
+        return services.attachment_filename(obj) if obj.attachment else None
 
     def validate_category(self, value):
         if not value.is_active:

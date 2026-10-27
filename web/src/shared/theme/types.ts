@@ -13,6 +13,23 @@ export interface BrandTheme {
     icon: string;
     favicon: string;
     og_image: string;
+    /** The home banner, one per mode — empty when not uploaded. */
+    hero_light: string;
+    hero_dark: string;
+  };
+  /**
+   * The home banner's text. Every field may be empty — the page then falls back to
+   * the store name, the tagline and the catalogue button.
+   *
+   * ⚠️  Optional: a payload cached before this field existed (the server caches the
+   * identity for 12 hours) simply does not have it.
+   */
+  hero?: {
+    title: Record<string, string>;
+    subtitle: Record<string, string>;
+    cta_label: Record<string, string>;
+    /** A path inside the store (`/offers`) or an `https://` URL; empty = the catalogue. */
+    cta_url: string;
   };
   default_mode: DefaultMode;
   /** Tokens constant across both modes: the fonts and the shape. */

@@ -1,7 +1,13 @@
 """Staff portal contracts — amounts as strings (ADR-31)."""
 
+import re
+
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from accounts.models import Language
+from employees import services
 from employees.models import CustomerAssignment, EmployeeProfile, EmployeeRole
 
 
@@ -88,6 +94,13 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
     )
     customers_count = serializers.IntegerField(read_only=True, default=0)
 
+    # ⚠️  What the staff table needs to tell "who can open what, and have they
+    #     started yet": the door (employee portal vs admin panel) and whether the
+    #     invite is still waiting to be used.
+    account_type = serializers.CharField(source="user.account_type", read_only=True)
+    phone = serializers.CharField(source="user.phone", read_only=True, default=None)
+    invite_pending = serializers.SerializerMethodField()
+
     class Meta:
         model = EmployeeProfile
         fields = [
@@ -95,6 +108,9 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "employee_number",
             "full_name",
             "email",
+            "phone",
+            "account_type",
+            "invite_pending",
             "role",
             "role_name_ar",
             "role_name_en",
@@ -106,6 +122,66 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "customers_count",
         ]
         read_only_fields = ["id", "full_name", "email", "customers_count"]
+
+    def get_invite_pending(self, obj) -> bool:
+        """Never signed in yet — the invite link (or temporary password) is still unused."""
+        return obj.user.last_login_at is None
+
+
+_PHONE = re.compile(r"^\+?\d{7,15}$")
+
+
+class CreateStaffSerializer(serializers.Serializer):
+    """
+    Input for `POST /employees/admin/staff/`.
+
+    ⚠️  Field-level validation here, the transactional work in
+        `services.create_staff` — which re-checks uniqueness itself, because
+        two admins submitting the same email at once both pass this serializer.
+
+    ⚠️  `role` and `manager` are limited to **active** rows: assigning a retired
+        role or a departed manager is never what the form meant.
+    """
+
+    email = serializers.EmailField(max_length=254)
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+
+    access = serializers.ChoiceField(choices=services.StaffAccess.CHOICES)
+    role = serializers.PrimaryKeyRelatedField(queryset=EmployeeRole.objects.filter(is_active=True))
+    manager = serializers.PrimaryKeyRelatedField(
+        queryset=EmployeeProfile.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+    )
+    phone_extension = serializers.CharField(max_length=16, required=False, allow_blank=True)
+    preferred_language = serializers.ChoiceField(choices=Language.choices, default=Language.AR)
+
+    #: ⚠️  The fallback for when mail is not set up. `write_only` and never echoed,
+    #:     logged or audited; `trim_whitespace=False` so a password with a leading
+    #:     space is the password that was typed.
+    temporary_password = serializers.CharField(
+        write_only=True, required=False, allow_blank=True, trim_whitespace=False, max_length=128
+    )
+
+    def validate_email(self, value: str) -> str:
+        return value.strip().lower()
+
+    def validate_phone(self, value: str) -> str:
+        value = re.sub(r"[\s\-()]", "", value or "")
+        if value and not _PHONE.match(value):
+            raise serializers.ValidationError("رقم الهاتف غير صالح", code="invalid")
+        return value
+
+    def validate_temporary_password(self, value: str) -> str:
+        if not value:
+            return value
+        try:
+            validate_password(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
+        return value
 
 
 class AssignedCustomerSerializer(serializers.Serializer):

@@ -2,7 +2,7 @@
 
 from django.urls import path
 
-from catalog import api, image_api
+from catalog import api, color_api, image_api
 
 app_name = "catalog"
 
@@ -65,6 +65,12 @@ urlpatterns = [
         api.RestoreProductAPI.as_view(),
         name="admin-product-restore",
     ),
+    # Who created / changed / deleted it, and when
+    path(
+        "admin/products/<uuid:pk>/history/",
+        api.AdminProductHistoryAPI.as_view(),
+        name="admin-product-history",
+    ),
     # Product images — upload, ordering and deletion
     path(
         "admin/products/<uuid:pk>/images/",
@@ -85,5 +91,21 @@ urlpatterns = [
         "admin/products/<uuid:pk>/images/<uuid:image_pk>/primary/",
         image_api.SetPrimaryImageAPI.as_view(),
         name="admin-product-image-primary",
+    ),
+    # Product colours — each with its own images, optional price and stock
+    path(
+        "admin/products/<uuid:pk>/colors/",
+        color_api.ProductColorListCreateAPI.as_view(),
+        name="admin-product-colors",
+    ),
+    path(
+        "admin/products/<uuid:pk>/colors/reorder/",
+        color_api.ReorderColorsAPI.as_view(),
+        name="admin-product-colors-reorder",
+    ),
+    path(
+        "admin/products/<uuid:pk>/colors/<uuid:color_pk>/",
+        color_api.ProductColorDetailAPI.as_view(),
+        name="admin-product-color-detail",
     ),
 ]

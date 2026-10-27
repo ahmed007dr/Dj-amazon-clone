@@ -16,7 +16,13 @@ from rest_framework.test import APIClient
 
 from branding import services
 from branding.contrast import contrast_ratio, passes_aa
-from branding.models import BrandProfile, DefaultMode, ThemeMode, ThemePalette
+from branding.models import (
+    BrandProfile,
+    DefaultMode,
+    ThemeMode,
+    ThemePalette,
+    validate_hero_cta_url,
+)
 from core.testing import grant_all_domains
 
 PASSWORD = "Str0ng-Test-Pass!23"
@@ -207,6 +213,108 @@ class TestPublicTheme:
         payload = str(APIClient().get(reverse("v1:branding:theme")).data)
         assert "is_active" not in payload
         assert str(profile.pk) not in payload
+
+    def test_the_hero_is_part_of_the_payload(self, profile):
+        """
+        ⚠️  The home page reads the banner from the same cached payload as the
+            colours — a second endpoint would be a second request on the busiest page.
+        """
+        profile.hero_title_ar = "صحتك أولًا"
+        profile.hero_title_en = "Your health first"
+        profile.hero_cta_label_en = "Shop now"
+        profile.hero_cta_url = "/offers"
+        profile.hero_image_light = "branding/hero-light.png"
+        profile.hero_image_dark = "branding/hero-dark.png"
+        profile.save()
+
+        payload = APIClient().get(reverse("v1:branding:theme")).data
+
+        assert payload["hero"]["title"] == {"ar": "صحتك أولًا", "en": "Your health first"}
+        assert payload["hero"]["cta_label"]["en"] == "Shop now"
+        assert payload["hero"]["cta_url"] == "/offers"
+        assert payload["assets"]["hero_light"].endswith("branding/hero-light.png")
+        assert payload["assets"]["hero_dark"].endswith("branding/hero-dark.png")
+
+    def test_an_unconfigured_hero_is_empty_not_missing(self, profile):
+        """The frontend falls back to name / tagline / catalogue — the keys must be there."""
+        payload = APIClient().get(reverse("v1:branding:theme")).data
+
+        assert payload["assets"]["hero_light"] == ""
+        assert payload["assets"]["hero_dark"] == ""
+        assert set(payload["hero"]) == {"title", "subtitle", "cta_label", "cta_url"}
+        assert payload["hero"]["title"] == {"ar": "", "en": ""}
+        assert payload["hero"]["cta_url"] == ""
+
+    def test_the_fallback_identity_carries_the_hero_shape_too(self, db):
+        BrandProfile.objects.all().delete()
+        services.invalidate_cache()
+
+        payload = APIClient().get(reverse("v1:branding:theme")).data
+
+        assert payload["assets"]["hero_light"] == ""
+        assert payload["hero"]["subtitle"] == {"ar": "", "en": ""}
+        assert payload["hero"]["cta_url"] == ""
+
+    def test_editing_the_hero_text_reaches_the_public_payload_immediately(self, profile):
+        client = APIClient()
+        client.get(reverse("v1:branding:theme"))  # fills the cache
+
+        profile.hero_title_en = "New headline"
+        profile.save()
+
+        after = client.get(reverse("v1:branding:theme")).data
+        assert after["hero"]["title"]["en"] == "New headline"
+
+
+class TestHeroUrlValidator:
+    @pytest.mark.parametrize("value", ["", "/", "/products", "/a/b?c=d#e", "https://example.com/x"])
+    def test_accepts(self, value):
+        validate_hero_cta_url(value)
+
+    @pytest.mark.parametrize(
+        "value",
+        ["javascript:alert(1)", "//evil.example", "/\\evil.example", "http://example.com", "x"],
+    )
+    def test_rejects(self, value):
+        with pytest.raises(ValidationError):
+            validate_hero_cta_url(value)
+
+
+@pytest.mark.django_db
+class TestMailIdentity:
+    """
+    ⚠️  The contract `mailing.layout` consumes through `settings.MAIL_BRAND_PROVIDER`.
+        `mailing` cannot import `branding` (siblings), so the *shape* is the interface
+        and these tests are what keep the two halves from drifting apart.
+    """
+
+    def test_shape(self, profile):
+        profile.contact_email = "hello@example.com"
+        profile.contact_phone = "+20 100 000 0000"
+        profile.save()
+
+        identity = services.mail_identity()
+
+        assert identity["name"] == {"ar": "متجر", "en": "Store"}
+        assert identity["color"].startswith("#")
+        assert identity["contact"]["email"] == "hello@example.com"
+        assert identity["logo"] == {}
+
+    def test_only_the_light_logo_is_ever_offered(self, profile):
+        """An email is white; the dark logo is usually white too and would vanish."""
+        profile.logo_dark = "branding/dark-only.png"
+        profile.save()
+        assert services.mail_identity()["logo"] == {}
+
+        profile.logo_light = "branding/light.png"
+        profile.save()
+        logo = services.mail_identity()["logo"]
+        assert logo["name"] == "branding/light.png"
+        assert logo["url"].endswith("branding/light.png")
+
+    def test_no_active_profile_gives_an_empty_identity(self, db):
+        BrandProfile.objects.all().delete()
+        assert services.mail_identity() == {}
 
 
 # ═══════════════════════════════════════════════════════════

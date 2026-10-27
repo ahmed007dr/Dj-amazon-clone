@@ -14,6 +14,7 @@ import { isApiError } from '@/shared/http';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
+import { CartIcon } from '@/shared/ui/CartIcon';
 import { Spinner } from '@/shared/ui/Spinner';
 import { StateMessage } from '@/shared/ui/StateMessage';
 
@@ -81,7 +82,7 @@ export function CheckoutPage() {
     return (
       <div className="container">
         <StateMessage
-          icon="⛿"
+          icon={<CartIcon />}
           title={t('cart.emptyTitle')}
           action={
             <Button variant="secondary">

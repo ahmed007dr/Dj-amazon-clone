@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 
 import { StudentProfileForm } from '@/features/academic/components/StudentProfileForm';
 import { useStudentProfile } from '@/features/academic/hooks';
+import { useStudentVerificationEnforced } from '@/features/settings/publicConfig';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
@@ -32,6 +33,10 @@ export function AcademicPage() {
   const { t } = useTranslation();
   const { data: profile, isPending, error } = useStudentProfile();
   const [editing, setEditing] = useState(false);
+  // ⚠️  Everything that talks about approval is hidden while verification is not a
+  //     requirement: "awaiting approval" and an "unverified" badge describe a
+  //     process that is switched off, and tell the student they are missing something.
+  const verificationEnforced = useStudentVerificationEnforced();
 
   if (isPending) return <Spinner />;
   if (error) return <StateMessage icon="⚠" title={t('state.errorTitle')} />;
@@ -68,7 +73,7 @@ export function AcademicPage() {
         }
       />
 
-      {!profile.is_verified ? (
+      {verificationEnforced && !profile.is_verified ? (
         <Alert tone="warning">
           {t('academic.pendingVerification')}{' '}
           <Link to="/account/documents">{t('account.documents')}</Link>
@@ -110,12 +115,14 @@ export function AcademicPage() {
               <span>{profile.student_number}</span>
             </div>
           ) : null}
-          <div className="academic__row">
-            <span className="muted">{t('academic.verification')}</span>
-            <Badge tone={profile.is_verified ? 'success' : 'neutral'}>
-              {t(profile.is_verified ? 'academic.verified' : 'academic.unverified')}
-            </Badge>
-          </div>
+          {verificationEnforced ? (
+            <div className="academic__row">
+              <span className="muted">{t('academic.verification')}</span>
+              <Badge tone={profile.is_verified ? 'success' : 'neutral'}>
+                {t(profile.is_verified ? 'academic.verified' : 'academic.unverified')}
+              </Badge>
+            </div>
+          ) : null}
         </section>
       )}
 

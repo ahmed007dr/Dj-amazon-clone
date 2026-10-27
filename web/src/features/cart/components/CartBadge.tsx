@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
+import { CartIcon } from '@/shared/ui/CartIcon';
+
 import { useCart } from '../hooks';
 
 import './CartBadge.css';
@@ -22,7 +24,7 @@ export function CartBadge() {
   return (
     <Link to="/cart" className="cart-badge" aria-label={t('nav.cart')}>
       <span className="cart-badge__icon" aria-hidden>
-        ⛿
+        <CartIcon size="1.375rem" />
       </span>
       {count > 0 ? (
         <span className="cart-badge__count" aria-hidden>

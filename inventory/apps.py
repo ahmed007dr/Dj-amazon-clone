@@ -20,3 +20,10 @@ class InventoryConfig(AppConfig):
         #     filter from this side inverts the direction the way `payments.events`
         #     does one layer up — see the full reasoning in `core/visibility.py`.
         register_product_filter(IN_STOCK_FILTER, in_stock_filter)
+
+        # The same inversion for the product page's swatches: whether each colour is
+        # sold out comes from here, and `catalog` asks the registry — see `core/color_facts.py`.
+        from core.color_facts import register_color_facts
+        from inventory.services import color_stock_facts
+
+        register_color_facts("inventory.color_stock", color_stock_facts)

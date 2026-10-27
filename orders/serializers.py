@@ -34,6 +34,14 @@ class OrderLineSerializer(serializers.ModelSerializer):
     net = MoneyField()
     total = MoneyField()
 
+    # The variant / colour the customer was sold — a snapshot, with a fallback (below)
+    variant_sku = serializers.SerializerMethodField()
+    variant_name_ar = serializers.SerializerMethodField()
+    variant_name_en = serializers.SerializerMethodField()
+    color_name_ar = serializers.SerializerMethodField()
+    color_name_en = serializers.SerializerMethodField()
+    color_hex = serializers.SerializerMethodField()
+
     class Meta:
         model = OrderLine
         fields = [
@@ -44,6 +52,12 @@ class OrderLineSerializer(serializers.ModelSerializer):
             "product_name_ar",
             "product_name_en",
             "variant",
+            "variant_sku",
+            "variant_name_ar",
+            "variant_name_en",
+            "color_name_ar",
+            "color_name_en",
+            "color_hex",
             "quantity",
             "unit_price",
             "list_price",
@@ -55,6 +69,43 @@ class OrderLineSerializer(serializers.ModelSerializer):
             "total",
         ]
         read_only_fields = fields
+
+    # ⚠️  The snapshot wins; the live variant is a fallback for **old lines only**.
+    #
+    #     Lines written before colours existed have a `variant` but blank snapshot
+    #     columns. Showing them with no variant at all would make an old invoice
+    #     look like a different purchase, so they borrow the variant's current
+    #     values — slightly less faithful than a snapshot, and the best that is left.
+    #     A new line never reaches the fallback: it has its snapshot.
+    def _snapshot_or_live(self, obj, column: str, live) -> str:
+        value = getattr(obj, column)
+        if value or obj.variant_id is None:
+            return value
+        return live(obj.variant) or ""
+
+    def get_variant_sku(self, obj) -> str:
+        return self._snapshot_or_live(obj, "variant_sku", lambda v: v.sku)
+
+    def get_variant_name_ar(self, obj) -> str:
+        return self._snapshot_or_live(obj, "variant_name_ar", lambda v: v.name_ar)
+
+    def get_variant_name_en(self, obj) -> str:
+        return self._snapshot_or_live(obj, "variant_name_en", lambda v: v.name_en)
+
+    def get_color_name_ar(self, obj) -> str:
+        return self._snapshot_or_live(
+            obj, "color_name_ar", lambda v: v.color.name_ar if v.color_id else ""
+        )
+
+    def get_color_name_en(self, obj) -> str:
+        return self._snapshot_or_live(
+            obj, "color_name_en", lambda v: v.color.name_en if v.color_id else ""
+        )
+
+    def get_color_hex(self, obj) -> str:
+        return self._snapshot_or_live(
+            obj, "color_hex", lambda v: v.color.hex if v.color_id else ""
+        )
 
 
 class OrderStatusHistorySerializer(serializers.ModelSerializer):

@@ -189,11 +189,87 @@ class POSProductSerializer(serializers.ModelSerializer):
     """
 
     base_price = MoneyField(read_only=True)
+    variants = serializers.SerializerMethodField()
+    matched_variant = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
-        fields = ["id", "sku", "barcode", "name_ar", "name_en", "base_price", "kind"]
+        fields = [
+            "id",
+            "sku",
+            "barcode",
+            "name_ar",
+            "name_en",
+            "base_price",
+            "kind",
+            "variants",
+            "matched_variant",
+        ]
         read_only_fields = fields
+
+    def get_variants(self, obj) -> list[dict]:
+        """
+        The variants (colours, sizes) the cashier can pick — each with **this
+        register's** stock.
+
+        ⚠️  `available` is the exact count at the counter's location.
+
+            At the counter the cashier needs the real number ("2 left in the blue"),
+            unlike the public storefront, which masks anything above the threshold.
+            With no open shift there is no location, so it is the shop-wide figure —
+            the same fallback the search itself uses.
+
+        ⚠️  No price here: the variant difference and a colour's own price only make
+            sense through `pricing` (price lists win over both), and the `/quote/`
+            call is the one source of the total. `price_override` / `price_adjustment`
+            are shown as the *reason* a price differs, never added up on the terminal.
+        """
+        variants = getattr(obj, "pos_variants", None)
+        if not variants:
+            return []
+
+        stock = (self.context.get("variant_stock") or {}).get(str(obj.pk), {})
+        payload = []
+        for variant in variants:
+            color = variant.color if variant.color_id else None
+            payload.append(
+                {
+                    "id": str(variant.pk),
+                    "sku": variant.sku,
+                    "barcode": variant.barcode,
+                    "name_ar": variant.name_ar,
+                    "name_en": variant.name_en,
+                    "price_adjustment": str(variant.price_adjustment),
+                    "available": stock.get(variant.pk, 0),
+                    "color": (
+                        {
+                            "id": str(color.pk),
+                            "name_ar": color.name_ar,
+                            "name_en": color.name_en,
+                            "hex": color.hex,
+                            "price_override": (
+                                None if color.price_override is None else str(color.price_override)
+                            ),
+                        }
+                        if color is not None
+                        else None
+                    ),
+                }
+            )
+        return payload
+
+    def get_matched_variant(self, obj) -> str | None:
+        """
+        Set when the search term **is** one variant's SKU / barcode — a scanned
+        colour label — so the counter can add that exact variant with no further tap.
+        """
+        term = (self.context.get("term") or "").lower()
+        if not term:
+            return None
+        for variant in getattr(obj, "pos_variants", None) or []:
+            if term in ((variant.sku or "").lower(), (variant.barcode or "").lower()):
+                return str(variant.pk)
+        return None
 
 
 class QuoteSerializer(serializers.Serializer):

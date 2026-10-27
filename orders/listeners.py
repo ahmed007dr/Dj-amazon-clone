@@ -143,3 +143,35 @@ def _register() -> None:
 
 
 _register()
+
+
+def _register_guest_claims() -> None:
+    """
+    Attach a user's earlier guest orders once they have **verified** their email.
+
+    ⚠️  `accounts` announces `email_verified` (after its transaction commits) and
+        does not know orders exist; this is the receiving side, and the direction
+        stays downward (`orders` imports `accounts`, never the reverse).
+
+    ⚠️  And a failure here is swallowed, unlike the payment listeners above: those
+        record that money was taken and must make the gateway retry. This one is a
+        convenience — a claim that did not run is run by the next verification,
+        and the user's verification itself has long since committed.
+    """
+    from accounts.events import email_verified
+
+    @receiver(email_verified, weak=False)
+    def on_email_verified(sender, user, **kwargs):
+        from orders import guest
+
+        try:
+            claimed = guest.claim_orders(user)
+        except Exception:
+            logger.exception("فشل ربط طلبات الزائر بالحساب %s", getattr(user, "pk", None))
+            return
+
+        if claimed:
+            logger.info("رُبط %d طلب زائر بالحساب %s بعد توثيق البريد", claimed, user.pk)
+
+
+_register_guest_claims()

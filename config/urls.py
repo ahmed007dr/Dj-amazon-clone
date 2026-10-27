@@ -18,6 +18,8 @@ from rest_framework import permissions
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.settings import api_settings
 
+from core.api.public import PublicConfigAPI
+
 # ⚠️  The docs page itself is protected by IsAdminUser, and the default
 #     authentication class is JWT alone — so a browser cannot even open it to
 #     paste a token in. In development only we also accept the admin session so
@@ -44,6 +46,8 @@ schema_view = get_schema_view(
 api_v1 = [
     # ── Visual identity — read before anything else on frontend load ──
     path("branding/", include("branding.urls")),
+    # ── Public switches the frontend reads once on load ──
+    path("public-config/", PublicConfigAPI.as_view(), name="public-config"),
     # ── Identity ───────────────────────────────────────────
     path("auth/", include("accounts.urls")),
     path("customers/", include("customers.urls")),

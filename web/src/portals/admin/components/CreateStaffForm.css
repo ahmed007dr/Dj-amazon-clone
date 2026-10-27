@@ -1,0 +1,57 @@
+/* ⚠️  The access choice is two cards, not a dropdown: the consequence ("opens the
+       admin panel") is the thing being decided and has to be readable before choosing. */
+.staff-access {
+  display: grid;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
+.staff-access legend {
+  padding: 0;
+  margin-block-end: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.staff-access__option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-block-size: var(--touch-target);
+  padding: var(--space-3);
+  cursor: pointer;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.staff-access__option.is-selected {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+}
+
+.staff-access__option input {
+  flex: 0 0 auto;
+  inline-size: 1.1rem;
+  block-size: 1.1rem;
+  margin-block-start: 0.3rem;
+  accent-color: var(--color-primary);
+}
+
+.staff-access__option > span {
+  display: grid;
+  gap: 0.1rem;
+  font-size: 0.9375rem;
+}
+
+.staff-access__option > span > span {
+  font-size: 0.8125rem;
+}
+
+.staff-invite-note {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}

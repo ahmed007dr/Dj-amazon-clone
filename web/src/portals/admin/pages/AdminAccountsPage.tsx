@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 import {
   getOnlineNow,
@@ -8,6 +9,7 @@ import {
   type AdminAccount,
 } from '@/features/administration/api';
 import { SuspendAccountModal } from '@/features/administration/components/SuspendAccountModal';
+import { useCan } from '@/features/auth/useCan';
 import { useDebounced } from '@/shared/hooks/useDebounced';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { AccountHistoryDrawer } from '@/portals/admin/components/AccountHistoryDrawer';
@@ -45,6 +47,8 @@ const ACCOUNT_TYPES = [
  */
 export function AdminAccountsPage() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const can = useCan();
 
   const [search, setSearch] = useState('');
   const [type, setType] = useState('');
@@ -159,6 +163,18 @@ export function AdminAccountsPage() {
       <PageHeader
         title={t('nav.users')}
         {...(accounts.data ? { description: t('admin.total', { count: accounts.data.count }) } : {})}
+        {...(can('employees.change_customerassignment')
+          ? {
+              // ⚠️  A shortcut, not a second form: staff are created on the Staff screen
+              //     (account + role + invite in one step) and this only opens it there.
+              //     Shown to those who may use it — the server refuses everyone else.
+              actions: (
+                <Button onClick={() => void navigate('/admin/staff?add=1')}>
+                  {t('staff.addStaff')}
+                </Button>
+              ),
+            }
+          : {})}
       />
 
       <div className="admin-accounts__stats">

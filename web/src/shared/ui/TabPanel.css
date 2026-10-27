@@ -1,0 +1,6 @@
+/* ⚠️  A caller's `className` may set `display: grid|flex` on the panel, and an author
+   `display` beats the browser's own `[hidden] { display: none }` — so a hidden,
+   kept-mounted panel would stay visible. This rule restores the attribute's meaning. */
+.tab-panel[hidden] {
+  display: none;
+}

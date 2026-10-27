@@ -495,7 +495,32 @@ REST_FRAMEWORK = {
         #     and unlike a list endpoint, there is no page size to hide behind.
         #     Twenty a minute is generous for a human and useless for a script.
         "export": "20/minute",
+        # ⚠️  Guest checkout — the only order endpoint an anonymous visitor can
+        #     reach, so the only one that can reserve stock for nothing.
+        #
+        #     Per client address; the real defences against a flood are the
+        #     per-phone/per-email open-order cap in `orders.guest` (counted in the
+        #     database, so it is exact) and the honeypot. Ten an hour is far
+        #     above what one household places and far below a script.
+        "guest_checkout": env("THROTTLE_GUEST_CHECKOUT", default="10/hour"),
+        # "Find my order" sends an email: same ceiling, so it cannot be turned
+        # into a mail cannon aimed at someone else's inbox.
+        "guest_lookup": env("THROTTLE_GUEST_LOOKUP", default="10/hour"),
+        # Reading / cancelling through the emailed link. The token is unguessable,
+        # so this only blunts probing; generous because a tracking page is reloaded.
+        "guest_token": env("THROTTLE_GUEST_TOKEN", default="60/minute"),
     },
+    # ⚠️  **How many reverse proxies sit in front of Django.**
+    #
+    #     Every throttle above is keyed on the client address. With this unset DRF
+    #     trusts the *whole* `X-Forwarded-For` header, which the client controls:
+    #     one request per spoofed value is one request per fresh bucket, so the
+    #     limits do nothing. Set it to the number of proxies in front of the app
+    #     (1 for a single nginx / Cloudflare-less setup, 2 behind both) and DRF
+    #     reads the address that many hops from the right, which the client
+    #     cannot forge. There is deliberately no default guess: a wrong number
+    #     is as bad as none (too high → the real IP is skipped).
+    "NUM_PROXIES": env.int("NUM_PROXIES", default=None),
 }
 
 
@@ -634,6 +659,13 @@ EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
 EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@example.com")
 
+# ⚠️  Where the branded email layout gets the store's identity (logo · colour · contact).
+#
+#     A dotted path, not an import: `mailing` and `branding` are siblings in the
+#     import-linter contract and may not import each other, so `mailing/layout.py`
+#     resolves this callable at runtime. Empty string = plain, unbranded HTML.
+MAIL_BRAND_PROVIDER = env("MAIL_BRAND_PROVIDER", default="branding.services.mail_identity")
+
 
 # ═══════════════════════════════════════════════════════════
 #  Configurable business rules
@@ -648,6 +680,43 @@ CURRENCY_DECIMAL_PLACES = env.int("CURRENCY_DECIMAL_PLACES", default=2)
 TAX_ENABLED = env.bool("TAX_ENABLED", default=True)
 TAX_DEFAULT_RATE = env("TAX_DEFAULT_RATE", default="14.00")
 TAX_PRICES_INCLUDE_TAX = env.bool("TAX_PRICES_INCLUDE_TAX", default=False)
+
+# ── Guest checkout — buying without an account (`orders/guest.py`) ──
+# ⚠️  Cash on delivery only, and the owner confirms each order by phone — so an
+#     unconfirmed order is a promise to hold stock for a stranger. These are the
+#     knobs that bound that promise; all are read through `getattr(settings, …)`
+#     so a missing one falls back to the default shown.
+
+#: Hours a guest order's stock stays reserved. The normal reservation is 30
+#: minutes, which suits a card payment and is wrong for "we will call you
+#: tomorrow". Keep it above the auto-cancel window below.
+GUEST_ORDER_RESERVATION_HOURS = env.int("GUEST_ORDER_RESERVATION_HOURS", default=72)
+
+#: Cancel a guest order still PENDING (never confirmed) after this many hours,
+#: releasing its stock. 0 = never auto-cancel. Run by `manage.py run_periodic`.
+GUEST_ORDER_AUTO_CANCEL_HOURS = env.int("GUEST_ORDER_AUTO_CANCEL_HOURS", default=48)
+
+#: At most this many unconfirmed (PENDING) guest orders per phone number or per
+#: email within the window — the exact, database-counted brake on stock-hoarding.
+GUEST_CHECKOUT_MAX_OPEN_ORDERS = env.int("GUEST_CHECKOUT_MAX_OPEN_ORDERS", default=3)
+GUEST_CHECKOUT_OPEN_WINDOW_HOURS = env.int("GUEST_CHECKOUT_OPEN_WINDOW_HOURS", default=24)
+
+#: A circuit breaker across *all* visitors: more guest orders than this in an
+#: hour is not shoppers. Shared counter (needs Redis to be shared across workers).
+#: 0 = off.
+GUEST_CHECKOUT_GLOBAL_PER_HOUR = env.int("GUEST_CHECKOUT_GLOBAL_PER_HOUR", default=200)
+
+#: How long the emailed order link works.
+GUEST_ORDER_TOKEN_MAX_AGE_DAYS = env.int("GUEST_ORDER_TOKEN_MAX_AGE_DAYS", default=90)
+
+#: The hook for a captcha later: a dotted path to `fn(token: str, request) -> bool`.
+#: Empty = no captcha (the honeypot and the throttles are the defence meanwhile).
+GUEST_CHECKOUT_CAPTCHA_VERIFIER = env("GUEST_CHECKOUT_CAPTCHA_VERIFIER", default="")
+
+#: Optional extra address that is emailed for every new guest order (it carries
+#: the buyer's name and phone, so it is opt-in — never guessed from the public
+#: contact address). When empty the staff are still alerted in-app.
+GUEST_ORDER_ALERT_EMAIL = env("GUEST_ORDER_ALERT_EMAIL", default="")
 
 
 # ═══════════════════════════════════════════════════════════

@@ -2,11 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { listAccounts } from '@/features/administration/api';
+import { useDocumentCounts } from '@/features/academic/verificationApi';
 import { getLivePulse } from '@/features/analytics/api';
+import { useCan } from '@/features/auth/useCan';
 import { listAlerts } from '@/features/inventory/api';
 import { listAdminOrders } from '@/features/orders/adminApi';
 import { listProviders } from '@/features/payments/adminApi';
+import { useStudentVerificationEnforced } from '@/features/settings/publicConfig';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { Alert } from '@/shared/ui/Alert';
 import { StatCard } from '@/shared/ui/StatCard';
@@ -58,11 +60,27 @@ export function AdminDashboardPage() {
     refetchInterval: 30 * 1000,
   });
 
-  const pendingVerification = useQuery({
-    queryKey: ['admin', 'dash', 'verification'],
-    queryFn: () => listAccounts({ verification_status: 'PENDING', page: 1 }),
-    staleTime: 60 * 1000,
-  });
+  /**
+   * ⚠️  Verification requests are **documents awaiting a decision**, not accounts
+   *     filtered by a status.
+   *
+   *     The card used to count accounts with `verification_status=PENDING` and link
+   *     to the users list — which has no verification filter and no way to decide
+   *     anything, so the number was a dead end. It now counts the review queue and
+   *     links to it.
+   *
+   * ⚠️  And it is **hidden while the owner's verification switch is off**.
+   *     With it off nothing is asked of students, and a card insisting that
+   *     requests are waiting contradicts every other screen. (The queue itself is
+   *     still reachable from the sidebar: an admin may always review uploads.)
+   *     The request is not even made unless the card will show: the endpoint is
+   *     `403` for anyone without the academic permission.
+   */
+  const verificationEnforced = useStudentVerificationEnforced();
+  const can = useCan();
+  const showVerification = verificationEnforced && can('academic.change_university');
+  const verificationQueue = useDocumentCounts(showVerification);
+  const pendingVerification = verificationQueue.data?.PENDING;
 
   const providers = useQuery({
     queryKey: ['admin', 'payment-providers'],
@@ -112,19 +130,17 @@ export function AdminDashboardPage() {
           />
         </Link>
 
-        <Link to="/admin/users" className="dashboard__link">
-          <StatCard
-            label={t('admin.awaitingVerification')}
-            value={pendingVerification.data?.count ?? '—'}
-            hint={t('admin.awaitingVerificationHint')}
-            tone={
-              pendingVerification.data && pendingVerification.data.count > 0
-                ? 'warning'
-                : 'neutral'
-            }
-            icon="⚿"
-          />
-        </Link>
+        {showVerification ? (
+          <Link to="/admin/academic?tab=verification" className="dashboard__link">
+            <StatCard
+              label={t('academic.review.dashboardLabel')}
+              value={pendingVerification ?? '—'}
+              hint={t('academic.review.dashboardHint')}
+              tone={pendingVerification ? 'warning' : 'neutral'}
+              icon="⚿"
+            />
+          </Link>
+        ) : null}
 
         {/* ⚠️  Two cards, not one.
             A registered user has a name and a profile that opens with a click;

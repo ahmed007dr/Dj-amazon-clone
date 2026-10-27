@@ -16,18 +16,27 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-from django.db import transaction
+from django.contrib.contenttypes.models import ContentType
+from django.db import IntegrityError, transaction
 from django.db.models import Count, DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
+from accounts import services as account_services
+from accounts.models import AccountStatus, AccountType, User
+from administration.models import AdminProfile
 from core.errors import BusinessError, ErrorCode
+from core.identifiers import business_number
+from core.models.audit import AuditAction, AuditLog
 from core.money import ZERO, quantize
 from employees.models import (
     AssignmentStatus,
     CustomerAssignment,
     EmployeeProfile,
 )
+from mailing import services as mail_services
+from mailing import templates as mail_templates
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +130,254 @@ def revoke_permissions(employee: EmployeeProfile) -> None:
     from django.contrib.auth.models import Group
 
     employee.user.groups.remove(*Group.objects.filter(name__startswith="employee:"))
+
+
+# ═══════════════════════════════════════════════════════════
+#  Creating staff — an account, a profile and an invite link
+# ═══════════════════════════════════════════════════════════
+#
+#  Before this existed there was no way to add a staff member from the panel at
+#  all: the only paths were the Django admin (whose add form even left the
+#  account inactive) and the development seed.
+
+
+class StaffAccess:
+    """
+    Which door the new person walks through.
+
+    ⚠️  **Both doors give permissions the same way: through the role.**
+
+        `STAFF_PORTAL` → `account_type=EMPLOYEE` — reaches `/staff` only.
+        `ADMIN_PANEL`  → `account_type=ADMIN`    — reaches `/admin`, and there only
+                         the screens their role's permissions open.
+
+        `administration.AdminRole` confers nothing (it is never synchronised to a
+        Django group), and the `system-admins` group that `grant_admin_permissions`
+        fills holds *every* domain permission — joining it would make each new panel
+        user an all-powerful admin. So a panel user also gets an `EmployeeProfile`
+        with the chosen role: the existing signal then puts them in that role's
+        `employee:<code>` group, `has_perm` / `/auth/me` / the sidebar all honour it,
+        and the role is the single place permissions are reviewed. The `AdminProfile`
+        is created non-owner, so nothing is inherited implicitly.
+    """
+
+    STAFF_PORTAL = "STAFF_PORTAL"
+    ADMIN_PANEL = "ADMIN_PANEL"
+    CHOICES = (STAFF_PORTAL, ADMIN_PANEL)
+
+
+#: Words the invite mail needs per recipient language.
+_ACCESS_LABELS = {
+    StaffAccess.STAFF_PORTAL: {"ar": "بوابة الموظفين", "en": "Staff portal"},
+    StaffAccess.ADMIN_PANEL: {"ar": "لوحة الإدارة", "en": "Admin panel"},
+}
+
+
+@dataclass(frozen=True)
+class StaffCreated:
+    employee: EmployeeProfile
+    #: `False` when a temporary password was set instead of mailing a link
+    invite_sent: bool
+
+
+def _new_employee_number() -> str:
+    """A generated, unguessable, non-sequential number (`EMP-2026-7K3M9P`)."""
+    for _attempt in range(10):
+        number = business_number("EMP", random_length=6)
+        if not EmployeeProfile.all_objects.filter(employee_number=number).exists():
+            return number
+    # ⚠️  Practically unreachable (31^6 per year) — failing loudly beats looping forever.
+    raise BusinessError(ErrorCode.INTERNAL_ERROR, status_code=500)
+
+
+def _duplicate_errors(email: str, phone: str) -> dict[str, list[str]]:
+    errors: dict[str, list[str]] = {}
+    if User.objects.filter(email__iexact=email).exists():
+        errors["email"] = ["هذا البريد مسجل بالفعل"]
+    if phone and User.objects.filter(phone=phone).exists():
+        errors["phone"] = ["هذا الرقم مسجل بالفعل"]
+    return errors
+
+
+def _access_of(user) -> str:
+    if user.account_type == AccountType.ADMIN:
+        return StaffAccess.ADMIN_PANEL
+    return StaffAccess.STAFF_PORTAL
+
+
+def _audit_staff(
+    actor, employee: EmployeeProfile, action: str, object_repr: str, changes: dict, request
+) -> None:
+    AuditLog.objects.create(
+        actor=actor,
+        action=action,
+        content_type=ContentType.objects.get_for_model(EmployeeProfile),
+        object_id=str(employee.pk),
+        object_repr=object_repr[:200],
+        changes=changes,
+        ip_address=request.META.get("REMOTE_ADDR") if request is not None else None,
+    )
+
+
+def send_invite(user, role, *, inviter=None, access: str, request=None) -> None:
+    """
+    Issue a fresh invite token (revoking any earlier one) and mail the link.
+
+    ⚠️  The plaintext token exists only in this function's local variable and the
+        email body — it is never logged, stored or returned by the API.
+    """
+    _record, raw_token = account_services.issue_invite_token(user, request=request)
+
+    language = user.preferred_language if user.preferred_language in ("ar", "en") else "ar"
+    days = account_services.STAFF_INVITE_TTL.days
+    mail_services.send_to_user(
+        mail_templates.STAFF_INVITE.key,
+        user,
+        {
+            "inviter": (inviter.full_name if inviter is not None else "") or "—",
+            "role": role.name_en if language == "en" else role.name_ar,
+            "access": _ACCESS_LABELS[access][language],
+            "link": account_services.frontend_url(f"/auth/reset-password?token={raw_token}"),
+            "expiry": f"{days} days" if language == "en" else f"{days} أيام",
+        },
+    )
+
+
+@transaction.atomic
+def create_staff(
+    *,
+    actor,
+    email: str,
+    first_name: str,
+    access: str,
+    role,
+    last_name: str = "",
+    phone: str = "",
+    manager: EmployeeProfile | None = None,
+    phone_extension: str = "",
+    language: str = "ar",
+    temporary_password: str = "",
+    request=None,
+) -> StaffCreated:
+    """
+    Creates the login, the employee profile (and the admin profile for panel
+    access) and mails the invite — all or nothing.
+
+    ⚠️  **One transaction.** A user without a profile can log in and see nothing; a
+        profile without a mail leaves a person nobody told. If anything below
+        raises, none of it is written (and, because delivery is `on_commit`, no
+        mail leaves either).
+
+    ⚠️  The account is created **active with a verified email and an unusable
+        password** — the invite link, which proves control of the mailbox, is the
+        only way in. A temporary password (the owner's fallback for when mail is
+        not set up) replaces the link; no mail is sent then, and the admin hands
+        the password over out-of-band.
+    """
+    if access not in StaffAccess.CHOICES:
+        raise ValidationError({"access": ["نوع الوصول غير معروف"]})
+
+    email = email.strip().lower()
+    phone = (phone or "").strip()
+
+    errors = _duplicate_errors(email, phone)
+    if errors:
+        raise ValidationError(errors)
+
+    try:
+        # A savepoint, so a race on the unique columns surfaces as a field error
+        # instead of a 500 that poisons the outer transaction.
+        with transaction.atomic():
+            is_panel = access == StaffAccess.ADMIN_PANEL
+            user = User(
+                email=email,
+                first_name=first_name.strip(),
+                last_name=(last_name or "").strip(),
+                phone=phone or None,
+                account_type=AccountType.ADMIN if is_panel else AccountType.EMPLOYEE,
+                status=AccountStatus.ACTIVE,
+                preferred_language=language,
+                is_active=True,
+                email_verified_at=timezone.now(),
+            )
+            if temporary_password:
+                user.set_password(temporary_password)
+            else:
+                user.set_unusable_password()
+            user.save()
+
+            employee = EmployeeProfile.objects.create(
+                user=user,
+                employee_number=_new_employee_number(),
+                role=role,
+                manager=manager,
+                phone_extension=(phone_extension or "").strip(),
+                hired_on=timezone.localdate(),
+            )
+
+            if is_panel:
+                AdminProfile.objects.create(user=user, job_title=role.name_ar[:100])
+    except IntegrityError:
+        errors = _duplicate_errors(email, phone)
+        if errors:
+            raise ValidationError(errors) from None
+        raise
+
+    invite_sent = not temporary_password
+    if invite_sent:
+        send_invite(user, role, inviter=actor, access=access, request=request)
+
+    # ⚠️  No secrets in the entry: whether a temporary password was used is
+    #     recorded, the password itself and the invite link never are.
+    _audit_staff(
+        actor,
+        employee,
+        AuditAction.CREATE,
+        f"موظف {employee.employee_number} · {user.email}",
+        {
+            "access": access,
+            "role": role.code,
+            "manager": manager.employee_number if manager else None,
+            "invite_sent": invite_sent,
+            "temporary_password": bool(temporary_password),
+        },
+        request,
+    )
+
+    return StaffCreated(employee=employee, invite_sent=invite_sent)
+
+
+@transaction.atomic
+def resend_invite(employee: EmployeeProfile, *, actor, request=None) -> None:
+    """
+    Mail a fresh invite link to someone who has not signed in yet.
+
+    ⚠️  Only while the invite is still pending (`last_login_at` empty). Mailing a
+        password-setting link to an account that is already in use is an account
+        takeover vector for anyone who can read that mailbox later, and there is
+        nothing a working employee needs it for — they use "forgot password".
+    """
+    user = employee.user
+
+    if not employee.is_active:
+        raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="الموظف ليس على رأس العمل")
+    if user.last_login_at is not None:
+        raise BusinessError(
+            ErrorCode.CONFLICT,
+            detail="هذا الموظف فعّل حسابه بالفعل",
+            status_code=409,
+        )
+
+    send_invite(user, employee.role, inviter=actor, access=_access_of(user), request=request)
+
+    _audit_staff(
+        actor,
+        employee,
+        AuditAction.UPDATE,
+        f"إعادة إرسال دعوة {employee.employee_number} · {user.email}",
+        {"invite_resent": True},
+        request,
+    )
 
 
 # ═══════════════════════════════════════════════════════════

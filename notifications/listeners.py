@@ -117,6 +117,14 @@ def _register_order_listeners():
         ⚠️  And a counter sale has no customer: there is no recipient at all.
         """
         if instance.customer is None:
+            # ⚠️  A guest order has no account but does have an email — it is told
+            #     about status changes (not about its own creation here: the lines
+            #     do not exist yet at insert time, so `guest_order_placed` carries
+            #     that mail). A counter sale has neither and is ignored inside.
+            if not created and instance.is_guest:
+                from notifications import guest_orders
+
+                guest_orders.status_changed(instance, kwargs.get("update_fields"))
             return
 
         user = instance.customer.user
@@ -227,6 +235,79 @@ def _register_account_listeners():
 
 
 # ═══════════════════════════════════════════════════════════
+#  Verification documents
+# ═══════════════════════════════════════════════════════════
+
+#: The document names as the recipient reads them, in both languages.
+#:
+#: ⚠️  Not `get_document_type_display()`: the repository ships no English catalogue,
+#:     so an English email would name the document in Arabic.
+_DOCUMENT_LABELS = {
+    "NATIONAL_ID": ("بطاقة الرقم القومي", "National ID"),
+    "STUDENT_CARD": ("الكارنيه الجامعي", "Student ID card"),
+    "MEDICAL_LICENSE": ("ترخيص مزاولة المهنة", "Medical licence"),
+    "PHARMACY_LICENSE": ("ترخيص الصيدلية", "Pharmacy licence"),
+    "TAX_CARD": ("البطاقة الضريبية", "Tax card"),
+    "COMMERCIAL_REGISTER": ("السجل التجاري", "Commercial register"),
+}
+
+
+def _register_document_listeners():
+    from customers.events import document_reviewed
+
+    @receiver(document_reviewed, weak=False)
+    @_safe
+    def on_document_reviewed(sender, document, approved, reason="", **kwargs):
+        """
+        ⚠️  The student is told the outcome — and, on a rejection, **why**.
+
+            The `ACCOUNT` category is mandatory, so a student who muted marketing
+            still hears that their card was refused. Without the reason they
+            upload the same photo again.
+        """
+        from accounts.services import frontend_url
+
+        user = document.customer.user
+        english = getattr(user, "preferred_language", "ar") == "en"
+        label_ar, label_en = _DOCUMENT_LABELS.get(
+            document.document_type, (document.document_type, document.document_type)
+        )
+        label = label_en if english else label_ar
+
+        if approved:
+            title = "Your document was approved" if english else "تم اعتماد وثيقتك"
+            body = (
+                f"{label} approved."
+                if english
+                else f"تم اعتماد {label}. يمكنك متابعة حالة وثائقك من حسابك."
+            )
+        else:
+            title = "Your document was not approved" if english else "لم يُعتمد مستندك"
+            body = reason
+
+        services.notify(
+            user,
+            category=NotificationCategory.ACCOUNT,
+            title=title,
+            body=body,
+            template_key=(
+                mail_templates.DOCUMENT_APPROVED.key
+                if approved
+                else mail_templates.DOCUMENT_REJECTED.key
+            ),
+            template_context={
+                "document_type": label,
+                "reason": reason,
+                "link": frontend_url("/account/documents"),
+            },
+            action_url="/account/documents",
+            reference_type="customer_document",
+            reference_id=document.pk,
+            priority=NotificationPriority.NORMAL if approved else NotificationPriority.HIGH,
+        )
+
+
+# ═══════════════════════════════════════════════════════════
 #  Inventory — for the admin
 # ═══════════════════════════════════════════════════════════
 
@@ -266,9 +347,32 @@ def _register_inventory_listeners():
 
 
 # ═══════════════════════════════════════════════════════════
+#  Guest orders — a buyer with no account
+# ═══════════════════════════════════════════════════════════
+
+
+def _register_guest_order_listeners():
+    from orders.events import guest_order_placed
+
+    @receiver(guest_order_placed, weak=False)
+    @_safe
+    def on_guest_order_placed(sender, order, tracking_token, **kwargs):
+        """
+        ⚠️  The buyer's confirmation (with the tracking link) and the owner's
+            "call this person" alert — both from one event, emitted after the
+            order's lines exist so the confirmation can list them.
+        """
+        from notifications import guest_orders
+
+        guest_orders.order_placed(order, tracking_token)
+
+
+# ═══════════════════════════════════════════════════════════
 #  Registration
 # ═══════════════════════════════════════════════════════════
 
+_register_guest_order_listeners()
 _register_order_listeners()
 _register_account_listeners()
+_register_document_listeners()
 _register_inventory_listeners()

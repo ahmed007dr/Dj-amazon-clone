@@ -34,6 +34,7 @@ class RejectionReason(str, Enum):
     ACCOUNT_TYPE_NOT_ELIGIBLE = "COUPON_NOT_APPLICABLE"
     FIRST_ORDER_ONLY = "COUPON_FIRST_ORDER_ONLY"
     NO_ELIGIBLE_ITEMS = "COUPON_NO_ELIGIBLE_ITEMS"
+    LOGIN_REQUIRED = "COUPON_LOGIN_REQUIRED"
 
 
 @dataclass(frozen=True)
@@ -104,6 +105,20 @@ def validate(code: str, user, items, *, subtotal: Decimal | None = None) -> Coup
     normalised = (code or "").strip().upper()
     if not normalised:
         return _reject(RejectionReason.NOT_FOUND, "أدخل كود الكوبون")
+
+    # ⚠️  **A coupon belongs to an account — a guest cannot use one.** (owner decision)
+    #
+    #     Every limit the engine enforces (`usage_limit_per_user`,
+    #     `first_order_only`, an owned coupon) is keyed on the user, and
+    #     `CouponRedemption.user` is not nullable: a guest redemption would be
+    #     either unlimited or an IntegrityError at checkout. So it is refused
+    #     here, before the lookup — which also means a guest trying codes learns
+    #     nothing about which ones exist.
+    if user is None or not getattr(user, "is_authenticated", False):
+        return _reject(
+            RejectionReason.LOGIN_REQUIRED,
+            "الكوبونات متاحة للحسابات المسجَّلة — سجّل الدخول لاستخدام كود الخصم",
+        )
 
     coupon = Coupon.objects.filter(code=normalised).first()
     if coupon is None:

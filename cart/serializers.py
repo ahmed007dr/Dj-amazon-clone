@@ -10,6 +10,8 @@ Cart contracts.
 
 from rest_framework import serializers
 
+from catalog.selectors import image_for
+
 
 class MoneyField(serializers.DecimalField):
     """
@@ -57,6 +59,11 @@ class CartLineSerializer(serializers.Serializer):
     product_name_ar = serializers.CharField(read_only=True)
     product_name_en = serializers.CharField(read_only=True)
     variant_id = serializers.UUIDField(read_only=True, allow_null=True)
+    variant_sku = serializers.CharField(read_only=True, allow_null=True)
+    variant_name_ar = serializers.CharField(read_only=True, allow_null=True)
+    variant_name_en = serializers.CharField(read_only=True, allow_null=True)
+    #: `{id, name_ar, name_en, hex}` when the variant belongs to a colour, else null
+    color = serializers.DictField(read_only=True, allow_null=True)
     image = serializers.CharField(read_only=True, allow_null=True)
     pricing = PricedLineSerializer(read_only=True)
 
@@ -134,7 +141,10 @@ class CartSnapshotSerializer(serializers.Serializer):
         for (product, _quantity, variant), priced in snapshot.lines:
             key = (str(product.pk), str(variant.pk if variant else ""))
             line = line_map.get(key)
-            images = getattr(product, "primary_images", None)
+            color = variant.color if variant is not None and variant.color_id else None
+            # ⚠️  The colour's own photo first, then the product's — the line shows
+            #     the item the customer actually chose, not the colour on the cover.
+            picture = image_for(product, color)
 
             result.append(
                 {
@@ -145,7 +155,20 @@ class CartSnapshotSerializer(serializers.Serializer):
                     "product_name_ar": product.name_ar,
                     "product_name_en": product.name_en,
                     "variant_id": str(variant.pk) if variant else None,
-                    "image": images[0].image.url if images else None,
+                    "variant_sku": variant.sku if variant else None,
+                    "variant_name_ar": variant.name_ar if variant else None,
+                    "variant_name_en": variant.name_en if variant else None,
+                    "color": (
+                        {
+                            "id": str(color.pk),
+                            "name_ar": color.name_ar,
+                            "name_en": color.name_en,
+                            "hex": color.hex,
+                        }
+                        if color is not None
+                        else None
+                    ),
+                    "image": picture.image.url if picture else None,
                     "pricing": PricedLineSerializer(priced).data,
                 }
             )

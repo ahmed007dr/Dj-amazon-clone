@@ -58,6 +58,21 @@ export interface AdminProduct {
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
+
+  /**
+   * ⚠️  Who added / last changed it — `null` for products that predate the audit
+   *     columns (the table shows "—"). Small objects, not ids: the table needs a
+   *     name per row and resolving ids would be a second request.
+   */
+  created_by?: AuditUser | null;
+  updated_by?: AuditUser | null;
+}
+
+/** A person as the audit columns show them. */
+export interface AuditUser {
+  id: string;
+  name: string;
+  email: string;
 }
 
 export interface AdminProductQuery {
@@ -65,6 +80,8 @@ export interface AdminProductQuery {
   category?: string;
   is_active?: string;
   include_deleted?: string;
+  /** `-created_at` (default) · `-updated_at` (recently modified first) · `name_ar` … */
+  ordering?: string;
   page?: number;
 }
 
@@ -204,4 +221,42 @@ export function useRestoreProduct() {
   return useProductMutation((id: string) =>
     http.post<AdminProduct>(`/catalog/admin/products/${id}/restore/`),
   );
+}
+
+// ═══════════════════════════════════════════════════════════
+//  History — who did what to this product, and when
+// ═══════════════════════════════════════════════════════════
+
+export interface ProductHistoryEntry {
+  id: number;
+  action: string;
+  /** The server's own label, so this screen never keeps a second list of actions. */
+  action_label: string;
+  /** `منتج SKU-1`, or a sub-object such as `صورة منتج SKU-1`. */
+  object_repr: string;
+  /** `{field: {old, new}}` for edits; a small descriptive object otherwise. */
+  changes: Record<string, unknown>;
+  actor: AuditUser | null;
+  created_at: string;
+}
+
+export interface ProductHistoryQuery {
+  action?: string;
+  page?: number;
+}
+
+/**
+ * ⚠️  Keyed under `['admin', 'products', …]` on purpose: every product write
+ *     invalidates that prefix, so an open timeline picks up the edit that was just
+ *     saved instead of showing a stale list.
+ */
+export function useProductHistory(productId: string, query: ProductHistoryQuery = {}) {
+  return useQuery({
+    queryKey: ['admin', 'products', 'history', productId, query],
+    queryFn: () =>
+      http.get<PagedResponse<ProductHistoryEntry>>(
+        `/catalog/admin/products/${productId}/history/`,
+        { params: { ...query } },
+      ),
+  });
 }

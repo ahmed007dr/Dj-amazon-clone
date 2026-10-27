@@ -42,6 +42,7 @@ from inventory import services as inventory_services
 from loyalty import services as loyalty_services
 from mailing import inbound as mail_inbound
 from mailing import services as mail_services
+from orders import guest as guest_order_services
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,17 @@ JOBS: dict[str, tuple[str, str, Callable[[], int]]] = {
         "cart",
         "إهمال السلال الراكدة",
         cart_services.abandon_stale_carts,
+    ),
+    # ⚠️  The other half of holding a guest's stock for days.
+    #
+    #     A guest order is cash on delivery from someone we have never spoken to;
+    #     the owner confirms it by phone. One that nobody confirms must not hold
+    #     goods for ever, so after `GUEST_ORDER_AUTO_CANCEL_HOURS` (default 48,
+    #     0 = never) it is cancelled and its stock released. Hourly is plenty.
+    "cancel_unconfirmed_guest_orders": (
+        "orders",
+        "إلغاء طلبات الزوار غير المؤكَّدة",
+        guest_order_services.cancel_unconfirmed,
     ),
     # ⚠️  Expiring due points is **a periodic job, not an on-the-fly calculation**.
     #
@@ -171,7 +183,7 @@ class Command(BaseCommand):
             "--job",
             help=(
                 "اسم مهمة واحدة أو مجموعة "
-                "(inventory · cart · loyalty · mail · presence · traffic)"
+                "(inventory · cart · orders · loyalty · mail · presence · traffic)"
             ),
         )
         parser.add_argument("--dry-run", action="store_true", help="عرض ما سيُنفَّذ بلا تنفيذ")
@@ -183,7 +195,7 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR(f"لا مهمة بهذا الاسم: {options.get('job')}"))
             self.stderr.write(
                 f"المتاح: {' · '.join(JOBS)} — "
-                "أو مجموعة: inventory · cart · loyalty · mail · presence · traffic"
+                "أو مجموعة: inventory · cart · orders · loyalty · mail · presence · traffic"
             )
             raise SystemExit(2)
 

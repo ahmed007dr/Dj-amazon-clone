@@ -126,7 +126,34 @@ class EmailAccount(TranslatedFieldMixin, BaseModel):
     imap_folder = models.CharField(_("المجلد"), max_length=100, default="INBOX")
 
     #: ⚠️  The last UID pulled — without it every cycle re-imports the whole mailbox.
+    #:     It only advances past a message that was **actually imported** (or that no longer
+    #:     exists on the server): a transient failure keeps it behind that UID so the next
+    #:     run retries it — see `mailing.inbound.fetch`.
     imap_last_uid = models.BigIntegerField(_("آخر معرّف مسحوب"), default=0)
+
+    #: ⚠️  UIDs are only comparable inside one `UIDVALIDITY`. When the server reports a
+    #:     different value (the mailbox was rebuilt, migrated, restored from backup) every
+    #:     UID we remember is meaningless, and continuing from the old cursor skips new mail
+    #:     silently. `0` = not recorded yet.
+    imap_uidvalidity = models.PositiveBigIntegerField(_("UIDVALIDITY"), default=0)
+
+    #: ⚠️  A hash of host / user / folder at the time the cursor was last valid. Pointing the
+    #:     account at another mailbox leaves a cursor that belongs to the previous one —
+    #:     `fetch` compares and resets it rather than trusting a stale number.
+    imap_fingerprint = models.CharField(_("بصمة الاتصال"), max_length=64, blank=True)
+
+    #: The UID that failed on the previous run, and how many runs in a row it has failed.
+    #: ⚠️  A message that can never be imported (a corrupt body) must not block the mailbox
+    #:     forever — after `MAX_UID_RETRIES` runs it is skipped and the skip is reported.
+    imap_retry_uid = models.BigIntegerField(_("معرّف قيد المحاولة"), default=0)
+    imap_retry_count = models.PositiveSmallIntegerField(_("محاولات المعرّف"), default=0)
+
+    #: ⚠️  IMAP health lives apart from `last_error` (which `record_success` clears on every
+    #:     successful SMTP send): on a BOTH account a working outbound path would otherwise
+    #:     keep wiping the only trace that the inbound one is broken.
+    imap_last_fetch_at = models.DateTimeField(_("آخر سحب"), null=True, blank=True)
+    imap_last_error = models.TextField(_("آخر خطأ IMAP"), blank=True)
+    imap_last_error_at = models.DateTimeField(_("وقت آخر خطأ IMAP"), null=True, blank=True)
 
     # ── Operation ──────────────────────────────────────────
     #: ⚠️  The flag that prevents security messages being assigned to it.
@@ -655,6 +682,8 @@ class InboundMessage(BaseModel):
         indexes = [
             models.Index(fields=["status", "-received_at"]),
             models.Index(fields=["from_email", "-received_at"]),
+            # The inbox is listed by *arrival* (`created_at`), not by the sender's Date header
+            models.Index(fields=["status", "-created_at"], name="inbound_status_arrival_idx"),
         ]
 
     def __str__(self):

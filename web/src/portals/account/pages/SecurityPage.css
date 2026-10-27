@@ -10,26 +10,31 @@
   inline-size: 100%;
 }
 
+/* ⚠️  A button keeps its natural width instead of stretching to the card's — in a
+   grid with `justify-items: start` the `> *` rule above would otherwise widen it. */
 .security > button {
   inline-size: auto;
 }
 
-.security-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin-block-start: var(--space-8);
-  padding-block-start: var(--space-5);
-  border-block-start: 1px solid var(--color-border);
-}
-
-.security-section__title {
+.security__title {
   margin: 0;
   font-size: 1.125rem;
   font-weight: 700;
 }
 
-.security-section p {
+.security p {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.security-devices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-inline-size: 40rem;
+}
+
+.security-devices p {
   margin: 0;
   font-size: 0.9375rem;
 }

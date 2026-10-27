@@ -9,6 +9,12 @@ app_name = "inventory"
 urlpatterns = [
     # Public — availability only, without exposing exact figures
     path("availability/", api.AvailabilityAPI.as_view(), name="availability"),
+    # …and for one product, per variant (colours, sizes) — what a picker needs
+    path(
+        "availability/<uuid:pk>/",
+        api.ProductAvailabilityAPI.as_view(),
+        name="product-availability",
+    ),
     # Locations
     path("locations/", api.StockLocationListCreateAPI.as_view(), name="locations"),
     path("locations/<uuid:pk>/", api.StockLocationDetailAPI.as_view(), name="location-detail"),
@@ -28,6 +34,9 @@ urlpatterns = [
     path("adjust/", api.AdjustStockAPI.as_view(), name="adjust"),
     path("transfer/", api.TransferStockAPI.as_view(), name="transfer"),
     path("damage/", api.MarkDamagedAPI.as_view(), name="damage"),
+    # Stock held on no variant → a colour (after a product's first colour is added)
+    path("unassigned-stock/", api.UnassignedStockAPI.as_view(), name="unassigned-stock"),
+    path("assign-stock/", api.AssignStockAPI.as_view(), name="assign-stock"),
     path("maintenance/", api.RunMaintenanceAPI.as_view(), name="maintenance"),
     # ── Stock counting ─────────────────────────────────────
     path("counts/", api.StockCountListAPI.as_view(), name="counts"),

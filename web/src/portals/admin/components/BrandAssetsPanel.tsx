@@ -20,9 +20,13 @@ import './BrandAssetsPanel.css';
  *
  *     The dark-mode logo is usually white: showing it on a light background
  *     makes it look missing, so the admin uploads it a second time believing
- *     the upload failed.
+ *     the upload failed. The dark hero is previewed on dark for the same reason —
+ *     it is the surface it will actually sit on.
  */
-const DARK_PREVIEW: AssetField[] = ['logo_dark'];
+const DARK_PREVIEW: AssetField[] = ['logo_dark', 'hero_image_dark'];
+
+/** The home banners are wide pictures — their tiles get more room than a logo's. */
+const WIDE: AssetField[] = ['hero_image_light', 'hero_image_dark'];
 
 export function BrandAssetsPanel({ profile }: { profile: AdminBrandProfile }) {
   const { t } = useTranslation();
@@ -47,6 +51,7 @@ export function BrandAssetsPanel({ profile }: { profile: AdminBrandProfile }) {
             label={t(`branding.asset_${field}`)}
             hint={t(`branding.assetHint_${field}`)}
             dark={DARK_PREVIEW.includes(field)}
+            wide={WIDE.includes(field)}
             busy={upload.isPending || clear.isPending}
             onPick={(file) =>
               upload.mutate(
@@ -79,6 +84,7 @@ function AssetTile({
   label,
   hint,
   dark,
+  wide,
   busy,
   onPick,
   onClear,
@@ -88,6 +94,7 @@ function AssetTile({
   label: string;
   hint: string;
   dark: boolean;
+  wide: boolean;
   busy: boolean;
   onPick: (file: File) => void;
   onClear: () => void;
@@ -96,7 +103,7 @@ function AssetTile({
   const inputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <section className="asset-tile">
+    <section className={`asset-tile ${wide ? 'asset-tile--wide' : ''}`}>
       <h4 className="asset-tile__label">{label}</h4>
 
       <div className={`asset-tile__preview ${dark ? 'is-dark' : ''}`}>

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
+import { useAuth } from '@/features/auth/useAuth';
 import { useAddBundle } from '@/features/cart/hooks';
 import type { BundleResult } from '@/features/cart/types';
 import { isApiError } from '@/shared/http';
@@ -29,6 +30,8 @@ import './AddBundleButton.css';
 export function AddBundleButton({ bundleId }: { bundleId: string }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user, isRestoring } = useAuth();
   const addBundle = useAddBundle();
 
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +40,19 @@ export function AddBundleButton({ bundleId }: { bundleId: string }) {
   function add(essentialsOnly: boolean) {
     setError(null);
     setResult(null);
+
+    // ⚠️  A guest is sent to sign in, with the way back — not shown a failure.
+    //
+    //     Adding a bundle needs an account (the browsing is public, the buying is
+    //     not), so the request would be refused. Sending it anyway shows a visitor
+    //     an error for pressing the button we offered; sending them to the login
+    //     page with this page as the return path lets them finish in one step.
+    //     `isRestoring` is excluded by `disabled` below: during it `user` is still
+    //     `null` for someone who is in fact signed in.
+    if (!user) {
+      void navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
 
     addBundle.mutate(
       { bundle: bundleId, essentialsOnly },
@@ -86,6 +102,7 @@ export function AddBundleButton({ bundleId }: { bundleId: string }) {
       <div className="add-bundle__buttons">
         <Button
           loading={addBundle.isPending}
+          disabled={isRestoring || addBundle.isPending}
           onClick={() => {
             add(false);
           }}
@@ -95,7 +112,7 @@ export function AddBundleButton({ bundleId }: { bundleId: string }) {
 
         <Button
           variant="secondary"
-          disabled={addBundle.isPending}
+          disabled={isRestoring || addBundle.isPending}
           onClick={() => {
             add(true);
           }}
@@ -103,6 +120,8 @@ export function AddBundleButton({ bundleId }: { bundleId: string }) {
           {t('academic.addEssentials')}
         </Button>
       </div>
+
+      {!isRestoring && !user ? <p className="add-bundle__hint">{t('academic.signInToAdd')}</p> : null}
 
       {error ? (
         <p className="add-bundle__error" role="alert">

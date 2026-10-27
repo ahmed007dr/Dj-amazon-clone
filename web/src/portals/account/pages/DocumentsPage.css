@@ -82,3 +82,24 @@
     gap: var(--space-4);
   }
 }
+
+/* ── The in-page preview ──────────────────────────────────── */
+
+.doc-preview__image {
+  display: block;
+  max-inline-size: 100%;
+  max-block-size: 70dvh;
+  margin-inline: auto;
+  object-fit: contain;
+}
+
+/* ⚠️  A fixed block size, not `100%`: the modal body scrolls, so a percentage
+   height has nothing to resolve against and the PDF collapses to its default 150px. */
+.doc-preview__frame {
+  display: block;
+  inline-size: 100%;
+  block-size: min(70dvh, 44rem);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}

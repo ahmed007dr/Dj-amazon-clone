@@ -68,6 +68,10 @@ class StockSerializer(serializers.ModelSerializer):
     available = serializers.IntegerField(read_only=True)
     needs_reorder = serializers.BooleanField(read_only=True)
     is_critical = serializers.BooleanField(read_only=True)
+    variant_sku = serializers.CharField(source="variant.sku", read_only=True, default=None)
+    variant_name_ar = serializers.CharField(source="variant.name_ar", read_only=True, default=None)
+    variant_name_en = serializers.CharField(source="variant.name_en", read_only=True, default=None)
+    color_hex = serializers.CharField(source="variant.color.hex", read_only=True, default=None)
 
     class Meta:
         model = Stock
@@ -77,6 +81,10 @@ class StockSerializer(serializers.ModelSerializer):
             "product_sku",
             "product_name",
             "variant",
+            "variant_sku",
+            "variant_name_ar",
+            "variant_name_en",
+            "color_hex",
             "location",
             "location_code",
             "quantity_physical",
@@ -142,6 +150,9 @@ class StockMovementSerializer(serializers.ModelSerializer):
     performed_by_email = serializers.EmailField(
         source="performed_by.email", read_only=True, default=None
     )
+    variant_sku = serializers.CharField(source="variant.sku", read_only=True, default=None)
+    variant_name_ar = serializers.CharField(source="variant.name_ar", read_only=True, default=None)
+    variant_name_en = serializers.CharField(source="variant.name_en", read_only=True, default=None)
 
     class Meta:
         model = StockMovement
@@ -151,6 +162,9 @@ class StockMovementSerializer(serializers.ModelSerializer):
             "product",
             "product_sku",
             "variant",
+            "variant_sku",
+            "variant_name_ar",
+            "variant_name_en",
             "location",
             "location_code",
             "batch",
@@ -269,6 +283,25 @@ class MarkDamagedSerializer(serializers.Serializer):
     location = serializers.UUIDField(required=False, allow_null=True)
     quantity = serializers.IntegerField(min_value=1)
     reason = serializers.CharField(min_length=3, max_length=500)
+
+
+class AssignStockSerializer(serializers.Serializer):
+    """
+    "Give the product's un-assigned stock to this colour / variant."
+
+    Exactly one of `variant` and `color` — the colour form is what the admin screen
+    sends (it knows colours, not their variants).
+    """
+
+    product = serializers.UUIDField()
+    variant = serializers.UUIDField(required=False, allow_null=True)
+    color = serializers.UUIDField(required=False, allow_null=True)
+    location = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        if bool(attrs.get("variant")) == bool(attrs.get("color")):
+            raise serializers.ValidationError("حدّد لونًا أو نسخة — واحدًا فقط")
+        return attrs
 
 
 class AvailabilitySerializer(serializers.Serializer):

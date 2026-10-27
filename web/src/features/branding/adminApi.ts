@@ -32,8 +32,15 @@ export interface AdminPalette {
   contrast: ContrastEntry[];
 }
 
-/** The five assets — all images uploaded by the admin. */
-export type AssetField = 'logo_light' | 'logo_dark' | 'icon' | 'favicon' | 'og_image';
+/** The assets — all images uploaded by the admin. */
+export type AssetField =
+  | 'logo_light'
+  | 'logo_dark'
+  | 'icon'
+  | 'favicon'
+  | 'og_image'
+  | 'hero_image_light'
+  | 'hero_image_dark';
 
 export const ASSET_FIELDS: AssetField[] = [
   'logo_light',
@@ -41,6 +48,8 @@ export const ASSET_FIELDS: AssetField[] = [
   'icon',
   'favicon',
   'og_image',
+  'hero_image_light',
+  'hero_image_dark',
 ];
 
 export interface AdminBrandProfile {
@@ -56,6 +65,17 @@ export interface AdminBrandProfile {
   icon: string | null;
   favicon: string | null;
   og_image: string | null;
+  hero_image_light: string | null;
+  hero_image_dark: string | null;
+  /** The home banner text — empty falls back to the name, tagline and catalogue button. */
+  hero_title_ar: string;
+  hero_title_en: string;
+  hero_subtitle_ar: string;
+  hero_subtitle_en: string;
+  hero_cta_label_ar: string;
+  hero_cta_label_en: string;
+  /** A path inside the store or an `https://` URL; validated on the server. */
+  hero_cta_url: string;
   font_ar: string;
   font_en: string;
   font_size_base: string;

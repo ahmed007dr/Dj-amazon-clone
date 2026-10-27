@@ -5,6 +5,7 @@ Academic domain endpoints.
 """
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, serializers
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -21,6 +22,7 @@ from academic.models import (
     StudyBundle,
     University,
 )
+from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
 from core.permissions import CanManageAcademic
@@ -113,10 +115,40 @@ class MyBundlesAPI(generics.ListAPIView):
         if profile is None:
             return StudyBundle.objects.none()
 
-        queryset = services.bundles_for_student(profile)
+        # ⚠️  `select_related` is added here, not in `bundles_for_student`: the
+        #     serializer now names each bundle's faculty and university, and that
+        #     service stays exactly what the "my faculty" shortcut relies on.
+        queryset = services.bundles_for_student(profile).select_related(
+            "faculty__university", "department"
+        )
         if kind := self.request.query_params.get("kind"):
             queryset = queryset.filter(kind=kind)
         return queryset
+
+
+class PublicBundleListAPI(generics.ListAPIView):
+    """
+    Every active bundle — for visitors and students alike.
+
+    ⚠️  Public, and **not scoped to the caller's faculty**.
+
+        Which faculty's bundles to look at is the visitor's choice, made with the
+        optional filters below; nothing is filtered by default. A student's own
+        profile only pre-fills those filters on the client (see `MyBundlesAPI`).
+
+        Filters: `university` · `faculty` · `department` (UUIDs) ·
+        `academic_year` (1-10) · `kind`. A malformed value is `400`.
+    """
+
+    permission_classes = [AllowAny]
+    serializer_class = s.BundleListSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        filters = s.BundleFilterSerializer(data=self.request.query_params)
+        filters.is_valid(raise_exception=True)
+
+        return services.public_bundles(**filters.validated_data)[: services.PUBLIC_BUNDLE_LIMIT]
 
 
 class BundleDetailAPI(generics.RetrieveAPIView):
@@ -125,8 +157,10 @@ class BundleDetailAPI(generics.RetrieveAPIView):
     lookup_field = "slug"
 
     def get_queryset(self):
-        return StudyBundle.objects.filter(is_active=True).prefetch_related(
-            "items__product", "items__variant"
+        return (
+            StudyBundle.objects.filter(is_active=True)
+            .select_related("faculty__university", "department")
+            .prefetch_related("items__product", "items__variant")
         )
 
 
@@ -155,25 +189,47 @@ class AdminPromoteStudentsAPI(APIView):
 
 
 class AdminStudentListAPI(generics.ListAPIView):
+    """
+    The students, with who they are.
+
+    ⚠️  Paginated with `AdminPageNumberPagination`, not the project default.
+
+        The default is cursor pagination without a total — its response has no
+        `page` or `pages`, so the screen's pager had nothing to draw. Admin lists
+        that show "page 2 of 9" use the page-number class.
+    """
+
     permission_classes = [CanManageAcademic]
-    serializer_class = s.StudentProfileSerializer
+    serializer_class = s.AdminStudentProfileSerializer
+    pagination_class = AdminPageNumberPagination
 
     def get_queryset(self):
         queryset = StudentProfile.objects.select_related(
             "user", "university", "faculty", "department"
         )
-        params = self.request.query_params
 
-        if university := params.get("university"):
-            queryset = queryset.filter(university_id=university)
-        if faculty := params.get("faculty"):
-            queryset = queryset.filter(faculty_id=faculty)
-        if year := params.get("academic_year"):
-            queryset = queryset.filter(academic_year=year)
-        if params.get("verified") == "false":
-            queryset = queryset.filter(is_verified=False)
+        filters = s.AdminStudentFilterSerializer(data=self.request.query_params)
+        filters.is_valid(raise_exception=True)
+        params = filters.validated_data
 
-        return queryset.order_by("-created_at")
+        if "university" in params:
+            queryset = queryset.filter(university_id=params["university"])
+        if "faculty" in params:
+            queryset = queryset.filter(faculty_id=params["faculty"])
+        if "academic_year" in params:
+            queryset = queryset.filter(academic_year=params["academic_year"])
+        if params.get("verified"):
+            queryset = queryset.filter(is_verified=params["verified"] == "true")
+        if term := params.get("search", "").strip():
+            queryset = queryset.filter(
+                Q(user__email__icontains=term)
+                | Q(user__first_name__icontains=term)
+                | Q(user__last_name__icontains=term)
+                | Q(user__phone__icontains=term)
+                | Q(student_number__icontains=term)
+            )
+
+        return queryset.order_by("-created_at", "id")
 
 
 # ═══════════════════════════════════════════════════════════

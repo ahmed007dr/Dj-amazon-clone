@@ -72,13 +72,25 @@ class EmailAccountSerializer(serializers.ModelSerializer):
             "last_error",
             "consecutive_failures",
             "is_failing",
+            "imap_last_uid",
+            "imap_uidvalidity",
+            "imap_last_fetch_at",
+            "imap_last_error",
+            "imap_last_error_at",
         ]
+        # ⚠️  The IMAP cursor and its health are the server's bookkeeping. Letting the screen
+        #     write `imap_last_uid` would be a one-field way to silently skip or re-pull mail.
         read_only_fields = [
             "id",
             "last_success_at",
             "last_error_at",
             "last_error",
             "consecutive_failures",
+            "imap_last_uid",
+            "imap_uidvalidity",
+            "imap_last_fetch_at",
+            "imap_last_error",
+            "imap_last_error_at",
         ]
 
     def get_has_password(self, account: EmailAccount) -> bool:
@@ -243,9 +255,19 @@ class TemplatePreviewSerializer(serializers.Serializer):
 
 
 class InboundAttachmentSerializer(serializers.ModelSerializer):
+    """
+    ⚠️  **`file` is deliberately not exposed.**
+
+        It used to be, and it linked to `/media/mail/inbound/…` — a path `config/urls.py`
+        refuses to serve (an attachment from a stranger must not be public). So the link
+        was dead *and* it disclosed the storage layout. The file is downloaded through
+        `GET admin/inbox/<message>/attachments/<id>/`, which is authenticated,
+        permission-gated and audited.
+    """
+
     class Meta:
         model = InboundAttachment
-        fields = ["id", "filename", "content_type", "size_bytes", "file"]
+        fields = ["id", "filename", "content_type", "size_bytes"]
         read_only_fields = fields
 
 
@@ -276,6 +298,7 @@ class InboundMessageSerializer(serializers.ModelSerializer):
             "body_text",
             "has_html",
             "received_at",
+            "created_at",
             "size_bytes",
             "is_auto",
             "status",
@@ -293,6 +316,7 @@ class InboundMessageSerializer(serializers.ModelSerializer):
             "subject",
             "body_text",
             "received_at",
+            "created_at",
             "size_bytes",
             "is_auto",
             "attachments",
@@ -305,3 +329,19 @@ class InboundMessageSerializer(serializers.ModelSerializer):
 class ReplySerializer(serializers.Serializer):
     body = serializers.CharField()
     subject = serializers.CharField(required=False, allow_blank=True)
+    # Sets the direction and footer language of the branded layout; the preview takes the same
+    language = serializers.ChoiceField(choices=["ar", "en"], required=False, default="ar")
+
+
+class MailPreviewSerializer(serializers.Serializer):
+    """
+    The text of a message about to be sent — to be shown inside the branded layout.
+
+    ⚠️  `body` is required and not blank: a blank body is "nothing to send", and
+        `layout.apply` refuses to wrap it at delivery too — the preview agrees with
+        what would actually go out.
+    """
+
+    subject = serializers.CharField(required=False, allow_blank=True, max_length=500, default="")
+    body = serializers.CharField(max_length=100_000)
+    language = serializers.ChoiceField(choices=["ar", "en"], default="ar")

@@ -1,0 +1,20 @@
+.doc-review__meta {
+  margin-block-end: var(--space-3);
+  font-size: 0.875rem;
+}
+
+.doc-review__image {
+  display: block;
+  max-inline-size: 100%;
+  max-block-size: 65dvh;
+  margin-inline: auto;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+
+.doc-review__frame {
+  inline-size: 100%;
+  block-size: 65dvh;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}

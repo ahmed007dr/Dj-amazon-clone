@@ -27,6 +27,22 @@ class BrandProfileAdmin(DomainModelAdmin):
         (_("الشعار"), {"fields": ("tagline_ar", "tagline_en")}),
         (_("الصور"), {"fields": ("logo_light", "logo_dark", "icon", "favicon", "og_image")}),
         (
+            _("واجهة الصفحة الرئيسية"),
+            {
+                "fields": (
+                    "hero_image_light",
+                    "hero_image_dark",
+                    "hero_title_ar",
+                    "hero_title_en",
+                    "hero_subtitle_ar",
+                    "hero_subtitle_en",
+                    "hero_cta_label_ar",
+                    "hero_cta_label_en",
+                    "hero_cta_url",
+                )
+            },
+        ),
+        (
             _("الطباعة والشكل"),
             {
                 "fields": (

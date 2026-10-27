@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import {
   downloadErrorFile,
@@ -17,7 +17,6 @@ import { ImportColumnGuide } from '@/portals/admin/components/ImportColumnGuide'
 import { ImportErrorTable } from '@/portals/admin/components/ImportErrorTable';
 import { ImportProgress } from '@/portals/admin/components/ImportProgress';
 import { isApiError } from '@/shared/http/errors';
-import { PageHeader } from '@/shared/layouts/PageHeader';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { useToast } from '@/shared/ui/useToast';
@@ -25,7 +24,10 @@ import { useToast } from '@/shared/ui/useToast';
 import './AdminImportPage.css';
 
 /**
- * Bulk catalogue import.
+ * Bulk catalogue import — the "Import" tab of `AdminImportHubPage`.
+ *
+ * ⚠️  It is a **panel**, not a page: the hub owns the header and the tabs, and
+ *     tells this panel which job to show (`jobId`, from `?job=`).
  *
  * ⚠️  **A page, not a drawer** — and that is the one structural decision here.
  *
@@ -44,7 +46,18 @@ import './AdminImportPage.css';
  */
 type Step = 1 | 2 | 3 | 4;
 
-export function AdminImportPage() {
+export function AdminImportPanel({
+  jobId,
+  onJobChange,
+  onBusyChange,
+}: {
+  /** The job to show (`?job=`), or `null` for a fresh upload wizard. */
+  jobId: string | null;
+  /** A new job now exists — the hub puts its id in the URL. */
+  onJobChange: (id: string) => void;
+  /** Whether this panel's chunk loop is running (the hub refuses to switch away). */
+  onBusyChange: (busy: boolean) => void;
+}) {
   const { t } = useTranslation();
   const { notify } = useToast();
 
@@ -53,24 +66,53 @@ export function AdminImportPage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [mode, setMode] = useState<ImportMode>('CREATE_ONLY');
-  const [duplicateOf, setDuplicateOf] = useState<ImportJob['duplicate_of']>(null);
+  // Tied to the job it was reported for, so it cannot leak onto another job's screen
+  const [duplicate, setDuplicate] = useState<{
+    jobId: string;
+    of: NonNullable<ImportJob['duplicate_of']>;
+  } | null>(null);
 
-  // ⚠️  The page serves two entrances now.
+  // ⚠️  The panel serves two entrances.
   //
   //     Without an id it is the upload wizard, as before. With one it reopens an
   //     existing run — which is what makes the runner's promise true from the
   //     operator's side: the tab can be closed and the job picked back up, with
   //     its progress, its error rows and its publish button all still reachable.
-  const { id: routeJobId } = useParams<{ id: string }>();
-  const existing = useImportJob(routeJobId ?? null);
+  const existing = useImportJob(jobId);
 
   const runner = useImportRunner(null);
 
-  // ⚠️  The runner's copy wins once it has one: it is the live result of the
-  //     chunk loop, while the query answer is a snapshot from before the last
-  //     chunk landed. Preferring the query here would make the progress bar
-  //     jump backwards between polls.
-  const job = runner.job ?? existing.data ?? null;
+  useEffect(() => {
+    onBusyChange(runner.isBusy);
+  }, [runner.isBusy, onBusyChange]);
+
+  // ⚠️  Which job is on screen is decided by the URL — not by whatever the runner
+  //     last held.
+  //
+  //     Both hub panels stay mounted (an unmount would stop the chunk loop), so
+  //     `runner.job` outlives the job the admin is looking at. Taking
+  //     `runner.job ?? existing.data` blindly, as this page used to, shows the
+  //     *previous* import's result when another job is opened from the list.
+  //
+  //     1. a loop that is running keeps its own job on screen — the progress bar
+  //        must not be swapped for another job's under it;
+  //     2. otherwise the runner's copy wins only if it IS the requested job: it is
+  //        the live result of the chunk loop, while the query answer is a snapshot
+  //        from before the last chunk landed (preferring the query would make the
+  //        progress bar jump backwards between polls);
+  //     3. otherwise the server's answer for the requested job (or nothing, for
+  //        a fresh wizard).
+  const runnerJob = runner.job;
+  const job: ImportJob | null =
+    (runner.isBusy ? runnerJob : null) ??
+    (runnerJob && runnerJob.id === jobId ? runnerJob : null) ??
+    existing.data ??
+    null;
+
+  // The runner's phase and error describe *its* job; for any other job on screen
+  // they would read as "executing…" or show a failure that belongs elsewhere.
+  const ownsJob = Boolean(job && runnerJob && runnerJob.id === job.id);
+  const phase = ownsJob ? runner.phase : 'idle';
 
   const fail = (error: unknown) =>
     notify(isApiError(error) ? error.displayMessage : t('state.errorTitle'), 'danger');
@@ -90,7 +132,9 @@ export function AdminImportPage() {
       {
         onSuccess: (created) => {
           runner.setJob(created);
-          setDuplicateOf(created.duplicate_of ?? null);
+          setDuplicate(created.duplicate_of ? { jobId: created.id, of: created.duplicate_of } : null);
+          // The URL follows the job, so a reload or a shared link lands on it
+          onJobChange(created.id);
           // ⚠️  Validation starts on its own. The dry run costs nothing and
           //     changes nothing, and making it a second button to press is how
           //     it becomes the step people skip.
@@ -122,15 +166,13 @@ export function AdminImportPage() {
 
   return (
     <div className="admin-import">
-      <PageHeader
-        title={t('imports.title')}
-        description={t('imports.subtitle')}
-        breadcrumb={
-          <Link to="/admin/products" className="admin-import__back">
-            ← {t('nav.products')}
-          </Link>
-        }
-      />
+      {/* A job id that does not exist (an old bookmark): say so, instead of
+          quietly showing an empty wizard under a URL that claims otherwise */}
+      {jobId && existing.error && !job ? (
+        <Alert tone="danger">
+          {isApiError(existing.error) ? existing.error.displayMessage : t('state.errorTitle')}
+        </Alert>
+      ) : null}
 
       {/* ⚠️  Said before the admin uploads anything. A store with no categories
           rejects every single row, and the reason is invisible in the report:
@@ -191,7 +233,7 @@ export function AdminImportPage() {
             <Button
               onClick={handleUpload}
               disabled={!file || runner.isBusy}
-              loading={upload.isPending || runner.phase === 'validating'}
+              loading={upload.isPending || phase === 'validating'}
             >
               {t('imports.uploadAndCheck')}
             </Button>
@@ -200,11 +242,11 @@ export function AdminImportPage() {
           {/* ⚠️  Reported, never blocked. Re-running a file is legitimate; doing
               it unknowingly on an upsert rewrites rows the admin believed they
               had already replaced. */}
-          {duplicateOf ? (
+          {duplicate && duplicate.jobId === job?.id ? (
             <Alert tone="warning">
               {t('imports.duplicateFile', {
-                date: new Date(duplicateOf.created_at).toLocaleString(),
-                count: duplicateOf.created_count,
+                date: new Date(duplicate.of.created_at).toLocaleString(),
+                count: duplicate.of.created_count,
               })}
             </Alert>
           ) : null}
@@ -218,7 +260,7 @@ export function AdminImportPage() {
         >
           {job && step >= 3 ? (
             <>
-              <ImportProgress job={job} phase={runner.phase} />
+              <ImportProgress job={job} phase={phase} />
 
               {job.status === 'VALIDATED' ? (
                 <>
@@ -231,7 +273,7 @@ export function AdminImportPage() {
                   <div className="admin-import__confirm">
                     <Button
                       onClick={() => void runner.execute(job.id)}
-                      loading={runner.phase === 'executing'}
+                      loading={phase === 'executing'}
                     >
                       {t('imports.runNow')}
                     </Button>
@@ -275,7 +317,7 @@ export function AdminImportPage() {
         </StepCard>
       </ol>
 
-      {runner.error ? (
+      {runner.error && ownsJob ? (
         <Alert tone="danger">
           {isApiError(runner.error) ? runner.error.displayMessage : t('state.errorTitle')}
         </Alert>

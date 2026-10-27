@@ -1,0 +1,48 @@
+.prefs__hint {
+  margin-block-end: var(--space-4);
+  font-size: 0.9375rem;
+}
+
+/* ⚠️  `min(100%, …)` inside `minmax` — a fixed 20rem minimum overflows a 320px
+   phone by a few pixels and brings back the horizontal scrollbar. One column on
+   a phone, two on a tablet, three on a wide screen, with no breakpoints to maintain. */
+.prefs__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-4);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.prefs__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.prefs__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.prefs__desc {
+  margin: var(--space-1) 0 0;
+  font-size: 0.8125rem;
+}
+
+.prefs__rows {
+  display: flex;
+  flex-direction: column;
+  border-block-start: 1px solid var(--color-border);
+}
+
+.prefs__row {
+  padding-block: var(--space-1);
+}
+
+.prefs__rows .prefs__row + .prefs__row {
+  border-block-start: 1px solid var(--color-border);
+}

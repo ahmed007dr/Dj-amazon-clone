@@ -102,9 +102,27 @@ def charge(
         with no second execution.
     """
     if idempotency_key:
+        # ⚠️  **Scoped to the thing being paid for, not global.**
+        #
+        #     The lookup used to match on the key alone. The key arrives in a
+        #     client-controlled header, so one customer's key replayed on another
+        #     order (or simply a retry that re-used a key after the first order
+        #     was created) returned a transaction belonging to a different
+        #     payment — and the new order was reported as charged by it. Now only
+        #     a transaction for the *same* reference counts as "the same
+        #     operation"; the same key against another reference is a conflict
+        #     (the unique index forbids reusing it anyway) and is refused plainly.
         existing = PaymentTransaction.objects.filter(idempotency_key=idempotency_key).first()
         if existing is not None:
-            return existing
+            if existing.reference_type == reference_type and existing.reference_id == (
+                str(reference_id) if reference_id else ""
+            ):
+                return existing
+            raise BusinessError(
+                ErrorCode.CONFLICT,
+                detail="مفتاح المنع التكراري مستخدم في عملية دفع أخرى",
+                status_code=409,
+            )
 
     if provider is None:
         candidates = available_providers(

@@ -13,12 +13,12 @@ The catalogue — "what is this product?"
     `avg_rate` and `reviews_count` as properties (N+1 on every list).
 """
 
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from core.identifiers import random_filename
-from core.models.base import BaseModel
+from core.models.base import AuditedModel, BaseModel
 from core.models.slug import SlugMixin
 from core.models.translatable import BilingualNameMixin
 from core.money import MoneyField
@@ -241,7 +241,7 @@ class StorageCondition(models.TextChoices):
     PROTECT_LIGHT = "PROTECT_LIGHT", _("بعيدًا عن الضوء")
 
 
-class Product(BilingualNameMixin, SlugMixin, BaseModel):
+class Product(BilingualNameMixin, SlugMixin, AuditedModel, BaseModel):
     """
     The product.
 
@@ -397,9 +397,106 @@ class Product(BilingualNameMixin, SlugMixin, BaseModel):
         return self.kind == ProductKind.MEDICINE
 
 
+#: `#RRGGBB` — the one colour notation the swatch, the colour picker and the
+#: import sheet all agree on. Shorthand (`#fff`) and names (`red`) are refused:
+#: three notations mean three code paths, and a swatch that silently renders
+#: nothing is how a wrong colour gets shipped.
+HEX_COLOR_VALIDATOR = RegexValidator(
+    r"^#[0-9A-Fa-f]{6}$", message=_("اللون يُكتب بصيغة #RRGGBB، مثل #1E40AF")
+)
+
+
+class ProductColor(BilingualNameMixin, BaseModel):
+    """
+    A colour of a product — with **its own images, optionally its own price,
+    and its own stock**.
+
+    ⚠️  A colour is *not* a second kind of variant; it sits in front of one.
+
+        Stock, the cart, order lines and the point of sale already speak in
+        `ProductVariant`, and every one of them works unchanged. So each colour
+        owns one or more variants (normally exactly one, created with the
+        colour), and "the colour's stock" is the stock of those variants. What
+        the colour adds is what a variant cannot carry: a swatch, a gallery, and
+        a price that replaces the product's.
+
+    ⚠️  `price_override` is an **absolute price**, and `NULL` means "use the product's".
+
+        Not a delta (that is `ProductVariant.price_adjustment`, which still
+        stacks on top for a size inside a colour) and not zero: `0.00` is a
+        legitimate price, so absence has to be distinguishable from it.
+
+        Price lists still win over it — the engine's order is
+        price-list rule → colour price → product price → + variant difference →
+        promotion. See `pricing.services.price_for`.
+    """
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name="colors", verbose_name=_("المنتج")
+    )
+    hex = models.CharField(
+        _("لون العرض"), max_length=7, validators=[HEX_COLOR_VALIDATOR], default="#9CA3AF"
+    )
+    price_override = MoneyField(
+        _("سعر خاص باللون"),
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        help_text=_("فارغ = يُستخدم سعر المنتج"),
+    )
+    display_order = models.PositiveIntegerField(_("الترتيب"), default=0)
+    is_active = models.BooleanField(_("مفعّل"), default=True, db_index=True)
+
+    class Meta:
+        verbose_name = _("لون منتج")
+        verbose_name_plural = _("ألوان المنتجات")
+        ordering = ["display_order", "created_at"]
+        constraints = [
+            # ⚠️  Unique among the *living* — a deleted "Blue" must not block a new one,
+            #     and the variant SKU generator copes with the deleted row still holding its SKU.
+            models.UniqueConstraint(
+                fields=["product", "name_ar"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_color_name_ar_per_product",
+            ),
+            models.UniqueConstraint(
+                fields=["product", "name_en"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_color_name_en_per_product",
+            ),
+        ]
+        indexes = [models.Index(fields=["product", "is_active"])]
+
+    def __str__(self):
+        return f"{self.product.sku} · {self.name_ar}"
+
+    def save(self, *args, **kwargs):
+        # The picker emits lower-case and a person types either — one spelling in the table.
+        if self.hex:
+            self.hex = self.hex.upper()
+        super().save(*args, **kwargs)
+
+
 class ProductImage(BaseModel):
     product = models.ForeignKey(
         Product, on_delete=models.CASCADE, related_name="images", verbose_name=_("المنتج")
+    )
+    #: `NULL` = one of the product's **base** images; set = that colour's own image.
+    #:
+    #: ⚠️  `CASCADE`, deliberately not `SET_NULL`.
+    #:
+    #:     `SET_NULL` would quietly promote a deleted colour's photos into the base
+    #:     gallery — showing a red photo on every colour — and could produce a
+    #:     second base primary image and trip the unique constraint below. A hard
+    #:     delete of the colour takes its photos with it; the normal delete is soft
+    #:     (see `color_api`), which never reaches this relation.
+    color = models.ForeignKey(
+        ProductColor,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="images",
+        verbose_name=_("اللون"),
     )
     image = models.ImageField(_("الصورة"), upload_to=catalog_image_path)
     alt_text_ar = models.CharField(_("النص البديل عربي"), max_length=200, blank=True)
@@ -412,10 +509,21 @@ class ProductImage(BaseModel):
         verbose_name_plural = _("صور المنتجات")
         ordering = ["-is_primary", "display_order"]
         constraints = [
+            # ⚠️  **One primary per scope**, and a scope is "the base gallery" or "one colour".
+            #
+            #     The single constraint this replaces (one primary per product) would have
+            #     made the second colour's first image fail with an integrity error.
+            #     Two partial constraints, because a nullable `color` inside one
+            #     unique index would not enforce anything — NULLs never collide.
             models.UniqueConstraint(
                 fields=["product"],
-                condition=models.Q(is_primary=True, deleted_at__isnull=True),
+                condition=models.Q(is_primary=True, deleted_at__isnull=True, color__isnull=True),
                 name="unique_primary_image_per_product",
+            ),
+            models.UniqueConstraint(
+                fields=["color"],
+                condition=models.Q(is_primary=True, deleted_at__isnull=True, color__isnull=False),
+                name="unique_primary_image_per_color",
             ),
         ]
 
@@ -443,6 +551,25 @@ class ProductVariant(BaseModel):
     #: The variant's differences: {"size": "M", "color": "blue"}
     attributes = models.JSONField(_("الخصائص"), default=dict, blank=True)
 
+    #: The colour this variant belongs to — `NULL` for a plain variant (a size, a strength).
+    #:
+    #: ⚠️  Never filled from `attributes["color"]`. That is free text typed by whoever
+    #:     imported the sheet ("blue", "Blue ", "أزرق"); guessing which colour it meant
+    #:     would attach swatches, prices and galleries to a string match. Linking an
+    #:     old variant to a colour is a deliberate act (`backfill_product_colors`).
+    #:
+    #: ⚠️  `PROTECT`: a colour that still has variants has stock and order history
+    #:     behind it. The API soft-deletes (deactivating the variants); only a hard
+    #:     delete reaches this relation, and refusing it is the point.
+    color = models.ForeignKey(
+        ProductColor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="variants",
+        verbose_name=_("اللون"),
+    )
+
     price_adjustment = MoneyField(
         _("فرق السعر"),
         default=0,
@@ -461,3 +588,20 @@ class ProductVariant(BaseModel):
 
     def __str__(self):
         return f"{self.sku} · {self.name_ar}"
+
+    @property
+    def is_sellable(self) -> bool:
+        """
+        Can a customer still choose this variant?
+
+        ⚠️  The variant's own flag **and** its colour's.
+
+            The colour API deactivates a colour's variants together with it, but
+            the Django panel and an import can flip either flag alone — and a
+            variant of a hidden colour that stays purchasable is a swatch nobody
+            can see, sold by a stale tab. Callers `select_related("color")`.
+        """
+        if not self.is_active or self.deleted_at is not None:
+            return False
+        color = self.color if self.color_id else None
+        return color is None or (color.is_active and color.deleted_at is None)

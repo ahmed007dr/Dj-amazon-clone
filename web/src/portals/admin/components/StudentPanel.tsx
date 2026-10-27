@@ -7,6 +7,7 @@ import {
   useUniversities,
   type StudentRow,
 } from '@/features/academic/adminApi';
+import { useDebounced } from '@/shared/hooks/useDebounced';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
 import { Badge } from '@/shared/ui/Badge';
@@ -17,9 +18,13 @@ import './AcademicPanels.css';
 /**
  * Students — **display and filtering only**.
  *
- * ⚠️  Verification happens on the documents screen, not here: it is a decision
- *     about an uploaded document, not about a row in a table. And duplicating
- *     it in two places makes two decisions for the same student.
+ * ⚠️  Verification happens on the *Verification requests* tab, not here: it is a
+ *     decision about an uploaded document, not about a row in a table. And
+ *     duplicating it in two places makes two decisions for the same student.
+ *
+ * ⚠️  The row says **who** the student is (name and email). Without them this was
+ *     a list of faculties and years with no way to tell which student a row was —
+ *     or to find the one a colleague just asked about.
  *
  * ⚠️  And "unverified" is the first filter: those are the ones waiting, and they
  *     are why this screen is opened at all.
@@ -32,7 +37,11 @@ export function StudentPanel() {
   const [faculty, setFaculty] = useState('');
   const [year, setYear] = useState('');
   const [pendingOnly, setPendingOnly] = useState(false);
+  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+
+  // ⚠️  A pause in typing, not a request per keystroke
+  const term = useDebounced(search.trim());
 
   const universities = useUniversities();
   const faculties = useFaculties(university || undefined);
@@ -43,11 +52,22 @@ export function StudentPanel() {
     ...(faculty ? { faculty } : {}),
     ...(year ? { academic_year: Number(year) } : {}),
     ...(pendingOnly ? { verified: 'false' } : {}),
+    ...(term ? { search: term } : {}),
   });
 
   const reset = () => setPage(1);
 
   const columns: Column<StudentRow>[] = [
+    {
+      key: 'student',
+      header: t('academic.review.student'),
+      render: (row) => (
+        <div className="academic-cell">
+          <strong>{row.user_name}</strong>
+          <code dir="ltr">{row.user_email}</code>
+        </div>
+      ),
+    },
     {
       key: 'number',
       header: t('academic.studentNumber'),
@@ -79,8 +99,10 @@ export function StudentPanel() {
       key: 'verified',
       header: t('academic.verification'),
       render: (row) => (
-        <Badge tone={row.is_verified ? 'success' : 'warning'}>
-          {row.is_verified ? t('academic.verified') : t('academic.pending')}
+        <Badge tone={row.is_verified ? 'success' : row.verification_status === 'REJECTED' ? 'danger' : 'warning'}>
+          {row.is_verified
+            ? t('academic.verified')
+            : t(`verification.${row.verification_status}`)}
         </Badge>
       ),
     },
@@ -89,6 +111,19 @@ export function StudentPanel() {
   return (
     <>
       <div className="academic-toolbar">
+        <label className="academic-filter">
+          {t('common.search')}
+          <input
+            type="search"
+            value={search}
+            placeholder={t('academic.review.searchPlaceholder')}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              reset();
+            }}
+          />
+        </label>
+
         <label className="academic-filter">
           {t('academic.university')}
           <select

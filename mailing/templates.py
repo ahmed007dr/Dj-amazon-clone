@@ -184,6 +184,34 @@ PASSWORD_CHANGED = register(
     )
 )
 
+#: ⚠️  A staff invite — sent when an admin creates a staff member. The recipient has
+#:     no password yet; the link is a long-lived password-reset token (`STAFF_INVITE_TTL`)
+#:     that opens the normal `/auth/reset-password` page.
+STAFF_INVITE = register(
+    MailTemplate(
+        key="staff_invite",
+        purpose=MailPurpose.ACCOUNT,
+        subject_ar="دعوة للانضمام إلى فريق العمل",
+        subject_en="You have been invited to join the team",
+        body_ar=(
+            "مرحبًا {name}،\n\n"
+            "دعاك {inviter} للانضمام إلى فريق العمل بصفة «{role}» ({access}).\n\n"
+            "لتفعيل حسابك واختيار كلمة المرور، افتح الرابط التالي:\n{link}\n\n"
+            "الرابط صالح لمدة {expiry} ويُستخدم مرة واحدة. "
+            "بعد تعيين كلمة المرور سجّل الدخول بهذا البريد الإلكتروني.\n\n"
+            "إن لم تكن تتوقع هذه الدعوة، تجاهل هذه الرسالة — لن يتغير شيء."
+        ),
+        body_en=(
+            "Hello {name},\n\n"
+            "{inviter} has invited you to join the team as “{role}” ({access}).\n\n"
+            "To activate your account and choose your password, open this link:\n{link}\n\n"
+            "The link is valid for {expiry} and can be used once. "
+            "After setting your password, sign in with this email address.\n\n"
+            "If you were not expecting this invitation, ignore this message — nothing will change."
+        ),
+    )
+)
+
 ACCOUNT_SUSPENDED = register(
     MailTemplate(
         key="account_suspended",
@@ -255,6 +283,51 @@ ACCOUNT_ACTIVATED = register(
         subject_en="Your account has been reactivated",
         body_ar="مرحبًا {name}،\n\nتم إعادة تفعيل حسابك. يمكنك تسجيل الدخول الآن.",
         body_en="Hello {name},\n\nYour account has been reactivated. You can sign in now.",
+    )
+)
+
+# ⚠️  The outcome of a document review — the rejection carries the reviewer's reason.
+#
+#     A student told only "rejected" uploads the same photo again. The reason is
+#     the part of the message that changes what they do next.
+
+DOCUMENT_APPROVED = register(
+    MailTemplate(
+        key="document_approved",
+        purpose=MailPurpose.ACCOUNT,
+        subject_ar="تم اعتماد وثيقتك",
+        subject_en="Your document was approved",
+        body_ar=(
+            "مرحبًا {name}،\n\n"
+            "تم اعتماد وثيقتك ({document_type}).\n\n"
+            "يمكنك متابعة حالة وثائقك من حسابك:\n{link}"
+        ),
+        body_en=(
+            "Hello {name},\n\n"
+            "Your document ({document_type}) was approved.\n\n"
+            "You can follow your documents from your account:\n{link}"
+        ),
+    )
+)
+
+DOCUMENT_REJECTED = register(
+    MailTemplate(
+        key="document_rejected",
+        purpose=MailPurpose.ACCOUNT,
+        subject_ar="لم نتمكن من اعتماد وثيقتك",
+        subject_en="We could not approve your document",
+        body_ar=(
+            "مرحبًا {name}،\n\n"
+            "لم نتمكن من اعتماد وثيقتك ({document_type}).\n"
+            "السبب: {reason}\n\n"
+            "يمكنك رفع وثيقة أوضح من حسابك:\n{link}"
+        ),
+        body_en=(
+            "Hello {name},\n\n"
+            "We could not approve your document ({document_type}).\n"
+            "Reason: {reason}\n\n"
+            "You can upload a clearer document from your account:\n{link}"
+        ),
     )
 )
 
@@ -399,6 +472,80 @@ PAYMENT_RECEIVED = register(
             "Payment method: {method}\n"
             "Reference: {reference}\n\n"
             "{link}"
+        ),
+    )
+)
+
+
+# ═══════════════════════════════════════════════════════════
+#  Guest orders — a buyer with no account
+# ═══════════════════════════════════════════════════════════
+#
+#  ⚠️  The link in these is the buyer's *only* way back to the order: there is no
+#      login to fall back on. It is a signed, expiring token (see `orders/guest.py`),
+#      so the message says what the link is and to whom it should not be forwarded.
+#
+#  ⚠️  `{items}` is a ready-made multi-line list built from the order's snapshot,
+#      in the buyer's language — never recomputed here (ADR-30).
+
+GUEST_ORDER_CONFIRMATION = register(
+    MailTemplate(
+        key="guest_order_confirmation",
+        purpose=MailPurpose.ORDERS,
+        subject_ar="استلمنا طلبك {number}",
+        subject_en="We received your order {number}",
+        body_ar=(
+            "مرحبًا {name}،\n\n"
+            "استلمنا طلبك رقم {number}:\n\n"
+            "{items}\n\n"
+            "الإجمالي: {total}\n"
+            "الدفع: نقدًا عند الاستلام\n"
+            "عنوان التوصيل: {address}\n\n"
+            "سنتصل بك على الرقم {phone} لتأكيد الطلب قبل شحنه.\n\n"
+            "تابع طلبك أو ألغِه قبل التأكيد من هذا الرابط:\n{link}\n\n"
+            "الرابط خاص بك — لا ترسله لأحد. إن لم تطلب هذا الطلب، تجاهل هذه الرسالة."
+        ),
+        body_en=(
+            "Hello {name},\n\n"
+            "We received your order {number}:\n\n"
+            "{items}\n\n"
+            "Total: {total}\n"
+            "Payment: cash on delivery\n"
+            "Delivery address: {address}\n\n"
+            "We will call you on {phone} to confirm the order before it ships.\n\n"
+            "Track your order, or cancel it before it is confirmed, from this link:\n{link}\n\n"
+            "The link is private to you — do not forward it. "
+            "If you did not place this order, ignore this message."
+        ),
+    )
+)
+
+#: For the owner, not the buyer — always sent in Arabic.
+GUEST_ORDER_ADMIN_ALERT = register(
+    MailTemplate(
+        key="guest_order_admin_alert",
+        purpose=MailPurpose.ORDERS,
+        subject_ar="طلب زائر جديد {number} — يحتاج تأكيدًا هاتفيًا",
+        subject_en="New guest order {number} — needs a confirmation call",
+        body_ar=(
+            "وصل طلب جديد من زائر بلا حساب، ويحتاج اتصالًا لتأكيده.\n\n"
+            "رقم الطلب: {number}\n"
+            "الاسم: {name}\n"
+            "الهاتف: {phone}\n"
+            "العنوان: {address}\n\n"
+            "{items}\n\n"
+            "الإجمالي: {total} (دفع عند الاستلام)\n\n"
+            "افتح الطلب:\n{link}"
+        ),
+        body_en=(
+            "A new order arrived from a visitor with no account and needs a call to confirm.\n\n"
+            "Order: {number}\n"
+            "Name: {name}\n"
+            "Phone: {phone}\n"
+            "Address: {address}\n\n"
+            "{items}\n\n"
+            "Total: {total} (cash on delivery)\n\n"
+            "Open the order:\n{link}"
         ),
     )
 )

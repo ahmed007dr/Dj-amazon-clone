@@ -26,6 +26,11 @@
   animation: modal-in 160ms ease;
 }
 
+.modal__panel--lg {
+  inline-size: min(100%, 56rem);
+  max-block-size: min(92dvh, 60rem);
+}
+
 @keyframes modal-in {
   from {
     opacity: 0;

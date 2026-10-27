@@ -20,12 +20,15 @@ export function Modal({
   title,
   children,
   footer,
+  size = 'md',
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
   footer?: ReactNode;
+  /** `lg` for content that needs room — a document preview, say. */
+  size?: 'md' | 'lg';
 }) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -66,7 +69,7 @@ export function Modal({
 
       <div
         ref={panelRef}
-        className="modal__panel surface"
+        className={`modal__panel surface ${size === 'lg' ? 'modal__panel--lg' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}

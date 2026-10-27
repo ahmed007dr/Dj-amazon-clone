@@ -34,4 +34,31 @@ urlpatterns = [
         api.DocumentDeleteAPI.as_view(),
         name="document-delete",
     ),
+    # Admin — reviewing verification documents (`CanManageAcademic`)
+    path("admin/documents/", api.AdminDocumentListAPI.as_view(), name="admin-documents"),
+    path(
+        "admin/documents/counts/",
+        api.AdminDocumentCountsAPI.as_view(),
+        name="admin-document-counts",
+    ),
+    path(
+        "admin/documents/bulk-approve/",
+        api.AdminDocumentBulkApproveAPI.as_view(),
+        name="admin-document-bulk-approve",
+    ),
+    path(
+        "admin/documents/<uuid:pk>/file/",
+        api.AdminDocumentFileAPI.as_view(),
+        name="admin-document-file",
+    ),
+    path(
+        "admin/documents/<uuid:pk>/approve/",
+        api.AdminDocumentApproveAPI.as_view(),
+        name="admin-document-approve",
+    ),
+    path(
+        "admin/documents/<uuid:pk>/reject/",
+        api.AdminDocumentRejectAPI.as_view(),
+        name="admin-document-reject",
+    ),
 ]

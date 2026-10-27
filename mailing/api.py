@@ -8,19 +8,22 @@ Mail endpoints — admin only.
     are enough for an attacker to know where to try passwords.
 """
 
-from django.http import Http404
+from django.http import FileResponse, Http404
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.api.pagination import AdminPageNumberPagination
+from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
 from core.permissions import CanManageMailing
+from mailing import inbound, layout, services
 from mailing import serializers as s
-from mailing import services
 from mailing.models import (
     EmailAccount,
+    InboundAttachment,
     InboundMessage,
+    InboundState,
     MailRoute,
     OutboundMessage,
     TemplateOverride,
@@ -76,7 +79,24 @@ class VerifyAccountAPI(APIView):
     def post(self, request, pk):
         account = generics.get_object_or_404(EmailAccount.objects.all(), pk=pk)
         ok, error = services.verify(account)
-        return Response({"ok": ok, "error": error})
+        # `skipped`: an inbound-only account has no SMTP - the screen shows the IMAP test instead
+        return Response({"ok": ok, "error": error, "skipped": not account.sends})
+
+
+class TestImapAPI(APIView):
+    """
+    Log in to the mailbox, open the folder, count - the **inbound** counterpart of `verify`.
+
+    ⚠️  Always `200` with `ok` in the body, like `verify`: a wrong password is an answer to
+        the question the button asks, not a server error. It reads the mailbox and changes
+        nothing in it; the only thing it writes is the account's own IMAP health.
+    """
+
+    permission_classes = [CanManageMailing]
+
+    def post(self, request, pk):
+        account = generics.get_object_or_404(EmailAccount.objects.all(), pk=pk)
+        return Response(inbound.check_connection(account))
 
 
 class TestSendAPI(APIView):
@@ -371,7 +391,73 @@ class InboxListAPI(generics.ListAPIView):
         if params.get("hide_auto") == "true":
             queryset = queryset.filter(is_auto=False)
 
-        return queryset.order_by("-received_at")
+        # ⚠️  By **arrival** (`created_at`), not by the sender's `Date` header (`received_at`).
+        #     The header is whatever the sender's clock said: a message stamped last March, or
+        #     stamped in the future, sorted to a page nobody opens - and "the customer replied
+        #     and it is not in the inbox" was, in part, exactly that.
+        return queryset.order_by("-created_at", "-pk")
+
+
+class InboxSummaryAPI(APIView):
+    """
+    How many messages are waiting - for the badge on the tab.
+
+    ⚠️  A count query, not the list: the badge is polled, and fetching a page of messages
+        every minute to read `count` would make the cheapest number on the screen the
+        most expensive request.
+    """
+
+    permission_classes = [CanManageMailing]
+
+    def get(self, request):
+        return Response({"new": InboundMessage.objects.filter(status=InboundState.NEW).count()})
+
+
+class InboundAttachmentDownloadAPI(APIView):
+    """
+    An inbound attachment - streamed to an authorised admin, never linked from `/media/`.
+
+    ⚠️  **The most dangerous file in the system**: it came from a stranger who only needed
+        our address. `config/urls.py` refuses to serve `media/mail/`, so this is the only way
+        in, and it is: authenticated, gated by `CanManageMailing`, audited, always a
+        download (`attachment`) and never rendered in the page, typed by its signature (the
+        stored `content_type` is the checked one, not the sender's claim), and `nosniff`.
+    """
+
+    permission_classes = [CanManageMailing]
+
+    def get(self, request, pk, attachment_pk):
+        attachment = (
+            InboundAttachment.objects.filter(pk=attachment_pk, message_id=pk)
+            .select_related("message")
+            .first()
+        )
+        if attachment is None or not attachment.file:
+            raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
+
+        try:
+            handle = attachment.file.open("rb")
+        except FileNotFoundError as error:
+            # The row outlived its file (a restored backup, a cleaned media folder)
+            raise BusinessError(ErrorCode.NOT_FOUND, status_code=404) from error
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditAction.EXPORT,
+            object_repr=f"مرفق وارد {attachment.filename}",
+            changes={"message": str(pk), "attachment": str(attachment.pk)},
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        response = FileResponse(
+            handle,
+            as_attachment=True,
+            filename=attachment.filename,
+            content_type=attachment.content_type or "application/octet-stream",
+        )
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Cache-Control"] = "private, no-store"
+        return response
 
 
 class InboxDetailAPI(generics.RetrieveUpdateAPIView):
@@ -386,6 +472,37 @@ class InboxDetailAPI(generics.RetrieveUpdateAPIView):
     permission_classes = [CanManageMailing]
     serializer_class = s.InboundMessageSerializer
     queryset = InboundMessage.objects.select_related("account").prefetch_related("attachments")
+
+
+class MailPreviewAPI(APIView):
+    """
+    The branded HTML of a message, exactly as it would go out - **before** it is sent.
+
+    ⚠️  It sends nothing and writes nothing, and it uses the same renderer as delivery
+        (`layout.preview` -> `layout.render_html`), so what the admin approves is what the
+        customer receives. The result is meant for a **sandboxed iframe** (`srcDoc`,
+        `sandbox=""`): it is rendered markup, built from text an admin typed.
+    """
+
+    permission_classes = [CanManageMailing]
+    serializer_class = s.MailPreviewSerializer
+
+    def post(self, request):
+        payload = s.MailPreviewSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        draft = payload.validated_data
+
+        document = layout.preview(
+            subject=draft["subject"], body=draft["body"], language=draft["language"]
+        )
+        if document is None:
+            raise BusinessError(
+                ErrorCode.VALIDATION_ERROR,
+                detail="لا نص لعرضه",
+                status_code=400,
+            )
+
+        return Response({"html": document})
 
 
 class ReplyAPI(APIView):
@@ -410,6 +527,7 @@ class ReplyAPI(APIView):
             body=payload.validated_data["body"],
             subject=payload.validated_data.get("subject", ""),
             actor=request.user,
+            language=payload.validated_data["language"],
         )
 
         AuditLog.objects.create(

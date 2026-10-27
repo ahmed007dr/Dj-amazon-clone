@@ -9,21 +9,67 @@ Catalogue admin panel.
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
-from catalog.models import Brand, Category, Manufacturer, Product, ProductImage, ProductVariant
+from catalog.models import (
+    Brand,
+    Category,
+    Manufacturer,
+    Product,
+    ProductColor,
+    ProductImage,
+    ProductVariant,
+)
 from core.admin import DeletedListFilter, DomainModelAdmin, SlugAdminMixin
 
 
 class ProductImageInline(admin.TabularInline):
     model = ProductImage
     extra = 0
-    fields = ("image", "alt_text_ar", "alt_text_en", "display_order", "is_primary")
+    fields = ("image", "color", "alt_text_ar", "alt_text_en", "display_order", "is_primary")
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        # ⚠️  A colour of THIS product only — the dropdown would otherwise list every
+        #     colour of every product, and a wrong pick files a photo under another
+        #     product's swatch.
+        if db_field.name == "color":
+            product_id = request.resolver_match.kwargs.get("object_id")
+            kwargs["queryset"] = ProductColor.objects.filter(product_id=product_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+class ProductColorInline(admin.TabularInline):
+    """
+    ⚠️  Adding a colour here does **not** create its variant — the API does.
+
+        Use the product page in the admin panel (Colours) for normal work; this
+        inline is for repair. A colour added here has no variant until
+        `backfill_product_colors` (or the panel) creates one.
+    """
+
+    model = ProductColor
+    extra = 0
+    fields = ("name_ar", "name_en", "hex", "price_override", "display_order", "is_active")
+    show_change_link = True
 
 
 class ProductVariantInline(admin.TabularInline):
     model = ProductVariant
     extra = 0
-    fields = ("sku", "name_ar", "attributes", "price_adjustment", "display_order", "is_active")
+    fields = (
+        "sku",
+        "name_ar",
+        "color",
+        "attributes",
+        "price_adjustment",
+        "display_order",
+        "is_active",
+    )
     show_change_link = True
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "color":
+            product_id = request.resolver_match.kwargs.get("object_id")
+            kwargs["queryset"] = ProductColor.objects.filter(product_id=product_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 @admin.register(Category)
@@ -129,7 +175,7 @@ class ProductAdmin(SlugAdminMixin, DomainModelAdmin):
     )
     autocomplete_fields = ("category", "brand", "manufacturer", "access_policy", "tax_class")
     date_hierarchy = "created_at"
-    inlines = (ProductImageInline, ProductVariantInline)
+    inlines = (ProductColorInline, ProductImageInline, ProductVariantInline)
     list_per_page = 50
 
     fieldsets = (
@@ -184,18 +230,36 @@ class ProductAdmin(SlugAdminMixin, DomainModelAdmin):
     )
 
 
+@admin.register(ProductColor)
+class ProductColorAdmin(DomainModelAdmin):
+    list_display = (
+        "product",
+        "name_ar",
+        "name_en",
+        "hex",
+        "price_override",
+        "display_order",
+        "is_active",
+        "is_deleted",
+    )
+    list_filter = ("is_active", DeletedListFilter)
+    list_select_related = ("product",)
+    search_fields = ("name_ar", "name_en", "product__name_ar", "product__sku")
+    autocomplete_fields = ("product",)
+
+
 @admin.register(ProductImage)
 class ProductImageAdmin(DomainModelAdmin):
-    list_display = ("product", "image", "is_primary", "display_order", "is_deleted")
+    list_display = ("product", "color", "image", "is_primary", "display_order", "is_deleted")
     list_filter = ("is_primary", DeletedListFilter)
-    list_select_related = ("product",)
+    list_select_related = ("product", "color")
     search_fields = ("product__name_ar", "product__sku", "alt_text_ar")
     autocomplete_fields = ("product",)
 
 
 @admin.register(ProductVariant)
 class ProductVariantAdmin(DomainModelAdmin):
-    list_display = ("sku", "product", "name_ar", "price_adjustment", "is_active", "is_deleted")
+    list_display = ("sku", "product", "name_ar", "color", "price_adjustment", "is_active", "is_deleted")
     list_filter = ("is_active", DeletedListFilter)
     list_select_related = ("product",)
     search_fields = ("sku", "barcode", "name_ar", "name_en", "product__name_ar", "product__sku")

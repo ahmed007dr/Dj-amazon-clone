@@ -17,6 +17,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from branding.models import BrandProfile, ThemeMode, ThemePalette
+from branding.serializers import ASSET_FIELDS, MAX_ASSET_SIZE, MAX_HERO_SIZE
 from conftest import real_png_bytes
 from core.testing import grant_all_domains
 
@@ -123,11 +124,13 @@ class TestUpload:
 
         assert response.status_code == 400
 
-    @pytest.mark.parametrize("field", ["logo_light", "logo_dark", "icon", "favicon", "og_image"])
+    @pytest.mark.parametrize("field", ASSET_FIELDS)
     def test_every_asset_field_is_guarded(self, admin_client, profile, field):
         """
-        ⚠️  The field forgotten from the check is the hole — and all five are
-            uploaded from the same screen with the same button.
+        ⚠️  The field forgotten from the check is the hole — and all of them are
+            uploaded from the same screen with the same button. The list is the
+            serializer's own `ASSET_FIELDS`, so a field added tomorrow is covered
+            without anyone remembering to extend this test.
         """
         response = admin_client.patch(
             detail_url(profile),
@@ -257,3 +260,165 @@ class TestProfileFields:
 
         assert response.status_code == 400
         assert "contact_email" in response.data["fields"]
+
+
+# ═══════════════════════════════════════════════════════════
+#  The home-page hero
+# ═══════════════════════════════════════════════════════════
+
+HERO_IMAGES = ["hero_image_light", "hero_image_dark"]
+
+
+def _png(name="hero.png", extra=0):
+    return SimpleUploadedFile(name, real_png_bytes() + b"0" * extra, "image/png")
+
+
+class TestHeroImages:
+    def test_the_hero_images_are_part_of_the_guarded_set(self):
+        """Outside `ASSET_FIELDS` they would lose the signature check and the clear path."""
+        assert set(HERO_IMAGES) <= set(ASSET_FIELDS)
+
+    @pytest.mark.parametrize("field", HERO_IMAGES)
+    def test_a_real_image_is_accepted_and_can_be_cleared(self, admin_client, profile, field):
+        response = admin_client.patch(detail_url(profile), {field: _png()}, format="multipart")
+        assert response.status_code == 200
+        profile.refresh_from_db()
+        assert getattr(profile, field).name
+
+        cleared = admin_client.patch(detail_url(profile), {field: None}, format="json")
+        assert cleared.status_code == 200
+        profile.refresh_from_db()
+        assert not getattr(profile, field).name
+
+    @pytest.mark.parametrize("field", HERO_IMAGES)
+    def test_a_forged_hero_is_refused(self, admin_client, profile, field):
+        """Served from the site's own origin — an SVG carrying a script is the worst case."""
+        response = admin_client.patch(
+            detail_url(profile),
+            {field: SimpleUploadedFile("x.png", b"<svg onload=alert(1)>", "image/png")},
+            format="multipart",
+        )
+
+        assert response.status_code == 400
+        assert field in response.data["fields"]
+
+    def test_the_hero_limit_is_higher_than_a_logos_but_still_a_limit(self, admin_client, profile):
+        """
+        ⚠️  A photograph does not fit in the two megabytes a logo is held to — and
+            "no limit" is not the alternative: 3 MB passes for the banner, the
+            same file is refused as an icon, and anything over the ceiling is
+            refused for the banner too.
+        """
+        assert MAX_HERO_SIZE > MAX_ASSET_SIZE
+        three_mb = 3 * 1024 * 1024
+
+        banner = admin_client.patch(
+            detail_url(profile), {"hero_image_light": _png(extra=three_mb)}, format="multipart"
+        )
+        icon = admin_client.patch(
+            detail_url(profile), {"icon": _png(extra=three_mb)}, format="multipart"
+        )
+        huge = admin_client.patch(
+            detail_url(profile),
+            {"hero_image_dark": _png(extra=MAX_HERO_SIZE + 1024)},
+            format="multipart",
+        )
+
+        assert banner.status_code == 200
+        assert icon.status_code == 400
+        assert huge.status_code == 400
+
+    def test_the_two_modes_are_independent(self, admin_client, profile):
+        admin_client.patch(
+            detail_url(profile), {"hero_image_dark": _png("dark.png")}, format="multipart"
+        )
+
+        profile.refresh_from_db()
+        assert profile.hero_image_dark.name
+        assert not profile.hero_image_light.name
+
+    def test_a_customer_cannot_upload_a_hero(self, profile):
+        customer = _model("accounts", "User").objects.create_user(
+            email="hero-c@test.local", password=PASSWORD
+        )
+        customer.is_active = True
+        customer.save()
+
+        client = APIClient()
+        client.force_authenticate(user=customer)
+
+        response = client.patch(
+            detail_url(profile), {"hero_image_light": _png()}, format="multipart"
+        )
+
+        assert response.status_code == 403
+
+
+class TestHeroText:
+    def test_the_texts_are_editable_in_both_languages(self, admin_client, profile):
+        response = admin_client.patch(
+            detail_url(profile),
+            {
+                "hero_title_ar": "صحتك أولًا",
+                "hero_title_en": "Your health first",
+                "hero_subtitle_ar": "كل ما تحتاجه في مكان واحد",
+                "hero_subtitle_en": "Everything you need in one place",
+                "hero_cta_label_ar": "تسوّق الآن",
+                "hero_cta_label_en": "Shop now",
+                "hero_cta_url": "/offers",
+            },
+            format="json",
+        )
+
+        assert response.status_code == 200
+        profile.refresh_from_db()
+        assert profile.hero_title_ar == "صحتك أولًا"
+        assert profile.hero_cta_label_en == "Shop now"
+        assert profile.hero_cta_url == "/offers"
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "",
+            "/products",
+            "/offers?sale=1",
+            "/category/medical-devices",
+            "https://example.com/promo",
+        ],
+    )
+    def test_a_safe_cta_url_is_accepted(self, admin_client, profile, url):
+        response = admin_client.patch(detail_url(profile), {"hero_cta_url": url}, format="json")
+        assert response.status_code == 200, url
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "javascript:alert(1)",
+            "JaVaScRiPt:alert(1)",
+            "data:text/html,<script>alert(1)</script>",
+            "//evil.example/phish",
+            "/\\evil.example",
+            "http://example.com/insecure",
+            "ftp://example.com/file",
+            "products",
+            "/with space",
+            "https://",
+        ],
+    )
+    def test_an_unsafe_cta_url_is_refused(self, admin_client, profile, url):
+        """
+        ⚠️  The value becomes a link on the busiest page, edited from a panel.
+            `javascript:` is stored XSS; `//host` *looks* like a path and leaves the site.
+        """
+        response = admin_client.patch(detail_url(profile), {"hero_cta_url": url}, format="json")
+
+        assert response.status_code == 400, url
+        assert "hero_cta_url" in response.data["fields"]
+        profile.refresh_from_db()
+        assert profile.hero_cta_url == ""
+
+    def test_the_title_length_is_bounded(self, admin_client, profile):
+        response = admin_client.patch(
+            detail_url(profile), {"hero_title_ar": "ع" * 121}, format="json"
+        )
+        assert response.status_code == 400

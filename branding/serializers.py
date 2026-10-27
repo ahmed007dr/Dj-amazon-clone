@@ -67,12 +67,32 @@ class ThemePaletteSerializer(serializers.ModelSerializer):
         return attrs
 
 
-#: The five identity assets — all images uploaded from the panel
-ASSET_FIELDS = ("logo_light", "logo_dark", "icon", "favicon", "og_image")
+#: The identity assets — all images uploaded from the panel
+ASSET_FIELDS = (
+    "logo_light",
+    "logo_dark",
+    "icon",
+    "favicon",
+    "og_image",
+    "hero_image_light",
+    "hero_image_dark",
+)
 
 #: ⚠️  Smaller than the product image limit: the logo is downloaded on **every**
 #:     page by every visitor. A two-megabyte file slows the whole site, not one product page.
 MAX_ASSET_SIZE = 2 * 1024 * 1024
+
+#: ⚠️  The home banner is the one asset that is genuinely a photograph: 1920 px wide at a
+#:     sensible JPEG quality is already a megabyte or two. It is only downloaded by visitors
+#:     who open the home page, and only one of the two (the one for their theme) — so the
+#:     ceiling is higher than a logo's, and still a ceiling.
+MAX_HERO_SIZE = 5 * 1024 * 1024
+
+#: Per-field overrides of `MAX_ASSET_SIZE`
+ASSET_MAX_SIZE = {
+    "hero_image_light": MAX_HERO_SIZE,
+    "hero_image_dark": MAX_HERO_SIZE,
+}
 
 
 class BrandProfileSerializer(serializers.ModelSerializer):
@@ -90,6 +110,8 @@ class BrandProfileSerializer(serializers.ModelSerializer):
     icon = serializers.ImageField(required=False, allow_null=True)
     favicon = serializers.ImageField(required=False, allow_null=True)
     og_image = serializers.ImageField(required=False, allow_null=True)
+    hero_image_light = serializers.ImageField(required=False, allow_null=True)
+    hero_image_dark = serializers.ImageField(required=False, allow_null=True)
 
     def update(self, instance, validated_data):
         """
@@ -105,7 +127,7 @@ class BrandProfileSerializer(serializers.ModelSerializer):
 
         return super().update(instance, validated_data)
 
-    def _validate_asset(self, value):
+    def _validate_asset(self, value, field_name: str = ""):
         """
         ⚠️  **The check is on the file signature, not on its header.**
 
@@ -126,18 +148,36 @@ class BrandProfileSerializer(serializers.ModelSerializer):
             validate_upload(
                 value,
                 allowed_types=ALLOWED_IMAGE_TYPES,
-                max_size=MAX_ASSET_SIZE,
+                max_size=ASSET_MAX_SIZE.get(field_name, MAX_ASSET_SIZE),
             )
         except DjangoValidationError as error:
             raise serializers.ValidationError(error.messages) from error
 
         return value
 
-    validate_logo_light = _validate_asset
-    validate_logo_dark = _validate_asset
-    validate_icon = _validate_asset
-    validate_favicon = _validate_asset
-    validate_og_image = _validate_asset
+    # ⚠️  One thin wrapper per field rather than `validate_<f> = _validate_asset`: DRF calls
+    #     `validate_<field>(value)` and does not say which field, and the hero images have a
+    #     different ceiling from the logos.
+    def validate_logo_light(self, value):
+        return self._validate_asset(value, "logo_light")
+
+    def validate_logo_dark(self, value):
+        return self._validate_asset(value, "logo_dark")
+
+    def validate_icon(self, value):
+        return self._validate_asset(value, "icon")
+
+    def validate_favicon(self, value):
+        return self._validate_asset(value, "favicon")
+
+    def validate_og_image(self, value):
+        return self._validate_asset(value, "og_image")
+
+    def validate_hero_image_light(self, value):
+        return self._validate_asset(value, "hero_image_light")
+
+    def validate_hero_image_dark(self, value):
+        return self._validate_asset(value, "hero_image_dark")
 
     class Meta:
         model = BrandProfile
@@ -153,6 +193,15 @@ class BrandProfileSerializer(serializers.ModelSerializer):
             "icon",
             "favicon",
             "og_image",
+            "hero_image_light",
+            "hero_image_dark",
+            "hero_title_ar",
+            "hero_title_en",
+            "hero_subtitle_ar",
+            "hero_subtitle_en",
+            "hero_cta_label_ar",
+            "hero_cta_label_en",
+            "hero_cta_url",
             "font_ar",
             "font_en",
             "font_size_base",
@@ -189,6 +238,7 @@ class PublicThemeSerializer(serializers.Serializer):
     name = serializers.DictField(read_only=True)
     tagline = serializers.DictField(read_only=True)
     assets = serializers.DictField(read_only=True)
+    hero = serializers.DictField(read_only=True)
     default_mode = serializers.CharField(read_only=True)
     tokens = serializers.DictField(read_only=True)
     palettes = serializers.DictField(read_only=True)

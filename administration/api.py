@@ -7,6 +7,8 @@ They cover what was explicitly requested:
   • last seen · last action · total time used
 """
 
+from uuid import UUID
+
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from rest_framework import generics
@@ -146,7 +148,11 @@ class AccountActivityAPI(generics.ListAPIView):
     pagination_class = AdminPageNumberPagination
 
     def get_queryset(self):
-        return AuditLog.objects.filter(actor_id=self.kwargs["pk"]).order_by("-created_at")
+        return (
+            AuditLog.objects.filter(actor_id=self.kwargs["pk"])
+            .select_related("actor", "content_type")
+            .order_by("-created_at")
+        )
 
 
 class AccountStatusHistoryAPI(generics.ListAPIView):
@@ -227,19 +233,39 @@ class ActivateAccountAPI(APIView):
 
 
 class AuditLogListAPI(generics.ListAPIView):
-    """The general audit log."""
+    """
+    The general audit log.
+
+    Filters: `action`, `actor` (user id), and — to answer "what happened to THIS
+    thing?" — `model` (`app_label.model`, e.g. `catalog.product`) with `object_id`.
+
+    ⚠️  `object_id` alone is refused as a filter: ids are only unique per model,
+        and a bare id would mix unrelated objects of different types.
+    """
 
     permission_classes = [CanManageAccounts]
     serializer_class = s.AuditLogSerializer
     pagination_class = AdminPageNumberPagination
 
     def get_queryset(self):
-        queryset = AuditLog.objects.all()
+        queryset = AuditLog.objects.select_related("actor", "content_type")
         params = self.request.query_params
 
         if action := params.get("action"):
             queryset = queryset.filter(action=action)
         if actor := params.get("actor"):
-            queryset = queryset.filter(actor_id=actor)
+            # ⚠️  A malformed id is "no such user", not a 500.
+            try:
+                queryset = queryset.filter(actor_id=UUID(actor))
+            except ValueError:
+                queryset = queryset.none()
 
-        return queryset.order_by("-created_at")
+        if model := params.get("model"):
+            app_label, _, model_name = model.lower().partition(".")
+            queryset = queryset.filter(
+                content_type__app_label=app_label, content_type__model=model_name
+            )
+            if object_id := params.get("object_id"):
+                queryset = queryset.filter(object_id=object_id)
+
+        return queryset.order_by("-created_at", "-id")

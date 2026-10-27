@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { http } from '@/shared/http';
+import { http, saveFile } from '@/shared/http';
 import type { PagedResponse } from '@/features/orders/adminApi';
 
 /**
@@ -81,7 +81,14 @@ export interface Expense {
   incurred_on: string;
   vendor_name: string;
   reference: string;
-  attachment: string | null;
+  /**
+   * ⚠️  No file URL: the stored path is private and the media route refuses it.
+   *     The file is read through `downloadExpenseAttachment` — an authenticated,
+   *     audited request — and these two fields only say whether there is one.
+   */
+  has_attachment: boolean;
+  /** The name the download will be saved under, e.g. `expense-2026-03-01-INV-77.pdf`. */
+  attachment_name: string | null;
   payment_mean: string;
   status: ExpenseStatus;
   entered_by_email: string;
@@ -155,6 +162,16 @@ function useFinanceMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResul
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['finance'] }),
   });
 }
+
+/**
+ * Save an expense's invoice / receipt.
+ *
+ * ⚠️  `http.download`, not an `<a href>`: the endpoint needs the bearer token, which
+ *     a plain link cannot send — and a failed request comes back as the ordinary JSON
+ *     error (thrown as an `ApiError`), never as a corrupt "invoice.pdf".
+ */
+export const downloadExpenseAttachment = async (id: string) =>
+  saveFile(await http.download(`/finance/expenses/${id}/attachment/`));
 
 export function useCreateExpense() {
   return useFinanceMutation((body: FormData) =>

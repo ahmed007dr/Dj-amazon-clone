@@ -33,6 +33,7 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone, translation
 
+from mailing import layout
 from mailing.models import (
     BACKOFF_MINUTES,
     MAX_ATTEMPTS,
@@ -286,6 +287,10 @@ def send_to_user(template_key: str, user, context: dict, **kwargs) -> bool:
 # ═══════════════════════════════════════════════════════════
 
 
+#: Returned by `verify` / `send_test` for an account that only receives — not a failure
+NOT_A_SENDING_ACCOUNT = "الحساب للاستقبال فقط — لا يوجد SMTP لاختباره. استخدم «اختبار IMAP»"
+
+
 def verify(account: EmailAccount) -> tuple[bool, str]:
     """
     A real SMTP handshake with no message sent.
@@ -297,6 +302,13 @@ def verify(account: EmailAccount) -> tuple[bool, str]:
         is, at the worst possible moment and on the most important message in
         the system.
     """
+    if not account.sends:
+        # ⚠️  An inbound-only account has no SMTP to shake hands with. Opening a connection
+        #     with an empty host either fails (recorded as an outbound fault that does not
+        #     exist) or, worse, passes against the console backend — a green "verified" for a
+        #     mailbox whose real path (IMAP) was never touched. The IMAP test is its own button.
+        return False, NOT_A_SENDING_ACCOUNT
+
     connection = connection_for(account)
 
     if connection is None:
@@ -322,6 +334,9 @@ def send_test(account: EmailAccount, *, to: str) -> tuple[bool, str]:
         Passing it through the resolver tested an account other than the one the
         operator is sitting in front of.
     """
+    if not account.sends:
+        return False, NOT_A_SENDING_ACCOUNT
+
     message = EmailMultiAlternatives(
         subject=f"رسالة تجريبية — {account.label_ar}",
         body=(
@@ -333,6 +348,9 @@ def send_test(account: EmailAccount, *, to: str) -> tuple[bool, str]:
         reply_to=[account.reply_to] if account.reply_to else None,
         connection=connection_for(account),
     )
+    # The test goes through the same layout as real mail: "it arrived" should also
+    # mean "and it looks the way customers will see it".
+    layout.apply(message, language="ar")
 
     try:
         message.send(fail_silently=False)
@@ -523,6 +541,12 @@ def _attempt(message: OutboundMessage) -> bool:
         headers=headers or None,
     )
 
+    # ⚠️  The branded HTML is added **here, at delivery**, for every message alike —
+    #     a template, a manual reply, anything that reaches the queue. The stored body
+    #     stays plain text and remains the text/plain alternative. `layout.apply`
+    #     never raises: an unbranded password reset beats a lost one.
+    layout.apply(email, language=message.language)
+
     try:
         email.send(fail_silently=False)
     except Exception as exc:
@@ -645,7 +669,9 @@ def enqueue_raw(
     return message
 
 
-def reply(inbound, *, body: str, subject: str = "", actor=None) -> OutboundMessage:
+def reply(
+    inbound, *, body: str, subject: str = "", actor=None, language: str = "ar"
+) -> OutboundMessage:
     """
     A reply to an inbound message — inside its thread.
 
@@ -674,6 +700,7 @@ def reply(inbound, *, body: str, subject: str = "", actor=None) -> OutboundMessa
         to=inbound.from_email,
         subject=subject or f"Re: {inbound.subject}",
         body=body,
+        language=language,
         purpose=inbound.account.routes.values_list("purpose", flat=True).first() or "",
         in_reply_to=inbound.message_id,
         references=references,

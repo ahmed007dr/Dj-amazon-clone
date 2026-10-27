@@ -23,6 +23,7 @@ from django.utils import timezone
 
 from cart import services as cart_services
 from cart.models import Cart, CartStatus
+from catalog.colors import variant_snapshot
 from core.errors import BusinessError, ErrorCode
 from core.money import ZERO
 from inventory import services as inventory_services
@@ -130,9 +131,20 @@ def create_from_cart(
     location=None,
     created_by=None,
     customer_note: str = "",
+    contact_email: str = "",
+    contact_language: str = "",
+    checkout_key: str = "",
+    reservation_ttl=None,
+    require_shipping_quote: bool = False,
 ) -> Order:
     """
     Convert a cart into an order.
+
+    The last five parameters exist for **guest checkout** (`orders.guest`) and
+    default to "not a guest": contact details for an order with no account, the
+    idempotency hash, a longer stock hold than the 30-minute card default, and
+    a demand that the chosen shipping method actually be offered for the
+    address (an unavailable code silently priced the shipping at zero).
 
     ⚠️  **A full re-validation first — without exception.**
 
@@ -167,6 +179,12 @@ def create_from_cart(
     if not snapshot.lines:
         raise BusinessError(ErrorCode.CART_EMPTY)
 
+    if require_shipping_quote and snapshot.shipping_quote is None:
+        raise BusinessError(
+            ErrorCode.VALIDATION_ERROR,
+            detail="طريقة الشحن غير متاحة لهذه المحافظة",
+        )
+
     priced = snapshot.priced
 
     # ── Creating the order ─────────────────────────────────
@@ -181,8 +199,13 @@ def create_from_cart(
         tax_total=priced.tax_total,
         shipping_total=priced.shipping_amount,
         grand_total=priced.total,
-        coupon_code=cart.coupon_code,
+        # ⚠️  A guest cart carries no coupon (the engine refuses them) — never
+        #     stamp a code on an order that did not get its discount.
+        coupon_code=cart.coupon_code if user is not None else "",
         shipping_method_code=shipping_method_code,
+        contact_email=contact_email,
+        contact_language=contact_language,
+        checkout_key=checkout_key,
         recipient_name=address.get("recipient_name", ""),
         recipient_phone=address.get("phone", ""),
         governorate=address.get("governorate", ""),
@@ -202,6 +225,7 @@ def create_from_cart(
             product_sku=product.sku,
             product_name_ar=product.name_ar,
             product_name_en=product.name_en,
+            **variant_snapshot(variant),
             quantity=quantity,
             unit_price=line.unit_price,
             list_price=line.list_price,
@@ -220,6 +244,7 @@ def create_from_cart(
             variant=variant,
             reference_type=REFERENCE_TYPE,
             reference_id=order.pk,
+            ttl=reservation_ttl,
         )
 
     # ── Recording the coupon ───────────────────────────────
@@ -383,7 +408,58 @@ def _commit_reservations(order: Order) -> int:
         here. `orders` is in L6 and `inventory` in L3; knowing its table
         structure makes any change to it a break in two places.
     """
+    _restore_lapsed_reservations(order)
     return inventory_services.commit_for_reference(REFERENCE_TYPE, order.pk)
+
+
+def _restore_lapsed_reservations(order: Order) -> int:
+    """
+    Re-reserve whatever a reservation timeout released before the goods shipped.
+
+    ⚠️  **A cash-on-delivery order outlives its reservation.**
+
+        Stock is held for 30 minutes (guest orders: longer, see `orders.guest`)
+        and a periodic job releases what expired. An order the owner confirms by
+        phone the next day therefore reaches "shipped" with *no* active
+        reservation — and `commit_for_reference` only commits active ones, so
+        the parcel left the shop and the stock figure never moved (while the
+        units had meanwhile been offered to other customers).
+
+        Here the shortfall is reserved again, line by line, just before the
+        commit. If the goods are no longer there the reservation raises
+        INSUFFICIENT_STOCK and the whole transition rolls back: refusing to ship
+        what is not on the shelf is the correct failure, and a 409 the owner can
+        read beats a silently wrong stock count.
+
+    Returns the number of units re-reserved.
+    """
+    held: dict[tuple, int] = {}
+    for reservation in inventory_services.active_reservations_for(REFERENCE_TYPE, order.pk):
+        key = (reservation.product_id, reservation.variant_id)
+        held[key] = held.get(key, 0) + reservation.quantity
+
+    wanted: dict[tuple, tuple] = {}
+    for line in order.lines.select_related("product", "variant"):
+        key = (line.product_id, line.variant_id)
+        quantity = wanted[key][2] + line.quantity if key in wanted else line.quantity
+        wanted[key] = (line.product, line.variant, quantity)
+
+    restored = 0
+    for key, (product, variant, quantity) in wanted.items():
+        missing = quantity - held.get(key, 0)
+        if missing <= 0:
+            continue
+        inventory_services.reserve(
+            product,
+            missing,
+            location=order.location,
+            variant=variant,
+            reference_type=REFERENCE_TYPE,
+            reference_id=order.pk,
+        )
+        restored += missing
+
+    return restored
 
 
 @transaction.atomic
@@ -546,6 +622,7 @@ def create_pos_order(
             product_sku=product.sku,
             product_name_ar=product.name_ar,
             product_name_en=product.name_en,
+            **variant_snapshot(entry.get("variant")),
             quantity=entry["quantity"],
             unit_price=entry["unit_price"],
             discount_amount=entry.get("discount_amount", ZERO),

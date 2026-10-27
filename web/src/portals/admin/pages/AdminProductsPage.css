@@ -12,3 +12,16 @@
   font-size: 0.875rem;
   color: var(--color-text-muted);
 }
+
+/* "Added by" / "Last modified by": the person on top, the date beneath — one
+   cell each, so a row stays two lines tall instead of four columns wide. */
+.admin-products__audit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.875rem;
+}
+
+.admin-products__audit .muted {
+  font-size: 0.75rem;
+}

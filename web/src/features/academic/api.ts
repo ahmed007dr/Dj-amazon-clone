@@ -1,6 +1,8 @@
 import { http } from '@/shared/http';
 
 import type {
+  BundleFilters,
+  BundleSummary,
   StudentProfile,
   StudentProfilePayload,
   StudyBundle,
@@ -8,13 +10,24 @@ import type {
 } from './types';
 
 /**
- * The current student's bundles.
+ * Every active bundle — **for everyone, signed in or not**.
  *
- * ⚠️  The server selects them from **their faculty and year** — not the frontend.
+ * ⚠️  Not scoped to the caller's faculty: narrowing is the visitor's choice,
+ *     made with the filters (university, faculty, year, kind), and nothing is
+ *     applied by default. The server validates every filter (`400` on a
+ *     malformed value) and does the narrowing — the browser never downloads
+ *     every faculty's bundles to hide most of them.
+ */
+export const getBundles = (filters: BundleFilters = {}) =>
+  http.get<BundleSummary[]>('/academic/bundles/', { params: { ...filters } });
+
+/**
+ * The current student's own faculty-and-year bundles.
  *
- *     Filtering locally means downloading every bundle for every university and
- *     then displaying one, and it also means a student seeing bundles from a
- *     faculty that is not theirs.
+ * ⚠️  No longer what the bundles page lists: that is `getBundles`, for everyone.
+ *     The server still selects these from **the student's faculty and year**, and
+ *     the page's "My faculty" shortcut fills the public filters with the same
+ *     faculty and year from the profile.
  */
 export const getMyBundles = () => http.get<StudyBundle[]>('/academic/me/bundles/');
 

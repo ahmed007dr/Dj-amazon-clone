@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 
 import {
   useAdminStaff,
   useAssignCustomer,
+  useResendInvite,
   useUnassignedCustomers,
   type AssignedCustomer,
   type EmployeeProfile,
@@ -16,6 +18,7 @@ import {
   RolesPanel,
 } from '@/portals/admin/components/StaffAdminPanel';
 import { AssignmentsPanel } from '@/portals/admin/components/AssignmentsPanel';
+import { CreateStaffForm } from '@/portals/admin/components/CreateStaffForm';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { Drawer } from '@/shared/ui/Drawer';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
@@ -52,6 +55,17 @@ export function AdminStaffPage() {
   const [page, setPage] = useState(1);
   const [assignTo, setAssignTo] = useState('');
 
+  // ⚠️  "Add staff member" is driven by `?add=1`, not by local state alone.
+  //
+  //     The Users screen links here ("Add staff member"), and a link can only carry
+  //     a URL — so the URL is the source of truth and the button just sets it.
+  //     `replace` keeps the back button from stepping through open/closed states.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const creating = searchParams.get('add') === '1';
+  const setCreating = (open: boolean) => setSearchParams(open ? { add: '1' } : {}, { replace: true });
+
+  const resendInvite = useResendInvite();
+
   const debounced = useDebounced(search);
   const staff = useAdminStaff({ ...(debounced ? { search: debounced } : {}), page });
   const unassigned = useUnassignedCustomers(page);
@@ -80,7 +94,16 @@ export function AdminStaffPage() {
     {
       key: 'role',
       header: t('staff.role'),
-      render: (row) => localized(row, 'role_name'),
+      render: (row) => (
+        <div className="staff-cell">
+          <span>{localized(row, 'role_name')}</span>
+          {/* ⚠️  The door, shown beside the role: a person who can open the admin
+              panel is a different decision from one who can only reach /staff. */}
+          {row.account_type === 'ADMIN' ? (
+            <Badge tone="info">{t('staff.access.ADMIN_PANEL')}</Badge>
+          ) : null}
+        </div>
+      ),
     },
     {
       key: 'manager',
@@ -99,7 +122,11 @@ export function AdminStaffPage() {
       header: t('admin.status'),
       render: (row) =>
         row.is_active ? (
-          <Badge tone="success">{t('staff.onDuty')}</Badge>
+          <span className="staff-cell">
+            <Badge tone="success">{t('staff.onDuty')}</Badge>
+            {/* Invited but has not signed in yet — the link (or temporary password) is unused. */}
+            {row.invite_pending ? <Badge tone="warning">{t('staff.invitePending')}</Badge> : null}
+          </span>
         ) : (
           // ⚠️  A deactivated employee appears in the list and is not hidden: hiding them
           //     makes their customers look unassigned with no explanation.
@@ -111,9 +138,33 @@ export function AdminStaffPage() {
       header: t('admin.actions'),
       align: 'end',
       render: (row) => (
-        <Button size="sm" variant="ghost" onClick={() => setEditing(row)}>
-          {t('common.edit')}
-        </Button>
+        <span className="staff-cell__actions">
+          {/* ⚠️  Only while the invite is unused: the server refuses it afterwards
+              (an active person uses "forgot password"), so offering it would be a
+              button that always fails. */}
+          {row.is_active && row.invite_pending ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              loading={resendInvite.isPending && resendInvite.variables === row.id}
+              onClick={() =>
+                resendInvite.mutate(row.id, {
+                  onSuccess: () => notify(t('staff.inviteResent', { email: row.email }), 'success'),
+                  onError: (error) =>
+                    notify(
+                      isApiError(error) ? error.displayMessage : t('state.errorTitle'),
+                      'danger',
+                    ),
+                })
+              }
+            >
+              {t('staff.resendInvite')}
+            </Button>
+          ) : null}
+          <Button size="sm" variant="ghost" onClick={() => setEditing(row)}>
+            {t('common.edit')}
+          </Button>
+        </span>
       ),
     },
   ];
@@ -172,7 +223,10 @@ export function AdminStaffPage() {
 
   return (
     <>
-      <PageHeader title={t('staff.staffTitle')} />
+      <PageHeader
+        title={t('staff.staffTitle')}
+        actions={<Button onClick={() => setCreating(true)}>{t('staff.addStaff')}</Button>}
+      />
 
       <div className="staff-tabs" role="tablist">
         <button
@@ -298,6 +352,12 @@ export function AdminStaffPage() {
           ) : null}
         </>
       )}
+
+      <Drawer open={creating} onClose={() => setCreating(false)} title={t('staff.addStaff')}>
+        {/* ⚠️  Mounted only while open, so a cancelled draft is not remembered and a
+            second "add" starts from an empty form. */}
+        {creating ? <CreateStaffForm onDone={() => setCreating(false)} /> : null}
+      </Drawer>
 
       <Drawer
         open={editing !== null}

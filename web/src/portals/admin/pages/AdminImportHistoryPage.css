@@ -37,8 +37,3 @@
 .import-history__counts .bad {
   color: var(--color-danger);
 }
-
-.import-history__link {
-  color: inherit;
-  text-decoration: none;
-}

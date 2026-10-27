@@ -17,6 +17,7 @@ Staff portal permissions.
 from rest_framework.permissions import BasePermission
 
 from accounts.models import AccountType
+from core.permissions import DomainPermission
 
 #: The fine-grained permissions — assigned to roles from the panel, never to people
 VIEW_DASHBOARD = "employees.view_employeeprofile"
@@ -63,15 +64,18 @@ class HasEmployeeProfile(IsEmployee):
         return profile is not None and profile.is_active
 
 
-class CanManageEmployees(BasePermission):
-    """Managing employees, roles and assignment — for admins with an explicit permission."""
+class CanManageEmployees(DomainPermission):
+    """
+    Managing employees, roles and assignment — for admins with an explicit permission.
 
+    ⚠️  **The owner passes too** (`is_superuser` or `admin_profile.is_owner`).
+
+        This class used to check the superuser flag and the permission only, so
+        an owner account created without the superuser flag could open every other
+        admin screen — and was refused on exactly the one that creates staff. It now
+        shares `DomainPermission`, the rule every other domain uses and the frontend's
+        `useCan` mirrors: the owner always passes, everyone else needs the permission.
+    """
+
+    permission = MANAGE_TEAM
     message = "إدارة الموظفين تحتاج صلاحية صريحة"
-
-    def has_permission(self, request, view):
-        user = request.user
-        if not (user and user.is_authenticated):
-            return False
-        if user.is_superuser:
-            return True
-        return user.has_perm(MANAGE_TEAM)

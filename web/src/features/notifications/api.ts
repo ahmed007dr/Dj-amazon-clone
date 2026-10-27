@@ -13,12 +13,18 @@ interface CursorPage<T> {
   previous: string | null;
 }
 
-export const listNotifications = (params?: { unread?: boolean; category?: string }) =>
+export const listNotifications = (params?: {
+  unread?: boolean;
+  category?: string;
+  /** The `cursor` value from the previous page's `next` link. */
+  cursor?: string;
+}) =>
   http.get<CursorPage<Notification>>('/notifications/', {
     params: {
       // ⚠️  `'true'` as text: the server compares against the string, not the boolean
       unread: params?.unread ? 'true' : undefined,
       category: params?.category,
+      cursor: params?.cursor,
     },
   });
 

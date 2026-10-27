@@ -28,6 +28,11 @@ export interface EmployeeProfile {
   hired_on: string | null;
   is_active: boolean;
   customers_count: number;
+  phone?: string | null;
+  /** `EMPLOYEE` reaches the staff portal only; `ADMIN` reaches the admin panel. */
+  account_type?: string;
+  /** Never signed in yet — the invite (or temporary password) is still unused. */
+  invite_pending?: boolean;
 }
 
 export interface MonthRow {
@@ -157,6 +162,8 @@ export interface StaffFilters {
   active?: string;
   search?: string;
   page?: number;
+  /** Page size (the server caps it at 200) — for pickers that need everyone at once. */
+  limit?: number;
 }
 
 export function useAdminStaff(filters: StaffFilters) {
@@ -273,6 +280,9 @@ function useStaffMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admin', 'staff'] });
       void queryClient.invalidateQueries({ queryKey: ['admin', 'employee-roles'] });
+      // ⚠️  The staff table is keyed under `employees`, not `admin`: without this an
+      //     edit (or a new member) is saved and the list keeps showing the old row.
+      void queryClient.invalidateQueries({ queryKey: ['employees', 'admin', 'staff'] });
     },
   });
 }
@@ -294,6 +304,52 @@ export function useCreateRole() {
 export function useUpdateEmployee() {
   return useStaffMutation(({ id, body }: { id: string; body: Record<string, unknown> }) =>
     http.patch(`/employees/admin/staff/${id}/`, body),
+  );
+}
+
+/**
+ * Which door the new person walks through.
+ *
+ * ⚠️  Both get their permissions from the **role** — "admin panel" only means they
+ *     may open `/admin`, and there they see exactly the screens the role allows.
+ */
+export type StaffAccess = 'STAFF_PORTAL' | 'ADMIN_PANEL';
+
+export interface CreateStaffInput {
+  email: string;
+  first_name: string;
+  last_name?: string;
+  phone?: string;
+  access: StaffAccess;
+  role: string;
+  manager?: string | null;
+  phone_extension?: string;
+  preferred_language?: 'ar' | 'en';
+  /** The fallback when mail is not set up. Sent once, never echoed back. */
+  temporary_password?: string;
+}
+
+export interface CreatedStaff extends EmployeeProfile {
+  /** `false` when a temporary password was set instead of mailing an invite link. */
+  invite_sent: boolean;
+}
+
+/**
+ * Add a staff member — an account, a profile and (by default) an emailed invite link.
+ *
+ * ⚠️  Field errors from the server (duplicate email, weak password…) arrive on
+ *     `error.fields`; the form shows them under the fields rather than only as a toast.
+ */
+export function useCreateStaff() {
+  return useStaffMutation((body: CreateStaffInput) =>
+    http.post<CreatedStaff>('/employees/admin/staff/', body),
+  );
+}
+
+/** A fresh invite link for someone who has not signed in yet (the old link stops working). */
+export function useResendInvite() {
+  return useStaffMutation((id: string) =>
+    http.post<{ invite_sent: boolean }>(`/employees/admin/staff/${id}/resend-invite/`),
   );
 }
 

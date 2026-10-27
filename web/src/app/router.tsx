@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { RequirePermission } from '@/features/auth/components/RequirePermission';
 import { RequireAuth } from '@/features/auth/components/RequireAuth';
 import { isAdmin, isStaff } from '@/features/auth/permissions';
+import { ImportJobRedirect, ImportJobsRedirect } from '@/portals/admin/pages/AdminImportRedirects';
 import { AccountShell } from '@/portals/account/AccountShell';
 import { AcademicPage } from '@/portals/account/pages/AcademicPage';
 import { TradeAccountPage } from '@/portals/account/pages/TradeAccountPage';
@@ -83,19 +84,14 @@ const AdminProductsPage = lazy(() =>
     default: module.AdminProductsPage,
   })),
 );
-const AdminImportHistoryPage = lazy(() =>
-  import('@/portals/admin/pages/AdminImportHistoryPage').then((module) => ({
-    default: module.AdminImportHistoryPage,
-  })),
-);
 const AdminExportsPage = lazy(() =>
   import('@/portals/admin/pages/AdminExportsPage').then((module) => ({
     default: module.AdminExportsPage,
   })),
 );
-const AdminImportPage = lazy(() =>
-  import('@/portals/admin/pages/AdminImportPage').then((module) => ({
-    default: module.AdminImportPage,
+const AdminImportHubPage = lazy(() =>
+  import('@/portals/admin/pages/AdminImportHubPage').then((module) => ({
+    default: module.AdminImportHubPage,
   })),
 );
 const AdminInventoryPage = lazy(() =>
@@ -426,37 +422,24 @@ const router = createBrowserRouter([
       //     admin reads carefully. A drawer closes on a click outside it and
       //     throws that away; a route survives, and can be linked to.
       {
+        // One page, two tabs (`?tab=import|jobs`, `?job=<id>`) — see AdminImportHubPage.
         path: 'products/import',
         element: (
           <RequirePermission permission="catalog.change_product" screen="imports.title">
             <Lazy>
-              <AdminImportPage />
+              <AdminImportHubPage />
             </Lazy>
           </RequirePermission>
         ),
       },
-      {
-        path: 'products/import/jobs',
-        element: (
-          <RequirePermission permission="catalog.change_product" screen="imports.title">
-            <Lazy>
-              <AdminImportHistoryPage />
-            </Lazy>
-          </RequirePermission>
-        ),
-      },
+      // ⚠️  The two former URLs are kept alive as redirects: they are in bookmarks,
+      //     support notes and browser history.
+      { path: 'products/import/jobs', element: <ImportJobsRedirect /> },
       {
         // ⚠️  Declared **after** `products/import/jobs` so the literal segment is
-        //     matched first — otherwise "jobs" is read as a job id and the
-        //     history page becomes unreachable.
+        //     matched first — otherwise "jobs" is read as a job id.
         path: 'products/import/:id',
-        element: (
-          <RequirePermission permission="catalog.change_product" screen="imports.title">
-            <Lazy>
-              <AdminImportPage />
-            </Lazy>
-          </RequirePermission>
-        ),
+        element: <ImportJobRedirect />,
       },
       {
         path: 'inventory',

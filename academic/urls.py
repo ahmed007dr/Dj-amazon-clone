@@ -9,6 +9,9 @@ app_name = "academic"
 urlpatterns = [
     # Public — a student picks their university before creating an account
     path("universities/", api.UniversityTreeAPI.as_view(), name="universities"),
+    # ⚠️  Everyone's bundles — before the slug route only for readability: `<slug:slug>`
+    #     needs at least one character, so the empty path can never reach it.
+    path("bundles/", api.PublicBundleListAPI.as_view(), name="bundles"),
     path("bundles/<slug:slug>/", api.BundleDetailAPI.as_view(), name="bundle-detail"),
     # Student
     path("me/", api.MyStudentProfileAPI.as_view(), name="me"),

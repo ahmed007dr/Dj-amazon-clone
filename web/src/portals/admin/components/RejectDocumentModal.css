@@ -1,0 +1,32 @@
+.reject-doc__target {
+  display: grid;
+  gap: 0.15rem;
+  margin-block-end: var(--space-3);
+}
+
+.reject-doc__label {
+  display: block;
+  margin-block: var(--space-4) var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.reject-doc__input {
+  inline-size: 100%;
+  padding: var(--space-2) var(--space-3);
+  resize: vertical;
+
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.reject-doc__input:focus {
+  border-color: var(--color-primary);
+}
+
+.reject-doc__rule {
+  margin-block-start: var(--space-1);
+  font-size: 0.8125rem;
+}

@@ -1,15 +1,23 @@
 .hero {
-  display: grid;
-  gap: var(--space-3);
-  justify-items: center;
   padding: var(--space-10) var(--space-4);
   text-align: center;
 
+  /* The look before pictures existed — and what shows while a picture loads or when none
+     is uploaded for either theme. */
   background: linear-gradient(
     135deg,
     color-mix(in srgb, var(--color-primary) 12%, var(--color-surface)),
     var(--color-surface)
   );
+}
+
+.hero__content {
+  position: relative;
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
+  max-inline-size: 48rem;
+  margin-inline: auto;
 }
 
 .hero__title {
@@ -20,15 +28,94 @@
 
 .hero__tagline {
   max-inline-size: 40rem;
+  margin: 0;
+  color: var(--color-text-muted);
 }
 
 .hero__cta {
-  color: inherit;
   text-decoration: none;
 }
 
 .hero__cta:hover {
   text-decoration: none;
+}
+
+/*
+  The hero with a picture.
+
+  ⚠️  The text is white on a dark scrim, whatever the theme and whatever the picture.
+
+      The admin uploads a photograph, and a photograph can be anything: pale, busy, or
+      bright exactly where the headline lands. Tying the text colour to the theme
+      (dark text in light mode) makes legibility depend on a picture nobody here has seen.
+      A fixed white on a scrim that darkens everything to at least ~50% keeps the
+      contrast above 4.5:1 even over a pure white image (0.45 × 255 -> luminance 0.17 ->
+      5:1 against white) — and the two pictures, light and dark, are free to differ.
+
+  ⚠️  `isolation` + negative `z-index`: the picture and the scrim sit behind the content
+      without the content needing a `z-index` of its own, and without them escaping the
+      section into the page's stacking context.
+
+  Logical properties only (`inset`, `inline-size`, `padding-block`): the hero is
+  centred, so nothing in it is direction-specific, but nothing may become so by accident.
+*/
+.hero--media {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  align-items: center;
+  overflow: hidden;
+  min-block-size: 15rem;
+  padding-block: var(--space-12);
+  border-radius: var(--radius);
+  color: #fff;
+}
+
+.hero__media {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.hero__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(0deg, rgb(0 0 0 / 70%), rgb(0 0 0 / 50%));
+}
+
+.hero--media .hero__title {
+  color: #fff;
+  text-shadow:
+    0 1px 3px rgb(0 0 0 / 45%),
+    0 2px 18px rgb(0 0 0 / 35%);
+}
+
+.hero--media .hero__tagline {
+  font-size: 1.0625rem;
+  color: rgb(255 255 255 / 92%);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 50%);
+}
+
+.hero--media .hero__cta {
+  box-shadow: var(--shadow-md);
+}
+
+@media (min-width: 768px) {
+  .hero--media {
+    min-block-size: 22rem;
+    padding-block: var(--space-16);
+  }
+}
+
+@media (min-width: 1200px) {
+  .hero--media {
+    min-block-size: 26rem;
+  }
 }
 
 /*

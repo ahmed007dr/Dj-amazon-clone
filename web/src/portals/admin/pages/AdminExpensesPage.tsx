@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
+  downloadExpenseAttachment,
   useExpenseDecision,
   useExpenses,
   type Expense,
@@ -45,6 +46,8 @@ export function AdminExpensesPage() {
   const [status, setStatus] = useState('DRAFT');
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
+  // Which expense's file is being fetched — one button spins, not the whole column.
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   const query = useExpenses({ ...(status ? { status } : {}), page });
   const decide = useExpenseDecision();
@@ -64,6 +67,26 @@ export function AdminExpensesPage() {
           notify(isApiError(error) ? error.displayMessage : t('state.errorTitle'), 'danger'),
       },
     );
+  };
+
+  const download = async (expense: Expense) => {
+    setDownloading(expense.id);
+    try {
+      await downloadExpenseAttachment(expense.id);
+    } catch (error) {
+      // ⚠️  The server answers 404 for a record whose file has gone from disk — say so
+      //     rather than a generic failure, so the admin knows to re-attach it.
+      notify(
+        isApiError(error) && error.status === 404
+          ? t('finance.attachmentMissing')
+          : isApiError(error)
+            ? error.displayMessage
+            : t('state.errorTitle'),
+        'danger',
+      );
+    } finally {
+      setDownloading(null);
+    }
   };
 
   if (isApiError(query.error) && query.error.status === 403) {
@@ -97,6 +120,27 @@ export function AdminExpensesPage() {
       header: t('finance.amount'),
       align: 'end',
       render: (row) => <strong dir="ltr">{row.amount}</strong>,
+    },
+    {
+      key: 'attachment',
+      header: t('finance.attachment'),
+      secondary: true,
+      // ⚠️  A button, not a link: the file needs the signed-in token, which a plain
+      //     `<a href>` cannot send — and the stored path is private anyway.
+      render: (row) =>
+        row.has_attachment ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            loading={downloading === row.id}
+            onClick={() => void download(row)}
+            aria-label={`${t('finance.downloadAttachment')}: ${row.attachment_name ?? ''}`}
+          >
+            {t('finance.downloadAttachment')}
+          </Button>
+        ) : (
+          '—'
+        ),
     },
     {
       key: 'status',

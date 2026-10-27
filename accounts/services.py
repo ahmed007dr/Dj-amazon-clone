@@ -57,6 +57,11 @@ PRESENCE_WINDOW = timedelta(minutes=5)
 EMAIL_VERIFICATION_TTL = timedelta(hours=24)
 PASSWORD_RESET_TTL = timedelta(minutes=45)
 
+#: ⚠️  A staff invite is a password-reset token that lives for days, not minutes:
+#:     the invitee may open the mail tomorrow, not within the hour a reset request
+#:     is expected to be used in. Still single-use, still stored hashed.
+STAFF_INVITE_TTL = timedelta(days=7)
+
 
 def _suspended_key(user_id) -> str:
     return f"{SUSPENDED_CACHE_PREFIX}{user_id}"
@@ -381,6 +386,19 @@ def issue_token(
     return record, raw
 
 
+def issue_invite_token(user: User, *, request=None) -> tuple[SecurityToken, str]:
+    """
+    The link a newly created staff member opens to choose their own password.
+
+    ⚠️  It is a `PASSWORD_RESET` token on purpose — the existing
+        `/auth/reset-password` page and `reset_password()` (which also revokes
+        every session) consume it unchanged, so the invite adds no second way to
+        set a password to secure. Issuing a new one revokes the previous, which is
+        exactly what "resend invite" needs.
+    """
+    return issue_token(user, TokenPurpose.PASSWORD_RESET, ttl=STAFF_INVITE_TTL, request=request)
+
+
 def consume_token(raw_token: str, purpose: str) -> SecurityToken:
     """Verifies and consumes. Raises `BusinessError` on failure."""
     record = SecurityToken.objects.filter(token_hash=hash_token(raw_token), purpose=purpose).first()
@@ -391,6 +409,25 @@ def consume_token(raw_token: str, purpose: str) -> SecurityToken:
     record.used_at = timezone.now()
     record.save(update_fields=["used_at"])
     return record
+
+
+def _announce_email_verified(user: User) -> None:
+    """
+    Tell the listeners the address is now proven — **after** the commit.
+
+    ⚠️  `on_commit`, and a listener that raises still cannot fail the caller:
+        the user's verification must stand whatever a downstream domain (orders
+        claiming guest purchases) does with the news.
+    """
+    from accounts.events import email_verified
+
+    def send() -> None:
+        try:
+            email_verified.send_robust(sender=User, user=user)
+        except Exception:
+            logger.exception("فشل إعلان توثيق البريد للحساب %s", user.pk)
+
+    transaction.on_commit(send)
 
 
 @transaction.atomic
@@ -408,6 +445,7 @@ def verify_email(raw_token: str) -> User:
         object_repr=str(user),
         changes={"email_verified": {"old": False, "new": True}},
     )
+    _announce_email_verified(user)
     return user
 
 
@@ -481,6 +519,7 @@ def confirm_email_change(raw_token: str) -> User:
         object_repr=str(user),
         changes={"email": {"old": previous, "new": new_email}},
     )
+    _announce_email_verified(user)  # the new address was proven by the confirmation link
     return user
 
 

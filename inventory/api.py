@@ -12,7 +12,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from catalog.models import Product, ProductVariant
+from catalog import audit as catalog_audit
+from catalog.models import Product, ProductColor, ProductVariant
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
@@ -33,6 +34,42 @@ from inventory.models import (
 
 def _resolve(model, value, default=None):
     return get_object_or_404(model, pk=value) if value else default
+
+
+def _has_sellable_variants(product) -> bool:
+    return (
+        ProductVariant.objects.filter(product=product, is_active=True)
+        .filter(Q(color__isnull=True) | Q(color__is_active=True, color__deleted_at__isnull=True))
+        .exists()
+    )
+
+
+def _resolve_variant(product, value, *, required: bool = False):
+    """
+    The variant a stock command is aimed at — which must be **this product's**.
+
+    ⚠️  Previously any variant id was accepted, so stock could be received "into" a
+        variant of an entirely different product and sit there looking like that
+        product's balance.
+
+    ⚠️  `required` is for commands that *add* stock (receive, an increase). Once a
+        product offers colours or sizes, units added to "no variant" are unsellable
+        — the cart insists on a variant — and nobody would notice until the product
+        sold out with a full shelf. Moving or removing legacy un-assigned stock stays
+        allowed without a variant.
+    """
+    if not value:
+        if required and _has_sellable_variants(product):
+            raise BusinessError(
+                ErrorCode.VALIDATION_ERROR,
+                detail="هذا المنتج له ألوان أو نسخ — اختر النسخة التي يُضاف إليها المخزون",
+            )
+        return None
+
+    variant = get_object_or_404(ProductVariant.objects.select_related("color"), pk=value)
+    if variant.product_id != product.pk:
+        raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="النسخة لا تخص هذا المنتج")
+    return variant
 
 
 # ═══════════════════════════════════════════════════════════
@@ -68,6 +105,43 @@ class AvailabilityAPI(APIView):
         )
 
 
+class ProductAvailabilityAPI(APIView):
+    """
+    One product's availability **per variant** — what a colour / size picker needs.
+
+        GET /inventory/availability/<product>/
+
+    ⚠️  Public, so masked exactly like the list endpoint: a number only at or below
+        the low-stock threshold, otherwise just "in stock". And the stock held on
+        *no variant* is never shown here — a customer cannot choose it.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, pk):
+        product = get_object_or_404(Product, pk=pk, is_active=True)
+        per_variant = services.availability_by_variant([product.pk])[str(product.pk)]
+
+        variants = {}
+        for variant_id, available in per_variant.items():
+            if variant_id is None:
+                continue
+            variants[str(variant_id)] = {
+                "is_available": available > 0,
+                "is_low": 0 < available <= services.LOW_STOCK_THRESHOLD,
+                "available": available if available <= services.LOW_STOCK_THRESHOLD else None,
+            }
+
+        if variants:
+            is_available = any(entry["is_available"] for entry in variants.values())
+        else:
+            is_available = services.availability_for([product.pk])[str(product.pk)].is_available
+
+        return Response(
+            {"product_id": str(product.pk), "is_available": is_available, "variants": variants}
+        )
+
+
 # ═══════════════════════════════════════════════════════════
 #  Admin — reading
 # ═══════════════════════════════════════════════════════════
@@ -92,7 +166,7 @@ class StockListAPI(generics.ListAPIView):
     pagination_class = AdminPageNumberPagination
 
     def get_queryset(self):
-        queryset = Stock.objects.select_related("product", "location", "variant")
+        queryset = Stock.objects.select_related("product", "location", "variant", "variant__color")
         params = self.request.query_params
 
         if location := params.get("location"):
@@ -224,7 +298,7 @@ class StockMovementListAPI(generics.ListAPIView):
 
     def get_queryset(self):
         queryset = StockMovement.objects.select_related(
-            "product", "location", "batch", "performed_by"
+            "product", "location", "batch", "performed_by", "variant"
         )
         params = self.request.query_params
 
@@ -282,12 +356,13 @@ class ReceiveStockAPI(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        product = _resolve(Product, data["product"])
         batch = services.receive(
-            _resolve(Product, data["product"]),
+            product,
             data["quantity"],
             data["unit_cost"],
             location=_resolve(StockLocation, data.get("location")),
-            variant=_resolve(ProductVariant, data.get("variant")),
+            variant=_resolve_variant(product, data.get("variant"), required=True),
             expires_at=data.get("expires_at"),
             supplier_batch_number=data.get("supplier_batch_number", ""),
             performed_by=request.user,
@@ -304,11 +379,12 @@ class AdjustStockAPI(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        product = _resolve(Product, data["product"])
         movement = services.adjust(
-            _resolve(Product, data["product"]),
+            product,
             data["quantity"],
             location=_resolve(StockLocation, data.get("location")),
-            variant=_resolve(ProductVariant, data.get("variant")),
+            variant=_resolve_variant(product, data.get("variant"), required=data["quantity"] > 0),
             reason=data["reason"],
             performed_by=request.user,
         )
@@ -324,12 +400,13 @@ class TransferStockAPI(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        product = _resolve(Product, data["product"])
         out_movement, in_movement = services.transfer(
-            _resolve(Product, data["product"]),
+            product,
             data["quantity"],
             from_location=_resolve(StockLocation, data["from_location"]),
             to_location=_resolve(StockLocation, data["to_location"]),
-            variant=_resolve(ProductVariant, data.get("variant")),
+            variant=_resolve_variant(product, data.get("variant")),
             performed_by=request.user,
         )
         return Response(
@@ -350,15 +427,106 @@ class MarkDamagedAPI(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        product = _resolve(Product, data["product"])
         movement = services.mark_damaged(
-            _resolve(Product, data["product"]),
+            product,
             data["quantity"],
             location=_resolve(StockLocation, data.get("location")),
-            variant=_resolve(ProductVariant, data.get("variant")),
+            variant=_resolve_variant(product, data.get("variant")),
             reason=data["reason"],
             performed_by=request.user,
         )
         return Response(s.StockMovementSerializer(movement).data, status=201)
+
+
+class UnassignedStockAPI(APIView):
+    """
+    Stock a product holds on **no variant** — the number the "assign to a colour"
+    step shows before the admin chooses.
+
+        GET /inventory/unassigned-stock/?product=<id>
+    """
+
+    permission_classes = [CanManageInventory]
+
+    def get(self, request):
+        product = get_object_or_404(Product.all_objects, pk=request.query_params.get("product"))
+        locations = services.unassigned_stock(product)
+        return Response(
+            {
+                "product": str(product.pk),
+                "total": sum(entry["quantity"] for entry in locations),
+                "locations": [
+                    {
+                        "location": str(entry["location"].pk),
+                        "location_code": entry["location_code"],
+                        "quantity": entry["quantity"],
+                    }
+                    for entry in locations
+                ],
+            }
+        )
+
+
+class AssignStockAPI(APIView):
+    """
+    Give a product's un-assigned stock to one colour (or variant) — the one-time step
+    after the product's **first** colour is added.
+
+    ⚠️  Never automatic. See `services.assign_unvariated_stock` for why, and for what
+        moves (only the available units, batches included).
+    """
+
+    permission_classes = [CanManageInventory]
+    serializer_class = s.AssignStockSerializer
+
+    def post(self, request):
+        serializer = s.AssignStockSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        product = get_object_or_404(Product, pk=data["product"])
+
+        if data.get("color"):
+            color = get_object_or_404(ProductColor, pk=data["color"], product=product)
+            variant = (
+                ProductVariant.objects.filter(color=color, is_active=True)
+                .order_by("display_order", "created_at")
+                .first()
+            )
+            if variant is None:
+                raise BusinessError(
+                    ErrorCode.VALIDATION_ERROR, detail="هذا اللون بلا نسخة مفعّلة تستقبل المخزون"
+                )
+        else:
+            variant = _resolve_variant(product, data["variant"])
+
+        result = services.assign_unvariated_stock(
+            product,
+            variant,
+            location=_resolve(StockLocation, data.get("location")),
+            performed_by=request.user,
+        )
+        if not result["moved"]:
+            raise BusinessError(
+                ErrorCode.CONFLICT, detail="لا يوجد مخزون غير مخصَّص لنقله", status_code=409
+            )
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditAction.STOCK_CHANGE,
+            object_repr=f"تخصيص مخزون {product.sku} ← {variant.sku}",
+            changes=result,
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+        catalog_audit.log_product_change(
+            request,
+            product,
+            AuditAction.STOCK_CHANGE,
+            {"assigned_to": variant.sku, **result},
+            object_repr=f"مخزون منتج {product.sku}",
+        )
+        return Response(result)
 
 
 class RunMaintenanceAPI(APIView):

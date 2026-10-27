@@ -23,6 +23,7 @@ from django.db.models import Exists, F, OuterRef, Q, Sum, Value
 from django.db.models.functions import Greatest
 from django.utils import timezone
 
+from catalog.models import ProductColor, ProductVariant
 from core.errors import BusinessError, ErrorCode
 from inventory.models import (
     AlertType,
@@ -47,6 +48,9 @@ DEFAULT_RESERVATION_TTL = timedelta(minutes=30)
 #: The near-expiry alert threshold
 EXPIRY_WARNING_DAYS = 90
 
+#: At or below this the public sees an exact number ("3 left"); above it just "in stock"
+LOW_STOCK_THRESHOLD = 5
+
 
 @dataclass(frozen=True)
 class Availability:
@@ -59,7 +63,7 @@ class Availability:
 
     @property
     def is_low(self) -> bool:
-        return 0 < self.available <= 5
+        return 0 < self.available <= LOW_STOCK_THRESHOLD
 
 
 # ═══════════════════════════════════════════════════════════
@@ -100,6 +104,42 @@ def get_or_create_stock(product, location=None, variant=None) -> Stock:
     return stock
 
 
+def counts_toward_availability() -> Q:
+    """
+    A condition on a `Stock` row: "can this stock actually be sold?"
+
+    ⚠️  Not every row that holds units is sellable.
+
+        * A row on a **variant** counts only while that variant — and its colour —
+          is live. Stock left on a deactivated colour is still on the books but a
+          customer cannot buy it, so it must not keep the product on the storefront.
+        * A row with **no variant** counts only for a product that *has no sellable
+          variant*. The cart requires a variant whenever the product offers one, so
+          units sitting un-assigned on a product that has since gained colours are
+          unsellable — until the admin assigns them (`assign_unvariated_stock`).
+          Counting them advertises stock nobody can put in a basket.
+
+    Used by the storefront filter, the public availability figures and the colour
+    facts, so the three cannot disagree.
+    """
+    live_colour = Q(variant__color__isnull=True) | Q(
+        variant__color__is_active=True, variant__color__deleted_at__isnull=True
+    )
+    on_live_variant = (
+        Q(variant__isnull=False, variant__is_active=True, variant__deleted_at__isnull=True)
+        & live_colour
+    )
+
+    product_has_sellable_variant = Exists(
+        ProductVariant.objects.filter(product=OuterRef("product"), is_active=True).filter(
+            Q(color__isnull=True) | Q(color__is_active=True, color__deleted_at__isnull=True)
+        )
+    )
+    unvaried_and_allowed = Q(variant__isnull=True) & ~Q(product_has_sellable_variant)
+
+    return unvaried_and_allowed | on_live_variant
+
+
 def availability_for(product_ids, location=None) -> dict:
     """
     Availability for a set of products — **a single aggregated query**.
@@ -122,7 +162,7 @@ def availability_for(product_ids, location=None) -> dict:
 
         No stock row is not the absence of an answer. It is zero.
     """
-    queryset = Stock.objects.filter(product_id__in=product_ids)
+    queryset = Stock.objects.filter(product_id__in=product_ids).filter(counts_toward_availability())
     if location is not None:
         queryset = queryset.filter(location=location)
     else:
@@ -189,6 +229,107 @@ def available_quantity(product, location=None, variant=None) -> int:
     )
 
 
+def availability_by_variant(product_ids, location=None) -> dict:
+    """
+    Availability **per variant** — `{product_id: {variant_id | None: available}}`.
+
+    One query however many products and variants there are.
+
+    ⚠️  Every sellable variant of a requested product is present, with `0` when it
+        has no stock row — the same rule as `availability_for`: "no row" is zero,
+        not "unknown". And a row on a variant that is not sellable (deactivated
+        colour…) is left out entirely rather than reported as out of stock, because
+        the customer cannot choose it at all.
+
+    The `None` key is stock held on **no variant** — it appears only when the
+    product has some, and only when it is still sellable (see
+    `counts_toward_availability`).
+    """
+    product_ids = [str(pid) for pid in product_ids]
+
+    queryset = Stock.objects.filter(product_id__in=product_ids).filter(counts_toward_availability())
+    if location is not None:
+        queryset = queryset.filter(location=location)
+    else:
+        queryset = queryset.filter(location__is_sellable=True, location__is_active=True)
+
+    result: dict = {pid: {} for pid in product_ids}
+
+    for row in queryset.values(
+        "product_id",
+        "variant_id",
+        "quantity_physical",
+        "quantity_reserved",
+        "quantity_damaged",
+        "quantity_expired",
+    ):
+        # ⚠️  Floored per stock row, exactly as `Stock.available` and `availability_for` do:
+        #     a damaged surplus in one branch must not eat another branch's stock.
+        available = max(
+            0,
+            row["quantity_physical"]
+            - row["quantity_reserved"]
+            - row["quantity_damaged"]
+            - row["quantity_expired"],
+        )
+        per_variant = result.setdefault(str(row["product_id"]), {})
+        per_variant[row["variant_id"]] = per_variant.get(row["variant_id"], 0) + available
+
+    sellable = (
+        ProductVariant.objects.filter(product_id__in=product_ids, is_active=True)
+        .filter(Q(color__isnull=True) | Q(color__is_active=True, color__deleted_at__isnull=True))
+        .values_list("product_id", "pk")
+    )
+    for product_id, variant_id in sellable:
+        result.setdefault(str(product_id), {}).setdefault(variant_id, 0)
+
+    return result
+
+
+def color_stock_facts(product, colors, user) -> dict[str, dict]:
+    """
+    `{color_id: {quantity, is_available, is_low, available}}` — the colours' stock.
+
+    Registered with `core.color_facts` (the catalogue cannot import this layer).
+
+    * `quantity` is the **exact** figure — read by the admin colour list only;
+      the public serialiser never forwards it.
+    * `available` is the public, masked one: a number below the threshold, else
+      `None` (the same rule as `AvailabilitySerializer` — "847 left" tells a
+      competitor your stock volume).
+    * A colour's stock is the sum over **all its variants** (one, or a size
+      matrix), over every sellable location.
+    """
+    ids = [color.pk for color in colors]
+    totals = {color_id: 0 for color_id in ids}
+
+    rows = Stock.objects.filter(
+        product=product,
+        variant__color_id__in=ids,
+        variant__is_active=True,
+        location__is_sellable=True,
+        location__is_active=True,
+    ).values_list(
+        "variant__color_id",
+        "quantity_physical",
+        "quantity_reserved",
+        "quantity_damaged",
+        "quantity_expired",
+    )
+    for color_id, physical, reserved, damaged, expired in rows:
+        totals[color_id] += max(0, physical - reserved - damaged - expired)
+
+    return {
+        str(color_id): {
+            "quantity": quantity,
+            "is_available": quantity > 0,
+            "is_low": 0 < quantity <= LOW_STOCK_THRESHOLD,
+            "available": quantity if quantity <= LOW_STOCK_THRESHOLD else None,
+        }
+        for color_id, quantity in totals.items()
+    }
+
+
 # ═══════════════════════════════════════════════════════════
 #  Catalogue visibility — "does any of it exist?"
 # ═══════════════════════════════════════════════════════════
@@ -233,7 +374,7 @@ def in_stock_filter(*, location=None, field: str = "pk") -> Q:
     else:
         rows = rows.filter(location__is_sellable=True, location__is_active=True)
 
-    rows = rows.annotate(
+    rows = rows.filter(counts_toward_availability()).annotate(
         _available=F("quantity_physical")
         - F("quantity_reserved")
         - F("quantity_damaged")
@@ -633,6 +774,168 @@ def adjust(
 
     check_alerts(product, location)
     return movement
+
+
+# ═══════════════════════════════════════════════════════════
+#  Giving a product's un-assigned stock to a variant (a colour)
+# ═══════════════════════════════════════════════════════════
+#
+#  ⚠️  A product that had no variants holds its stock on `variant=None`. The moment
+#      it gets its first colour the cart requires a variant, so those units become
+#      unsellable — and the shop must decide which colour they really are. Guessing
+#      ("the first colour") would be wrong half the time and invisible; leaving them
+#      would silently orphan the whole stock of the product. So it is an explicit,
+#      one-time step, and it moves the units through recorded movements.
+
+
+def unassigned_stock(product) -> list[dict]:
+    """
+    The units held on **no variant**, per location — `[{location, location_code, quantity}]`.
+
+    "Units" are the *available* ones: reserved, damaged and expired units cannot be
+    moved to another colour (a reservation is bound to the row it was taken on).
+    """
+    rows = (
+        Stock.objects.filter(product=product, variant__isnull=True)
+        .select_related("location")
+        .order_by("location__code")
+    )
+    return [
+        {"location": row.location, "location_code": row.location.code, "quantity": row.available}
+        for row in rows
+        if row.available > 0
+    ]
+
+
+def _move_batches(product, location, to_variant, quantity: int) -> None:
+    """
+    Re-point `quantity` units' worth of un-assigned batches at `to_variant`, FEFO.
+
+    ⚠️  The batches travel with the stock — a sale consumes batches of the *same*
+        variant (`_consume_batches`), so leaving them behind would sell the colour
+        "without a batch": no cost recorded, and COGS wrong for every unit.
+
+        A batch bigger than what remains to move is **split**, the cost and expiry
+        copied — both halves keep `received - remaining` (what was already sold)
+        intact, so the `batch_remaining_not_above_received` constraint holds.
+    """
+    batches = list(
+        Batch.objects.select_for_update()
+        .filter(
+            product=product,
+            variant__isnull=True,
+            location=location,
+            quantity_remaining__gt=0,
+            is_quarantined=False,
+        )
+        .order_by(F("expires_at").asc(nulls_last=True), "received_at")
+    )
+
+    remaining = quantity
+    for batch in batches:
+        if remaining <= 0:
+            break
+
+        take = min(batch.quantity_remaining, remaining)
+        if take == batch.quantity_remaining:
+            Batch.objects.filter(pk=batch.pk).update(variant=to_variant)
+        else:
+            Batch.objects.create(
+                product=product,
+                variant=to_variant,
+                location=location,
+                number=batch.number,
+                supplier_batch_number=batch.supplier_batch_number,
+                quantity_received=take,
+                quantity_remaining=take,
+                unit_cost=batch.unit_cost,
+                manufactured_at=batch.manufactured_at,
+                expires_at=batch.expires_at,
+                received_at=batch.received_at,
+            )
+            Batch.objects.filter(pk=batch.pk).update(
+                quantity_received=F("quantity_received") - take,
+                quantity_remaining=F("quantity_remaining") - take,
+            )
+        remaining -= take
+
+
+@transaction.atomic
+def assign_unvariated_stock(product, variant, *, location=None, performed_by=None) -> dict:
+    """
+    Move the product's un-assigned stock onto `variant` — every location, or one.
+
+    Returns `{"moved": total, "locations": [{"location_code", "quantity"}]}`.
+
+    Each location produces **two recorded movements** (a decrease on the old row, an
+    increase on the new one) sharing `reference_type="variant_assignment"`, so the
+    log shows exactly where the units went; the total on the shelf is unchanged.
+
+    ⚠️  Only the **available** units move.
+
+        Reserved units stay on the old row: their reservation is bound to it and is
+        committed or released against it. Damaged and expired units are not for
+        sale and have no business inflating a colour's balance.
+
+    ⚠️  Alerts are *not* re-evaluated.
+
+        The product's total on the shelf is unchanged, so nothing about "is it low /
+        out of stock" has changed — and the emptied row on its own would read as
+        "out of stock" for a product whose units are right there on the colour.
+    """
+    if variant is None or variant.product_id != product.pk:
+        raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="النسخة لا تخص هذا المنتج")
+    if not variant.is_active:
+        raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="النسخة غير مفعّلة")
+
+    candidates = Stock.objects.filter(product=product, variant__isnull=True)
+    if location is not None:
+        candidates = candidates.filter(location=location)
+
+    moved_total = 0
+    per_location = []
+
+    for row in candidates.select_related("location"):
+        source = _locked_stock(product, row.location, None)
+        quantity = source.available
+        if quantity <= 0:
+            continue
+
+        target = _locked_stock(product, row.location, variant)
+
+        Stock.objects.filter(pk=source.pk).update(
+            quantity_physical=F("quantity_physical") - quantity
+        )
+        Stock.objects.filter(pk=target.pk).update(
+            quantity_physical=F("quantity_physical") + quantity
+        )
+        source.refresh_from_db()
+        target.refresh_from_db()
+
+        reference = {"reference_type": "variant_assignment", "reference_id": str(variant.pk)}
+        _record_movement(
+            stock=source,
+            movement_type=MovementType.ADJUSTMENT_DOWN,
+            quantity=quantity,
+            note=f"نقل المخزون غير المخصَّص إلى {variant.name_ar}",
+            performed_by=performed_by,
+            **reference,
+        )
+        _record_movement(
+            stock=target,
+            movement_type=MovementType.ADJUSTMENT_UP,
+            quantity=quantity,
+            note="مخزون غير مخصَّص نُقل إلى هذه النسخة",
+            performed_by=performed_by,
+            **reference,
+        )
+
+        _move_batches(product, row.location, variant, quantity)
+
+        moved_total += quantity
+        per_location.append({"location_code": row.location.code, "quantity": quantity})
+
+    return {"moved": moved_total, "locations": per_location}
 
 
 # ═══════════════════════════════════════════════════════════

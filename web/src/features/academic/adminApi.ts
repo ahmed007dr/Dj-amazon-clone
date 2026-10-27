@@ -92,6 +92,17 @@ export interface BundleItem {
 
 export interface StudentRow {
   id: string;
+  /**
+   * Who the student is — admin list only (`AdminStudentProfileSerializer`).
+   * The student's own contract does not carry these.
+   */
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  user_phone: string;
+  /** The account's authoritative state; `is_verified` below is only its mirror. */
+  verification_status: 'NOT_REQUIRED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
+  created_at: string;
   university: string;
   university_name: string;
   faculty: string;
@@ -147,6 +158,8 @@ export interface StudentFilters {
   faculty?: string;
   academic_year?: number;
   verified?: string;
+  /** Name, email, phone or student number. */
+  search?: string;
   page?: number;
 }
 

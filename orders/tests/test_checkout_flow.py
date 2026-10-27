@@ -23,6 +23,10 @@ from promotions.models import Coupon, CouponKind
 
 PASSWORD = "Str0ng-Test-Pass!23"
 
+# ⚠️  The guest cart key is validated as a UUID (`cart.services.normalise_session_key`).
+GUEST_KEY = "7d0c5d0e-3c52-4f0e-9a43-5a1f0c6a1b01"
+MERGE_KEY = "7d0c5d0e-3c52-4f0e-9a43-5a1f0c6a1b02"
+
 ADDRESS = {
     "recipient_name": "أحمد محمود",
     "phone": "+201001234567",
@@ -193,7 +197,7 @@ class TestGuestCart:
             reverse("v1:cart:lines"),
             {"product": str(product.pk), "quantity": 1},
             format="json",
-            HTTP_X_CART_SESSION="guest-abc-123",
+            HTTP_X_CART_SESSION=GUEST_KEY,
         )
 
         assert response.status_code == 201
@@ -214,7 +218,7 @@ class TestGuestCart:
             reverse("v1:cart:lines"),
             {"product": str(product.pk), "quantity": 2},
             format="json",
-            HTTP_X_CART_SESSION="guest-merge",
+            HTTP_X_CART_SESSION=MERGE_KEY,
         )
 
         client.post(
@@ -224,7 +228,7 @@ class TestGuestCart:
         )
 
         merged = client.post(
-            reverse("v1:cart:merge"), {"session_key": "guest-merge"}, format="json"
+            reverse("v1:cart:merge"), {"session_key": MERGE_KEY}, format="json"
         )
         assert merged.data["totals"]["item_count"] == 3
 

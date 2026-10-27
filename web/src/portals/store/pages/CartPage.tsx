@@ -8,6 +8,7 @@ import { CouponBox } from '@/features/cart/components/CouponBox';
 import { useCart } from '@/features/cart/hooks';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { Button } from '@/shared/ui/Button';
+import { CartIcon } from '@/shared/ui/CartIcon';
 import { Spinner } from '@/shared/ui/Spinner';
 import { StateMessage } from '@/shared/ui/StateMessage';
 
@@ -40,7 +41,7 @@ export function CartPage() {
     return (
       <div className="container">
         <StateMessage
-          icon="⛿"
+          icon={<CartIcon />}
           title={t('cart.emptyTitle')}
           body={t('cart.emptyBody')}
           action={

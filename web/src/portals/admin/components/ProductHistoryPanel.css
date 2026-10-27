@@ -1,0 +1,111 @@
+.product-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.product-history__filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.product-history__filter select {
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ⚠️  A rail down the start edge: the timeline reads top-down in both directions,
+       and `border-inline-start` puts the rail on the correct side in RTL. */
+.product-history__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.product-history__item {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  padding-inline-start: var(--space-4);
+  border-inline-start: 2px solid var(--color-border);
+}
+
+.product-history__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+}
+
+.product-history__who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.product-history__who .muted {
+  font-size: 0.8125rem;
+}
+
+.product-history__repr {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.product-history__changes {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-1) 0 0;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.product-history__changes li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.product-history__field {
+  font-weight: 600;
+}
+
+.product-history__diff {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.product-history__diff del {
+  color: var(--color-text-muted);
+}
+
+.product-history__diff ins {
+  text-decoration: none;
+  font-weight: 600;
+  color: var(--color-text);
+}

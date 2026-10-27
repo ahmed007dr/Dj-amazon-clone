@@ -11,18 +11,20 @@ Product images — upload, ordering and deletion.
     or the constraint rejects the operation with an integrity message nobody understands.
 """
 
-from django.db import transaction
+from uuid import UUID
+
+from django.db import models, transaction
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext as _
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from catalog import watermark
-from catalog.models import Product, ProductImage
+from catalog import audit, watermark
+from catalog.models import Product, ProductColor, ProductImage
 from catalog.serializers import ProductImageSerializer
 from core.errors import BusinessError, ErrorCode
-from core.models.audit import AuditAction, AuditLog
+from core.models.audit import AuditAction
 from core.permissions import CanManageCatalog
 
 #: ⚠️  An upper bound on the number of images.
@@ -31,6 +33,46 @@ from core.permissions import CanManageCatalog
 #:     on a phone, and makes the list query drag rows that are never displayed.
 #:     Eight is enough for any medical product.
 MAX_IMAGES_PER_PRODUCT = 8
+
+
+def _parse_uuid(raw):
+    """A UUID or `None` — a malformed id is "no such colour", never a 500."""
+    try:
+        return UUID(str(raw))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+def _requested_color(request, product) -> ProductColor | None:
+    """
+    The colour an upload / reorder is aimed at — `None` = the product's **base** gallery.
+
+    ⚠️  A colour must belong to *this* product.
+
+        The id arrives in a form field, so without the check a colour of another
+        product could be named and its gallery filled from the wrong screen.
+    """
+    raw = request.data.get("color") if hasattr(request, "data") else None
+    if raw in (None, "", "null", "base"):
+        return None
+
+    color_id = _parse_uuid(raw)
+    color = (
+        ProductColor.objects.filter(pk=color_id, product=product).first()
+        if color_id is not None
+        else None
+    )
+    if color is None:
+        raise BusinessError(
+            ErrorCode.VALIDATION_ERROR, detail=_("هذا اللون لا يخص هذا المنتج"), status_code=400
+        )
+    return color
+
+
+def _scope(product_id, color) -> "models.QuerySet":
+    """The images of one scope: a colour's own, or the product's base gallery."""
+    queryset = ProductImage.objects.filter(product_id=product_id)
+    return queryset.filter(color=color) if color is not None else queryset.filter(color__isnull=True)
 
 
 def _watermark_if_present(serializer) -> None:
@@ -53,7 +95,24 @@ class ProductImageListCreateAPI(generics.ListCreateAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        return ProductImage.objects.filter(product_id=self.kwargs["pk"])
+        """
+        ⚠️  One scope at a time. No `?color=` means the **base** gallery.
+
+            `?color=<id>` is that colour's own gallery and `?color=all` every image
+            of the product. The default keeps this endpoint answering what it always
+            did for a product without colours, and stops a colour's photos appearing
+            in the main-images panel.
+        """
+        queryset = ProductImage.objects.filter(product_id=self.kwargs["pk"])
+        raw = self.request.query_params.get("color", "")
+
+        if raw == "all":
+            return queryset
+        if raw in ("", "base"):
+            return queryset.filter(color__isnull=True)
+
+        color_id = _parse_uuid(raw)
+        return queryset.filter(color_id=color_id) if color_id is not None else queryset.none()
 
     def get_product(self) -> Product:
         return get_object_or_404(Product.all_objects, pk=self.kwargs["pk"])
@@ -61,34 +120,50 @@ class ProductImageListCreateAPI(generics.ListCreateAPIView):
     @transaction.atomic
     def perform_create(self, serializer):
         product = self.get_product()
-        existing = ProductImage.objects.filter(product=product).count()
+        color = _requested_color(self.request, product)
+        existing = _scope(product.pk, color).count()
 
+        # ⚠️  The cap is **per scope**: eight base images and eight per colour.
         if existing >= MAX_IMAGES_PER_PRODUCT:
+            message = (
+                _("الحد الأقصى {count} صور لكل لون")
+                if color is not None
+                else _("الحد الأقصى {count} صور لكل منتج")
+            )
             raise BusinessError(
                 ErrorCode.CONFLICT,
-                detail=_("الحد الأقصى {count} صور لكل منتج").format(count=MAX_IMAGES_PER_PRODUCT),
+                detail=message.format(count=MAX_IMAGES_PER_PRODUCT),
                 status_code=409,
             )
 
-        # ⚠️  The first image automatically becomes the primary.
+        # ⚠️  The first image **of its scope** automatically becomes that scope's primary.
         #
         #     A product with images but no primary shows up with no image in every
         #     list — and the admin, seeing their images uploaded, cannot work out why.
+        #     The same holds per colour: its swatch gallery opens on its primary.
         is_first = existing == 0
 
         _watermark_if_present(serializer)
 
         image = serializer.save(
             product=product,
+            color=color,
             display_order=existing * 10,
             is_primary=is_first,
         )
 
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditAction.CREATE,
+        # ⚠️  Through `catalog.audit`, so the entry carries the product's content
+        #     type + id and shows up on that product's History timeline.
+        audit.log_product_change(
+            self.request,
+            product,
+            AuditAction.CREATE,
+            {
+                "image_id": str(image.pk),
+                "is_primary": is_first,
+                **({"color": color.name_en} if color is not None else {}),
+            },
             object_repr=f"صورة منتج {product.sku}",
-            changes={"image_id": str(image.pk), "is_primary": is_first},
         )
 
 
@@ -118,11 +193,29 @@ class ProductImageDetailAPI(generics.RetrieveUpdateDestroyAPIView):
         """
         was_primary = instance.is_primary
         product_id = instance.product_id
+        color_id = instance.color_id
+        image_id = str(instance.pk)
         instance.delete()
 
+        # Deleting a picture is a content change someone will ask about later.
+        product = Product.all_objects.filter(pk=product_id).first()
+        if product is not None:
+            audit.log_product_change(
+                self.request,
+                product,
+                AuditAction.DELETE,
+                {"image_id": image_id, "was_primary": was_primary},
+                object_repr=f"صورة منتج {product.sku}",
+            )
+
         if was_primary:
+            # ⚠️  The replacement comes from the **same scope** — promoting a colour's
+            #     photo to the base gallery's primary (or the reverse) would trip the
+            #     per-scope unique constraint and show the wrong picture on every list.
             replacement = (
-                ProductImage.objects.filter(product_id=product_id).order_by("display_order").first()
+                ProductImage.objects.filter(product_id=product_id, color_id=color_id)
+                .order_by("display_order")
+                .first()
             )
             if replacement is not None:
                 replacement.is_primary = True
@@ -145,9 +238,11 @@ class SetPrimaryImageAPI(APIView):
     def post(self, request, pk, image_pk):
         image = get_object_or_404(ProductImage, pk=image_pk, product_id=pk)
 
-        ProductImage.objects.filter(product_id=pk, is_primary=True).exclude(pk=image.pk).update(
-            is_primary=False
-        )
+        # ⚠️  Only within the image's own scope (base gallery or one colour): the
+        #     primary of the base gallery and the primary of each colour coexist.
+        ProductImage.objects.filter(
+            product_id=pk, color_id=image.color_id, is_primary=True
+        ).exclude(pk=image.pk).update(is_primary=False)
 
         image.is_primary = True
         image.save(update_fields=["is_primary"])
@@ -172,10 +267,13 @@ class ReorderImagesAPI(APIView):
         if not isinstance(order, list) or not order:
             raise BusinessError(ErrorCode.VALIDATION_ERROR, detail=_("أرسل `order` كقائمة معرّفات"))
 
-        owned = {
-            str(image_id)
-            for image_id in ProductImage.objects.filter(product_id=pk).values_list("id", flat=True)
-        }
+        # ⚠️  An optional `color` names the scope being reordered (absent = the base
+        #     gallery). Ids from another scope are "not yours" like any foreign id.
+        product = get_object_or_404(Product.all_objects, pk=pk)
+        color = _requested_color(request, product)
+        scope = _scope(pk, color)
+
+        owned = {str(image_id) for image_id in scope.values_list("id", flat=True)}
 
         # ⚠️  **Validate before mutating, not after.**
         #
@@ -192,12 +290,9 @@ class ReorderImagesAPI(APIView):
         for index, image_id in enumerate(order):
             # ⚠️  Filtering by product remains despite the check above — a cheap
             #     second barrier at the point of writing itself.
-            ProductImage.objects.filter(pk=image_id, product_id=pk).update(display_order=index * 10)
+            scope.filter(pk=image_id).update(display_order=index * 10)
 
         return Response(
-            ProductImageSerializer(
-                ProductImage.objects.filter(product_id=pk).order_by("display_order"),
-                many=True,
-            ).data,
+            ProductImageSerializer(scope.order_by("display_order"), many=True).data,
             status=status.HTTP_200_OK,
         )

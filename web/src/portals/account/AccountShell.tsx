@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { useAuth } from '@/features/auth/useAuth';
+import { useStudentVerificationEnforced } from '@/features/settings/publicConfig';
 import { Alert } from '@/shared/ui/Alert';
 
 import { AccountNav } from './components/AccountNav';
@@ -18,6 +19,7 @@ import './AccountShell.css';
 export function AccountShell() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const verificationEnforced = useStudentVerificationEnforced();
 
   return (
     <div className="container account-shell">
@@ -28,11 +30,16 @@ export function AccountShell() {
       <div className="account-shell__content">
         {/* ⚠️  The verification status is shown on every account screen rather than on
             one page: a professional awaiting review sees retail prices and
-            assumes the system is broken. */}
-        {user?.verification_status === 'PENDING' ? (
+            assumes the system is broken.
+
+            ⚠️  …but only while verification is a requirement at all. With the switch
+            off nothing waits on a review, so "under review" would be a notice about a
+            process that does not exist (and the rejected one asks for a re-upload that
+            changes nothing). */}
+        {verificationEnforced && user?.verification_status === 'PENDING' ? (
           <Alert tone="info">{t('auth.awaitingVerification')}</Alert>
         ) : null}
-        {user?.verification_status === 'REJECTED' ? (
+        {verificationEnforced && user?.verification_status === 'REJECTED' ? (
           <Alert tone="warning">{t('account.verificationRejected')}</Alert>
         ) : null}
 

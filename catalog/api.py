@@ -7,7 +7,11 @@ Catalogue endpoints.
     by direct link — and the filtering is in the queryset, not in the serializer.
 """
 
-from django.db.models import Q
+from uuid import UUID
+
+from django.db import transaction
+from django.db.models import Exists, OuterRef, Q
+from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -16,7 +20,7 @@ from rest_framework.views import APIView
 from access import services as access_services
 from access.preview import PreviewAwareMixin
 from access.services import PolicyAwareQuerySetMixin
-from catalog import selectors
+from catalog import audit, selectors
 from catalog import serializers as s
 from catalog.models import (
     Brand,
@@ -25,6 +29,7 @@ from catalog.models import (
     Manufacturer,
     Product,
     ProductKind,
+    ProductVariant,
     RegulatoryClass,
     StorageCondition,
 )
@@ -89,6 +94,8 @@ class ProductListAPI(PublicCatalogMixin, generics.ListAPIView):
                 | Q(active_ingredient_en__icontains=term)
                 | Q(sku__iexact=term)
                 | Q(barcode__iexact=term)
+                # A shopper pasting a variant's SKU, or a scanner reading its barcode
+                | selectors.variant_code_match(term)
             )
 
         if category_slug := params.get("category"):
@@ -143,6 +150,15 @@ class ProductDetailAPI(PublicCatalogMixin, generics.RetrieveAPIView):
     def get_base_queryset(self):
         return selectors.product_detail_queryset().filter(is_active=True)
 
+    def get_serializer_context(self):
+        # ⚠️  The colour prices are computed for **whoever is being evaluated** —
+        #     the preview user in admin preview mode, otherwise the requester.
+        user = self.get_access_user()
+        return {
+            **super().get_serializer_context(),
+            "price_user": user if getattr(user, "is_authenticated", False) else None,
+        }
+
 
 class ProductByBarcodeAPI(PublicCatalogMixin, generics.RetrieveAPIView):
     """
@@ -156,6 +172,48 @@ class ProductByBarcodeAPI(PublicCatalogMixin, generics.RetrieveAPIView):
 
     def get_base_queryset(self):
         return selectors.product_detail_queryset().filter(is_active=True)
+
+    def get_serializer_context(self):
+        user = self.get_access_user()
+        return {
+            **super().get_serializer_context(),
+            "price_user": user if getattr(user, "is_authenticated", False) else None,
+        }
+
+    def get_object(self):
+        """
+        ⚠️  Matches the product's barcode **or one of its variants'**.
+
+            Each colour is a variant with its own physical label, so a scanner
+            reading the red one's EAN must find the product — and `matched_variant`
+            (set in `retrieve`) tells the counter which colour was scanned.
+        """
+        barcode = self.kwargs[self.lookup_field]
+        by_variant = Exists(
+            ProductVariant.objects.filter(
+                barcode=barcode, is_active=True, product=OuterRef("pk")
+            )
+        )
+        product = (
+            self.filter_queryset(self.get_queryset())
+            .filter(Q(barcode=barcode) | Q(by_variant))
+            .first()
+        )
+        if product is None:
+            raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
+        self.check_object_permissions(self.request, product)
+        return product
+
+    def retrieve(self, request, *args, **kwargs):
+        product = self.get_object()
+        data = dict(self.get_serializer(product).data)
+
+        barcode = self.kwargs[self.lookup_field]
+        matched = next(
+            (v for v in product.variants.all() if v.barcode and v.barcode == barcode), None
+        )
+        data["matched_variant"] = str(matched.pk) if matched is not None and product.barcode != barcode else None
+        return Response(data)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -223,6 +281,13 @@ class ManufacturerListAPI(generics.ListAPIView):
 # ═══════════════════════════════════════════════════════════
 
 
+#: The orderings the admin table may ask for. "Last modified" lets the owner see
+#: what the team touched most recently without opening each product.
+ADMIN_PRODUCT_ORDERINGS = frozenset(
+    {"created_at", "-created_at", "updated_at", "-updated_at", "name_ar", "-name_ar"}
+)
+
+
 class AdminProductListCreateAPI(generics.ListCreateAPIView):
     """
     ⚠️  **No policy filtering** — the admin manages every product, including the
@@ -234,8 +299,11 @@ class AdminProductListCreateAPI(generics.ListCreateAPIView):
     pagination_class = AdminPageNumberPagination
 
     def get_queryset(self):
+        # ⚠️  `created_by` / `updated_by` are joined here: the table shows "added
+        #     by" and "last modified by" on every row, and resolving them lazily
+        #     is one extra query per product per column.
         queryset = Product.all_objects.select_related(
-            "category", "brand", "manufacturer", "access_policy"
+            "category", "brand", "manufacturer", "access_policy", "created_by", "updated_by"
         )
         params = self.request.query_params
 
@@ -247,6 +315,16 @@ class AdminProductListCreateAPI(generics.ListCreateAPIView):
                 | Q(name_en__icontains=search)
                 | Q(sku__icontains=search)
                 | Q(barcode__iexact=search)
+                # …or by any variant (colours included), live or not — an admin
+                # hunting for a retired SKU must still find the product it belonged to
+                | Q(
+                    Exists(
+                        ProductVariant.all_objects.filter(
+                            Q(sku__icontains=search) | Q(barcode__iexact=search),
+                            product=OuterRef("pk"),
+                        )
+                    )
+                )
             )
 
         # ⚠️  `is_active` is what the frontend sends.
@@ -258,24 +336,44 @@ class AdminProductListCreateAPI(generics.ListCreateAPIView):
         if (is_active := params.get("is_active")) in ("true", "false"):
             queryset = queryset.filter(is_active=is_active == "true")
 
-        return queryset.order_by("-created_at")
+        # ⚠️  Whitelisted: the value goes straight into `order_by`, and an unknown
+        #     field name would be a 500 rather than a polite fallback.
+        ordering = params.get("ordering", "-created_at")
+        if ordering not in ADMIN_PRODUCT_ORDERINGS:
+            ordering = "-created_at"
+        return queryset.order_by(ordering, "-created_at")
 
+    @transaction.atomic
     def perform_create(self, serializer):
-        product = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditAction.CREATE,
-            object_repr=f"منتج {product.sku}",
-            changes={"name_ar": product.name_ar, "sku": product.sku},
-            ip_address=self.request.META.get("REMOTE_ADDR"),
+        user = self.request.user
+        product = serializer.save(created_by=user, updated_by=user)
+        audit.log_product_change(
+            self.request,
+            product,
+            AuditAction.CREATE,
+            {"name_ar": product.name_ar, "sku": product.sku},
         )
 
 
 class AdminProductDetailAPI(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [CanManageCatalog]
     serializer_class = s.AdminProductSerializer
-    queryset = Product.all_objects.all()
+    queryset = Product.all_objects.select_related("created_by", "updated_by")
 
+    @transaction.atomic
+    def perform_update(self, serializer):
+        """
+        ⚠️  An update is audited with a **diff**, not just a line saying "edited".
+
+            The snapshot is taken from `serializer.instance` *before* `save()`
+            — the serializer mutates that same object in place, so reading it
+            afterwards would compare the new values with themselves.
+        """
+        before = audit.snapshot(serializer.instance)
+        product = serializer.save(updated_by=self.request.user)
+        audit.log_update(self.request, product, before)
+
+    @transaction.atomic
     def perform_destroy(self, instance):
         """
         Always a soft delete.
@@ -284,13 +382,13 @@ class AdminProductDetailAPI(generics.RetrieveUpdateDestroyAPIView):
             movements — deleting it for real breaks every past report.
         """
         instance.delete()
+        audit.stamp_updated(instance, self.request.user)
 
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditAction.DELETE,
-            object_repr=f"منتج {instance.sku}",
-            changes={"name_ar": instance.name_ar, "soft": True},
-            ip_address=self.request.META.get("REMOTE_ADDR"),
+        audit.log_product_change(
+            self.request,
+            instance,
+            AuditAction.DELETE,
+            {"name_ar": instance.name_ar, "soft": True},
         )
 
 
@@ -319,16 +417,45 @@ class RestoreProductAPI(APIView):
                 status_code=409,
             )
 
-        product.restore()
-
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditAction.RESTORE,
-            object_repr=f"منتج {product.sku}",
-            ip_address=request.META.get("REMOTE_ADDR"),
-        )
+        with transaction.atomic():
+            product.restore()
+            audit.stamp_updated(product, request.user)
+            audit.log_product_change(request, product, AuditAction.RESTORE)
 
         return Response(s.AdminProductSerializer(product).data)
+
+
+class AdminProductHistoryAPI(generics.ListAPIView):
+    """
+    The audit timeline of one product — who did what, and when.
+
+    ⚠️  Reads `AuditLog` through `catalog.audit.history_for`, which understands
+        both the current entries (content type + id) and the legacy ones that
+        only carried the SKU in their text. Optional `?actor=<user id>` and
+        `?action=<UPDATE|PRICE_CHANGE|…>` narrow it.
+
+    ⚠️  A soft-deleted product still has a history (it is the history that tells
+        you who deleted it), so the lookup goes through `all_objects`.
+    """
+
+    permission_classes = [CanManageCatalog]
+    serializer_class = s.ProductHistorySerializer
+    pagination_class = AdminPageNumberPagination
+
+    def get_queryset(self):
+        product = get_object_or_404(Product.all_objects, pk=self.kwargs["pk"])
+        queryset = audit.history_for(product)
+        params = self.request.query_params
+
+        if actor := params.get("actor"):
+            # ⚠️  A malformed id is "no such user", not a 500.
+            try:
+                queryset = queryset.filter(actor_id=UUID(actor))
+            except ValueError:
+                queryset = queryset.none()
+        if action := params.get("action"):
+            queryset = queryset.filter(action=action)
+        return queryset
 
 
 class ProductFormOptionsAPI(APIView):

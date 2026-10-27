@@ -187,6 +187,37 @@ class Order(BaseModel):
     customer_note = models.TextField(_("ملاحظة العميل"), blank=True)
     internal_note = models.TextField(_("ملاحظة داخلية"), blank=True)
 
+    # ── Guest checkout — a buyer with no account ───────────
+    #
+    # ⚠️  **Contact details, not an identity.**
+    #
+    #     A guest order has `customer = NULL` (see the comment on `customer`): no
+    #     shadow account is ever created for a buyer who did not ask for one. What
+    #     it needs instead is somewhere to send the confirmation and the tracking
+    #     link — that is all `contact_email` is. It is deliberately **not** used to
+    #     attach the order to a registered account at checkout (that would confirm
+    #     to a stranger that an account exists for the address); the claim happens
+    #     only after the owner *verifies* the email — see `orders.guest.claim`.
+    #
+    #     A guest order is therefore: channel ONLINE · customer NULL · email set.
+    #     (A counter sale is also customer NULL, but it has channel POS and no email.)
+    contact_email = models.EmailField(
+        _("بريد التواصل"),
+        blank=True,
+        db_index=True,
+        help_text=_("بريد الزائر الذي يُرسَل إليه التأكيد ورابط التتبّع"),
+    )
+    contact_language = models.CharField(
+        _("لغة التواصل"),
+        max_length=5,
+        blank=True,
+        help_text=_("لغة رسائل الزائر — لا حساب له يحمل تفضيلًا"),
+    )
+    #: A hash of (cart session + the client's `Idempotency-Key`) — never the raw key.
+    checkout_key = models.CharField(
+        _("مفتاح منع تكرار الطلب"), max_length=64, blank=True, editable=False
+    )
+
     confirmed_at = models.DateTimeField(_("تاريخ التأكيد"), null=True, blank=True)
     completed_at = models.DateTimeField(_("تاريخ الإكمال"), null=True, blank=True)
     cancelled_at = models.DateTimeField(_("تاريخ الإلغاء"), null=True, blank=True)
@@ -204,9 +235,30 @@ class Order(BaseModel):
             models.Index(fields=["location", "-created_at"]),
             models.Index(fields=["owner_employee", "-created_at"]),
         ]
+        constraints = [
+            # ⚠️  A retried checkout (double click · dropped connection) returns the
+            #     order the first attempt made instead of creating a second one.
+            models.UniqueConstraint(
+                fields=["checkout_key"],
+                condition=models.Q(checkout_key__gt="", deleted_at__isnull=True),
+                name="unique_order_checkout_key",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.number} [{self.status}]"
+
+    @property
+    def is_guest(self) -> bool:
+        """
+        Placed without an account (and not yet claimed by one).
+
+        ⚠️  Once an order is claimed `customer` is set and this turns False, but
+            `contact_email` stays — the emailed tracking link keeps working.
+        """
+        return (
+            self.customer_id is None and self.channel == OrderChannel.ONLINE and bool(self.contact_email)
+        )
 
     @property
     def is_paid(self) -> bool:
@@ -260,6 +312,19 @@ class OrderLine(BaseModel):
     product_sku = models.CharField(_("رمز المنتج"), max_length=64)
     product_name_ar = models.CharField(_("اسم المنتج بالعربية"), max_length=200)
     product_name_en = models.CharField(_("اسم المنتج بالإنجليزية"), max_length=200)
+
+    # ── Variant / colour snapshot ──────────────────────────
+    #
+    # ⚠️  Blank for a plain product — and for every line written before colours existed.
+    #     Those old lines still have `variant`, so the serializer falls back to the
+    #     live variant for them (`orders.serializers.OrderLineSerializer`); a line
+    #     written from now on never needs to.
+    variant_sku = models.CharField(_("رمز النسخة"), max_length=64, blank=True)
+    variant_name_ar = models.CharField(_("اسم النسخة بالعربية"), max_length=200, blank=True)
+    variant_name_en = models.CharField(_("اسم النسخة بالإنجليزية"), max_length=200, blank=True)
+    color_name_ar = models.CharField(_("اسم اللون بالعربية"), max_length=200, blank=True)
+    color_name_en = models.CharField(_("اسم اللون بالإنجليزية"), max_length=200, blank=True)
+    color_hex = models.CharField(_("لون العرض"), max_length=7, blank=True)
 
     quantity = models.PositiveIntegerField(_("الكمية"), validators=[MinValueValidator(1)])
 

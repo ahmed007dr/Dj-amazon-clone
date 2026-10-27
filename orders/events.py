@@ -26,3 +26,10 @@ order_paid = django.dispatch.Signal()
 
 #: Shipped — stock was actually deducted
 order_shipped = django.dispatch.Signal()
+
+#: A **guest** order was placed — emitted once its lines exist.
+#:
+#: ⚠️  A separate signal rather than `post_save(created=True)` on `Order`: that
+#:     fires when the order row is inserted, before its lines, so a confirmation
+#:     built from it would list no items. Carries `order` and `tracking_token`.
+guest_order_placed = django.dispatch.Signal()

@@ -13,14 +13,16 @@ Cart services.
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from access.services import evaluate
 from cart.models import Cart, CartLine, CartStatus
 from catalog import selectors as catalog_selectors
+from catalog.colors import assert_variant_choice
 from core.errors import BusinessError, ErrorCode
 from core.money import ZERO
 from inventory import services as inventory_services
@@ -71,23 +73,65 @@ class CartSnapshot:
 # ═══════════════════════════════════════════════════════════
 
 
+def normalise_session_key(raw) -> str:
+    """
+    A guest cart key as the API accepts it: a UUID, in its canonical spelling.
+
+    ⚠️  The header is **client-controlled input that becomes a database value.**
+
+        It used to be stored as sent. A key longer than the 64-character column
+        raised a database error (a 500) on Postgres, and `ABC…` and `abc…`
+        opened two different carts for one browser. The frontend generates
+        `crypto.randomUUID()`, so a strict UUID costs honest clients nothing and
+        closes both — and the canonical spelling means one browser, one cart.
+    """
+    text = raw.strip() if isinstance(raw, str) else ""
+    if not text:
+        raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="مفتاح جلسة السلة مطلوب")
+    try:
+        return str(uuid.UUID(text))
+    except (ValueError, AttributeError, TypeError):
+        raise BusinessError(
+            ErrorCode.VALIDATION_ERROR, detail="مفتاح جلسة السلة غير صالح"
+        ) from None
+
+
+def _get_or_create_active(lookup: dict, **create) -> Cart:
+    """
+    Fetch the active cart, creating it if absent — **safe against a double click.**
+
+    ⚠️  Two requests arriving together (a double tap, or a page firing two cart
+        calls on load) both found nothing and both created a cart. The partial
+        unique indexes now refuse the second; the savepoint keeps that refusal
+        from poisoning the caller's transaction, and the loser simply re-reads
+        the winner's cart.
+    """
+    queryset = Cart.objects.filter(status=CartStatus.ACTIVE, **lookup)
+    cart = queryset.first()
+    if cart is not None:
+        return cart
+
+    try:
+        with transaction.atomic():
+            return Cart.objects.create(**create)
+    except IntegrityError:
+        cart = queryset.first()
+        if cart is None:
+            raise
+        return cart
+
+
 def get_active_cart(user=None, session_key: str = "") -> Cart:
     """The active cart for the user or the session, created if absent."""
     if user is not None and getattr(user, "is_authenticated", False):
-        cart = Cart.objects.filter(user=user, status=CartStatus.ACTIVE).first()
-        if cart is None:
-            cart = Cart.objects.create(user=user)
-        return cart
+        return _get_or_create_active({"user": user}, user=user)
 
     if not session_key:
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="يلزم تسجيل الدخول أو مفتاح جلسة")
 
-    cart = Cart.objects.filter(
-        session_key=session_key, status=CartStatus.ACTIVE, user__isnull=True
-    ).first()
-    if cart is None:
-        cart = Cart.objects.create(session_key=session_key)
-    return cart
+    return _get_or_create_active(
+        {"session_key": session_key, "user__isnull": True}, session_key=session_key
+    )
 
 
 @transaction.atomic
@@ -164,6 +208,7 @@ def add_line(cart: Cart, product, quantity: int = 1, *, variant=None, user=None)
         raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="الكمية يجب أن تكون موجبة")
 
     _assert_purchasable(product, user or cart.user)
+    assert_variant_choice(product, variant)
 
     line = CartLine.objects.filter(cart=cart, product=product, variant=variant).first()
     target_quantity = (line.quantity if line else 0) + quantity
@@ -291,12 +336,18 @@ def revalidate(
             "product__access_policy",
             "product__tax_class",
             "variant",
+            "variant__color",
         ).prefetch_related(
             # ⚠️  The thumbnail the cart draws — without it `primary_images` is
             #     missing on the product and every line falls back to the
             #     placeholder glyph, which reads as "the image was deleted".
             catalog_selectors.primary_image_prefetch("product__"),
+            # …and the colour's own photo, when the line carries a colour
+            catalog_selectors.color_primary_image_prefetch("variant__color__"),
         )
+    )
+    offering_variants = catalog_selectors.products_offering_variants(
+        {line.product_id for line in lines if line.variant_id is None}
     )
 
     issues: list[LineIssue] = []
@@ -327,6 +378,32 @@ def revalidate(
                     product_name=product.name_ar,
                     code=ErrorCode.PRODUCT_ACCESS_DENIED,
                     message="لم يعد هذا المنتج متاحًا لحسابك",
+                )
+            )
+            continue
+
+        # 2b — the chosen variant (colour) is still on sale, and a variant is still
+        #      chosen where the product now needs one
+        variant = line.variant
+        if variant is not None and not variant.is_sellable:
+            issues.append(
+                LineIssue(
+                    line_id=str(line.pk),
+                    product_sku=product.sku,
+                    product_name=product.name_ar,
+                    code=ErrorCode.PRODUCT_UNAVAILABLE,
+                    message="لم يعد هذا اللون أو الخيار متاحًا",
+                )
+            )
+            continue
+        if variant is None and str(product.pk) in offering_variants:
+            issues.append(
+                LineIssue(
+                    line_id=str(line.pk),
+                    product_sku=product.sku,
+                    product_name=product.name_ar,
+                    code=ErrorCode.VALIDATION_ERROR,
+                    message="اختر اللون أو الخيار — احذف هذا السطر وأضفه من جديد",
                 )
             )
             continue
@@ -428,6 +505,16 @@ def add_bundle(cart: Cart, bundle, *, user=None, essentials_only: bool = False) 
         One item out of ten being out of stock must not block the other nine.
         Rejecting the whole bundle over one item loses the entire sale.
     """
+    # ⚠️  **Fails closed — a bundle needs a signed-in account.** (owner decision)
+    #
+    #     The view already demands `IsAuthenticated`; this is the second lock, so
+    #     a future caller (an employee tool, a seed, a task) cannot add a bundle
+    #     to a guest cart by omitting `user=`. The cart's own owner counts: a
+    #     service call that passes `user=None` on a member's cart is still a member.
+    actor = user if user is not None else cart.user
+    if actor is None or not getattr(actor, "is_authenticated", False):
+        raise BusinessError(ErrorCode.AUTHENTICATION_REQUIRED, status_code=401)
+
     items = bundle.items.select_related("product", "variant").all()
     if essentials_only:
         items = [item for item in items if item.is_essential]
@@ -436,7 +523,7 @@ def add_bundle(cart: Cart, bundle, *, user=None, essentials_only: bool = False) 
 
     for item in items:
         try:
-            add_line(cart, item.product, item.quantity, variant=item.variant, user=user)
+            add_line(cart, item.product, item.quantity, variant=item.variant, user=actor)
             added.append(
                 {
                     "sku": item.product.sku,

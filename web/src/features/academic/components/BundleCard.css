@@ -30,6 +30,12 @@
   text-decoration: none;
 }
 
+.bundle-card__where {
+  display: grid;
+  gap: 0.1rem;
+  font-size: 0.875rem;
+}
+
 .bundle-card__desc,
 .bundle-card__count {
   font-size: 0.875rem;

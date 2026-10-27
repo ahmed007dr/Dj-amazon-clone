@@ -11,6 +11,11 @@ urlpatterns = [
     path("admin/accounts/<uuid:pk>/", api.AccountDetailAPI.as_view(), name="account-detail"),
     path("admin/accounts/<uuid:pk>/verify/", api.VerifyAccountAPI.as_view(), name="account-verify"),
     path(
+        "admin/accounts/<uuid:pk>/test-imap/",
+        api.TestImapAPI.as_view(),
+        name="account-test-imap",
+    ),
+    path(
         "admin/accounts/<uuid:pk>/test-send/",
         api.TestSendAPI.as_view(),
         name="account-test-send",
@@ -30,8 +35,16 @@ urlpatterns = [
     path("admin/templates/<slug:key>/", api.TemplateDetailAPI.as_view(), name="template-detail"),
     # ── Inbox ──────────────────────────────────────────────
     path("admin/inbox/", api.InboxListAPI.as_view(), name="inbox"),
+    path("admin/inbox/summary/", api.InboxSummaryAPI.as_view(), name="inbox-summary"),
     path("admin/inbox/<uuid:pk>/", api.InboxDetailAPI.as_view(), name="inbox-detail"),
+    path(
+        "admin/inbox/<uuid:pk>/attachments/<uuid:attachment_pk>/",
+        api.InboundAttachmentDownloadAPI.as_view(),
+        name="inbox-attachment",
+    ),
     path("admin/inbox/<uuid:pk>/reply/", api.ReplyAPI.as_view(), name="inbox-reply"),
+    # -- Branded layout preview ----------------------------
+    path("admin/preview/", api.MailPreviewAPI.as_view(), name="mail-preview"),
     path(
         "admin/templates/<slug:key>/preview/",
         api.TemplatePreviewAPI.as_view(),

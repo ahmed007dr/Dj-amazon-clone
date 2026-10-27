@@ -18,6 +18,13 @@ const EDITABLE = [
   'name_en',
   'tagline_ar',
   'tagline_en',
+  'hero_title_ar',
+  'hero_title_en',
+  'hero_subtitle_ar',
+  'hero_subtitle_en',
+  'hero_cta_label_ar',
+  'hero_cta_label_en',
+  'hero_cta_url',
   'font_ar',
   'font_en',
   'font_size_base',
@@ -156,6 +163,84 @@ export function BrandIdentityForm({ profile }: { profile: AdminBrandProfile }) {
           {...errorFor('tagline_en')}
         />
       </div>
+
+      {/* ── The home hero ─────────────────────────── */}
+      <h3 className="identity-form__legend">{t('branding.sectionHero')}</h3>
+      {/* ⚠️  Every field here is optional: an empty one falls back to the store name, the
+          tagline and the catalogue button, so a profile that was never configured keeps
+          the page it always had. The pictures are files, and live on the assets tab. */}
+      <p className="identity-form__note">{t('branding.heroNote')}</p>
+
+      <div className="identity-form__row">
+        <Field
+          label={t('branding.heroTitleAr')}
+          value={draft.hero_title_ar}
+          onChange={(event) => set('hero_title_ar')(event.target.value)}
+          hint={t('branding.heroTitleHint')}
+          maxLength={120}
+          {...errorFor('hero_title_ar')}
+        />
+        <Field
+          label={t('branding.heroTitleEn')}
+          value={draft.hero_title_en}
+          onChange={(event) => set('hero_title_en')(event.target.value)}
+          dir="ltr"
+          maxLength={120}
+          {...errorFor('hero_title_en')}
+        />
+      </div>
+
+      <div className="identity-form__row">
+        <Field
+          label={t('branding.heroSubtitleAr')}
+          value={draft.hero_subtitle_ar}
+          onChange={(event) => set('hero_subtitle_ar')(event.target.value)}
+          hint={t('branding.heroSubtitleHint')}
+          maxLength={300}
+          {...errorFor('hero_subtitle_ar')}
+        />
+        <Field
+          label={t('branding.heroSubtitleEn')}
+          value={draft.hero_subtitle_en}
+          onChange={(event) => set('hero_subtitle_en')(event.target.value)}
+          dir="ltr"
+          maxLength={300}
+          {...errorFor('hero_subtitle_en')}
+        />
+      </div>
+
+      <div className="identity-form__row">
+        <Field
+          label={t('branding.heroCtaLabelAr')}
+          value={draft.hero_cta_label_ar}
+          onChange={(event) => set('hero_cta_label_ar')(event.target.value)}
+          hint={t('branding.heroCtaLabelHint')}
+          maxLength={60}
+          {...errorFor('hero_cta_label_ar')}
+        />
+        <Field
+          label={t('branding.heroCtaLabelEn')}
+          value={draft.hero_cta_label_en}
+          onChange={(event) => set('hero_cta_label_en')(event.target.value)}
+          dir="ltr"
+          maxLength={60}
+          {...errorFor('hero_cta_label_en')}
+        />
+      </div>
+
+      {/* ⚠️  The link rules live on the server (a path inside the store or an `https`
+          address). The form does not repeat them: two copies of a rule drift apart, and
+          the server's message is shown at this field. */}
+      <Field
+        label={t('branding.heroCtaUrl')}
+        value={draft.hero_cta_url}
+        onChange={(event) => set('hero_cta_url')(event.target.value)}
+        dir="ltr"
+        inputMode="url"
+        hint={t('branding.heroCtaUrlHint')}
+        maxLength={300}
+        {...errorFor('hero_cta_url')}
+      />
 
       {/* ── Fonts and shape ───────────────────────── */}
       <h3 className="identity-form__legend">{t('branding.sectionType')}</h3>

@@ -10,9 +10,12 @@ Finance endpoints — admin only (business rule 14).
 
 from __future__ import annotations
 
+import mimetypes
 from datetime import date
 
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
@@ -228,6 +231,59 @@ class ExpenseDetailAPI(generics.RetrieveUpdateDestroyAPIView):
                 ErrorCode.CONFLICT, detail="المصروف معتمد — لا يُحذف", status_code=409
             )
         instance.delete()
+
+
+class ExpenseAttachmentAPI(APIView):
+    """
+    Download an expense's invoice / receipt.
+
+    ⚠️  **An authenticated stream, not a link.**
+
+        The file sits under `private/expense-attachments/`, which the media route
+        refuses by design (a rent invoice carries the landlord's name and amount).
+        The only way to read it is here: same permission as reading the expense,
+        every download audited (`EXPORT`), and the response is forced to download
+        (`attachment`, `nosniff`) so an uploaded HTML file is never rendered under
+        this origin.
+
+    ⚠️  A missing file on disk is `404`, not `500` — a restored database with the
+        media folder left behind must say "not found", not crash.
+    """
+
+    permission_classes = [CanManageExpenses]
+
+    def get(self, request, pk):
+        expense = get_object_or_404(Expense.objects.select_related("category"), pk=pk)
+
+        if not expense.attachment:
+            raise BusinessError(ErrorCode.NOT_FOUND, status_code=404)
+
+        try:
+            handle = expense.attachment.open("rb")
+        except (FileNotFoundError, ValueError, OSError):
+            raise BusinessError(ErrorCode.NOT_FOUND, status_code=404) from None
+
+        filename = services.attachment_filename(expense)
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditAction.EXPORT,
+            content_type=ContentType.objects.get_for_model(Expense),
+            object_id=str(expense.pk),
+            object_repr=f"مرفق مصروف {expense.category.name_ar} · {expense.amount}"[:200],
+            changes={"filename": filename},
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        response = FileResponse(
+            handle,
+            as_attachment=True,
+            filename=filename,
+            content_type=mimetypes.guess_type(filename)[0] or "application/octet-stream",
+        )
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Cache-Control"] = "private, no-store"
+        return response
 
 
 class ExpenseDecisionAPI(APIView):

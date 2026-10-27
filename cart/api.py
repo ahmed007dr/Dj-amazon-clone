@@ -10,7 +10,7 @@ Cart endpoints.
 
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -39,12 +39,9 @@ class CartMixin:
         if request.user.is_authenticated:
             return services.get_active_cart(user=request.user)
 
-        session_key = request.META.get(GUEST_HEADER, "").strip()
-        if not session_key:
-            raise BusinessError(
-                ErrorCode.VALIDATION_ERROR,
-                detail="ترويسة X-Cart-Session مطلوبة لسلة الزائر",
-            )
+        # ⚠️  Validated, not trusted: it is client input that becomes a database
+        #     value (a UUID in its canonical spelling, or a 400).
+        session_key = services.normalise_session_key(request.META.get(GUEST_HEADER, ""))
         return services.get_active_cart(session_key=session_key)
 
     def snapshot_response(self, cart, *, http_status=status.HTTP_200_OK):
@@ -85,7 +82,7 @@ class CartLinesAPI(CartMixin, APIView):
             get_object_or_404(Product, pk=data["product"]),
             data["quantity"],
             variant=(
-                get_object_or_404(ProductVariant, pk=data["variant"])
+                get_object_or_404(ProductVariant.objects.select_related("color"), pk=data["variant"])
                 if data.get("variant")
                 else None
             ),
@@ -158,6 +155,12 @@ class CartBundleAPI(CartMixin, APIView):
 
     serializer_class = s.AddBundleSerializer
 
+    # ⚠️  **A bundle needs an account** (owner decision) — a visitor may *see*
+    #     every bundle, but adding one to the cart means signing in first.
+    #     `CartMixin` allows anyone; this overrides it, and `add_bundle` refuses
+    #     a missing user again below it so a future caller cannot skip the gate.
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         from academic.models import StudyBundle
 
@@ -193,10 +196,10 @@ class CartMergeAPI(APIView):
     """
 
     def post(self, request):
-        session_key = request.data.get("session_key", "").strip()
+        session_key = request.data.get("session_key", "")
         if not session_key:
             raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="session_key مطلوب")
 
-        cart = services.merge_guest_cart(request.user, session_key)
+        cart = services.merge_guest_cart(request.user, services.normalise_session_key(session_key))
         snapshot = services.revalidate(cart, user=request.user)
         return Response(s.CartSnapshotSerializer(snapshot, context={"request": request}).data)

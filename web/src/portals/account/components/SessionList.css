@@ -41,3 +41,7 @@
   direction: ltr;
   text-align: start;
 }
+
+.session__signed {
+  font-size: 0.8125rem;
+}

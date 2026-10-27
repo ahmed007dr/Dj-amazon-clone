@@ -176,8 +176,20 @@ class AdminProfileSerializer(serializers.ModelSerializer):
 class AuditLogSerializer(serializers.Serializer):
     id = serializers.IntegerField(read_only=True)
     actor = serializers.UUIDField(read_only=True, allow_null=True)
+    # Who, readable — added beside `actor` (the id stays) so a timeline needs no
+    # second lookup per row.
+    actor_name = serializers.CharField(source="actor.full_name", read_only=True, default=None)
+    actor_email = serializers.EmailField(source="actor.email", read_only=True, default=None)
     action = serializers.CharField(read_only=True)
+    action_label = serializers.CharField(source="get_action_display", read_only=True)
+    model = serializers.SerializerMethodField()
+    object_id = serializers.CharField(read_only=True, allow_null=True)
     object_repr = serializers.CharField(read_only=True)
     changes = serializers.JSONField(read_only=True)
     ip_address = serializers.IPAddressField(read_only=True, allow_null=True)
     created_at = serializers.DateTimeField(read_only=True)
+
+    def get_model(self, obj) -> str | None:
+        """`catalog.product` — the value the list's `model` filter accepts."""
+        content_type = obj.content_type
+        return f"{content_type.app_label}.{content_type.model}" if content_type else None

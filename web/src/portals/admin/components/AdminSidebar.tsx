@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
+import { useDocumentCounts } from '@/features/academic/verificationApi';
 import { useCan } from '@/features/auth/useCan';
 
 import { AdminLogo } from './AdminLogo';
@@ -27,7 +28,13 @@ interface AdminLink {
   end?: boolean;
   /** The Django permission the server checks — or `null` for no condition. */
   permission: string | null;
+  /** A count of work waiting behind this link — shown beside the label, hidden at zero. */
+  badge?: number;
 }
+
+/** The permission behind the academic screen — also what the verification queue is gated on. */
+const ACADEMIC_PERMISSION = 'academic.change_university';
+const ACADEMIC_PATH = '/admin/academic';
 
 const SECTIONS: { key: string; links: AdminLink[] }[] = [
   {
@@ -52,13 +59,6 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
       //     catalogue is built and how a price list lands every week — it is
       //     product work, not configuration done once.
       { to: '/admin/products/import', key: 'imports.navLabel', permission: 'catalog.change_product' },
-      // ⚠️  Beside the wizard rather than inside it: a job whose tab was closed
-      //     has to be reachable without starting a new import to get there.
-      {
-        to: '/admin/products/import/jobs',
-        key: 'imports.history',
-        permission: 'catalog.change_product',
-      },
       // ⚠️  Under products rather than in "system": the category is mandatory on a
       //     product, so it is a step in adding an item rather than a setting configured once.
       { to: '/admin/reference', key: 'nav.reference', permission: 'catalog.change_product' },
@@ -110,9 +110,6 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
       { to: '/admin/finance', key: 'finance.title', permission: 'finance.view_revenueentry' },
       { to: '/admin/expenses', key: 'finance.expensesTitle', permission: 'finance.add_expense' },
       { to: '/admin/businesses', key: 'b2b.businesses', permission: 'b2b.change_businessprofile' },
-      // ⚠️  Employees here rather than in "system": assignment is a daily
-      //     commercial matter — a customer with no owner is a lost sale, not a setting.
-      { to: '/admin/staff', key: 'staff.staffTitle', permission: 'employees.change_customerassignment' },
       { to: '/admin/targets', key: 'targets.title', permission: 'commissions.change_commissionrecord' },
     ],
   },
@@ -120,6 +117,12 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
     key: 'system',
     links: [
       { to: '/admin/users', key: 'nav.users', permission: 'accounts.change_user' },
+      // ⚠️  Staff beside Users, not under finance: it used to sit among the money
+      //     screens because customer assignment is a daily commercial matter, but the
+      //     screen now also creates logins (including admin-panel ones) and edits the
+      //     roles that decide who can open what — account administration, which is
+      //     where someone looking for "add a person" goes first.
+      { to: '/admin/staff', key: 'staff.staffTitle', permission: 'employees.change_customerassignment' },
       { to: '/admin/tax', key: 'admin.tax', permission: 'inventory.change_stocklocation' },
       { to: '/admin/settings', key: 'nav.settings', permission: 'inventory.change_stocklocation' },
       { to: '/admin/payments', key: 'nav.payments', permission: 'payments.change_paymentprovider' },
@@ -133,13 +136,21 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   const can = useCan();
 
+  // ⚠️  The badge is fetched only for someone who can open the screen it points at.
+  //     The endpoint answers `403` to everyone else, and the sidebar is rendered
+  //     for every account that enters the panel.
+  const canReview = can(ACADEMIC_PERMISSION);
+  const pending = useDocumentCounts(canReview).data?.PENDING ?? 0;
+
   // ⚠️  **An empty section disappears along with its heading.**
   //
   //     Filtering the links alone leaves section headings hanging over nothing —
   //     so the user reads them as "something failed to load" rather than "here is what is not yours".
   const sections = SECTIONS.map((section) => ({
     ...section,
-    links: section.links.filter((link) => can(link.permission)),
+    links: section.links
+      .filter((link) => can(link.permission))
+      .map((link) => (link.to === ACADEMIC_PATH && pending > 0 ? { ...link, badge: pending } : link)),
   })).filter((section) => section.links.length > 0);
 
   return (
@@ -160,6 +171,14 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
                   onClick={onNavigate}
                 >
                   {t(link.key)}
+                  {link.badge ? (
+                    <span className="admin-sidebar__badge">
+                      <span aria-hidden>{link.badge}</span>
+                      <span className="visually-hidden">
+                        {t('academic.review.pendingBadge', { count: link.badge })}
+                      </span>
+                    </span>
+                  ) : null}
                 </NavLink>
               </li>
             ))}

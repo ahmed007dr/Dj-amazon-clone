@@ -2,26 +2,35 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
+import { PreferencesPanel } from '@/features/notifications/components/PreferencesPanel';
 import {
   useMarkAllRead,
   useMarkRead,
   useNotifications,
-  usePreferences,
-  useSetPreference,
 } from '@/features/notifications/hooks';
 import type { Notification } from '@/features/notifications/types';
+import { useTabParam } from '@/shared/hooks/useTabParam';
 import { PageHeader } from '@/shared/layouts/PageHeader';
-import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Spinner } from '@/shared/ui/Spinner';
 import { StateMessage } from '@/shared/ui/StateMessage';
 import { StatusTabs } from '@/shared/ui/StatusTabs';
+import { TabPanel } from '@/shared/ui/TabPanel';
 import { formatRelative } from '@/shared/utils/format';
 
 import './NotificationsPage.css';
 
+const TABS = ['inbox', 'preferences'] as const;
+
 /**
  * Notifications and their preferences.
+ *
+ * ⚠️  Two tabs, not one long page.
+ *
+ *     The preferences used to sit underneath the inbox, so they were buried below
+ *     however many notifications had piled up — and a user who wanted to stop one
+ *     kind of message had to scroll past all of them to find out they could. The
+ *     tab is in the URL (`?tab=preferences`), so a link in an email can open it.
  *
  * ⚠️  **Arabic only** — and the difference from email is deliberate, not an oversight.
  *
@@ -31,28 +40,31 @@ import './NotificationsPage.css';
  *     means regenerating it from data that has changed — and text that
  *     contradicts what arrived by email at the time. Unifying them requires
  *     storing the text in both languages at send time, which is a model change,
- *     not a frontend one.
+ *     not a frontend one. (The *preferences* screen, which is not a snapshot, is
+ *     translated.)
  */
 export function NotificationsPage() {
   const { t, i18n } = useTranslation();
-  const [tab, setTab] = useState<'all' | 'unread'>('all');
+  const [tab, setTab] = useTabParam(TABS, 'inbox');
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
-  const unreadOnly = tab === 'unread';
-  const { data, isPending, error } = useNotifications({ unread: unreadOnly });
+  const unreadOnly = filter === 'unread';
+  const inbox = tab === 'inbox';
+
+  // Not fetched while the preferences tab is showing — the inbox is not on screen
+  const { data, isPending, error, hasNextPage, fetchNextPage, isFetchingNextPage } =
+    useNotifications({ unread: unreadOnly }, inbox);
   const markRead = useMarkRead();
   const markAllRead = useMarkAllRead();
 
-  const preferences = usePreferences();
-  const setPreference = useSetPreference();
-
-  const notifications = data?.results ?? [];
+  const notifications = data?.pages.flatMap((page) => page.results) ?? [];
 
   return (
     <>
       <PageHeader
         title={t('notifications.title')}
         actions={
-          notifications.some((one) => !one.is_read) ? (
+          inbox && notifications.some((one) => !one.is_read) ? (
             <Button
               variant="ghost"
               loading={markAllRead.isPending}
@@ -67,87 +79,80 @@ export function NotificationsPage() {
       />
 
       <StatusTabs
+        id="notifications"
+        label={t('notifications.title')}
         value={tab}
         onChange={(next) => {
-          setTab(next as 'all' | 'unread');
+          setTab(next as (typeof TABS)[number]);
         }}
         options={[
-          { value: 'all', label: t('common.all') },
-          { value: 'unread', label: t('notifications.unread') },
+          { value: 'inbox', label: t('notifications.tabInbox') },
+          { value: 'preferences', label: t('notifications.tabPreferences') },
         ]}
       />
 
-      {isPending ? <Spinner /> : null}
-      {error ? <StateMessage icon="⚠" title={t('state.errorTitle')} /> : null}
+      <TabPanel id="notifications" value="inbox" active={inbox}>
+        {/* ⚠️  A filter, not a second tab bar: two stacked underlined tab strips
+            read as one navigation with two levels, and "All / Unread" is a view
+            of the same list rather than a place. */}
+        <div className="notifications-filter" role="group" aria-label={t('common.filters')}>
+          {(['all', 'unread'] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              className={`notifications-filter__option ${filter === value ? 'is-active' : ''}`}
+              aria-pressed={filter === value}
+              onClick={() => {
+                setFilter(value);
+              }}
+            >
+              {value === 'all' ? t('common.all') : t('notifications.unread')}
+            </button>
+          ))}
+        </div>
 
-      {!isPending && !error && notifications.length === 0 ? (
-        <StateMessage
-          icon="✉"
-          title={t(unreadOnly ? 'notifications.noUnread' : 'notifications.empty')}
-          body={t('notifications.emptyBody')}
-        />
-      ) : null}
+        {isPending ? <Spinner /> : null}
+        {error ? <StateMessage icon="⚠" title={t('state.errorTitle')} /> : null}
 
-      <ul className="notifications">
-        {notifications.map((notification) => (
-          <NotificationRow
-            key={notification.id}
-            notification={notification}
-            locale={i18n.language}
-            onRead={() => {
-              markRead.mutate(notification.id);
-            }}
+        {!isPending && !error && notifications.length === 0 ? (
+          <StateMessage
+            icon="✉"
+            title={t(unreadOnly ? 'notifications.noUnread' : 'notifications.empty')}
+            body={t('notifications.emptyBody')}
           />
-        ))}
-      </ul>
+        ) : null}
 
-      <section className="notifications__preferences">
-        <h2 className="notifications__subtitle">{t('notifications.preferences')}</h2>
-        <p className="muted">{t('notifications.preferencesHint')}</p>
-
-        {preferences.isPending ? <Spinner /> : null}
-
-        <ul className="preferences">
-          {(preferences.data ?? []).map((preference) => {
-            const key = `${preference.category}-${preference.channel}`;
-
-            return (
-              <li key={key} className="surface preference">
-                <div className="preference__labels">
-                  <strong>{preference.category_label}</strong>
-                  <span className="muted">{preference.channel_label}</span>
-                </div>
-
-                {/* ⚠️  A mandatory one is shown disabled rather than hidden: hiding it
-                    makes the user think they turned everything off while
-                    security messages keep arriving — so they report
-                    "notifications I never asked for". */}
-                {preference.is_mandatory ? (
-                  <Badge tone="neutral">{t('notifications.mandatory')}</Badge>
-                ) : (
-                  <label className="preference__switch">
-                    <input
-                      type="checkbox"
-                      checked={preference.is_enabled}
-                      disabled={setPreference.isPending}
-                      onChange={(event) => {
-                        setPreference.mutate({
-                          category: preference.category,
-                          channel: preference.channel,
-                          is_enabled: event.target.checked,
-                        });
-                      }}
-                    />
-                    <span className="visually-hidden">
-                      {`${preference.category_label} — ${preference.channel_label}`}
-                    </span>
-                  </label>
-                )}
-              </li>
-            );
-          })}
+        <ul className="notifications">
+          {notifications.map((notification) => (
+            <NotificationRow
+              key={notification.id}
+              notification={notification}
+              locale={i18n.language}
+              onRead={() => {
+                markRead.mutate(notification.id);
+              }}
+            />
+          ))}
         </ul>
-      </section>
+
+        {/* ⚠️  The server pages with a cursor (20 at a time). Without this the
+            older notifications are simply unreachable. */}
+        {hasNextPage ? (
+          <div className="notifications__more">
+            <Button
+              variant="secondary"
+              loading={isFetchingNextPage}
+              onClick={() => void fetchNextPage()}
+            >
+              {t('notifications.loadMore')}
+            </Button>
+          </div>
+        ) : null}
+      </TabPanel>
+
+      <TabPanel id="notifications" value="preferences" active={tab === 'preferences'}>
+        <PreferencesPanel />
+      </TabPanel>
     </>
   );
 }

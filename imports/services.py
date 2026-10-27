@@ -692,7 +692,7 @@ def _chunk_products(job, rows, data, *, dry_run: bool) -> None:
     updates = [row for row in result.clean if row.action == "UPDATE"]
 
     with transaction.atomic():
-        created = _create_products(creates)
+        created = _create_products(creates, actor=job.started_by)
         updated = _update_products(job, updates, existing)
 
     job.touch(
@@ -702,11 +702,16 @@ def _chunk_products(job, rows, data, *, dry_run: bool) -> None:
     )
 
 
-def _create_products(clean_rows) -> int:
+def _create_products(clean_rows, *, actor=None) -> int:
     """
     ⚠️  `bulk_create`, which means **`save()` never runs** — and `SlugMixin.save`
         is what fills the slug. So the slugs are built here, in memory, before
         the insert.
+
+    ⚠️  For the same reason `created_by` / `updated_by` are stamped here by hand:
+        the product's audit columns ("added by" / "last modified by" in the admin
+        table) would otherwise stay empty for everything that came from a sheet —
+        which is exactly the bulk of a store's catalogue.
 
         The alternative is `unique_slug()` per row, and that helper does an
         `.exists()` query every time it is called: ten thousand round trips to
@@ -734,7 +739,7 @@ def _create_products(clean_rows) -> int:
             slug = f"{slug}-{random_code(5).lower()}"
         taken.add(slug)
 
-        objects.append(Product(slug=slug, **row.values))
+        objects.append(Product(slug=slug, created_by=actor, updated_by=actor, **row.values))
 
     Product.objects.bulk_create(objects, batch_size=spec.PRODUCT_CHUNK_SIZE)
     return len(objects)
@@ -766,6 +771,9 @@ def _update_products(job, clean_rows, existing: dict) -> int:
         )
     }
 
+    # ⚠️  `bulk_update` never runs `pre_save`, so `auto_now` does not fire — the
+    #     "last modified" column is stamped by hand, together with its author.
+    now = timezone.now()
     changed = []
     for row in clean_rows:
         product = by_sku.get(row.identifier)
@@ -774,13 +782,17 @@ def _update_products(job, clean_rows, existing: dict) -> int:
         for attribute in fields:
             if attribute in row.values:
                 setattr(product, attribute, row.values[attribute])
+        product.updated_by = job.started_by
+        product.updated_at = now
         changed.append(product)
 
     if changed:
         # ⚠️  `all_objects`, matching the queryset the rows were fetched through.
         #     `objects` filters the soft-deleted out, so an update touching a
         #     deleted product would report success and write nothing.
-        Product.all_objects.bulk_update(changed, fields, batch_size=spec.PRODUCT_CHUNK_SIZE)
+        Product.all_objects.bulk_update(
+            changed, [*fields, "updated_by", "updated_at"], batch_size=spec.PRODUCT_CHUNK_SIZE
+        )
     return len(changed)
 
 

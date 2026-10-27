@@ -7,7 +7,7 @@ Point-of-sale endpoints.
     so a cashier cannot record a sale on a colleague's shift by passing an id.
 """
 
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext as _
 from rest_framework import generics, status
@@ -15,11 +15,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from catalog import selectors as catalog_selectors
+from catalog.colors import assert_variant_choice
 from catalog.models import Product, ProductVariant
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
 from core.permissions import CanViewPOSSessions
+from inventory import services as inventory_services
 from pos import serializers as s
 from pos import services
 from pos.models import POSSession, Register, SessionStatus
@@ -44,7 +46,9 @@ def _resolve_lines(entries: list[dict]) -> list[services.SaleLine]:
     products = Product.objects.in_bulk([entry["product"] for entry in entries])
 
     variant_ids = [entry.get("variant") for entry in entries if entry.get("variant")]
-    variants = ProductVariant.objects.in_bulk(variant_ids) if variant_ids else {}
+    variants = (
+        ProductVariant.objects.select_related("color").in_bulk(variant_ids) if variant_ids else {}
+    )
 
     lines = []
     for entry in entries:
@@ -55,13 +59,18 @@ def _resolve_lines(entries: list[dict]) -> list[services.SaleLine]:
                 detail=_("منتج غير موجود: {id}").format(id=entry["product"]),
                 status_code=404,
             )
-        lines.append(
-            services.SaleLine(
-                product=product,
-                quantity=entry["quantity"],
-                variant=variants.get(entry.get("variant")) if entry.get("variant") else None,
+        variant = variants.get(entry.get("variant")) if entry.get("variant") else None
+        if entry.get("variant") and variant is None:
+            raise BusinessError(
+                ErrorCode.NOT_FOUND,
+                detail=_("نسخة غير موجودة: {id}").format(id=entry["variant"]),
+                status_code=404,
             )
-        )
+        # ⚠️  The counter obeys the same rule as the cart: the variant is this product's,
+        #     still on sale, and present whenever the product offers one. Without it
+        #     "sell the blue" and "sell the product" are one tap apart on the terminal.
+        assert_variant_choice(product, variant)
+        lines.append(services.SaleLine(product=product, quantity=entry["quantity"], variant=variant))
     return lines
 
 
@@ -367,6 +376,7 @@ class QuoteAPI(SessionMixin, APIView):
                 "lines": [
                     {
                         "product": str(line.product.pk),
+                        "variant": str(line.variant.pk) if line.variant is not None else None,
                         "quantity": line.quantity,
                         "unit_price": str(priced.unit_price),
                         "tax_rate": str(priced.tax_rate),
@@ -484,7 +494,18 @@ class POSProductSearchAPI(generics.ListAPIView):
     def get_queryset(self):
         term = (self.request.query_params.get("search") or "").strip()
 
-        queryset = Product.objects.filter(is_active=True).select_related("category")
+        queryset = (
+            Product.objects.filter(is_active=True)
+            .select_related("category")
+            .prefetch_related(
+                # The colours / sizes the cashier can pick — see `POSProductSerializer`
+                Prefetch(
+                    "variants",
+                    queryset=catalog_selectors.sellable_variants().select_related("color"),
+                    to_attr="pos_variants",
+                )
+            )
+        )
 
         if (location := self.register_location()) is not None:
             queryset = catalog_selectors.in_stock_only(queryset, location=location)
@@ -498,7 +519,15 @@ class POSProductSearchAPI(generics.ListAPIView):
         #
         #     The scanner sends a complete number; matching it partially returns items
         #     whose numbers share a segment — so the cashier adds the wrong item with one press.
-        exact = queryset.filter(Q(barcode__iexact=term) | Q(sku__iexact=term))
+        #
+        #     A colour has its own label, so the scanned code may be a **variant's**
+        #     SKU or barcode — it finds the product, and `matched_variant` tells the
+        #     screen which colour to add.
+        exact = queryset.filter(
+            Q(barcode__iexact=term)
+            | Q(sku__iexact=term)
+            | catalog_selectors.variant_code_match(term)
+        )
         if exact.exists():
             return exact[: self.LIMIT]
 
@@ -508,6 +537,25 @@ class POSProductSearchAPI(generics.ListAPIView):
             | Q(sku__icontains=term)
             | Q(active_ingredient_ar__icontains=term)
         )[: self.LIMIT]
+
+    def list(self, request, *args, **kwargs):
+        products = list(self.get_queryset())
+
+        # ⚠️  One query for every variant of every result — not one per product.
+        stock = (
+            inventory_services.availability_by_variant(
+                [product.pk for product in products if getattr(product, "pos_variants", None)],
+                location=self.register_location(),
+            )
+            if any(getattr(product, "pos_variants", None) for product in products)
+            else {}
+        )
+        context = {
+            **self.get_serializer_context(),
+            "variant_stock": stock,
+            "term": (request.query_params.get("search") or "").strip(),
+        }
+        return Response(s.POSProductSerializer(products, many=True, context=context).data)
 
 
 # ═══════════════════════════════════════════════════════════

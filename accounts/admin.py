@@ -24,6 +24,13 @@ class UserCreateForm(UserCreationForm):
         fields = ("email",)
         field_classes = {}
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Ticked by default — the model's own default (`False`) is right for
+        # self-registration, which needs email verification, and wrong here.
+        if "is_active" in self.fields:
+            self.fields["is_active"].initial = True
+
 
 class UserEditForm(UserChangeForm):
     class Meta(UserChangeForm.Meta):
@@ -100,7 +107,10 @@ class UserAdmin(DjangoUserAdmin):
             None,
             {
                 "classes": ("wide",),
-                "fields": ("email", "phone", "account_type", "password1", "password2"),
+                # ⚠️  `is_active` is on the add form: the model default is `False`, so an
+                #     account created here could never log in until someone found the
+                #     checkbox on the *change* page.
+                "fields": ("email", "phone", "account_type", "is_active", "password1", "password2"),
             },
         ),
     )

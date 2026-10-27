@@ -338,7 +338,16 @@ class AdminPermissionCatalogueAPI(APIView):
         )
 
 
-class AdminEmployeeListAPI(generics.ListAPIView):
+class AdminEmployeeListAPI(generics.ListCreateAPIView):
+    """
+    List the staff — and **create** a new member (`POST`).
+
+    ⚠️  Creation is one transactional service call: login + employee profile (+ admin
+        profile for panel access) + invite mail + audit entry, or nothing at all.
+        The response is the new profile plus `invite_sent`; the invite link itself is
+        never returned — it exists only in the email.
+    """
+
     permission_classes = [CanManageEmployees]
     serializer_class = s.EmployeeProfileSerializer
     pagination_class = AdminPageNumberPagination
@@ -365,13 +374,54 @@ class AdminEmployeeListAPI(generics.ListAPIView):
                 | Q(user__email__icontains=value)
             )
 
-        return queryset
+        # ⚠️  Explicit: the `Count` annotation above drops `Meta.ordering`, and an
+        #     unordered page can repeat or skip a person between pages.
+        return queryset.order_by("employee_number")
+
+    def create(self, request, *args, **kwargs):
+        serializer = s.CreateStaffSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        created = services.create_staff(
+            actor=request.user,
+            email=data["email"],
+            first_name=data["first_name"],
+            last_name=data.get("last_name", ""),
+            phone=data.get("phone", ""),
+            access=data["access"],
+            role=data["role"],
+            manager=data.get("manager"),
+            phone_extension=data.get("phone_extension", ""),
+            language=data["preferred_language"],
+            temporary_password=data.get("temporary_password", ""),
+            request=request,
+        )
+
+        body = s.EmployeeProfileSerializer(created.employee).data
+        body["invite_sent"] = created.invite_sent
+        return Response(body, status=status.HTTP_201_CREATED)
 
 
 class AdminEmployeeDetailAPI(generics.RetrieveUpdateAPIView):
     permission_classes = [CanManageEmployees]
     serializer_class = s.EmployeeProfileSerializer
     queryset = EmployeeProfile.objects.select_related("user", "role", "manager__user")
+
+
+class AdminResendInviteAPI(APIView):
+    """
+    Mail a fresh invite link to a staff member who has not signed in yet.
+
+    ⚠️  Refused (`409`) once they have signed in — see `services.resend_invite`.
+    """
+
+    permission_classes = [CanManageEmployees]
+
+    def post(self, request, pk):
+        employee = get_object_or_404(EmployeeProfile.objects.select_related("user", "role"), pk=pk)
+        services.resend_invite(employee, actor=request.user, request=request)
+        return Response({"invite_sent": True})
 
 
 class AdminEmployeePerformanceAPI(APIView):

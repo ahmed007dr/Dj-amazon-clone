@@ -51,3 +51,20 @@
   background: color-mix(in srgb, var(--color-primary) 10%, transparent);
   border-inline-start-color: var(--color-primary);
 }
+
+/* A count of work waiting behind the link. It sits at the inline end (the left in
+   Arabic) and is absent at zero, so a quiet queue costs the menu no space. */
+.admin-sidebar__badge {
+  margin-inline-start: auto;
+  padding-inline: var(--space-2);
+  min-inline-size: 1.4rem;
+
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.4rem;
+  text-align: center;
+
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-radius: var(--radius-pill);
+}

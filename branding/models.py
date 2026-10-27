@@ -16,7 +16,12 @@ Visual identity — everything the customer sees, configurable from the admin pa
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
+from django.core.validators import (
+    MaxValueValidator,
+    MinValueValidator,
+    RegexValidator,
+    URLValidator,
+)
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -32,6 +37,37 @@ HEX_COLOR = RegexValidator(
 
 def branding_asset_path(instance, filename: str) -> str:
     return f"branding/{random_filename(filename)}"
+
+
+def validate_hero_cta_url(value: str) -> None:
+    """
+    The home banner button goes to **a path inside the store or an `https` page** — nothing else.
+
+    ⚠️  The value is rendered as a link on the most visited page of the site, by
+        someone who can edit it from a panel. `javascript:…` and `data:…` would
+        make that field a stored XSS; `//evil.example` looks like a path and is
+        in fact a protocol-relative URL leaving the site. Both are refused here,
+        on the model, so the Django admin and the API enforce the same rule.
+
+    An empty value is valid and means "the catalogue" (the frontend decides the route).
+    """
+    if not value:
+        return
+
+    if value.startswith("/"):
+        # `//host` and `/\host` are read by browsers as an absolute URL
+        if value.startswith(("//", "/\\")) or any(ch.isspace() or ord(ch) < 32 for ch in value):
+            raise ValidationError(_("مسار غير صالح — استخدم مسارًا داخليًا مثل /products"))
+        return
+
+    if value.lower().startswith("https://"):
+        try:
+            URLValidator(schemes=["https"])(value)
+        except ValidationError as error:
+            raise ValidationError(_("رابط غير صالح")) from error
+        return
+
+    raise ValidationError(_("الرابط يبدأ بـ / (صفحة داخل المتجر) أو بـ https://"))
 
 
 class ThemeMode(models.TextChoices):
@@ -93,6 +129,37 @@ class BrandProfile(BaseModel):
         upload_to=branding_asset_path,
         blank=True,
         help_text=_("تظهر عند مشاركة رابط الموقع — 1200×630"),
+    )
+
+    # ── Home-page hero ─────────────────────────────────────
+    # ⚠️  One image per mode, like the logo — and for the same reason, plus one more.
+    #     A photograph that reads well on a light page turns the white headline into
+    #     mush on a dark one (or the reverse), so a single image is a compromise that
+    #     fails in one theme. The page falls back to the other image, then to the gradient.
+    hero_image_light = models.ImageField(
+        _("صورة الواجهة — الوضع الفاتح"),
+        upload_to=branding_asset_path,
+        blank=True,
+        help_text=_("صورة عريضة للصفحة الرئيسية — 1920×800 تقريبًا"),
+    )
+    hero_image_dark = models.ImageField(
+        _("صورة الواجهة — الوضع الداكن"), upload_to=branding_asset_path, blank=True
+    )
+
+    # ⚠️  Empty = the store's own name / tagline / "catalogue" — the page worked
+    #     before these fields existed, and an unconfigured profile must look the same.
+    hero_title_ar = models.CharField(_("عنوان الواجهة بالعربية"), max_length=120, blank=True)
+    hero_title_en = models.CharField(_("عنوان الواجهة بالإنجليزية"), max_length=120, blank=True)
+    hero_subtitle_ar = models.CharField(_("نص الواجهة بالعربية"), max_length=300, blank=True)
+    hero_subtitle_en = models.CharField(_("نص الواجهة بالإنجليزية"), max_length=300, blank=True)
+    hero_cta_label_ar = models.CharField(_("نص الزر بالعربية"), max_length=60, blank=True)
+    hero_cta_label_en = models.CharField(_("نص الزر بالإنجليزية"), max_length=60, blank=True)
+    hero_cta_url = models.CharField(
+        _("رابط الزر"),
+        max_length=300,
+        blank=True,
+        validators=[validate_hero_cta_url],
+        help_text=_("فارغ = صفحة المنتجات · مسار داخلي (/offers) أو رابط https"),
     )
 
     # ── Fonts ──────────────────────────────────────────────

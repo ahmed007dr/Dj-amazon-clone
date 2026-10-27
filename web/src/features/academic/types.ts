@@ -25,7 +25,18 @@ export interface BundleItem {
   note_en: string;
 }
 
-export interface StudyBundle {
+/**
+ * A bundle as the **list** returns it — a card, not a page.
+ *
+ * ⚠️  No `items`: the list carries `item_count` only, and the full item list
+ *     comes with the detail (`StudyBundle`). Typing the card with `StudyBundle`
+ *     would promise an array the list endpoint never sends.
+ *
+ * ⚠️  And it says **whose** bundle it is. Bundles are public and unfiltered by
+ *     the visitor's own profile, so "Year 2 essentials" is meaningless without
+ *     the faculty and university beside it.
+ */
+export interface BundleSummary {
   id: string;
   slug: string;
   name_ar: string;
@@ -35,8 +46,32 @@ export interface StudyBundle {
   kind: BundleKind;
   academic_year: number;
   image: string | null;
-  items: BundleItem[];
   item_count: number;
+  faculty: string;
+  faculty_name_ar: string;
+  faculty_name_en: string;
+  university: string;
+  university_name_ar: string;
+  university_name_en: string;
+  /** `null` = a faculty-wide bundle, for every department. */
+  department: string | null;
+  department_name_ar: string | null;
+  department_name_en: string | null;
+}
+
+export interface StudyBundle extends BundleSummary {
+  items: BundleItem[];
+}
+
+/**
+ * What a visitor may narrow the public bundles list by — all optional, and
+ * **nothing is applied by default**.
+ */
+export interface BundleFilters {
+  university?: string;
+  faculty?: string;
+  academic_year?: number;
+  kind?: BundleKind;
 }
 
 export interface StudentProfile {

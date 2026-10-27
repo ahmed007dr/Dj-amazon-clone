@@ -63,6 +63,16 @@ def _serialize(profile: BrandProfile) -> dict:
             "icon": _asset(profile.icon),
             "favicon": _asset(profile.favicon),
             "og_image": _asset(profile.og_image),
+            "hero_light": _asset(profile.hero_image_light),
+            "hero_dark": _asset(profile.hero_image_dark),
+        },
+        "hero": {
+            "title": {"ar": profile.hero_title_ar, "en": profile.hero_title_en},
+            "subtitle": {"ar": profile.hero_subtitle_ar, "en": profile.hero_subtitle_en},
+            "cta_label": {"ar": profile.hero_cta_label_ar, "en": profile.hero_cta_label_en},
+            # ⚠️  Sent as stored: empty means "the catalogue", and the *route* for it is the
+            #     frontend's to know — the backend has no business owning `/products`.
+            "cta_url": profile.hero_cta_url,
         },
         "default_mode": profile.default_mode,
         "tokens": {
@@ -154,6 +164,14 @@ def _fallback() -> dict:
             "icon": "",
             "favicon": "",
             "og_image": "",
+            "hero_light": "",
+            "hero_dark": "",
+        },
+        "hero": {
+            "title": {"ar": "", "en": ""},
+            "subtitle": {"ar": "", "en": ""},
+            "cta_label": {"ar": "", "en": ""},
+            "cta_url": "",
         },
         "default_mode": DefaultMode.SYSTEM,
         "tokens": {
@@ -175,5 +193,51 @@ def _fallback() -> dict:
             "linkedin": "",
             "youtube": "",
             "tiktok": "",
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+#  What an email needs to look like it came from the store
+# ═══════════════════════════════════════════════════════════
+
+
+def mail_identity() -> dict:
+    """
+    The identity as `mailing` consumes it — a plain dict, not a model.
+
+    ⚠️  **`mailing` cannot import this module, and does not.**
+
+        `branding` and `mailing` are siblings (`pyproject.toml` → import-linter), and
+        siblings never import each other. `mailing.layout` therefore asks for a *callable*
+        by dotted path (`settings.MAIL_BRAND_PROVIDER`) and this is what that path
+        points at. The contract is the shape below; neither side knows the other's types.
+
+    ⚠️  **Only `logo_light`, never `logo_dark`.**
+
+        An email body is white in practically every client. The dark logo is usually
+        white itself, so falling back to it would put an invisible mark on the header —
+        and a missing logo (the store name as text) beats an invisible one.
+
+    ⚠️  Returns `{}` when no profile is active — the layout then falls back to a
+        plain, name-less header instead of failing the delivery.
+    """
+    profile = get_active_profile()
+    if profile is None:
+        return {}
+
+    light = next((p for p in profile.palettes.all() if p.mode == ThemeMode.LIGHT), None)
+    logo = profile.logo_light
+
+    return {
+        "name": {"ar": profile.name_ar, "en": profile.name_en},
+        "color": light.primary if light else "",
+        # `name` is the path inside the storage (readable by mailing through the default
+        # storage to embed the file); `url` is the fallback when it cannot be read.
+        "logo": {"name": logo.name, "url": logo.url} if logo else {},
+        "contact": {
+            "email": profile.contact_email,
+            "phone": profile.contact_phone,
+            "address": {"ar": profile.address_ar, "en": profile.address_en},
         },
     }

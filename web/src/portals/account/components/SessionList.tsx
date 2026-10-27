@@ -67,6 +67,14 @@ export function SessionList() {
             <span className="session__meta muted">
               {session.ip_address ?? '—'} · {formatDateTime(session.last_activity, i18n.language)}
             </span>
+
+            {/* When this device signed in, as opposed to when it was last seen: a
+                session that signed in last month and was active a minute ago is a
+                long-lived device, and one that signed in an hour ago from an
+                unfamiliar address is the one to look at. */}
+            <span className="session__signed muted">
+              {t('account.signedInAt', { date: formatDateTime(session.login_at, i18n.language) })}
+            </span>
           </div>
 
           {!session.is_current ? (
