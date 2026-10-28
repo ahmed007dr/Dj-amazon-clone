@@ -668,9 +668,11 @@ def _chunk_products(job, rows, data, *, dry_run: bool) -> None:
     #     only at the living ones makes a re-imported code look new, and the
     #     insert dies on a unique violation that names a product the admin
     #     cannot see anywhere in the panel.
-    existing = dict(
-        Product.all_objects.filter(sku__in=skus).values_list("sku", "id")
-    )
+    found = list(Product.all_objects.filter(sku__in=skus).values_list("sku", "id", "base_price"))
+    existing = {sku: pk for sku, pk, _price in found}
+    # The stored prices, for the one rule that needs them: a row that sets only the
+    # "price before discount" must be judged against the price the product already has.
+    existing_prices = {sku: price for sku, _pk, price in found}
 
     result = validators.validate_products(
         rows,
@@ -678,6 +680,7 @@ def _chunk_products(job, rows, data, *, dry_run: bool) -> None:
         mode=job.mode,
         existing_skus=existing,
         duplicate_skus=_duplicates_for(job, spec.Sheet.PRODUCTS),
+        existing_prices=existing_prices,
     )
 
     _record_errors(job, result.errors)

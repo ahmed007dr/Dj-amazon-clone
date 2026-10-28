@@ -148,7 +148,18 @@ export function AdminProductsPage() {
       key: 'price',
       header: t('admin.basePrice'),
       align: 'end',
-      render: (product) => formatMoney(product.base_price, i18n.language),
+      // ⚠️  "On sale" rides under the price rather than in a column of its own — the table was just
+      //     tuned to fit 1280px. It reads the stored field; whether a given shopper actually sees
+      //     the old price is the server's per-viewer decision.
+      render: (product) =>
+        product.compare_at_price ? (
+          <div className="admin-products__price">
+            <span>{formatMoney(product.base_price, i18n.language)}</span>
+            <Badge tone="danger">{t('products.onSale')}</Badge>
+          </div>
+        ) : (
+          formatMoney(product.base_price, i18n.language)
+        ),
     },
     {
       key: 'status',

@@ -12,3 +12,9 @@ class PricingConfig(AppConfig):
         from pricing.color_prices import color_price_facts
 
         register_color_facts("pricing.color_price", color_price_facts)
+
+        # The same inversion for the product card and page: what *this viewer* pays.
+        from core.price_facts import register_price_provider
+        from pricing.catalog_prices import listing_price_facts
+
+        register_price_provider("pricing.listing", listing_price_facts)

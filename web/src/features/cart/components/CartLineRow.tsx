@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { VariantTag } from '@/features/catalog/components/VariantTag';
 import { mediaUrl } from '@/shared/http';
 import { useLocalized } from '@/shared/i18n/useLocalized';
+import { PriceTag } from '@/shared/ui/PriceTag';
 import { formatMoney } from '@/shared/utils/format';
 
 import { useRemoveLine, useSetLineQuantity } from '../hooks';
@@ -57,14 +58,19 @@ export function CartLineRow({ line }: { line: CartLine }) {
           variant={line.variant_id ? localized(line, 'variant_name') : null}
         />
 
-        {/* ⚠️  The pre-discount price appears only when there is a real discount —
-            striking through a price equal to the current one is a visual deception */}
-        <p className="cart-line__unit">
-          {line.pricing.has_discount ? (
-            <s className="muted">{formatMoney(line.pricing.list_price, i18n.language)}</s>
-          ) : null}
-          <span>{formatMoney(line.pricing.unit_price, i18n.language)}</span>
-        </p>
+        {/* ⚠️  The "price before discount" comes from the server, which sends it only when it
+            is above this line's unit price — striking through a price that is not higher than
+            the current one is a visual deception. (The old strike on `list_price` is gone
+            with it: `list_price` equals `unit_price` here — the promotion is applied below
+            the unit price, in `discount_amount` — so it only ever struck the same number.) */}
+        <div className="cart-line__unit">
+          <PriceTag
+            variant="line"
+            price={line.pricing.unit_price}
+            compareAt={line.compare_at_price}
+            percent={line.discount_percent}
+          />
+        </div>
       </div>
 
       <div className="cart-line__controls">

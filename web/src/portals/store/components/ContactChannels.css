@@ -1,0 +1,68 @@
+/*
+  The footer's "Contact us" rows: an icon chip, a small label over the value.
+
+  ⚠️  Every colour is a theme token, so the rows follow the active palette and the dark
+      mode with no rule of their own.
+*/
+.contact-list {
+  gap: var(--space-3);
+}
+
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-block-size: var(--touch-target);
+
+  color: var(--color-text);
+  text-decoration: none;
+  border-radius: var(--radius);
+}
+
+.contact-row__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background-color var(--transition);
+}
+
+.contact-row__text {
+  display: grid;
+  min-inline-size: 0; /* lets a long link shrink and wrap instead of pushing the column wide */
+  line-height: 1.35;
+}
+
+.contact-row__label {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.contact-row__value {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.contact-row:hover {
+  text-decoration: none;
+}
+
+.contact-row:hover .contact-row__icon,
+.contact-row:focus-visible .contact-row__icon {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.contact-row:hover .contact-row__value {
+  color: var(--color-primary);
+}

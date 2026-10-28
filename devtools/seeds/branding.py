@@ -10,7 +10,7 @@ The default visual identity — two complete palettes.
     value, as ADR-22 states, and the admin changes it from the panel with no deployment.
 """
 
-from branding.models import BrandProfile, DefaultMode, ThemeMode, ThemePalette
+from branding.models import BrandProfile, ContactChannel, DefaultMode, ThemeMode, ThemePalette
 
 PROFILE = {
     "code": "default",
@@ -66,6 +66,22 @@ DARK = {
 }
 
 
+#: Sample "Contact us" channels — enough to see the rows, the icons and the floating button
+CHANNELS = [
+    (
+        "WHATSAPP",
+        {
+            "value": "01001234567",
+            "message_ar": "مرحبًا، أريد الاستفسار عن منتج",
+            "message_en": "Hello, I have a question about a product",
+            "show_floating_button": True,
+        },
+    ),
+    ("TELEGRAM", {"value": "@medicalstore_eg"}),
+    ("INSTAGRAM", {"value": "@medicalstore.eg"}),
+]
+
+
 def seed():
     payload = dict(PROFILE)
     code = payload.pop("code")
@@ -84,4 +100,15 @@ def seed():
     for mode, colors in ((ThemeMode.LIGHT, LIGHT), (ThemeMode.DARK, DARK)):
         ThemePalette.objects.update_or_create(profile=profile, mode=mode, defaults=colors)
 
-    return {"profile": profile, "counts": {"profiles": 1, "palettes": 2}}
+    # ⚠️  Keyed by (profile, kind) so re-running the seed updates the sample rows instead of
+    #     stacking copies — and never touches a channel the admin added of another kind.
+    #     `save()` normalises, so the local-format number below becomes `201001234567`.
+    for order, (kind, defaults) in enumerate(CHANNELS):
+        ContactChannel.objects.update_or_create(
+            profile=profile, kind=kind, defaults={**defaults, "display_order": order}
+        )
+
+    return {
+        "profile": profile,
+        "counts": {"profiles": 1, "palettes": 2, "contact_channels": len(CHANNELS)},
+    }

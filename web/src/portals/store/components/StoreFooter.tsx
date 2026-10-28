@@ -2,7 +2,10 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { useBrand } from '@/shared/branding/useBrand';
+import { useContactChannels } from '@/shared/branding/useContactChannels';
 
+import { ContactChannels } from './ContactChannels';
+import { FloatingWhatsApp } from './FloatingWhatsApp';
 import { SocialLinks } from './SocialLinks';
 import { StoreLogo } from './StoreLogo';
 
@@ -17,10 +20,13 @@ import './StoreFooter.css';
  */
 export function StoreFooter() {
   const { t } = useTranslation();
-  const { name, contact, address } = useBrand();
+  const { name, address } = useBrand();
+  const hasFloatingButton = useContactChannels().some((channel) => channel.floating);
 
   return (
-    <footer className="store-footer">
+    // ⚠️  With the floating chat button on, the copyright line gets extra room at the bottom
+    //     on a phone — otherwise the button sits on the last text of the page.
+    <footer className={`store-footer ${hasFloatingButton ? 'store-footer--floating' : ''}`}>
       <div className="container store-footer__grid">
         <div className="store-footer__brand">
           <StoreLogo />
@@ -29,18 +35,8 @@ export function StoreFooter() {
 
         <section>
           <h2 className="store-footer__title">{t('footer.contact')}</h2>
-          <ul className="store-footer__list">
-            {contact?.phone ? (
-              <li>
-                <a href={`tel:${contact.phone}`}>{contact.phone}</a>
-              </li>
-            ) : null}
-            {contact?.email ? (
-              <li>
-                <a href={`mailto:${contact.email}`}>{contact.email}</a>
-              </li>
-            ) : null}
-          </ul>
+          {/* The profile's phone and email as before, then the configured channels */}
+          <ContactChannels />
         </section>
 
         <section>
@@ -69,6 +65,8 @@ export function StoreFooter() {
           © {new Date().getFullYear()} {name} — {t('footer.rights')}
         </small>
       </div>
+
+      <FloatingWhatsApp />
     </footer>
   );
 }

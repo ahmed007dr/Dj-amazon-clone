@@ -111,6 +111,7 @@ L8   finance                           ← إيراد · COGS · مصروف · P
 | `catalog ↔ pricing` | **`Product` بلا `get_price()`.** التسعير عبر `PricingService.price_for(product, customer)` |
 | `orders ↔ inventory` | `orders` لا يلمس موديلات المخزون. يستدعي `inventory.services.reserve()` / `commit()` / `release()` فقط |
 | `orders ↔ promotions` | `orders` يستهلك **نتيجة** التحقق من الكوبون، ولا ينفّذ محرك الكوبونات |
+| `promotions` يقرأ مبيعات `orders` (تحليلات الكوبون) | `promotions` أسفل `orders` فلا يستورد موديلاته: `promotions/analytics.py` يحلّ `orders.Order` و`orders.OrderLine` بالاسم عبر `apps.get_model` (قراءة فقط، نفس أسلوب `administration/tax_api.py`). مفتاح الربط `CouponRedemption.order_ref` (UUID مفهرس بلا FK). ثوابت الحالات نسخ نصية تُثبّتها `reporting/tests/test_coupon_export.py` بقيم `OrderStatus` |
 | `orders ↔ commissions` | `orders` لا يعرف بوجود العمولات. `commissions` يستمع لإشارة `order_completed` |
 | `accounts ↔ orders` | ⛔ **الدائرة القائمة حاليًا (H1).** تُحَل بنقل `Address` ← `shipping` و `dashbord()` ← `reporting` |
 | `customers ↔ employees` | **`CustomerAssignment` يسكن في `employees/`.** `Customer` بلا حقل `assigned_employee`. ✅ **مفروضة بعقد `import-linter` منذ 2026-08-15** — كانت موثَّقة وغير مفروضة |

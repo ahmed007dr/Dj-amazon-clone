@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from decimal import Decimal
 
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -23,8 +24,9 @@ from access.services import evaluate
 from cart.models import Cart, CartLine, CartStatus
 from catalog import selectors as catalog_selectors
 from catalog.colors import assert_variant_choice
+from core import features
 from core.errors import BusinessError, ErrorCode
-from core.money import ZERO
+from core.money import ZERO, quantize
 from inventory import services as inventory_services
 from pricing import services as pricing_services
 from promotions import services as promotion_services
@@ -58,6 +60,10 @@ class CartSnapshot:
     issues: tuple
     coupon_result: promotion_services.CouponResult | None = None
     shipping_quote: object = None
+    #: Where the cart stands against the owner's free-shipping rule (`FreeShippingStatus`)
+    free_shipping: object = None
+    #: The shipping fee the threshold rule waived on this order — zero unless it did
+    shipping_discount: Decimal = ZERO
 
     @property
     def is_checkoutable(self) -> bool:
@@ -444,14 +450,39 @@ def revalidate(
 
     # Shipping
     shipping_amount = ZERO
+    shipping_discount = ZERO
     quote = None
     method_code = shipping_method_code or cart.shipping_method_code
 
+    # ⚠️  The amount the store-wide free-shipping rule looks at: the products after
+    #     item discounts **and the coupon**, before tax and shipping. A coupon that
+    #     drops the cart under the threshold takes the free shipping with it —
+    #     otherwise "free shipping" and "20% off" stack into a loss-making order.
+    #
+    #     Computed here, on the server, for every caller: the cart payload, the
+    #     checkout and the guest checkout all pass through `revalidate`, so a client
+    #     has no way to claim a qualifying total.
+    rule = features.free_shipping_rule()
+    products_net = sum((line.net for line in priced_lines), ZERO)
+    eligible_amount = quantize(max(products_net - coupon_discount, ZERO))
+    free_shipping = shipping_services.free_shipping_status(eligible_amount, rule)
+
     if governorate and method_code:
-        subtotal = sum((line.net for line in priced_lines), ZERO)
-        quote = shipping_services.fee_for(method_code, governorate, subtotal)
+        quote = shipping_services.fee_for(
+            method_code,
+            governorate,
+            products_net,
+            eligible_amount=eligible_amount,
+            rule=rule,
+        )
         if quote is not None:
-            shipping_amount = ZERO if (coupon_result and coupon_result.free_shipping) else quote.fee
+            if coupon_result and coupon_result.free_shipping:
+                # The coupon already made it free — it is the reason, not the threshold
+                shipping_amount = ZERO
+            else:
+                shipping_amount = quote.fee
+                if quote.free_by_threshold:
+                    shipping_discount = quote.original_fee - quote.fee
 
     priced = pricing_services.PricedCart(
         lines=tuple(priced_lines),
@@ -466,6 +497,8 @@ def revalidate(
         issues=tuple(issues),
         coupon_result=coupon_result,
         shipping_quote=quote,
+        free_shipping=free_shipping,
+        shipping_discount=shipping_discount,
     )
 
 

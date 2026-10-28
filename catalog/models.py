@@ -13,10 +13,12 @@ The catalogue — "what is this product?"
     `avg_rate` and `reviews_count` as properties (N+1 on every list).
 """
 
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from catalog.compare_at import compare_at_error
 from core.identifiers import random_filename
 from core.models.base import AuditedModel, BaseModel
 from core.models.slug import SlugMixin
@@ -324,6 +326,20 @@ class Product(BilingualNameMixin, SlugMixin, AuditedModel, BaseModel):
         validators=[MinValueValidator(0)],
         help_text=_("مرجع لمحرك التسعير — ليس السعر النهائي للعميل"),
     )
+    #: "Price before discount" — what the storefront shows struck through.
+    #:
+    #: ⚠️  A *claim about the past*, not a price: nothing computes with it. It is shown only
+    #:     while it is strictly above what the viewer pays (see `catalog.compare_at`), and the
+    #:     rule that it must exceed `base_price` is enforced by the admin serializer, the
+    #:     importer and `clean()` — not by a DB constraint, because `base_price` is also moved
+    #:     by price-list imports that must not turn into an integrity error.
+    compare_at_price = MoneyField(
+        _("السعر قبل الخصم"),
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        help_text=_("اختياري — يظهر مشطوبًا بجانب السعر الحالي، ويجب أن يكون أعلى من السعر المرجعي"),
+    )
 
     # ── Regulatory and pharmaceutical fields ───────────────
     regulatory_class = models.CharField(
@@ -396,6 +412,13 @@ class Product(BilingualNameMixin, SlugMixin, AuditedModel, BaseModel):
     def is_medicine(self) -> bool:
         return self.kind == ProductKind.MEDICINE
 
+    def clean(self):
+        super().clean()
+        # The Django panel goes through `full_clean`, so the rule holds there too
+        message = compare_at_error(self.compare_at_price, self.base_price)
+        if message:
+            raise ValidationError({"compare_at_price": message})
+
 
 #: `#RRGGBB` — the one colour notation the swatch, the colour picker and the
 #: import sheet all agree on. Shorthand (`#fff`) and names (`red`) are refused:
@@ -444,6 +467,18 @@ class ProductColor(BilingualNameMixin, BaseModel):
         validators=[MinValueValidator(0)],
         help_text=_("فارغ = يُستخدم سعر المنتج"),
     )
+    #: This colour's own "price before discount" — see `Product.compare_at_price`.
+    #:
+    #: ⚠️  It must exceed the colour's *own* effective price: `price_override` when set,
+    #:     otherwise the product's. A colour without its own compare-at inherits the
+    #:     product's only when it also has no price of its own (`catalog.compare_at`).
+    compare_at_price = MoneyField(
+        _("السعر قبل الخصم للون"),
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        help_text=_("اختياري — يجب أن يكون أعلى من سعر اللون (أو سعر المنتج إن لم يكن له سعر خاص)"),
+    )
     display_order = models.PositiveIntegerField(_("الترتيب"), default=0)
     is_active = models.BooleanField(_("مفعّل"), default=True, db_index=True)
 
@@ -469,6 +504,15 @@ class ProductColor(BilingualNameMixin, BaseModel):
 
     def __str__(self):
         return f"{self.product.sku} · {self.name_ar}"
+
+    def clean(self):
+        super().clean()
+        own_price = self.price_override
+        if own_price is None and self.product_id:
+            own_price = self.product.base_price
+        message = compare_at_error(self.compare_at_price, own_price)
+        if message:
+            raise ValidationError({"compare_at_price": message})
 
     def save(self, *args, **kwargs):
         # The picker emits lower-case and a person types either — one spelling in the table.

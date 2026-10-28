@@ -44,3 +44,11 @@
   font-weight: 600;
   white-space: nowrap;
 }
+
+/* The shipping fee the owner's free-shipping rule waived — struck through beside "Free".
+   The word "Free" carries the meaning; the strike-through is the saving. */
+.option__was {
+  font-weight: 400;
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}

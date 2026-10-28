@@ -152,6 +152,11 @@ export interface ShippingZone {
 export interface AdminShippingMethod extends ShippingMethod {
   display_order: number;
   is_active: boolean;
+  /**
+   * ⚠️  Whether the owner's free-shipping rule may waive this method's fee. Off keeps
+   *     it paid (typically express) even when the cart qualifies.
+   */
+  eligible_for_free_shipping: boolean;
 }
 
 export interface ShippingRate {
@@ -220,3 +225,24 @@ export const saveRate = (id: string | undefined, body: Record<string, unknown>) 
     : http.post<ShippingRate>('/shipping/admin/rates/', body);
 
 export const deleteRate = (id: string) => http.delete<void>(`/shipping/admin/rates/${id}/`);
+
+// ── Free shipping above an amount ──────────────────────────
+
+/**
+ * The owner's switch and amount, as stored.
+ *
+ * ⚠️  `active` is what the checkout acts on: on **and** a positive amount. A switch
+ *     left on with no amount applies to nothing, and the server says so here.
+ */
+export interface FreeShippingSettings {
+  enabled: boolean;
+  /** EGP, a string like every other amount. */
+  threshold: string;
+  active: boolean;
+}
+
+export const getFreeShippingSettings = () =>
+  http.get<FreeShippingSettings>('/shipping/admin/free-shipping/');
+
+export const saveFreeShippingSettings = (body: { enabled: boolean; threshold: string }) =>
+  http.put<FreeShippingSettings>('/shipping/admin/free-shipping/', body);

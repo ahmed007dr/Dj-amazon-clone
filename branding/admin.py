@@ -3,7 +3,7 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
-from branding.models import BrandProfile, ThemePalette
+from branding.models import BrandProfile, ContactChannel, ThemePalette
 from core.admin import DeletedListFilter, DomainModelAdmin, TimeStampedAdmin
 
 
@@ -14,13 +14,34 @@ class ThemePaletteInline(admin.StackedInline):
     readonly_fields = ("created_at", "updated_at")
 
 
+class ContactChannelInline(admin.TabularInline):
+    """
+    ⚠️  Saved through `ContactChannel.clean()`, so a hostile link is refused here exactly
+        as it is by the API.
+    """
+
+    model = ContactChannel
+    extra = 0
+    fields = (
+        "kind",
+        "value",
+        "label_ar",
+        "label_en",
+        "message_ar",
+        "message_en",
+        "display_order",
+        "is_active",
+        "show_floating_button",
+    )
+
+
 @admin.register(BrandProfile)
 class BrandProfileAdmin(DomainModelAdmin):
     list_display = ("code", "name_ar", "default_mode", "contact_email", "is_active", "is_deleted")
     list_filter = ("is_active", "default_mode", DeletedListFilter)
     search_fields = ("code", "name_ar", "name_en", "contact_email")
     ordering = ("-is_active", "code")
-    inlines = (ThemePaletteInline,)
+    inlines = (ThemePaletteInline, ContactChannelInline)
 
     fieldsets = (
         (None, {"fields": ("id", "code", "name_ar", "name_en", "is_active")}),
@@ -76,3 +97,19 @@ class ThemePaletteAdmin(TimeStampedAdmin):
     list_filter = ("mode", "profile")
     list_select_related = ("profile",)
     search_fields = ("profile__code", "profile__name_ar")
+
+
+@admin.register(ContactChannel)
+class ContactChannelAdmin(TimeStampedAdmin):
+    list_display = (
+        "profile",
+        "kind",
+        "value",
+        "display_order",
+        "is_active",
+        "show_floating_button",
+    )
+    list_filter = ("kind", "is_active", "profile")
+    list_select_related = ("profile",)
+    search_fields = ("value", "label_ar", "label_en", "profile__code")
+    ordering = ("profile", "display_order")

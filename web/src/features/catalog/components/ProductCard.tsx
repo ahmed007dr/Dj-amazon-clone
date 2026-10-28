@@ -4,8 +4,8 @@ import { Link } from 'react-router-dom';
 import { AddToCartButton } from '@/features/cart/components/AddToCartButton';
 import { mediaUrl } from '@/shared/http';
 import { useLocalized } from '@/shared/i18n/useLocalized';
-import { formatMoney } from '@/shared/utils/format';
 import { Badge } from '@/shared/ui/Badge';
+import { PriceTag } from '@/shared/ui/PriceTag';
 
 import type { Availability, ProductListItem } from '../types';
 
@@ -36,10 +36,15 @@ export function ProductCard({
   product: ProductListItem;
   availability?: Availability | undefined;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const localized = useLocalized();
 
   const name = localized(product, 'name');
+
+  // ⚠️  `price` is what *this viewer* pays (a student sees the student price); `base_price` is
+  //     only the reference and the fallback for a payload from before `price` existed.
+  //     The old price arrives from the server only when it really is above `price`.
+  const hasSale = Boolean(product.compare_at_price);
 
   // ⚠️  The server sends the complete image object rather than its path — and the alt text comes from it
   //     more precise than the product name, because it describes the image, not the item.
@@ -63,6 +68,13 @@ export function ProductCard({
             <Badge tone="info">★</Badge>
           </span>
         ) : null}
+        {/* The price tag below already says it in full (and to a screen reader); this is the
+            glanceable cue in a grid of twenty cards, so it is hidden from assistive tech. */}
+        {hasSale ? (
+          <span className="product-card__sale" aria-hidden>
+            {t('catalog.price.sale')}
+          </span>
+        ) : null}
       </Link>
 
       <div className="product-card__body">
@@ -76,9 +88,14 @@ export function ProductCard({
           </p>
         ) : null}
 
-        <p className="product-card__price">
-          {formatMoney(product.base_price, i18n.language)}
-        </p>
+        <div className="product-card__price">
+          <PriceTag
+            variant="card"
+            price={product.price ?? product.base_price}
+            compareAt={product.compare_at_price}
+            percent={product.discount_percent}
+          />
+        </div>
 
         <p className="product-card__sku muted">
           {t('catalog.sku')}: {product.sku}

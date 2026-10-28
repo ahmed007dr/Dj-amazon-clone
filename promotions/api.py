@@ -12,16 +12,58 @@ Coupon endpoints.
     their history.
 """
 
+from decimal import Decimal
+
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework import generics
+from rest_framework import generics, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
 from core.permissions import CanManagePricing
+from promotions import analytics, services
 from promotions import serializers as s
 from promotions.models import Coupon, CouponRedemption
+
+
+def filter_coupons(queryset, params):
+    """
+    The coupon list's filters — shared by the CRUD list and the analytics ranking.
+
+    ⚠️  One copy, so "running" and "expired" mean the same thing on both screens,
+        and a holder searched for in one is found in the other.
+    """
+    now = timezone.now()
+
+    if search := (params.get("search") or "").strip():
+        queryset = queryset.filter(
+            Q(code__icontains=search)
+            | Q(name_ar__icontains=search)
+            | Q(name_en__icontains=search)
+            | Q(holder_name__icontains=search)
+            | Q(holder_note__icontains=search)
+        )
+
+    # ⚠️  The status is computed in the query, not in Python: filtering after
+    #     pagination gives short pages with nobody noticing.
+    status_filter = params.get("status")
+    if status_filter == "running":
+        queryset = queryset.filter(is_active=True, starts_at__lte=now).filter(
+            Q(ends_at__isnull=True) | Q(ends_at__gt=now)
+        )
+    elif status_filter == "expired":
+        queryset = queryset.filter(ends_at__lte=now)
+    elif status_filter == "scheduled":
+        queryset = queryset.filter(starts_at__gt=now)
+
+    if params.get("has_holder") == "true":
+        queryset = queryset.exclude(holder_name="")
+
+    return queryset
 
 
 class CouponListCreateAPI(generics.ListCreateAPIView):
@@ -31,25 +73,30 @@ class CouponListCreateAPI(generics.ListCreateAPIView):
 
     def get_queryset(self):
         queryset = Coupon.objects.prefetch_related("products", "categories")
-        params = self.request.query_params
-        now = timezone.now()
+        return filter_coupons(queryset, self.request.query_params).order_by("-created_at")
 
-        if search := params.get("search"):
-            queryset = queryset.filter(Q(code__icontains=search) | Q(name_ar__icontains=search))
+    def list(self, request, *args, **kwargs):
+        """
+        ⚠️  `times_used` and `net_sales` for the whole page in **two grouped queries**.
 
-        # ⚠️  The status is computed in the query, not in Python: filtering after
-        #     pagination gives short pages with nobody noticing.
-        status_filter = params.get("status")
-        if status_filter == "running":
-            queryset = queryset.filter(is_active=True, starts_at__lte=now).filter(
-                Q(ends_at__isnull=True) | Q(ends_at__gt=now)
-            )
-        elif status_filter == "expired":
-            queryset = queryset.filter(ends_at__lte=now)
-        elif status_filter == "scheduled":
-            queryset = queryset.filter(starts_at__gt=now)
+            The serializer reads them from the context instead of asking per row;
+            a page of 25 costs the same as a page of 1. They follow the
+            `date_from` / `date_to` the stat cards use, so the table and the cards
+            above it always describe the same period.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        items = page if page is not None else list(queryset)
 
-        return queryset.order_by("-created_at")
+        date_from, date_to = analytics.parse_period(request.query_params)
+        stats = analytics.summaries([coupon.pk for coupon in items], date_from, date_to)
+
+        serializer = self.get_serializer(
+            items, many=True, context={**self.get_serializer_context(), "coupon_stats": stats}
+        )
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         coupon = serializer.save()
@@ -125,3 +172,239 @@ class CouponRedemptionListAPI(generics.ListAPIView):
             queryset = queryset.filter(is_cancelled=False)
 
         return queryset.order_by("-created_at")
+
+
+# ═══════════════════════════════════════════════════════════
+#  Analytics
+# ═══════════════════════════════════════════════════════════
+
+
+def public(value):
+    """
+    Money to strings, recursively.
+
+    ⚠️  DRF's JSON encoder turns a `Decimal` into a **float**. Money crosses the wire
+        as a string (ADR-31) — a float loses the piastre on a large total.
+    """
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: public(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [public(item) for item in value]
+    return value
+
+
+#: The keys the ranking may be ordered by
+_RANKING_KEYS = {
+    "net_sales",
+    "gross_sales",
+    "discount_given",
+    "order_total",
+    "orders",
+    "customers",
+    "times_used",
+    "last_used_at",
+    "code",
+    "holder_name",
+    "created_at",
+}
+
+
+def _coupon_meta(coupon: Coupon) -> dict:
+    return {
+        "id": coupon.pk,
+        "code": coupon.code,
+        "name_ar": coupon.name_ar,
+        "name_en": coupon.name_en,
+        "holder_name": coupon.holder_name,
+        "holder_note": coupon.holder_note,
+        "kind": coupon.kind,
+        "value": coupon.value,
+        "starts_at": coupon.starts_at,
+        "ends_at": coupon.ends_at,
+        "is_active": coupon.is_active,
+        "is_running": coupon.is_running,
+        "is_expired": coupon.is_expired,
+        "is_exhausted": coupon.is_exhausted,
+        "created_at": coupon.created_at,
+    }
+
+
+class CouponAnalyticsOverviewAPI(APIView):
+    """
+    `GET` — totals across every coupon, and the coupons ranked by sales.
+
+        ?date_from=2026-10-01&date_to=2026-10-31   the period (inclusive, optional)
+        ?search=&status=&has_holder=true            the same filters as the coupon list
+        ?ordering=-net_sales                        default; any key in `_RANKING_KEYS`
+
+    ⚠️  `totals` covers **all** coupons whatever the search says: the cards above a
+        filtered table must not change when someone types in the search box.
+    """
+
+    permission_classes = [CanManagePricing]
+
+    def get(self, request):
+        params = request.query_params
+        date_from, date_to = analytics.parse_period(params)
+
+        ordering = params.get("ordering") or "-net_sales"
+        descending = ordering.startswith("-")
+        key = ordering.lstrip("-")
+        if key not in _RANKING_KEYS:
+            raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="ترتيب غير مدعوم")
+
+        coupons = list(filter_coupons(Coupon.objects.all(), params))
+        stats = analytics.summaries([coupon.pk for coupon in coupons], date_from, date_to)
+
+        rows = []
+        for coupon in coupons:
+            row = _coupon_meta(coupon)
+            row.update(stats[coupon.pk])
+            row["usage_limit"] = coupon.usage_limit
+            row["usage_count"] = coupon.usage_count
+            row["remaining_total"] = (
+                max(coupon.usage_limit - coupon.usage_count, 0)
+                if coupon.usage_limit is not None
+                else None
+            )
+            rows.append(row)
+
+        # None sorts last in either direction: "never used" is not the biggest or the smallest
+        present = [row for row in rows if row[key] is not None]
+        absent = [row for row in rows if row[key] is None]
+        present.sort(key=lambda row: (row[key], row["code"]), reverse=descending)
+        rows = present + absent
+
+        paginator = AdminPageNumberPagination()
+        page = paginator.paginate_queryset(rows, request, view=self)
+        response = paginator.get_paginated_response(public(page))
+        response.data["totals"] = public(analytics.totals(date_from, date_to))
+        response.data["counts"] = analytics.coupon_counts()
+        response.data["period"] = {"date_from": date_from, "date_to": date_to}
+        return response
+
+
+class CouponAnalyticsDetailAPI(APIView):
+    """
+    `GET` — one coupon: the summary, the products it sold and a daily series.
+
+    ⚠️  The recent orders are a separate endpoint (`.../orders/`) — they paginate,
+        and a drawer that opens should not wait for a list it has not scrolled to.
+    """
+
+    permission_classes = [CanManagePricing]
+
+    def get(self, request, pk):
+        coupon = get_object_or_404(
+            Coupon.objects.select_related("owner").prefetch_related("products", "categories"),
+            pk=pk,
+        )
+        date_from, date_to = analytics.parse_period(request.query_params)
+
+        summary = analytics.summaries([coupon.pk], date_from, date_to)[coupon.pk]
+        owner_used = None
+        if coupon.owner_id is not None:
+            owner_used = CouponRedemption.objects.filter(
+                coupon=coupon, user_id=coupon.owner_id, is_cancelled=False
+            ).count()
+        summary.update(analytics.remaining_uses(coupon, owner_used))
+        summary["customers_at_limit"] = analytics.customers_at_limit(coupon)
+
+        meta = _coupon_meta(coupon)
+        meta.update(
+            owner_email=coupon.owner.email if coupon.owner_id else None,
+            products_count=len(coupon.products.all()),
+            categories_count=len(coupon.categories.all()),
+        )
+
+        return Response(
+            public(
+                {
+                    "coupon": meta,
+                    "period": {"date_from": date_from, "date_to": date_to},
+                    "summary": summary,
+                    "products": analytics.product_breakdown(coupon, date_from, date_to),
+                    "series": analytics.series(coupon, date_from, date_to),
+                }
+            )
+        )
+
+
+class CouponOrdersAPI(APIView):
+    """
+    `GET` — the orders that used this coupon, newest first, paginated.
+
+        ?only=sales|excluded    counted sales / cancelled·refunded·failed (default: all)
+
+    ⚠️  Contact details are **masked** (`a***@gmail.com`): the page is for reading
+        the campaign, not for harvesting the people who used it. The full order is
+        one click away in the orders screen, behind its own permission.
+    """
+
+    permission_classes = [CanManagePricing]
+
+    def get(self, request, pk):
+        coupon = get_object_or_404(Coupon, pk=pk)
+        date_from, date_to = analytics.parse_period(request.query_params)
+
+        only = request.query_params.get("only")
+        if only not in (None, "", "sales", "excluded"):
+            raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="قيمة only غير مدعومة")
+
+        queryset = analytics.orders_queryset(coupon, date_from, date_to, only=only or None)
+
+        paginator = AdminPageNumberPagination()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        return paginator.get_paginated_response(
+            public([analytics.order_row(row) for row in page])
+        )
+
+
+class CouponBulkCreateAPI(APIView):
+    """
+    `POST` — one template, a list of people, a unique random code for each.
+
+    ⚠️  The response is `name -> code` and is **the only time the codes are shown
+        together** in a form meant to be copied — the list screen shows them one by
+        one afterwards. Everything is created in one transaction: all or none.
+    """
+
+    permission_classes = [CanManagePricing]
+
+    def post(self, request):
+        serializer = s.BulkCouponSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = dict(serializer.validated_data)
+
+        holders = data.pop("holders")
+        prefix = data.pop("prefix", "")
+
+        coupons = services.create_for_holders(holders, template=data, prefix=prefix)
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditAction.CREATE,
+            object_repr=f"كوبونات جماعية ({len(coupons)})",
+            # ⚠️  Count and shape, never the codes: the audit log is read by more
+            #     people than are meant to hold a working code.
+            changes={
+                "count": len(coupons),
+                "prefix": prefix,
+                "kind": data["kind"],
+                "value": str(data.get("value", 0)),
+            },
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        return Response(
+            {
+                "count": len(coupons),
+                "results": [
+                    {"id": coupon.pk, "holder_name": coupon.holder_name, "code": coupon.code}
+                    for coupon in coupons
+                ],
+            },
+            status=status.HTTP_201_CREATED,
+        )

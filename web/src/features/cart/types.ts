@@ -37,6 +37,12 @@ export interface CartLine {
   /** The colour's own photo when it has one, else the product's */
   image: string | null;
   pricing: PricedLine;
+  /**
+   * The "price before discount" — ⚠️  sent by the server only while it is above
+   * `pricing.unit_price`, so a line renders it as given and never compares.
+   */
+  compare_at_price?: string | null;
+  discount_percent?: number | null;
 }
 
 /**
@@ -76,6 +82,22 @@ export interface CouponResult {
   message: string;
 }
 
+/**
+ * Where the cart stands against the owner's free-shipping rule.
+ *
+ * ⚠️  Computed by the server on every response — the strip subtracts nothing itself.
+ *     `enabled: false` means the owner has the rule off (or on without an amount):
+ *     draw nothing at all.
+ */
+export interface FreeShipping {
+  enabled: boolean;
+  /** EGP */
+  threshold: string;
+  qualifies: boolean;
+  /** EGP still missing; `"0.00"` once `qualifies` */
+  remaining: string;
+}
+
 export interface CartSnapshot {
   id: string;
   status: string;
@@ -84,6 +106,7 @@ export interface CartSnapshot {
   totals: CartTotals;
   issues: LineIssue[];
   coupon: CouponResult | null;
+  free_shipping: FreeShipping;
   /** ⚠️  The only gate to checkout — the frontend displays it and never decides it. */
   is_checkoutable: boolean;
 }

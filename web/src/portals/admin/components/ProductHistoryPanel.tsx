@@ -104,7 +104,9 @@ export function ProductHistoryPanel({ productId }: { productId: string }) {
     // Nested structures are not expected in a product diff, but never print "[object Object]".
     if (typeof value === 'object') return JSON.stringify(value);
     const text = typeof value === 'string' || typeof value === 'number' ? String(value) : '';
-    if (field === 'base_price') return formatMoney(text, i18n.language);
+    if (field === 'base_price' || field === 'compare_at_price') {
+      return formatMoney(text, i18n.language);
+    }
     if (field === 'published_at') return formatDateTime(text, i18n.language);
     if (REFERENCE_FIELDS.includes(field)) return names.get(text) ?? text;
     return choiceLabel(field, text) ?? text;

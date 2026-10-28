@@ -1,0 +1,65 @@
+.free-ship {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+}
+
+.free-ship__text {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.free-ship__text svg {
+  flex: none;
+  color: var(--color-primary);
+}
+
+/* A track and a fill, both on the inline axis: the fill grows from the start edge,
+   which is the right-hand side in Arabic and the left in English. */
+.free-ship__track {
+  block-size: 0.5rem;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-border);
+}
+
+.free-ship__fill {
+  display: block;
+  block-size: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+  transition: inline-size 0.3s ease;
+}
+
+.free-ship__hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* Unlocked: the icon, the sentence and the border all change — never colour alone */
+.free-ship.is-unlocked {
+  border-color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 10%, var(--color-surface));
+}
+
+.free-ship.is-unlocked .free-ship__text,
+.free-ship.is-unlocked .free-ship__text svg {
+  color: var(--color-success);
+}
+
+.free-ship.is-unlocked .free-ship__fill {
+  background: var(--color-success);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .free-ship__fill {
+    transition: none;
+  }
+}

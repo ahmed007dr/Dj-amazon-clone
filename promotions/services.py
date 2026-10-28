@@ -10,11 +10,12 @@ The coupon engine — **one implementation**.
 
 from __future__ import annotations
 
+import secrets
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
@@ -306,3 +307,123 @@ def active_coupons_for(user):
         ]
 
     return list(queryset.filter(account_types=[]))
+
+
+# ═══════════════════════════════════════════════════════════
+#  Handing a code to several people at once
+# ═══════════════════════════════════════════════════════════
+
+#: ⚠️  A readable alphabet: no `0/O`, `1/I/L`. A code is read out loud, typed from a
+#:     screenshot and copied from a chat — the characters that look alike are the
+#:     ones that turn "my code does not work" into a support ticket.
+CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+CODE_LENGTH = 6
+
+
+def _random_suffix(length: int = CODE_LENGTH) -> str:
+    return "".join(secrets.choice(CODE_ALPHABET) for _ in range(length))
+
+
+def _fresh_codes(count: int, prefix: str, length: int) -> list[str]:
+    """
+    `count` codes that exist neither in the database nor twice in the batch.
+
+    ⚠️  Collision-safe in two steps: one query checks the whole candidate set, and
+        only the colliding ones are drawn again. The unique index is the final word
+        (see the retry in `create_for_holders`) — this loop just makes a collision
+        the rare case rather than a failed request.
+    """
+    codes: list[str] = []
+    taken: set[str] = set()
+
+    for _attempt in range(20):
+        needed = count - len(codes)
+        if needed == 0:
+            return codes
+
+        candidates = {f"{prefix}{_random_suffix(length)}" for _ in range(needed)} - taken
+        # `all_objects`: a soft-deleted coupon still owns its code (the index is unique)
+        existing = set(
+            Coupon.all_objects.filter(code__in=candidates).values_list("code", flat=True)
+        )
+        accepted = sorted(candidates - existing)
+
+        codes.extend(accepted)
+        taken |= candidates
+
+    raise BusinessError(
+        ErrorCode.CONFLICT,
+        detail="تعذّر توليد أكواد فريدة — جرّب بادئة مختلفة أو كودًا أطول",
+        status_code=409,
+    )
+
+
+def create_for_holders(
+    holders: list[str], *, template: dict, prefix: str = "", length: int = CODE_LENGTH
+) -> list[Coupon]:
+    """
+    One coupon per holder, from a single template — **all or none**.
+
+    ⚠️  Atomic: either every person gets a code or nobody does. A half-created batch
+        is the worst outcome — the owner would not know which names were handled and
+        would re-run it, minting a second code for those already served.
+
+    ⚠️  Each code is random and unguessable (`secrets`, a 31-symbol alphabet): a code
+        that follows the holder's name or a sequence can be guessed by a stranger
+        trying `NAME10`, which defeats handing a code to *certain* people.
+    """
+    products = list(template.get("products") or [])
+    categories = list(template.get("categories") or [])
+    fields = {
+        key: value
+        for key, value in template.items()
+        if key not in ("products", "categories", "holders", "prefix")
+    }
+
+    for attempt in range(3):
+        try:
+            with transaction.atomic():
+                codes = _fresh_codes(len(holders), prefix, length)
+
+                coupons = [
+                    Coupon(
+                        code=code,
+                        holder_name=holder,
+                        **{
+                            **fields,
+                            # A holder's name is the best label the admin list can have
+                            "name_ar": fields.get("name_ar") or holder,
+                            "name_en": fields.get("name_en") or holder,
+                        },
+                    )
+                    for code, holder in zip(codes, holders, strict=True)
+                ]
+                # bulk_create skips `save()`, which is what upper-cases the code —
+                # the alphabet and the prefix are upper case already.
+                Coupon.objects.bulk_create(coupons)
+
+                if products:
+                    through = Coupon.products.through
+                    through.objects.bulk_create(
+                        [
+                            through(coupon_id=coupon.pk, product_id=product.pk)
+                            for coupon in coupons
+                            for product in products
+                        ]
+                    )
+                if categories:
+                    through = Coupon.categories.through
+                    through.objects.bulk_create(
+                        [
+                            through(coupon_id=coupon.pk, category_id=category.pk)
+                            for coupon in coupons
+                            for category in categories
+                        ]
+                    )
+                return coupons
+        except IntegrityError:
+            # Someone created one of these codes between the check and the insert.
+            # The transaction rolled back whole; draw a fresh batch.
+            if attempt == 2:
+                raise
+    return []  # pragma: no cover — the loop returns or raises

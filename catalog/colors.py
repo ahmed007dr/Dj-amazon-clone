@@ -152,6 +152,7 @@ def create_color(
     name_en: str,
     hex: str = "#9CA3AF",  # the column's own name
     price_override: Decimal | None = None,
+    compare_at_price: Decimal | None = None,
     display_order: int | None = None,
     is_active: bool = True,
 ) -> ProductColor:
@@ -167,6 +168,7 @@ def create_color(
         name_en=name_en,
         hex=hex,
         price_override=price_override,
+        compare_at_price=compare_at_price,
         display_order=next_display_order(product) if display_order is None else display_order,
         is_active=is_active,
     )
@@ -207,7 +209,15 @@ def update_color(color: ProductColor, **changes) -> dict:
     * A rename is copied to the variants that still carry the **old** names. One a
       human renamed by hand ("Blue — Large") is theirs and is left alone.
     """
-    allowed = {"name_ar", "name_en", "hex", "price_override", "display_order", "is_active"}
+    allowed = {
+        "name_ar",
+        "name_en",
+        "hex",
+        "price_override",
+        "compare_at_price",
+        "display_order",
+        "is_active",
+    }
     unknown = set(changes) - allowed
     if unknown:
         raise ValueError(f"حقول غير مسموحة: {sorted(unknown)}")

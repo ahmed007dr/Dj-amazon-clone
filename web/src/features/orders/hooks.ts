@@ -29,10 +29,10 @@ export function useOrder(id: string | undefined) {
  *     all of which are changed from the admin panel. Holding them in the
  *     frontend makes the admin's edit take no effect until redeployment.
  */
-export function useShippingQuotes(governorate: string, subtotal: string) {
+export function useShippingQuotes(governorate: string, subtotal: string, eligibleAmount: string) {
   return useQuery({
-    queryKey: ['shipping', 'quotes', governorate, subtotal],
-    queryFn: () => api.getShippingQuotes(governorate, subtotal),
+    queryKey: ['shipping', 'quotes', governorate, subtotal, eligibleAmount],
+    queryFn: () => api.getShippingQuotes(governorate, subtotal, eligibleAmount),
     enabled: governorate.length > 0,
     staleTime: 5 * 60 * 1000,
   });

@@ -9,6 +9,7 @@ import {
   type AdminProduct,
   type ProductDraft,
 } from '@/features/catalog/adminApi';
+import { checkCompareAt } from '@/features/catalog/compareAt';
 import { isApiError } from '@/shared/http/errors';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { Alert } from '@/shared/ui/Alert';
@@ -16,6 +17,7 @@ import { Button } from '@/shared/ui/Button';
 import { Field } from '@/shared/ui/Field';
 import { Spinner } from '@/shared/ui/Spinner';
 import { useToast } from '@/shared/ui/useToast';
+import { formatNumber } from '@/shared/utils/format';
 
 import './ProductForm.css';
 
@@ -47,7 +49,7 @@ export function ProductForm({
   product?: AdminProduct | undefined;
   onDone: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { notify } = useToast();
   const localized = useLocalized();
 
@@ -66,6 +68,7 @@ export function ProductForm({
     brand: product?.brand ?? '',
     manufacturer: product?.manufacturer ?? '',
     base_price: product?.base_price ?? '0.00',
+    compare_at_price: product?.compare_at_price ?? '',
     short_description_ar: product?.short_description_ar ?? '',
     short_description_en: product?.short_description_en ?? '',
     regulatory_class: product?.regulatory_class ?? 'NOT_APPLICABLE',
@@ -117,6 +120,8 @@ export function ProductForm({
       brand: form.brand || null,
       manufacturer: form.manufacturer || null,
       base_price: form.base_price,
+      // ⚠️  `null` clears it: an empty string is not a number, and "no old price" is a real answer.
+      compare_at_price: form.compare_at_price.trim() === '' ? null : form.compare_at_price.trim(),
       short_description_ar: form.short_description_ar,
       short_description_en: form.short_description_en,
       regulatory_class: form.regulatory_class,
@@ -170,7 +175,13 @@ export function ProductForm({
   };
 
   const busy = create.isPending || update.isPending;
-  const ready = form.name_ar !== '' && form.category !== '' && (isEdit || form.sku !== '');
+  const compareCheck = checkCompareAt(form.compare_at_price, form.base_price);
+  const ready =
+    form.name_ar !== '' &&
+    form.category !== '' &&
+    (isEdit || form.sku !== '') &&
+    compareCheck.state !== 'too-low' &&
+    compareCheck.state !== 'malformed';
 
   // The chosen policy — or the default when the field is left empty
   const chosenPolicy =
@@ -293,6 +304,32 @@ export function ProductForm({
           hint={t('products.basePriceHint')}
           {...(fieldErrors.base_price ? { error: fieldErrors.base_price } : {})}
         />
+        {/* ⚠️  Beside the price it explains. The preview is the admin's check that the figure
+            means what they think ("-20%") before the shopper sees it; the server re-checks. */}
+        <Field
+          label={t('products.compareAt')}
+          value={form.compare_at_price}
+          onChange={(event) => set('compare_at_price')(event.target.value)}
+          inputMode="decimal"
+          dir="ltr"
+          hint={
+            compareCheck.state === 'ok'
+              ? t('products.compareAtPreview', {
+                  percent: formatNumber(compareCheck.percent, i18n.language),
+                })
+              : t('products.compareAtHint')
+          }
+          {...(fieldErrors.compare_at_price
+            ? { error: fieldErrors.compare_at_price }
+            : compareCheck.state === 'too-low'
+              ? { error: t('products.compareAtInvalid') }
+              : compareCheck.state === 'malformed'
+                ? { error: t('catalog.colors.invalidPrice') }
+                : {})}
+        />
+      </div>
+
+      <div className="product-form__row">
         <Field
           label={t('products.weight')}
           value={form.weight_grams}

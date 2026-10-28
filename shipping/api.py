@@ -7,6 +7,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core import features
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
@@ -17,8 +18,33 @@ from shipping.governorates import EGYPT_GOVERNORATES
 from shipping.models import Shipment, ShippingMethod, ShippingRate, ShippingZone
 
 
+def _money_param(request, name: str) -> Decimal | None:
+    """A non-negative finite amount from the query string, or `None` if absent or unreadable."""
+    raw = request.query_params.get(name)
+    if raw in (None, ""):
+        return None
+    try:
+        value = Decimal(raw)
+    except (TypeError, InvalidOperation):
+        return None
+    # ⚠️  `Decimal("NaN")` parses, and comparing it raises — a 500 from a query string.
+    return value if value.is_finite() and value >= 0 else None
+
+
 class ShippingQuoteAPI(APIView):
-    """The shipping quotes available for this governorate — computed from the source."""
+    """
+    The shipping quotes available for this governorate — computed from the source.
+
+    ⚠️  `{quotes, free_shipping}`, not a bare list: the response also says where
+        the cart stands against the owner's free-shipping rule.
+
+    ⚠️  `subtotal` and `eligible_amount` are display hints, never an authority.
+
+        This endpoint prices what the page shows. The order is priced again from
+        the cart on the server (`orders.services.create_from_cart`), so a client
+        that sends a bigger number sees a lower fee here and is charged the real
+        one at checkout.
+    """
 
     permission_classes = [AllowAny]
 
@@ -27,13 +53,23 @@ class ShippingQuoteAPI(APIView):
         if not governorate:
             raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="المحافظة مطلوبة")
 
-        try:
-            subtotal = Decimal(request.query_params.get("subtotal", "0"))
-        except (TypeError, InvalidOperation):
-            subtotal = Decimal("0")
+        subtotal = _money_param(request, "subtotal") or Decimal("0")
+        # The amount the store-wide rule looks at (after coupon, before tax) — the
+        # cart payload's `net_sales`. Falls back to the subtotal for older callers.
+        eligible = _money_param(request, "eligible_amount")
+        if eligible is None:
+            eligible = subtotal
 
-        quotes = services.quote(governorate, subtotal)
-        return Response(s.ShippingQuoteSerializer(quotes, many=True).data)
+        rule = features.free_shipping_rule()
+        quotes = services.quote(governorate, subtotal, eligible_amount=eligible, rule=rule)
+        return Response(
+            s.ShippingQuoteResponseSerializer(
+                {
+                    "quotes": quotes,
+                    "free_shipping": services.free_shipping_status(eligible, rule),
+                }
+            ).data
+        )
 
 
 class ShippingMethodListAPI(generics.ListAPIView):
@@ -338,3 +374,62 @@ class AdminRateDetailAPI(generics.RetrieveUpdateDestroyAPIView):
             base_fee=str(instance.base_fee),
         )
         instance.delete()
+
+
+class AdminFreeShippingAPI(APIView):
+    """
+    The owner's free-shipping switch and amount.
+
+    ⚠️  Behind `CanManageShipping`, like the fee table it sits beside — it is the
+        same decision ("what does delivery cost the customer?") and the person
+        who edits one edits the other.
+
+    ⚠️  Audited as `SETTING_CHANGE` with the before and after of both values: a
+        switch that quietly waives shipping on every large order is exactly the
+        change someone will later ask "who turned this on, and when?" about.
+    """
+
+    permission_classes = [CanManageShipping]
+    serializer_class = s.AdminFreeShippingSerializer
+
+    @staticmethod
+    def _payload(rule: features.FreeShippingRule) -> dict:
+        return {
+            "enabled": rule.enabled,
+            "threshold": str(rule.threshold),
+            # What the checkout actually acts on: on, with a positive amount
+            "active": rule.active,
+        }
+
+    def get(self, request):
+        return Response(self._payload(features.free_shipping_rule()))
+
+    def put(self, request):
+        return self._save(request)
+
+    def patch(self, request):
+        return self._save(request, partial=True)
+
+    def _save(self, request, *, partial: bool = False):
+        current = features.free_shipping_rule()
+        serializer = s.AdminFreeShippingSerializer(
+            data=request.data, partial=partial, context={"current": current}
+        )
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        before, after = services.save_free_shipping_rule(
+            enabled=data["enabled"], threshold=data["threshold"]
+        )
+
+        if (before.enabled, before.threshold) != (after.enabled, after.threshold):
+            _log(
+                request,
+                AuditAction.SETTING_CHANGE,
+                "الشحن المجاني فوق مبلغ معيّن",
+                enabled_from=before.enabled,
+                enabled_to=after.enabled,
+                threshold_from=str(before.threshold),
+                threshold_to=str(after.threshold),
+            )
+        return Response(self._payload(after))

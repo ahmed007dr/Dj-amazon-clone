@@ -136,6 +136,24 @@ COUPONS = [
         "usage_limit_per_user": 3,
     },
     {
+        # ⚠️  A code **handed to a person** — it shows the holder column, the "Insights"
+        #     drawer and the sales-per-code figures from the first minute. The seeded
+        #     orders in `transactions.py` use it (a delivered one, a confirmed one and
+        #     a cancelled one, which analytics reports apart instead of counting).
+        "code": "DRSARA15",
+        "name_ar": "كود الشريكة د. سارة",
+        "name_en": "Partner code - Dr. Sara",
+        "holder_name": "د. سارة الحكيم",
+        "holder_note": "شريكة تسويقية — سُلِّم الكود في مؤتمر طب الأسنان",
+        "kind": "PERCENTAGE",
+        "value": Decimal("15.00"),
+        "max_discount_amount": Decimal("150.00"),
+        # No minimum on purpose: the seeded orders must always accept it
+        "min_order_amount": Decimal("0.00"),
+        "usage_limit": 200,
+        "usage_limit_per_user": 2,
+    },
+    {
         "code": "EXPIRED2025",
         "name_ar": "كوبون منتهٍ — للاختبار",
         "name_en": "Expired coupon — for testing",

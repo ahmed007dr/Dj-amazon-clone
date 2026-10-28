@@ -16,6 +16,7 @@ import {
   useShippingRates,
   useShippingZones,
 } from '@/features/shipping/hooks';
+import { FreeShippingCard } from '@/portals/admin/components/FreeShippingCard';
 import { ShippingMethodForm } from '@/portals/admin/components/ShippingMethodForm';
 import { ShippingRateForm } from '@/portals/admin/components/ShippingRateForm';
 import { ShippingZoneForm } from '@/portals/admin/components/ShippingZoneForm';
@@ -180,6 +181,11 @@ export function AdminShippingPage() {
         <span>
           <code>{row.code}</code> — {row.name_ar}
           {row.is_pickup ? <Badge tone="info">{t('shipping.pickup')}</Badge> : null}
+          {/* ⚠️  Said on the row: a method excluded from free shipping keeps its price
+              even when the cart qualifies, and nobody should have to open it to find out. */}
+          {!row.is_pickup && !row.eligible_for_free_shipping ? (
+            <Badge tone="warning">{t('shipping.excludedFromFree')}</Badge>
+          ) : null}
           {!row.is_active ? <Badge tone="neutral">{t('shipping.inactive')}</Badge> : null}
         </span>
       ),
@@ -309,6 +315,8 @@ export function AdminShippingPage() {
           <small className="shipping-unassigned">{coverage.data.unassigned.join('، ')}</small>
         </Alert>
       ) : null}
+
+      <FreeShippingCard />
 
       <StatusTabs
         options={[

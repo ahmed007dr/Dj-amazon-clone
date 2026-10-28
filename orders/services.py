@@ -198,6 +198,11 @@ def create_from_cart(
         coupon_discount=priced.coupon_discount,
         tax_total=priced.tax_total,
         shipping_total=priced.shipping_amount,
+        # ⚠️  The fee the store-wide free-shipping rule waived, taken from the same
+        #     server-side repricing as `shipping_total` — never from the request. It is
+        #     what separates "free because the cart reached the threshold" from a
+        #     method that costs nothing anyway.
+        shipping_discount=snapshot.shipping_discount,
         grand_total=priced.total,
         # ⚠️  A guest cart carries no coupon (the engine refuses them) — never
         #     stamp a code on an order that did not get its discount.

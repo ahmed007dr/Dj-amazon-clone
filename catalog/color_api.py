@@ -33,6 +33,9 @@ from core.permissions import CanManageCatalog
 #: The provider whose facts the admin list reads (`inventory.apps`)
 STOCK_PROVIDER = "inventory.color_stock"
 
+#: A change to either is a `PRICE_CHANGE` entry on the product's timeline, not a plain edit
+COLOR_PRICE_FIELDS = frozenset({"price_override", "compare_at_price"})
+
 
 def _object_repr(product: Product) -> str:
     return f"لون منتج {product.sku}"
@@ -113,6 +116,7 @@ class ProductColorListCreateAPI(_ProductColorMixin, generics.ListCreateAPIView):
             name_en=data["name_en"],
             hex=data["hex"],
             price_override=data.get("price_override"),
+            compare_at_price=data.get("compare_at_price"),
             display_order=data.get("display_order"),
             is_active=data.get("is_active", True),
         )
@@ -126,6 +130,9 @@ class ProductColorListCreateAPI(_ProductColorMixin, generics.ListCreateAPIView):
                 "hex": color.hex,
                 "price_override": (
                     None if color.price_override is None else str(color.price_override)
+                ),
+                "compare_at_price": (
+                    None if color.compare_at_price is None else str(color.compare_at_price)
                 ),
             },
             object_repr=_object_repr(product),
@@ -159,8 +166,9 @@ class ProductColorDetailAPI(_ProductColorMixin, generics.RetrieveUpdateDestroyAP
         if diff:
             product = self.get_product()
             # ⚠️  A price move is a `PRICE_CHANGE` — the action finance filters the log by.
-            price = {k: v for k, v in diff.items() if k == "price_override"}
-            other = {k: v for k, v in diff.items() if k != "price_override"}
+            # "Price before discount" is a price too — finance filters the log by it
+            price = {k: v for k, v in diff.items() if k in COLOR_PRICE_FIELDS}
+            other = {k: v for k, v in diff.items() if k not in COLOR_PRICE_FIELDS}
             label = {"color": instance.name_en}
             if price:
                 audit.log_product_change(

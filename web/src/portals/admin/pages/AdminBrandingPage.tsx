@@ -14,6 +14,7 @@ import { ContrastReport } from '@/features/branding/components/ContrastReport';
 import { BrandAssetsPanel } from '@/portals/admin/components/BrandAssetsPanel';
 import { BrandIdentityForm } from '@/portals/admin/components/BrandIdentityForm';
 import { BrandProfileCreate } from '@/portals/admin/components/BrandProfileCreate';
+import { ContactChannelsPanel } from '@/portals/admin/components/ContactChannelsPanel';
 import { useDebounced } from '@/shared/hooks/useDebounced';
 import { isApiError } from '@/shared/http';
 import { PageHeader } from '@/shared/layouts/PageHeader';
@@ -26,7 +27,7 @@ import { useToast } from '@/shared/ui/useToast';
 
 import './AdminBrandingPage.css';
 
-type Tab = 'colors' | 'identity' | 'assets';
+type Tab = 'colors' | 'identity' | 'assets' | 'channels';
 
 const COLOR_FIELDS = [
   'primary',
@@ -205,6 +206,7 @@ export function AdminBrandingPage() {
           { value: 'colors', label: t('admin.colors') },
           { value: 'identity', label: t('branding.tabIdentity') },
           { value: 'assets', label: t('branding.tabAssets') },
+          { value: 'channels', label: t('branding.tabChannels') },
         ]}
         value={tab}
         onChange={(next) => setTab(next as Tab)}
@@ -217,6 +219,8 @@ export function AdminBrandingPage() {
       {tab === 'identity' ? <BrandIdentityForm key={profile.id} profile={profile} /> : null}
 
       {tab === 'assets' ? <BrandAssetsPanel key={profile.id} profile={profile} /> : null}
+
+      {tab === 'channels' ? <ContactChannelsPanel key={profile.id} profile={profile} /> : null}
 
       {tab !== 'colors' ? null : (
       <>

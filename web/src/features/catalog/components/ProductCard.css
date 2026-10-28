@@ -65,10 +65,28 @@
   font-size: 0.8125rem;
 }
 
+/* The size, weight and colour now belong to `PriceTag` (shared/ui) */
 .product-card__price {
-  font-size: 1.0625rem;
+  min-block-size: 1.75rem;
+}
+
+/*
+  A small "Sale" cue on the opposite corner from the featured star.
+  Tinted from `--color-danger` over the surface, like `Badge`, so it follows the brand and
+  the dark palette; `inset-inline-end` mirrors it in Arabic.
+*/
+.product-card__sale {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-end: var(--space-2);
+  padding: 0.1rem var(--space-2);
+  font-size: 0.6875rem;
   font-weight: 700;
-  color: var(--color-primary);
+  line-height: 1.6;
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, transparent);
+  border-radius: var(--radius-pill);
 }
 
 .product-card__action {

@@ -15,6 +15,8 @@ Coupons and offers.
     extended it again.
 """
 
+import uuid
+
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
@@ -91,6 +93,27 @@ class Coupon(BilingualNameMixin, BaseModel):
         related_name="personal_coupons",
         verbose_name=_("مالك الكوبون"),
         help_text=_("فارغ = حملة عامة"),
+    )
+
+    #: ⚠️  **Who the code was handed to** — a partner, a public figure, a campaign
+    #:     owner. Free text on purpose, and *not* `owner`.
+    #:
+    #:     `owner` is an account that alone may spend the coupon (the engine hides it
+    #:     from everyone else). A holder is usually somebody who has no account at
+    #:     all, who passes the code on to their audience — so the code stays
+    #:     redeemable by anyone and the holder is only the label the owner reads the
+    #:     sales against: "how much did the code we gave X bring in?".
+    holder_name = models.CharField(
+        _("اسم حامل الكود"),
+        max_length=120,
+        blank=True,
+        db_index=True,
+        help_text=_("لمن سُلِّم الكود — للتتبّع فقط، لا يقيّد من يستخدمه"),
+    )
+    holder_note = models.TextField(
+        _("ملاحظة عن الحامل"),
+        blank=True,
+        help_text=_("نص حر داخلي — لا يراه العميل ولا يدخل في التصدير"),
     )
 
     products = models.ManyToManyField(
@@ -196,6 +219,19 @@ class CouponRedemption(BaseModel):
     reference_type = models.CharField(_("نوع المرجع"), max_length=32, blank=True)
     reference_id = models.CharField(_("معرّف المرجع"), max_length=64, blank=True)
 
+    #: ⚠️  The order this use belongs to, as a **typed, indexed** value.
+    #:
+    #:     `reference_id` is free text (it also carries non-order references), and a
+    #:     text column cannot be joined to `Order.pk` portably — a UUID is stored
+    #:     dashed in one place and as 32 hex digits in another depending on the
+    #:     database. Analytics needs "all the orders that used coupon X" as one query,
+    #:     not a Python loop over thousands of redemptions.
+    #:
+    #:     Still no foreign key: `promotions` sits below `orders` (L4 vs L6) and a
+    #:     real FK would make it import the model above it. `save()` derives it from
+    #:     the reference, so no caller has to know it exists.
+    order_ref = models.UUIDField(_("معرّف الطلب"), null=True, blank=True, db_index=True)
+
     is_cancelled = models.BooleanField(
         _("ملغى"),
         default=False,
@@ -214,3 +250,20 @@ class CouponRedemption(BaseModel):
 
     def __str__(self):
         return f"{self.coupon.code} · {self.user} · {self.discount_amount}"
+
+    def save(self, *args, **kwargs):
+        """
+        ⚠️  `order_ref` follows the reference — one place, so a writer that only
+            knows `reference_type="order"` / `reference_id=<pk>` keeps working and
+            the analytics join keeps finding its rows.
+        """
+        if self.order_ref is None and self.reference_type == "order" and self.reference_id:
+            try:
+                self.order_ref = uuid.UUID(str(self.reference_id))
+            except ValueError:
+                self.order_ref = None
+            else:
+                update_fields = kwargs.get("update_fields")
+                if update_fields is not None:
+                    kwargs["update_fields"] = {*update_fields, "order_ref"}
+        super().save(*args, **kwargs)

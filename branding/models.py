@@ -22,9 +22,10 @@ from django.core.validators import (
     RegexValidator,
     URLValidator,
 )
-from django.db import models
+from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 
+from branding import channels
 from core.identifiers import random_filename
 from core.models.base import BaseModel, TimeStampedModel, UUIDPrimaryKeyModel
 
@@ -324,3 +325,149 @@ class ThemePalette(UUIDPrimaryKeyModel, TimeStampedModel):
             raise ValidationError(
                 {"__all__": _("تباين غير كافٍ — WCAG AA: ") + " · ".join(map(str, failures))}
             )
+
+
+class ChannelKind(models.TextChoices):
+    WHATSAPP = "WHATSAPP", _("واتساب")
+    TELEGRAM = "TELEGRAM", _("تيليجرام")
+    PHONE = "PHONE", _("هاتف")
+    EMAIL = "EMAIL", _("بريد إلكتروني")
+    FACEBOOK = "FACEBOOK", _("فيسبوك")
+    INSTAGRAM = "INSTAGRAM", _("إنستجرام")
+    TIKTOK = "TIKTOK", _("تيك توك")
+    YOUTUBE = "YOUTUBE", _("يوتيوب")
+    X = "X", _("إكس")
+    SNAPCHAT = "SNAPCHAT", _("سناب شات")
+    LINKEDIN = "LINKEDIN", _("لينكدإن")
+    WEBSITE = "WEBSITE", _("موقع إلكتروني")
+    MAP = "MAP", _("الخريطة")
+    OTHER = "OTHER", _("رابط آخر")
+
+
+class ContactChannel(UUIDPrimaryKeyModel, TimeStampedModel):
+    """
+    One way to reach the store — WhatsApp, Telegram, a phone line, a social page…
+
+    ⚠️  Belongs to a **profile**, not to the site: a seasonal identity prepared as a
+        draft carries its own channels and goes live with one click, exactly like its
+        colours. The old `contact_*` / social columns on the profile stay and keep
+        rendering — channels are *additional*, never a migration of them.
+
+    ⚠️  `value` is stored in its **canonical form** (`channels.normalise`): digits for
+        WhatsApp, `@name` for Telegram, an `https` URL for the social networks. `save()`
+        enforces it on every path (API · Django admin · seed · shell), so no row exists
+        whose link was never checked.
+
+    ⚠️  A UUIDv7 key — channels appear in `/admin/profiles/{id}/contact-channels/{id}/`.
+    """
+
+    profile = models.ForeignKey(
+        BrandProfile,
+        on_delete=models.CASCADE,
+        related_name="contact_channels",
+        verbose_name=_("ملف الهوية"),
+    )
+    kind = models.CharField(_("النوع"), max_length=16, choices=ChannelKind.choices)
+    value = models.CharField(
+        _("القيمة"),
+        max_length=channels.MAX_VALUE_LENGTH,
+        help_text=_("رقم أو اسم حساب أو رابط — حسب النوع"),
+    )
+
+    # Empty = the kind's default label ("WhatsApp" / "واتساب")
+    label_ar = models.CharField(
+        _("الاسم بالعربية"), max_length=channels.MAX_LABEL_LENGTH, blank=True
+    )
+    label_en = models.CharField(
+        _("الاسم بالإنجليزية"), max_length=channels.MAX_LABEL_LENGTH, blank=True
+    )
+
+    # WhatsApp only: the text already typed in the customer's chat box
+    message_ar = models.CharField(
+        _("الرسالة الجاهزة بالعربية"), max_length=channels.MAX_MESSAGE_LENGTH, blank=True
+    )
+    message_en = models.CharField(
+        _("الرسالة الجاهزة بالإنجليزية"), max_length=channels.MAX_MESSAGE_LENGTH, blank=True
+    )
+
+    display_order = models.PositiveSmallIntegerField(_("الترتيب"), default=0)
+    is_active = models.BooleanField(_("مفعّل"), default=True)
+    show_floating_button = models.BooleanField(
+        _("زر عائم"),
+        default=False,
+        help_text=_("واتساب فقط — زر دائري في زاوية صفحات المتجر"),
+    )
+
+    class Meta:
+        verbose_name = _("قناة تواصل")
+        verbose_name_plural = _("قنوات التواصل")
+        ordering = ["display_order", "created_at"]
+        indexes = [models.Index(fields=["profile", "is_active", "display_order"])]
+
+    def __str__(self):
+        return f"{self.kind} · {self.value}"
+
+    # ── Validation ─────────────────────────────────────────
+
+    def _cleaned(self) -> dict:
+        """The normalised user-typed fields. Raises `ValidationError` keyed by field."""
+        try:
+            return channels.clean_channel(
+                kind=self.kind,
+                value=self.value,
+                label_ar=self.label_ar,
+                label_en=self.label_en,
+                message_ar=self.message_ar,
+                message_en=self.message_en,
+                show_floating_button=self.show_floating_button,
+            )
+        except channels.ChannelValidationError as error:
+            raise ValidationError(
+                {
+                    field: ValidationError(err.message, code=err.code)
+                    for field, err in error.errors.items()
+                }
+            ) from error
+
+    def clean(self):
+        for field, value in self._cleaned().items():
+            setattr(self, field, value)
+
+    # ── Persistence ────────────────────────────────────────
+
+    #: Writes that touch none of the typed fields skip validation (the toggle, the reorder)
+    _STATE_ONLY = frozenset({"is_active", "display_order", "updated_at"})
+
+    def save(self, *args, **kwargs):
+        """
+        ⚠️  Validates and normalises on **every** write — not only through a form.
+
+            The API validates in its serializer and the Django admin through `clean()`,
+            but the seed and the shell call `create()` directly. Doing it here is what
+            makes "no stored link was ever unchecked" true rather than usual.
+
+        ⚠️  One floating button per profile. Turning it on for this row turns it off on
+            the others, in the same transaction — two floating buttons on one page would
+            sit on top of each other.
+        """
+        update_fields = kwargs.get("update_fields")
+        if update_fields is None or not set(update_fields) <= self._STATE_ONLY:
+            self.clean()
+
+        with transaction.atomic():
+            if self.show_floating_button:
+                type(self).objects.filter(
+                    profile_id=self.profile_id, show_floating_button=True
+                ).exclude(pk=self.pk).update(show_floating_button=False)
+            super().save(*args, **kwargs)
+
+    # ── Presentation ───────────────────────────────────────
+
+    @property
+    def label(self) -> dict[str, str]:
+        """The label to show — the admin's text, else the kind's default."""
+        return channels.resolve_label(self.kind, self.label_ar, self.label_en)
+
+    def describe(self) -> dict:
+        """`{value, display, href, href_en}` — computed, never stored."""
+        return channels.describe(self.kind, self.value, self.message_ar, self.message_en)

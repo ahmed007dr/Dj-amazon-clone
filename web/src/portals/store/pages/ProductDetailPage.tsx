@@ -16,14 +16,14 @@ import { isApiError } from '@/shared/http';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
+import { PriceTag } from '@/shared/ui/PriceTag';
 import { Spinner } from '@/shared/ui/Spinner';
 import { StateMessage } from '@/shared/ui/StateMessage';
-import { formatMoney } from '@/shared/utils/format';
 
 import './ProductDetailPage.css';
 
 export function ProductDetailPage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const localized = useLocalized();
   const { slug } = useParams<{ slug: string }>();
 
@@ -124,6 +124,25 @@ export function ProductDetailPage() {
     ).toFixed(2);
   }
 
+  // ⚠️  The price, the old price and the saving all come from the server, for exactly what the
+  //     shopper has chosen: a size inside a colour → that variant; a colour → the colour; no colour
+  //     yet → the cheapest swatch ("from"); a plain size → that variant; otherwise the product.
+  //     The page never works out a discount itself — `compare_at_price` arrives only when it is
+  //     above what *this* shopper pays (a student price can make it vanish, or grow).
+  //
+  //     `price` is the legacy sum above when the server did not send one (an older payload).
+  const priceSource: {
+    price?: string | undefined;
+    compare_at_price?: string | null | undefined;
+    discount_percent?: number | null | undefined;
+  } =
+    hasColors && selectedColor
+      ? (selected ?? selectedColor)
+      : hasColors && lowest !== null
+        ? (colors.find((color) => Number.parseFloat(color.price) === lowest) ?? product)
+        : (selected ?? product);
+  const shownPrice = priceSource.price ?? displayPrice;
+
   // The colour's own availability when one is chosen; otherwise the product's.
   const stock: Availability | undefined = selectedColor
     ? {
@@ -187,12 +206,15 @@ export function ProductDetailPage() {
             <StarRating value={product.rating.average} count={product.rating.count} />
           ) : null}
 
-          <p className="product-page__price">
-            {priceIsFrom ? (
-              <span className="product-page__price-from">{t('catalog.colors.from')} </span>
-            ) : null}
-            {formatMoney(displayPrice, i18n.language)}
-          </p>
+          <div className="product-page__price">
+            <PriceTag
+              variant="detail"
+              price={shownPrice}
+              compareAt={priceSource.compare_at_price}
+              percent={priceSource.discount_percent}
+              prefix={priceIsFrom ? t('catalog.colors.from') : undefined}
+            />
+          </div>
 
           <StockBadge availability={stock} />
 

@@ -3,6 +3,45 @@
 export type ThemeMode = 'LIGHT' | 'DARK';
 export type DefaultMode = ThemeMode | 'SYSTEM';
 
+/** Matches `branding.models.ChannelKind`. */
+export type ChannelKind =
+  | 'WHATSAPP'
+  | 'TELEGRAM'
+  | 'PHONE'
+  | 'EMAIL'
+  | 'FACEBOOK'
+  | 'INSTAGRAM'
+  | 'TIKTOK'
+  | 'YOUTUBE'
+  | 'X'
+  | 'SNAPCHAT'
+  | 'LINKEDIN'
+  | 'WEBSITE'
+  | 'MAP'
+  | 'OTHER';
+
+/**
+ * One public "Contact us" channel — `branding.services.public_channels`.
+ *
+ * ⚠️  Everything here is **computed on the server**: `href` is built there from the
+ * validated value (never the admin's raw text), and `value` is the display text. The
+ * page paints them as they come and builds no link of its own.
+ */
+export interface ContactChannel {
+  kind: ChannelKind;
+  /** The admin's label, or the kind's default — both languages. */
+  label: Record<string, string>;
+  /** What the visitor reads: `+20 10 1234 5678`, `@store`, `example.com/page`. */
+  value: string;
+  /** `https:`, `tel:` or `mailto:` — WhatsApp carries the Arabic prefilled message. */
+  href: string;
+  /** The same link with the English prefilled message (equal to `href` for every other kind). */
+  href_en?: string;
+  order: number;
+  /** An active WhatsApp channel that earns the floating chat button. */
+  floating: boolean;
+}
+
 export interface BrandTheme {
   code: string;
   name: Record<string, string>;
@@ -43,4 +82,11 @@ export interface BrandTheme {
     address: Record<string, string>;
   };
   social: Record<string, string>;
+  /**
+   * Additional ways to reach the store, active ones in display order. They sit
+   * **beside** `contact` and `social`, which keep rendering as before.
+   *
+   * ⚠️  Optional: a payload cached before this field existed (12 hours) lacks it.
+   */
+  contact_channels?: ContactChannel[];
 }

@@ -35,6 +35,14 @@
   text-align: center;
 }
 
+/* Room under the copyright line for the floating chat button (3.5rem + its gap) — a phone
+   is the only width where the centred text can reach the corner the button sits in */
+@media (max-width: 575px) {
+  .store-footer--floating .store-footer__bottom {
+    padding-block-end: calc(var(--space-4) + 4.5rem);
+  }
+}
+
 @media (min-width: 576px) {
   .store-footer__grid {
     grid-template-columns: 1fr 1fr;

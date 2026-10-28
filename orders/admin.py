@@ -132,6 +132,7 @@ class OrderAdmin(DomainModelAdmin):
         "coupon_discount",
         "tax_total",
         "shipping_total",
+        "shipping_discount",
         "grand_total",
         "coupon_code",
         "shipping_method_code",
@@ -162,6 +163,7 @@ class OrderAdmin(DomainModelAdmin):
                     "coupon_code",
                     "tax_total",
                     "shipping_total",
+                    "shipping_discount",
                     "grand_total",
                 )
             },

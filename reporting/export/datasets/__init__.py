@@ -22,6 +22,7 @@ def load_all() -> None:
     """
     from reporting.export.datasets import (  # noqa: F401 — the import is the registration
         catalog,
+        coupons,
         customers,
         finance,
         inventory,

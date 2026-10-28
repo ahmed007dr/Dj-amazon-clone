@@ -17,6 +17,10 @@
   لا ٢ — صورة فوتوغرافية. تعود الصفحة إلى صورة الوضع الآخر ثم إلى التدرّج القديم.
 - `hero_cta_url` مسار داخلي (`/offers`) أو `https://` فقط — `javascript:` و`//host` مرفوضان
   في النموذج، فيسري على الأدمن وعلى الـ API معًا.
+- **قنوات التواصل** (`ContactChannel`): واتساب · تيليجرام · هاتف · بريد · سوشيال · روابط، لكل
+  ملف هوية قنواته. `channels.py` هو المحلّل الوحيد — يعيد بناء الرابط على نطاق يختاره هو
+  (`wa.me` · `t.me` · `tel:` · `mailto:`) ويرفض `javascript:` و`data:` و`//host` و`http:`،
+  فيسري على الـ API ولوحة Django والـ seed معًا. تظهر في `contact_channels` ضمن الحمولة العامة.
 - `services.mail_identity()` هو ما يقرؤه `mailing` لتصميم البريد (عبر
   `settings.MAIL_BRAND_PROVIDER`) — `logo_light` وحده.
 

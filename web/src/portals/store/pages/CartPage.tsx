@@ -96,7 +96,7 @@ export function CartPage() {
         {/* ⚠️  Shipping is not known here: the governorate is chosen at checkout.
             Showing zero suggests it is free and then an amount appears — the
             most common reason for cart abandonment. */}
-        <CartSummary totals={cart.totals} shippingKnown={false}>
+        <CartSummary totals={cart.totals} shippingKnown={false} freeShipping={cart.free_shipping}>
           <Button
             block
             size="lg"

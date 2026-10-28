@@ -38,8 +38,10 @@ from core.models.audit import AuditAction, AuditLog
 #: Fields whose change is a *price* change, not an ordinary edit.
 #:
 #: ⚠️  `Product` only carries the reference price — the price the customer pays
-#:     is computed by `pricing` and never stored here — so this is one field.
-PRICE_FIELDS = frozenset({"base_price"})
+#:     is computed by `pricing` and never stored here — and the "price before discount"
+#:     shown struck through beside it. Both are figures a customer reads as a price, so a
+#:     change to either is a `PRICE_CHANGE`, the action finance filters the log by.
+PRICE_FIELDS = frozenset({"base_price", "compare_at_price"})
 
 #: Not tracked in the diff: bookkeeping that changes on every save (noise) or is
 #: derived. `slug` is read-only and `deleted_at` has its own DELETE/RESTORE entry.

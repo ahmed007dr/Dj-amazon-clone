@@ -170,6 +170,15 @@ class Order(BaseModel):
     coupon_discount = MoneyField(_("خصم الكوبون"), default=0)
     tax_total = MoneyField(_("إجمالي الضريبة"), default=0)
     shipping_total = MoneyField(_("إجمالي الشحن"), default=0)
+    # ⚠️  What the store's free-shipping rule waived (the fee it would have charged
+    #     minus what it charged). Zero both for a paying order and for a method that
+    #     is free anyway (pickup · a zero rate) — that is how reports tell "free
+    #     because the cart reached the threshold" from "free by nature".
+    shipping_discount = MoneyField(
+        _("خصم الشحن"),
+        default=0,
+        help_text=_("قيمة الشحن التي أُسقطت بقاعدة الشحن المجاني — صفر = لم تُطبَّق"),
+    )
     grand_total = MoneyField(_("الإجمالي النهائي"), default=0)
 
     coupon_code = models.CharField(_("كود الكوبون"), max_length=32, blank=True)

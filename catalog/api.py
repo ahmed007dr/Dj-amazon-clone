@@ -78,6 +78,16 @@ class ProductListAPI(PublicCatalogMixin, generics.ListAPIView):
 
     serializer_class = s.ProductListSerializer
 
+    def get_serializer_context(self):
+        # ⚠️  The card's price is computed for **whoever is being evaluated** — the preview
+        #     user in admin preview mode, otherwise the requester — so a student's card shows
+        #     the student price and the "price before discount" is judged against it.
+        user = self.get_access_user()
+        return {
+            **super().get_serializer_context(),
+            "price_user": user if getattr(user, "is_authenticated", False) else None,
+        }
+
     def get_base_queryset(self):
         # ⚠️  `get_base_queryset`, not `get_queryset` —
         #     overriding the latter silently disables policy filtering.

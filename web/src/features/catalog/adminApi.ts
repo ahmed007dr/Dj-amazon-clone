@@ -33,6 +33,8 @@ export interface AdminProduct {
   description_en: string;
   kind: string;
   base_price: string;
+  /** "Price before discount" — `null` = none. Optional on the wire for older payloads. */
+  compare_at_price?: string | null;
 
   /** Ids, not objects — their names are resolved from `useProductFormOptions` */
   category: string | null;

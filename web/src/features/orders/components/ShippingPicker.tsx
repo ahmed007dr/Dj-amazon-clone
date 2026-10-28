@@ -22,24 +22,28 @@ import './OptionList.css';
 export function ShippingPicker({
   governorate,
   subtotal,
+  eligibleAmount,
   value,
   onChange,
 }: {
   governorate: string;
   subtotal: string;
+  /** The cart's `net_sales` — what the owner's free-shipping rule looks at. */
+  eligibleAmount: string;
   value: string | null;
   onChange: (methodCode: string) => void;
 }) {
   const { t, i18n } = useTranslation();
   const localized = useLocalized();
-  const { data: quotes, isPending, error } = useShippingQuotes(governorate, subtotal);
+  const { data, isPending, error } = useShippingQuotes(governorate, subtotal, eligibleAmount);
+  const quotes = data?.quotes ?? [];
 
   if (!governorate) {
     return <p className="muted">{t('checkout.pickAddressFirst')}</p>;
   }
 
   if (isPending) return <Spinner />;
-  if (error) return <StateMessage icon="⚠" title={t('state.errorTitle')} />;
+  if (error || !data) return <StateMessage icon="⚠" title={t('state.errorTitle')} />;
 
   if (quotes.length === 0) {
     // ⚠️  A governorate with no shipping method is a real case (a remote zone with no express)
@@ -66,6 +70,17 @@ export function ShippingPicker({
           <span className="option__label">{localized(quote, 'method_name')}</span>
 
           <span className="option__meta">
+            {/* ⚠️  The fee the owner's free-shipping rule waived stays visible, struck through:
+                the customer sees what they are saving, and the word "Free" is text rather
+                than a colour. The figures are the server's. */}
+            {quote.free_by_threshold ? (
+              <>
+                <s className="option__was">
+                  <span className="visually-hidden">{t('checkout.originalFee')} </span>
+                  {formatMoney(quote.original_fee, i18n.language)}
+                </s>{' '}
+              </>
+            ) : null}
             {Number.parseFloat(quote.fee) === 0
               ? t('checkout.freeShipping')
               : formatMoney(quote.fee, i18n.language)}

@@ -72,6 +72,9 @@ export interface Coupon {
   account_types: string[];
   first_order_only: boolean;
   owner: string | null;
+  /** Who the code was handed to — a label for reading sales against, not a restriction. */
+  holder_name: string;
+  holder_note: string;
   products: string[];
   categories: string[];
   usage_limit: number | null;
@@ -84,6 +87,9 @@ export interface Coupon {
   is_running: boolean;
   is_expired: boolean;
   is_exhausted: boolean;
+  /** Live (non-cancelled) uses in the requested period. Money is a string (ADR-31). */
+  times_used: number;
+  net_sales: string;
 }
 
 const KEY = ['admin', 'pricing'] as const;
@@ -182,7 +188,13 @@ export function useDeleteOverride() {
 // ── Coupons ───────────────────────────────────────────────
 
 export function useCoupons(
-  params: { search?: string; status?: string; page?: number },
+  params: {
+    search?: string;
+    status?: string;
+    page?: number;
+    date_from?: string;
+    date_to?: string;
+  },
   enabled = true,
 ) {
   return useQuery({
@@ -246,4 +258,219 @@ export function useCouponRedemptions(params: {
         params: { ...params },
       }),
   });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Coupon analytics
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * ⚠️  **What counts as a sale** — the server's definition, repeated in the UI help text:
+ *     an order that used the code and is not cancelled, not refunded and not
+ *     payment-failed. Those three are reported apart (`cancelled_orders`,
+ *     `refunded_orders` + `refunded_amount`, `failed_orders`) so the number the
+ *     owner reads is trustworthy.
+ *
+ *     Money is a string (ADR-31) and is only ever displayed here, never added up.
+ */
+export interface CouponSummary {
+  /** Live (non-cancelled) redemptions — the same notion as the coupon's usage counter. */
+  times_used: number;
+  cancelled_redemptions: number;
+  /** Distinct customers with a counted sale. */
+  customers: number;
+  /** Counted sales. */
+  orders: number;
+  /** Products after price-list discounts, BEFORE the coupon (no tax, no shipping). */
+  gross_sales: string;
+  discount_given: string;
+  /** Products after the coupon (no tax, no shipping). */
+  net_sales: string;
+  /** What customers paid, tax and shipping included. */
+  order_total: string;
+  average_order_value: string;
+  first_used_at: string | null;
+  last_used_at: string | null;
+  cancelled_orders: number;
+  refunded_orders: number;
+  refunded_amount: string;
+  failed_orders: number;
+}
+
+export interface CouponRankRow extends CouponSummary {
+  id: string;
+  code: string;
+  name_ar: string;
+  name_en: string;
+  holder_name: string;
+  holder_note: string;
+  kind: Coupon['kind'];
+  value: string;
+  is_active: boolean;
+  is_running: boolean;
+  is_expired: boolean;
+  is_exhausted: boolean;
+  usage_limit: number | null;
+  usage_count: number;
+  remaining_total: number | null;
+}
+
+export interface CouponTotals extends CouponSummary {
+  /** How many different coupons were used at least once in the period. */
+  coupons_used: number;
+}
+
+export interface CouponCounts {
+  coupons: number;
+  running: number;
+  exhausted: number;
+  expired: number;
+  scheduled: number;
+  inactive: number;
+  with_holder: number;
+}
+
+export interface CouponOverview extends PagedResponse<CouponRankRow> {
+  totals: CouponTotals;
+  counts: CouponCounts;
+  period: { date_from: string | null; date_to: string | null };
+}
+
+export interface CouponProductRow {
+  product: string;
+  variant: string | null;
+  sku: string;
+  product_sku: string;
+  name_ar: string;
+  name_en: string;
+  color_name_ar: string;
+  color_name_en: string;
+  color_hex: string;
+  units: number;
+  orders: number;
+  /** Before the coupon. */
+  revenue: string;
+  /** Allocated pro-rata from the order's discount — an attribution, not a stored fact. */
+  discount: string;
+  net_revenue: string;
+}
+
+export interface CouponSeriesPoint {
+  date: string;
+  redemptions: number;
+  orders: number;
+  net_sales: string;
+}
+
+export interface CouponInsights {
+  coupon: {
+    id: string;
+    code: string;
+    name_ar: string;
+    name_en: string;
+    holder_name: string;
+    holder_note: string;
+    kind: Coupon['kind'];
+    value: string;
+    starts_at: string;
+    ends_at: string | null;
+    is_active: boolean;
+    is_running: boolean;
+    is_expired: boolean;
+    is_exhausted: boolean;
+    owner_email: string | null;
+    products_count: number;
+    categories_count: number;
+  };
+  period: { date_from: string | null; date_to: string | null };
+  summary: CouponSummary & {
+    usage_limit: number | null;
+    usage_count: number;
+    usage_limit_per_user: number;
+    /** Null means unlimited — never render it as zero left. */
+    remaining_total: number | null;
+    /** Only for a personal coupon. */
+    owner_remaining: number | null;
+    customers_at_limit: number;
+  };
+  products: CouponProductRow[];
+  series: { granularity: 'day' | 'month'; points: CouponSeriesPoint[] };
+}
+
+export interface CouponOrderRow {
+  id: string;
+  number: string;
+  created_at: string;
+  status: string;
+  payment_status: string;
+  channel: string;
+  /** False for cancelled / refunded / payment-failed orders. */
+  counted: boolean;
+  customer_name: string;
+  /** Masked: `a***@gmail.com`. */
+  contact: string;
+  gross_sales: string;
+  discount: string;
+  net_sales: string;
+  order_total: string;
+}
+
+export interface CouponPeriod {
+  date_from?: string;
+  date_to?: string;
+}
+
+/**
+ * Totals across every coupon, and the coupons ranked by sales.
+ *
+ * ⚠️  The query key sits under `KEY`, so saving a coupon (or creating a batch)
+ *     refreshes the cards and the table together — never one without the other.
+ */
+export function useCouponOverview(
+  params: CouponPeriod & { search?: string; ordering?: string; page?: number; limit?: number },
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: [...KEY, 'coupon-overview', params],
+    queryFn: () =>
+      http.get<CouponOverview>('/promotions/admin/coupons/analytics/', { params: { ...params } }),
+    enabled,
+  });
+}
+
+export function useCouponInsights(id: string | null, period: CouponPeriod) {
+  return useQuery({
+    queryKey: [...KEY, 'coupon-insights', id, period],
+    queryFn: () =>
+      http.get<CouponInsights>(`/promotions/admin/coupons/${id ?? ''}/analytics/`, {
+        params: { ...period },
+      }),
+    enabled: id !== null,
+  });
+}
+
+export function useCouponOrders(
+  id: string | null,
+  params: CouponPeriod & { only?: string; page?: number },
+) {
+  return useQuery({
+    queryKey: [...KEY, 'coupon-orders', id, params],
+    queryFn: () =>
+      http.get<PagedResponse<CouponOrderRow>>(`/promotions/admin/coupons/${id ?? ''}/orders/`, {
+        params: { ...params },
+      }),
+    enabled: id !== null,
+  });
+}
+
+export interface BulkCouponResult {
+  count: number;
+  results: { id: string; holder_name: string; code: string }[];
+}
+
+/** One template, a list of people, one unique random code each — all or none. */
+export function useBulkCreateCoupons() {
+  return usePricingMutation((body: Record<string, unknown>) =>
+    http.post<BulkCouponResult>('/promotions/admin/coupons/bulk/', body),
+  );
 }

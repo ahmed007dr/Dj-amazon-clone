@@ -1,0 +1,439 @@
+/* ═══════════════════════════════════════════════════════════
+   Coupon analytics — stat cards, period filter, insights drawer, daily chart, bulk form.
+
+   ⚠️  Logical properties and design tokens only: the screen is Arabic-first (RTL),
+       and every colour has to survive the dark theme without a second set of rules.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── The period selector ──────────────────────────────────── */
+
+.coupon-period {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.coupon-period__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.coupon-period__field select,
+.coupon-period__field input {
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ── The stat-card row ────────────────────────────────────── */
+
+.coupon-stats {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-end: var(--space-4);
+}
+
+.coupon-stats__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+  gap: var(--space-3);
+}
+
+.coupon-stats__help {
+  max-inline-size: 70ch;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+.coupon-stats__top h3 {
+  margin-block: 0 var(--space-2);
+  font-size: 0.875rem;
+}
+
+.coupon-stats__top ol {
+  display: grid;
+  gap: var(--space-1);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.coupon-stats__top button {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  inline-size: 100%;
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  color: var(--color-text);
+  text-align: start;
+  cursor: pointer;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.coupon-stats__top button:hover {
+  border-color: var(--color-primary);
+}
+
+.coupon-stats__holder {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── The table's code cell ────────────────────────────────── */
+
+.coupon-code-link {
+  padding: 0;
+  font: inherit;
+  color: var(--color-primary);
+  text-align: start;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.coupon-code-link:hover {
+  text-decoration: underline;
+}
+
+.coupon-holder {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* ── The insights drawer ──────────────────────────────────── */
+
+/* ⚠️  The shared Drawer is 20rem wide — right for a form, too narrow for a product
+       table. Widened from here with `:has()` so the shared component stays untouched. */
+.drawer__panel:has(.coupon-insights) {
+  inline-size: min(46rem, 96vw);
+}
+
+.coupon-insights {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5, 1.5rem);
+  padding-block-end: var(--space-6, 2rem);
+}
+
+.coupon-insights__who {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.coupon-insights__who small {
+  color: var(--color-text-muted);
+}
+
+.coupon-insights section > h3 {
+  margin-block: 0 var(--space-2);
+  font-size: 1rem;
+}
+
+.coupon-insights__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-2);
+}
+
+.coupon-insights__facts {
+  display: grid;
+  gap: var(--space-1);
+  padding: 0;
+  margin: 0;
+  font-size: 0.875rem;
+  list-style: none;
+}
+
+.coupon-insights__facts li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: space-between;
+  padding-block: var(--space-1);
+  border-block-end: 1px dashed var(--color-border);
+}
+
+.coupon-insights__facts span:first-child {
+  color: var(--color-text-muted);
+}
+
+.coupon-insights__note {
+  margin: 0 0 var(--space-2);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+.coupon-insights__swatch {
+  display: inline-block;
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  margin-inline-end: var(--space-1);
+  vertical-align: middle;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+}
+
+.coupon-insights__orders-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: var(--space-2);
+}
+
+.coupon-insights__orders-head h3 {
+  margin: 0;
+}
+
+.coupon-insights__muted-row {
+  opacity: 0.65;
+}
+
+/* ── The daily chart ──────────────────────────────────────── */
+
+.coupon-chart__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: var(--space-2);
+}
+
+.coupon-chart__head h3 {
+  margin: 0;
+}
+
+.coupon-chart__metrics {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.coupon-chart__metrics button {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.coupon-chart__metrics button + button {
+  border-inline-start: 1px solid var(--color-border);
+}
+
+.coupon-chart__metrics button[aria-pressed='true'] {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
+
+/* ⚠️  `dir="ltr"` on the plot: time runs left to right whatever the language, the way
+       the dates and numerals in the labels do — a chart mirrored in Arabic puts "last
+       week" on the left of "today" while the axis labels say the opposite. */
+.coupon-chart__plot {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  block-size: 8rem;
+  padding-block-end: 1px;
+  border-block-end: 1px solid var(--color-border);
+  background-image: linear-gradient(
+    to bottom,
+    transparent calc(50% - 1px),
+    var(--color-border) calc(50% - 1px),
+    var(--color-border) 50%,
+    transparent 50%
+  );
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  opacity: 1;
+}
+
+.coupon-chart__plot:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.coupon-chart__bar {
+  flex: 1 1 0;
+  min-inline-size: 2px;
+  max-inline-size: 1.75rem;
+  background: var(--color-primary);
+  border-start-start-radius: 4px;
+  border-start-end-radius: 4px;
+  opacity: 0.7;
+}
+
+.coupon-chart__bar.is-empty {
+  opacity: 0.25;
+}
+
+.coupon-chart__bar.is-active {
+  opacity: 1;
+  outline: 2px solid var(--color-surface);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 35%, transparent);
+}
+
+.coupon-chart__axis {
+  display: flex;
+  justify-content: space-between;
+  margin-block-start: var(--space-1);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.coupon-chart__readout {
+  min-block-size: 1.5rem;
+  margin: var(--space-1) 0 0;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.coupon-chart__table summary {
+  min-block-size: var(--touch-target);
+  padding-block: var(--space-2);
+  font-size: 0.8125rem;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.coupon-chart__table-wrap {
+  max-block-size: 14rem;
+  overflow: auto;
+}
+
+.coupon-chart__table table {
+  inline-size: 100%;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  border-collapse: collapse;
+}
+
+.coupon-chart__table th,
+.coupon-chart__table td {
+  padding: var(--space-1) var(--space-2);
+  text-align: start;
+  border-block-end: 1px solid var(--color-border);
+}
+
+/* ── The bulk form ────────────────────────────────────────── */
+
+.coupon-bulk {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.coupon-bulk__names {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.coupon-bulk__names textarea {
+  min-block-size: 9rem;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-weight: 400;
+  color: var(--color-text);
+  resize: vertical;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.coupon-bulk__names small {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.coupon-bulk__error {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-danger);
+}
+
+.coupon-bulk__result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.coupon-bulk__table-wrap {
+  max-block-size: 22rem;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.coupon-bulk__result table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+
+.coupon-bulk__result th,
+.coupon-bulk__result td {
+  padding: var(--space-2) var(--space-3);
+  text-align: start;
+  border-block-end: 1px solid var(--color-border);
+}
+
+.coupon-bulk__result code {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  user-select: all;
+}
+
+/* ── The holder note on the coupon form ──────────────────── */
+
+.coupon-textarea {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.coupon-textarea textarea {
+  min-block-size: 4.5rem;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-weight: 400;
+  color: var(--color-text);
+  resize: vertical;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.coupon-textarea small {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}

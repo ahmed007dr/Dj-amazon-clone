@@ -12,6 +12,7 @@ class CouponAdmin(DomainModelAdmin):
     list_display = (
         "code",
         "name_ar",
+        "holder_name",
         "kind",
         "value",
         "usage_count",
@@ -21,7 +22,7 @@ class CouponAdmin(DomainModelAdmin):
         "is_active",
     )
     list_filter = ("kind", "is_active", "first_order_only", "starts_at", DeletedListFilter)
-    search_fields = ("code", "name_ar", "name_en")
+    search_fields = ("code", "name_ar", "name_en", "holder_name")
     filter_horizontal = ("products", "categories")
     date_hierarchy = "starts_at"
 
@@ -31,6 +32,7 @@ class CouponAdmin(DomainModelAdmin):
 
     fieldsets = (
         (None, {"fields": ("id", "code", "name_ar", "name_en", "is_active")}),
+        (_("حامل الكود"), {"fields": ("holder_name", "holder_note")}),
         (_("الوصف"), {"fields": ("description_ar", "description_en")}),
         (_("قيمة الخصم"), {"fields": ("kind", "value", "max_discount_amount")}),
         (

@@ -10,7 +10,7 @@ import type {
   OrderDetail,
   OrderListItem,
   PaymentMethodOption,
-  ShippingQuote,
+  ShippingQuotes,
 } from './types';
 
 interface CursorPage<T> {
@@ -30,8 +30,15 @@ export const checkout = (payload: CheckoutPayload) =>
 export const cancelOrder = (id: string, reason: string) =>
   http.post<OrderDetail>(`/orders/${id}/cancel/`, { reason });
 
-export const getShippingQuotes = (governorate: string, subtotal: string) =>
-  http.get<ShippingQuote[]>('/shipping/quote/', { params: { governorate, subtotal } });
+/**
+ * ⚠️  `eligibleAmount` is the cart's `net_sales` (after discounts and coupon, before tax and
+ *     shipping) — what the free-shipping rule looks at. It only decides what this list
+ *     *shows*; the order is priced again from the cart on the server.
+ */
+export const getShippingQuotes = (governorate: string, subtotal: string, eligibleAmount: string) =>
+  http.get<ShippingQuotes>('/shipping/quote/', {
+    params: { governorate, subtotal, eligible_amount: eligibleAmount },
+  });
 
 // ── Guest checkout ─────────────────────────────────────────
 // ⚠️  The cart is the one named by the `X-Cart-Session` header the HTTP client

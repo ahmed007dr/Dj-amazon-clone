@@ -35,6 +35,35 @@ class ShippingQuoteSerializer(serializers.Serializer):
     estimated_days_min = serializers.IntegerField(read_only=True)
     estimated_days_max = serializers.IntegerField(read_only=True)
     is_pickup = serializers.BooleanField(read_only=True)
+    #: The fee without the store-wide free-shipping rule (the struck-through price)
+    original_fee = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True, coerce_to_string=True
+    )
+    #: True only when the threshold rule — not the rate itself — made `fee` zero
+    free_by_threshold = serializers.BooleanField(read_only=True)
+
+
+class FreeShippingStatusSerializer(serializers.Serializer):
+    """
+    Where a cart stands against the owner's free-shipping rule.
+
+    ⚠️  One shape on the cart and on the quote, so the storefront never subtracts
+        the cart from the threshold itself. `enabled=false` means draw nothing.
+    """
+
+    enabled = serializers.BooleanField(read_only=True)
+    threshold = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True, coerce_to_string=True
+    )
+    qualifies = serializers.BooleanField(read_only=True)
+    remaining = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True, coerce_to_string=True
+    )
+
+
+class ShippingQuoteResponseSerializer(serializers.Serializer):
+    quotes = ShippingQuoteSerializer(many=True, read_only=True)
+    free_shipping = FreeShippingStatusSerializer(read_only=True)
 
 
 class ShippingMethodSerializer(serializers.ModelSerializer):
@@ -251,6 +280,7 @@ class AdminShippingMethodSerializer(serializers.ModelSerializer):
             "estimated_days_min",
             "estimated_days_max",
             "is_pickup",
+            "eligible_for_free_shipping",
             "display_order",
             "is_active",
         ]
@@ -335,3 +365,33 @@ class AdminShippingRateSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+
+class AdminFreeShippingSerializer(serializers.Serializer):
+    """
+    The owner's free-shipping switch and amount (EGP).
+
+    ⚠️  Partial updates merge with what is stored, and the amount is validated
+        against the **resulting** state, not the request alone.
+
+        Turning the switch on without sending an amount must still be refused
+        when the stored amount is empty — otherwise "on, free above 0" reaches
+        the database and reads as free shipping on every order (the checkout also
+        ignores such a rule, but a row nobody can read as wrong is the thing to prevent).
+    """
+
+    enabled = serializers.BooleanField()
+    threshold = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=0, coerce_to_string=True
+    )
+
+    def validate(self, attrs):
+        current = self.context.get("current")
+        enabled = attrs.get("enabled", current.enabled if current else False)
+        threshold = attrs.get("threshold", current.threshold if current else 0)
+
+        if enabled and threshold <= 0:
+            raise serializers.ValidationError(
+                {"threshold": "حدّد مبلغًا أكبر من صفر لتفعيل الشحن المجاني"}
+            )
+        return {"enabled": enabled, "threshold": threshold}

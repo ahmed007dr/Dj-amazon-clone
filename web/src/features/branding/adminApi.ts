@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { http } from '@/shared/http';
+import type { ChannelKind } from '@/shared/theme/types';
+
+export type { ChannelKind };
 
 export interface ContrastEntry {
   key: string;
@@ -230,5 +233,121 @@ export function useUpdatePalette() {
       paletteId: string;
       body: Partial<AdminPalette>;
     }) => updatePalette(profileId, paletteId, body),
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Contact channels
+// ═══════════════════════════════════════════════════════════
+
+/** What the admin edits — everything else on a channel is computed by the server. */
+export interface ChannelDraft {
+  kind: ChannelKind;
+  value: string;
+  label_ar: string;
+  label_en: string;
+  /** WhatsApp only — the text already typed in the customer's chat box. */
+  message_ar: string;
+  message_en: string;
+  is_active: boolean;
+  /** WhatsApp only; turning it on turns it off on the profile's other channels. */
+  show_floating_button: boolean;
+}
+
+export interface AdminContactChannel extends ChannelDraft {
+  id: string;
+  display_order: number;
+  /**
+   * ⚠️  Computed on every read, never stored: the formatted value, the finished link, and
+   * the label that applies when the admin left theirs empty.
+   */
+  display: string;
+  href: string;
+  href_en: string;
+  label: { ar: string; en: string };
+}
+
+export interface ChannelPreview {
+  /** The canonical form that would be stored. */
+  value: string;
+  display: string;
+  href: string;
+  href_en: string;
+  /** The name shown when the label is left empty — the form's placeholder. */
+  default_label: { ar: string; en: string };
+}
+
+const channelsUrl = (profileId: string) => `/branding/admin/profiles/${profileId}/contact-channels/`;
+
+export const listChannels = (profileId: string) =>
+  http.get<AdminContactChannel[]>(channelsUrl(profileId));
+
+/**
+ * What a value would turn into, **without saving it** — the form's live preview.
+ *
+ * ⚠️  The parsing rules live on the server only. A copy here would drift the first time a
+ * rule changed, and the admin would preview a link the server then refuses.
+ */
+export const previewChannel = (body: Pick<ChannelDraft, 'kind' | 'value' | 'message_ar' | 'message_en'>) =>
+  http.post<ChannelPreview>('/branding/admin/contact-channels/preview/', body);
+
+export const CHANNELS_KEY = ['admin', 'branding-channels'] as const;
+
+export function useContactChannelList(profileId: string) {
+  return useQuery({
+    queryKey: [...CHANNELS_KEY, profileId],
+    queryFn: () => listChannels(profileId),
+  });
+}
+
+/**
+ * ⚠️  Channels are part of the **public theme payload** (cached for 12 hours on the
+ * server), so every write refetches the list and the theme together — the admin sees
+ * the footer change in the same session, like every other branding edit.
+ */
+function useChannelMutation<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: run,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: CHANNELS_KEY });
+      void queryClient.invalidateQueries({ queryKey: ['branding', 'theme'] });
+    },
+  });
+}
+
+export function useCreateChannel(profileId: string) {
+  return useChannelMutation((body: ChannelDraft) =>
+    http.post<AdminContactChannel>(channelsUrl(profileId), body),
+  );
+}
+
+export function useUpdateChannel(profileId: string) {
+  return useChannelMutation(({ id, body }: { id: string; body: Partial<ChannelDraft> }) =>
+    http.patch<AdminContactChannel>(`${channelsUrl(profileId)}${id}/`, body),
+  );
+}
+
+export function useDeleteChannel(profileId: string) {
+  return useChannelMutation((id: string) => http.delete<void>(`${channelsUrl(profileId)}${id}/`));
+}
+
+/**
+ * Show or hide a channel.
+ *
+ * ⚠️  Sends the wanted state, not "flip": a flip from a stale list would undo somebody
+ * else's click made a moment earlier.
+ */
+export function useToggleChannel(profileId: string) {
+  return useChannelMutation(({ id, is_active }: { id: string; is_active: boolean }) =>
+    http.post<AdminContactChannel>(`${channelsUrl(profileId)}${id}/toggle/`, { is_active }),
+  );
+}
+
+/** The **whole** order, first to last — the server refuses a partial or foreign list. */
+export function useReorderChannels(profileId: string) {
+  return useChannelMutation((ids: string[]) =>
+    http.post<AdminContactChannel[]>(`${channelsUrl(profileId)}reorder/`, { ids }),
   );
 }

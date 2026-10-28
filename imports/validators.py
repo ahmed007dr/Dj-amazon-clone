@@ -370,6 +370,7 @@ def validate_products(
     mode: str,
     existing_skus: dict[str, object],
     duplicate_skus: set[str],
+    existing_prices: dict[str, Decimal] | None = None,
 ) -> SheetResult:
     """
     ⚠️  Both lookups are passed in, never queried here.
@@ -516,6 +517,37 @@ def validate_products(
                 )
             )
         values["base_price"] = price if price is not None else Decimal("0.00")
+
+        # ── "Price before discount" — the same rule the admin form enforces ──
+        #
+        # ⚠️  Judged against the price **the product will have after this row**: the row's own
+        #     `base_price` when it carries one, otherwise — an update that only touches the
+        #     compare-at column — the stored one. Comparing with the `0.00` create-default would
+        #     accept any figure, and an update that omits the price would never be checked.
+        compare_at = row.get("compare_at_price")
+        values["compare_at_price"] = None if compare_at is None else Decimal(str(compare_at))
+        if compare_at is not None:
+            reference = price
+            if reference is None and action == "UPDATE":
+                reference = (existing_prices or {}).get(sku)
+            if reference is None:
+                reference = Decimal("0.00")
+
+            if Decimal(str(compare_at)) < 0:
+                problems = {"compare_at_price": "السعر قبل الخصم لا يكون سالبًا"}
+            else:
+                problems = rules.compare_at_errors(compare_at=compare_at, price=reference)
+            for message in problems.values():
+                errors.append(
+                    RowError(
+                        sheet=sheet,
+                        row_number=row.number,
+                        column=columns["compare_at_price"].header,
+                        value=str(compare_at),
+                        message=message,
+                        identifier=sku,
+                    )
+                )
 
         weight = row.get("weight_grams")
         if weight is not None and int(weight) < 0:

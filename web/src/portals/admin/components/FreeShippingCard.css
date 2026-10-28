@@ -1,0 +1,46 @@
+.free-card {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  margin-block-end: var(--space-4);
+}
+
+.free-card__header {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.free-card__title {
+  font-size: 1.0625rem;
+  font-weight: 700;
+}
+
+.free-card__body {
+  display: grid;
+  gap: var(--space-3);
+  max-inline-size: 36rem;
+}
+
+.free-card__preview {
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+}
+
+/* Live: the sentence the customer will read — stronger once it is real */
+.free-card__preview.is-on {
+  border-style: solid;
+  border-color: var(--color-success);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.free-card__note {
+  font-size: 0.8125rem;
+}
+
+.free-card__actions {
+  display: flex;
+  gap: var(--space-2);
+}

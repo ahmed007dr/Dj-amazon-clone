@@ -62,11 +62,9 @@
   font-size: 0.8125rem;
 }
 
+/* The look of the unit price belongs to `PriceTag` (shared/ui) */
 .cart-line__unit {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  font-size: 0.875rem;
+  min-inline-size: 0;
 }
 
 .cart-line__controls {

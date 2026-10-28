@@ -21,6 +21,14 @@
   font-size: 0.75rem;
 }
 
+/* The price with a compact "on sale" badge beneath it — no extra column */
+.admin-products__price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+}
+
 .admin-products__soft-note {
   margin-block-start: var(--space-2);
   font-size: 0.875rem;

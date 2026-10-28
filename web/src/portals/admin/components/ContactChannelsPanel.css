@@ -1,0 +1,337 @@
+.channels {
+  display: grid;
+  gap: var(--space-4);
+  max-inline-size: 60rem;
+}
+
+.channels__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.channels__intro {
+  flex: 1 1 18rem;
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.channels__empty {
+  padding: var(--space-6);
+  margin: 0;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.channels__list {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+/* ── What the identity tab already shows ───────────────── */
+.channel-legacy {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.channel-legacy__title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.channel-legacy__hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.channel-legacy__list {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 0;
+}
+
+.channel-legacy__list > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.channel-legacy__list dt {
+  min-inline-size: 7rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.channel-legacy__list dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+}
+
+.channel-legacy__chip {
+  padding: 0.125rem var(--space-2);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ── One channel ──────────────────────────────────────── */
+.channel-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'icon main switch'
+    'actions actions actions';
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  transition: opacity var(--transition);
+}
+
+/* A hidden channel stays readable — it is dimmed, not struck out */
+.channel-row.is-off .channel-row__icon,
+.channel-row.is-off .channel-row__main {
+  opacity: 0.55;
+}
+
+.channel-row__icon {
+  grid-area: icon;
+  display: grid;
+  place-items: center;
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+  color: var(--color-primary);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+}
+
+.channel-row__main {
+  grid-area: main;
+  display: grid;
+  gap: 0.125rem;
+  min-inline-size: 0;
+}
+
+.channel-row__label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+  font-weight: 700;
+}
+
+.channel-row__kind {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.channel-row__value {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+
+.channel-row__switch {
+  grid-area: switch;
+}
+
+.channel-row__actions {
+  grid-area: actions;
+  display: flex;
+  gap: var(--space-1);
+  justify-content: flex-end;
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.channel-row__btn {
+  display: grid;
+  place-items: center;
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    background-color var(--transition),
+    border-color var(--transition),
+    color var(--transition);
+}
+
+.channel-row__btn:hover:not(:disabled) {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+}
+
+.channel-row__btn:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.channel-row__btn--danger:hover:not(:disabled) {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+/* Wide enough: the actions sit on the same line instead of under the row */
+@media (min-width: 40rem) {
+  .channel-row {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: 'icon main switch actions';
+  }
+
+  .channel-row__actions {
+    padding-block-start: 0;
+    border-block-start: 0;
+  }
+}
+
+/* ── The add / edit form ──────────────────────────────── */
+.channel-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.channel-form__row {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (min-width: 34rem) {
+  .channel-form__row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.channel-form__select {
+  display: grid;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.channel-form__select-box {
+  position: relative;
+  display: block;
+}
+
+.channel-form__select-icon {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: var(--space-3);
+  display: grid;
+  place-items: center;
+  color: var(--color-primary);
+  pointer-events: none;
+}
+
+.channel-form__select select {
+  inline-size: 100%;
+  min-block-size: var(--touch-target);
+  padding-block: var(--space-2);
+  /* Room for the icon at the start edge, whichever side that is */
+  padding-inline: calc(var(--space-3) + 1.75rem) var(--space-3);
+  font: inherit;
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.channel-form__select select:focus {
+  border-color: var(--color-primary);
+}
+
+.channel-form__error {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-danger);
+}
+
+.channel-form__note {
+  margin: calc(var(--space-2) * -1) 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* ── Link preview ─────────────────────────────────────── */
+.channel-preview {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.channel-preview__title {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.channel-preview__muted,
+.channel-preview__error {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.channel-preview__muted {
+  color: var(--color-text-muted);
+}
+
+.channel-preview__error {
+  font-weight: 600;
+  color: var(--color-danger);
+}
+
+.channel-preview__list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.channel-preview__list dt {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.channel-preview__list dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Read-only text, selectable in one click so it can be copied and tried */
+.channel-preview__link {
+  display: block;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+  user-select: all;
+  text-align: start;
+}

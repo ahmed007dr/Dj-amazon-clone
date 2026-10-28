@@ -17,6 +17,7 @@ Catalogue rules that hold no matter who is asking.
 
 from __future__ import annotations
 
+from catalog.compare_at import compare_at_error
 from catalog.models import ProductKind, RegulatoryClass
 
 
@@ -47,3 +48,15 @@ def regulatory_errors(
         errors["regulatory_class"] = "الدواء يجب أن يحمل تصنيفًا تنظيميًا"
 
     return errors
+
+
+def compare_at_errors(*, compare_at, price) -> dict[str, str]:
+    """
+    `{"compare_at_price": message}` when the "price before discount" is not above `price`.
+
+    `price` is the figure it is compared with — the product's `base_price`, or for a
+    colour its own effective price. The importer and both admin serializers call this
+    one function, so a sheet cannot carry what the form would refuse.
+    """
+    message = compare_at_error(compare_at, price)
+    return {"compare_at_price": message} if message else {}

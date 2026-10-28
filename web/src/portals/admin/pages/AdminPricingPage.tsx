@@ -15,8 +15,20 @@ import {
   type PriceOverride,
   type PriceRule,
 } from '@/features/pricing/api';
+import { downloadExport } from '@/features/exports/adminApi';
+import { CouponBulkForm } from '@/portals/admin/components/CouponBulkForm';
 import { CouponForm } from '@/portals/admin/components/CouponForm';
+import {
+  CouponInsightsDrawer,
+  type InsightsTarget,
+} from '@/portals/admin/components/CouponInsightsDrawer';
 import { CouponRedemptionsDrawer } from '@/portals/admin/components/CouponRedemptionsDrawer';
+import { CouponPeriodFilter, CouponStatsBar } from '@/portals/admin/components/CouponStatsBar';
+import {
+  ALL_TIME,
+  periodParams,
+  type PeriodState,
+} from '@/portals/admin/components/couponPeriod';
 import { PriceListForm } from '@/portals/admin/components/PriceListForm';
 import { PriceRuleForm } from '@/portals/admin/components/PriceRuleForm';
 import { useDebounced } from '@/shared/hooks/useDebounced';
@@ -65,6 +77,13 @@ export function AdminPricingPage() {
   const [usageOf, setUsageOf] = useState<Coupon | null>(null);
   const [creating, setCreating] = useState(false);
 
+  // Coupon analytics: one period for the cards, the table, the drawer and the export
+  const [period, setPeriod] = useState<PeriodState>(ALL_TIME);
+  const [insightsOf, setInsightsOf] = useState<InsightsTarget | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const periodQuery = periodParams(period);
+
   const debouncedSearch = useDebounced(search);
 
   const lists = usePriceLists();
@@ -78,6 +97,7 @@ export function AdminPricingPage() {
     {
       ...(debouncedSearch ? { search: debouncedSearch } : {}),
       ...(couponStatus ? { status: couponStatus } : {}),
+      ...periodQuery,
       page,
     },
     tab === 'coupons',
@@ -90,6 +110,25 @@ export function AdminPricingPage() {
 
   const fail = (error: unknown) =>
     notify(isApiError(error) ? error.displayMessage : t('state.errorTitle'), 'danger');
+
+  // ⚠️  Through the export system's own download flow (bearer token, audit entry,
+  //     row ceiling) with the same period and search the screen is showing — a file
+  //     that disagrees with the table in front of the owner is worse than no file.
+  const exportCoupons = async () => {
+    setExporting(true);
+    try {
+      await downloadExport('coupons', {
+        start: periodQuery.date_from ?? '',
+        end: periodQuery.date_to ?? '',
+        search: debouncedSearch,
+      });
+      notify(t('pricing.insights.exported'), 'success');
+    } catch (error) {
+      fail(error);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const closeDrawer = () => {
     setCreating(false);
@@ -289,7 +328,21 @@ export function AdminPricingPage() {
       header: t('pricing.couponCode'),
       render: (row) => (
         <span>
-          <code style={{ direction: 'ltr' }}>{row.code}</code> — {row.name_ar}
+          {/* ⚠️  The code opens the insights: it is the cell the eye lands on, and a
+              row-wide click would fight the edit and delete buttons beside it. */}
+          <button
+            type="button"
+            className="coupon-code-link"
+            onClick={() => setInsightsOf({ id: row.id, code: row.code })}
+          >
+            <code style={{ direction: 'ltr' }}>{row.code}</code>
+          </button>{' '}
+          — {row.name_ar}
+          {row.holder_name ? (
+            <small className="coupon-holder">
+              {t('pricing.holder')}: {row.holder_name}
+            </small>
+          ) : null}
         </span>
       ),
     },
@@ -311,6 +364,22 @@ export function AdminPricingPage() {
       secondary: true,
       render: (row) =>
         row.usage_limit ? `${row.usage_count} / ${row.usage_limit}` : row.usage_count,
+    },
+    {
+      key: 'timesUsed',
+      header: t('pricing.timesUsed'),
+      align: 'end',
+      secondary: true,
+      render: (row) => row.times_used,
+    },
+    {
+      key: 'netSales',
+      header: t('pricing.netSales'),
+      align: 'end',
+      // ⚠️  Zero is a dash, not "0.00": an unused code and a code that sold nothing
+      //     both read as "no sales yet", and a column of zeros looks like a bug.
+      render: (row) =>
+        row.times_used > 0 ? formatMoney(row.net_sales, i18n.language) : '—',
     },
     {
       key: 'status',
@@ -337,6 +406,14 @@ export function AdminPricingPage() {
         <span className="pricing-actions">
           <Button size="sm" variant="ghost" onClick={() => setEditingCoupon(row)}>
             {t('common.edit')}
+          </Button>
+
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setInsightsOf({ id: row.id, code: row.code })}
+          >
+            {t('pricing.insights.open')}
           </Button>
 
           {/* ⚠️  "Usage" appears for used ones alone: a coupon with zero redemptions
@@ -375,7 +452,27 @@ export function AdminPricingPage() {
       <PageHeader
         title={t('nav.pricing')}
         description={t('pricing.hint')}
-        actions={<Button onClick={() => setCreating(true)}>{t(`pricing.new_${tab}`)}</Button>}
+        actions={
+          <>
+            {tab === 'coupons' ? (
+              <>
+                <Button
+                  variant="secondary"
+                  loading={exporting}
+                  onClick={() => {
+                    void exportCoupons();
+                  }}
+                >
+                  {t('pricing.insights.export')}
+                </Button>
+                <Button variant="secondary" onClick={() => setBulkOpen(true)}>
+                  {t('pricing.insights.bulkOpen')}
+                </Button>
+              </>
+            ) : null}
+            <Button onClick={() => setCreating(true)}>{t(`pricing.new_${tab}`)}</Button>
+          </>
+        }
       />
 
       <StatusTabs
@@ -469,6 +566,15 @@ export function AdminPricingPage() {
       {/* ── Coupons ───────────────────────────────── */}
       {tab === 'coupons' ? (
         <>
+          <CouponPeriodFilter
+            value={period}
+            onChange={(next) => {
+              setPeriod(next);
+              setPage(1);
+            }}
+          />
+          <CouponStatsBar period={period} params={periodQuery} onOpen={setInsightsOf} />
+
           <FilterBar
             hasFilters={Boolean(search || couponStatus)}
             onClear={() => {
@@ -550,6 +656,20 @@ export function AdminPricingPage() {
           />
         ) : null}
       </Drawer>
+
+      <Drawer
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        title={t('pricing.insights.bulkTitle')}
+      >
+        {bulkOpen ? <CouponBulkForm onDone={() => setBulkOpen(false)} /> : null}
+      </Drawer>
+
+      <CouponInsightsDrawer
+        target={insightsOf}
+        period={periodQuery}
+        onClose={() => setInsightsOf(null)}
+      />
 
       <CouponRedemptionsDrawer coupon={usageOf} onClose={() => setUsageOf(null)} />
     </>

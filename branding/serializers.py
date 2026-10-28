@@ -2,9 +2,11 @@
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+from rest_framework.exceptions import ErrorDetail
 
+from branding import channels
 from branding.contrast import audit_palette
-from branding.models import BrandProfile, ThemePalette
+from branding.models import BrandProfile, ChannelKind, ContactChannel, ThemePalette
 from core.files import ALLOWED_IMAGE_TYPES, validate_upload
 
 
@@ -244,3 +246,125 @@ class PublicThemeSerializer(serializers.Serializer):
     palettes = serializers.DictField(read_only=True)
     contact = serializers.DictField(read_only=True)
     social = serializers.DictField(read_only=True)
+    contact_channels = serializers.ListField(child=serializers.DictField(), read_only=True)
+
+
+def _channel_errors(error: channels.ChannelValidationError) -> serializers.ValidationError:
+    """`ChannelValidationError` → DRF field errors, keeping each error's stable `code`."""
+    return serializers.ValidationError(
+        {field: [ErrorDetail(err.message, code=err.code)] for field, err in error.errors.items()}
+    )
+
+
+class ContactChannelSerializer(serializers.ModelSerializer):
+    """
+    The admin's view of a channel: the editable fields plus what they resolve to.
+
+    ⚠️  `display` / `href` / `label` are **recomputed on every read**, never stored —
+        a stored link goes stale the first time the rules change.
+    """
+
+    display = serializers.SerializerMethodField()
+    href = serializers.SerializerMethodField()
+    href_en = serializers.SerializerMethodField()
+    label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ContactChannel
+        fields = [
+            "id",
+            "kind",
+            "value",
+            "label_ar",
+            "label_en",
+            "message_ar",
+            "message_en",
+            "display_order",
+            "is_active",
+            "show_floating_button",
+            "display",
+            "href",
+            "href_en",
+            "label",
+        ]
+        read_only_fields = ["id"]
+        extra_kwargs = {
+            # ⚠️  Length and emptiness of `value` are `branding.channels`'s to judge, so the
+            #     refusal carries a stable code and a bilingual message like every other one.
+            "value": {"allow_blank": True, "max_length": 2000},
+            # A new channel goes to the end unless told otherwise — see `create()`
+            "display_order": {"required": False},
+        }
+
+    def _described(self, obj) -> dict:
+        try:
+            return obj.describe()
+        except channels.ChannelError:
+            # A row that predates a stricter rule shows as unreadable instead of 500-ing the list
+            return {"display": "", "href": "", "href_en": ""}
+
+    def get_display(self, obj) -> str:
+        return self._described(obj)["display"]
+
+    def get_href(self, obj) -> str:
+        return self._described(obj)["href"]
+
+    def get_href_en(self, obj) -> str:
+        return self._described(obj)["href_en"]
+
+    def get_label(self, obj) -> dict:
+        return obj.label
+
+    def validate(self, attrs):
+        """
+        ⚠️  The rules depend on `kind` *and* `value` together, so they run on the
+            merged state — a PATCH that changes only the kind re-checks the old value
+            against the new kind instead of saving a Telegram row holding a phone number.
+        """
+        instance = self.instance
+        defaults = {
+            "kind": "",
+            "value": "",
+            "label_ar": "",
+            "label_en": "",
+            "message_ar": "",
+            "message_en": "",
+            "show_floating_button": False,
+        }
+        merged = {
+            field: attrs.get(field, getattr(instance, field, default))
+            for field, default in defaults.items()
+        }
+        try:
+            cleaned = channels.clean_channel(**merged)
+        except channels.ChannelValidationError as error:
+            raise _channel_errors(error) from error
+
+        # The canonical values replace what was typed, so the response (and the row)
+        # carry `201012345678`, not `010 1234 5678`
+        return {**attrs, **cleaned}
+
+    def create(self, validated_data):
+        profile = self.context["profile"]
+        if "display_order" not in validated_data:
+            last = (
+                ContactChannel.objects.filter(profile=profile)
+                .order_by("-display_order")
+                .values_list("display_order", flat=True)
+                .first()
+            )
+            validated_data["display_order"] = 0 if last is None else last + 1
+        return ContactChannel.objects.create(profile=profile, **validated_data)
+
+
+class ChannelPreviewSerializer(serializers.Serializer):
+    """What the "add channel" form sends on every pause in typing — nothing is saved."""
+
+    kind = serializers.ChoiceField(choices=ChannelKind.choices)
+    value = serializers.CharField(allow_blank=True, required=False, default="", max_length=2000)
+    message_ar = serializers.CharField(allow_blank=True, required=False, default="")
+    message_en = serializers.CharField(allow_blank=True, required=False, default="")
+
+
+class ChannelReorderSerializer(serializers.Serializer):
+    ids = serializers.ListField(child=serializers.UUIDField(), allow_empty=False)

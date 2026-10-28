@@ -9,9 +9,14 @@ The public interface of `branding`.
     a month.
 """
 
+import logging
+
 from django.core.cache import cache
 
-from branding.models import BrandProfile, DefaultMode, ThemeMode
+from branding import channels
+from branding.models import BrandProfile, ContactChannel, DefaultMode, ThemeMode
+
+logger = logging.getLogger(__name__)
 
 CACHE_KEY = "branding:active"
 CACHE_TIMEOUT = 60 * 60 * 12
@@ -48,6 +53,45 @@ def theme_payload() -> dict:
 
 def _asset(field) -> str:
     return field.url if field else ""
+
+
+def public_channels(profile: BrandProfile) -> list[dict]:
+    """
+    The **active** contact channels, in display order, as the storefront paints them.
+
+    ⚠️  Only what gets painted: the kind · the resolved label · the display text · the
+        link(s) · the order · whether it earns the floating button. No id, no
+        `is_active`, no raw message fields — the prefilled text reaches the public only
+        inside the WhatsApp link, where it is visible to the customer anyway.
+
+    ⚠️  A row that fails to parse is **skipped, not raised**. This runs on every cache
+        miss for every visitor; one corrupt row (a hand-edited database, a rule that
+        tightened after the row was written) must cost a log line, not the whole site.
+    """
+    rows = ContactChannel.objects.filter(profile=profile, is_active=True).order_by(
+        "display_order", "created_at"
+    )
+
+    entries = []
+    for channel in rows:
+        try:
+            described = channel.describe()
+        except channels.ChannelError:
+            logger.warning("Skipping unreadable contact channel %s", channel.pk)
+            continue
+
+        entries.append(
+            {
+                "kind": channel.kind,
+                "label": channel.label,
+                "value": described["display"],
+                "href": described["href"],
+                "href_en": described["href_en"],
+                "order": channel.display_order,
+                "floating": channel.kind == "WHATSAPP" and channel.show_floating_button,
+            }
+        )
+    return entries
 
 
 def _serialize(profile: BrandProfile) -> dict:
@@ -99,6 +143,8 @@ def _serialize(profile: BrandProfile) -> dict:
             "youtube": profile.youtube,
             "tiktok": profile.tiktok,
         },
+        # ⚠️  Additional to `contact` / `social` above, which keep rendering as they always did
+        "contact_channels": public_channels(profile),
     }
 
 
@@ -194,6 +240,7 @@ def _fallback() -> dict:
             "youtube": "",
             "tiktok": "",
         },
+        "contact_channels": [],
     }
 
 

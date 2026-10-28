@@ -35,10 +35,9 @@
   justify-self: start;
 }
 
+/* Size, weight and colour belong to `PriceTag` (shared/ui) */
 .product-page__price {
-  font-size: clamp(1.375rem, 4vw, 1.875rem);
-  font-weight: 700;
-  color: var(--color-primary);
+  margin-block: var(--space-1);
 }
 
 .product-page__summary {
@@ -89,9 +88,3 @@
   }
 }
 
-/* "From 100.00" — the lowest swatch price before a colour is chosen */
-.product-page__price-from {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
-}

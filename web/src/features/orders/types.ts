@@ -123,6 +123,24 @@ export interface ShippingQuote {
   method_name_ar: string;
   method_name_en: string;
   fee: string;
+  /** The fee before the owner's free-shipping rule — what gets struck through when `free_by_threshold` */
+  original_fee: string;
+  /** True only when the free-shipping threshold (not the rate itself) made `fee` zero */
+  free_by_threshold: boolean;
+}
+
+/**
+ * `GET /shipping/quote/` — the options plus where the cart stands against the owner's
+ * free-shipping rule (the same shape the cart payload carries as `free_shipping`).
+ */
+export interface ShippingQuotes {
+  quotes: ShippingQuote[];
+  free_shipping: {
+    enabled: boolean;
+    threshold: string;
+    qualifies: boolean;
+    remaining: string;
+  };
 }
 
 export interface PaymentMethodOption {

@@ -10,6 +10,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 
+from core import features
 from core.errors import BusinessError, ErrorCode
 from core.money import ZERO, quantize
 from shipping.models import (
@@ -54,11 +55,65 @@ class ShippingQuote:
     estimated_days_min: int
     estimated_days_max: int
     is_pickup: bool
+    #: The fee before the store-wide free-shipping rule — equal to `fee` unless that rule waived it
+    original_fee: Decimal = ZERO
+    #: True only when the **threshold rule** zeroed a fee that would otherwise be charged
+    free_by_threshold: bool = False
 
 
-def quote(governorate: str, subtotal: Decimal, *, weight_grams: int = 0) -> list[ShippingQuote]:
+@dataclass(frozen=True)
+class FreeShippingStatus:
+    """
+    Where a cart stands against the store-wide free-shipping rule.
+
+    ⚠️  Computed on the server and shown as-is: the storefront never subtracts
+        the cart from the threshold itself.
+    """
+
+    enabled: bool
+    threshold: Decimal
+    qualifies: bool
+    remaining: Decimal
+
+
+def free_shipping_status(
+    eligible_amount: Decimal, rule: features.FreeShippingRule | None = None
+) -> FreeShippingStatus:
+    """
+    `eligible_amount`: the products total **after item and coupon discounts, before
+    tax and shipping** — "X or more" qualifies, so exactly the threshold is free.
+
+    A rule that is off (or on without a positive amount) reports `enabled=False`
+    and the storefront draws nothing.
+    """
+    rule = rule or features.free_shipping_rule()
+    if not rule.active:
+        return FreeShippingStatus(enabled=False, threshold=ZERO, qualifies=False, remaining=ZERO)
+
+    amount = quantize(max(eligible_amount, ZERO))
+    qualifies = amount >= rule.threshold
+    return FreeShippingStatus(
+        enabled=True,
+        threshold=rule.threshold,
+        qualifies=qualifies,
+        remaining=ZERO if qualifies else quantize(rule.threshold - amount),
+    )
+
+
+def quote(
+    governorate: str,
+    subtotal: Decimal,
+    *,
+    weight_grams: int = 0,
+    eligible_amount: Decimal | None = None,
+    rule: features.FreeShippingRule | None = None,
+) -> list[ShippingQuote]:
     """
     The shipping quotes available for this governorate.
+
+    `subtotal` feeds the per-zone `free_above` of each rate (existing behaviour).
+    `eligible_amount` feeds the store-wide threshold rule and defaults to
+    `subtotal` — callers that know the coupon discount pass the amount after it.
 
     ⚠️  Computed from the source on every request.
 
@@ -68,6 +123,8 @@ def quote(governorate: str, subtotal: Decimal, *, weight_grams: int = 0) -> list
     zone = ShippingZone.for_governorate(governorate)
     if zone is None:
         return []
+
+    status = free_shipping_status(subtotal if eligible_amount is None else eligible_amount, rule)
 
     # ⚠️  `method__deleted_at__isnull=True` is not redundant with the manager.
     #
@@ -84,15 +141,27 @@ def quote(governorate: str, subtotal: Decimal, *, weight_grams: int = 0) -> list
 
     quotes = []
     for rate in rates:
+        free_by_threshold = False
+
         if rate.method.is_pickup:
             fee, is_free = ZERO, True
+            original_fee = fee
         elif rate.free_above is not None and subtotal >= rate.free_above:
             fee, is_free = ZERO, True
+            original_fee = fee
         else:
             fee = rate.base_fee
             if rate.per_kg_fee and weight_grams:
                 fee += quantize(rate.per_kg_fee * Decimal(weight_grams) / Decimal(1000))
-            fee, is_free = quantize(fee), False
+            fee = original_fee = quantize(fee)
+            is_free = False
+
+            # ⚠️  The store-wide rule only waives a fee that would really be charged,
+            #     and only for a method the owner left eligible (express can stay paid).
+            #     A rate that costs nothing anyway is not "free by threshold" — reports
+            #     must be able to tell the two apart.
+            if status.qualifies and rate.method.eligible_for_free_shipping and fee > 0:
+                fee, is_free, free_by_threshold = ZERO, True, True
 
         quotes.append(
             ShippingQuote(
@@ -104,15 +173,31 @@ def quote(governorate: str, subtotal: Decimal, *, weight_grams: int = 0) -> list
                 estimated_days_min=rate.method.estimated_days_min,
                 estimated_days_max=rate.method.estimated_days_max,
                 is_pickup=rate.method.is_pickup,
+                original_fee=original_fee,
+                free_by_threshold=free_by_threshold,
             )
         )
 
     return sorted(quotes, key=lambda q: (q.fee, q.estimated_days_min))
 
 
-def fee_for(method_code: str, governorate: str, subtotal: Decimal, *, weight_grams: int = 0):
+def fee_for(
+    method_code: str,
+    governorate: str,
+    subtotal: Decimal,
+    *,
+    weight_grams: int = 0,
+    eligible_amount: Decimal | None = None,
+    rule: features.FreeShippingRule | None = None,
+):
     """The fee for a specific method, or `None` if it is unavailable."""
-    for entry in quote(governorate, subtotal, weight_grams=weight_grams):
+    for entry in quote(
+        governorate,
+        subtotal,
+        weight_grams=weight_grams,
+        eligible_amount=eligible_amount,
+        rule=rule,
+    ):
         if entry.method_code == method_code:
             return entry
     return None
@@ -365,3 +450,56 @@ def delete_method(method: ShippingMethod) -> None:
     method.is_active = False
     method.save(update_fields=["is_active"])
     method.delete()
+
+
+# ═══════════════════════════════════════════════════════════
+#  Free shipping above an amount — the owner's switch
+# ═══════════════════════════════════════════════════════════
+
+
+@transaction.atomic
+def save_free_shipping_rule(
+    *, enabled: bool, threshold: Decimal
+) -> tuple[features.FreeShippingRule, features.FreeShippingRule]:
+    """
+    Store the switch and the amount; returns `(before, after)` for the audit trail.
+
+    ⚠️  The two rows are written together or not at all — a switch flipped on
+        while the amount write fails would leave the shop on a rule nobody saw.
+
+    ⚠️  `get_or_create` first: if the rows are missing (a database restored from
+        before `core/0003`), they are created with their labels; an existing row
+        keeps whatever the Django panel shows for it and only gets a new value.
+    """
+    from core.models.settings import SystemSetting
+
+    before = features.free_shipping_rule()
+    threshold = quantize(threshold)
+
+    wanted = {
+        features.FREE_SHIPPING_ENABLED: (
+            bool(enabled),
+            {
+                "value_type": "BOOL",
+                "label_ar": "تفعيل الشحن المجاني فوق مبلغ معيّن",
+                "label_en": "Free shipping above an amount",
+            },
+        ),
+        features.FREE_SHIPPING_THRESHOLD: (
+            str(threshold),
+            {
+                "value_type": "DECIMAL",
+                "label_ar": "حدّ الشحن المجاني (بالجنيه)",
+                "label_en": "Free shipping threshold (EGP)",
+            },
+        ),
+    }
+    for key, (value, defaults) in wanted.items():
+        row, created = SystemSetting.objects.get_or_create(
+            key=key, defaults={"value": value, "group": "orders", **defaults}
+        )
+        if not created and row.value != value:
+            row.value = value
+            row.save()  # ⚠️  `save()`, not `update()`: it drops the cached copy
+
+    return before, features.free_shipping_rule()

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from catalog import rules
 from catalog.models import HEX_COLOR_VALIDATOR, ProductColor
 from catalog.serializers import ProductImageSerializer
 
@@ -30,6 +31,11 @@ class AdminProductColorSerializer(serializers.ModelSerializer):
     price_override = serializers.DecimalField(
         max_digits=12, decimal_places=2, min_value=0, allow_null=True, required=False
     )
+    #: "Price before discount" for this colour — nullable like `price_override`, and judged
+    #: against the colour's *own* effective price (see `validate`).
+    compare_at_price = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=0, allow_null=True, required=False
+    )
     name_ar = serializers.CharField(max_length=200, trim_whitespace=True)
     name_en = serializers.CharField(max_length=200, trim_whitespace=True)
 
@@ -48,6 +54,7 @@ class AdminProductColorSerializer(serializers.ModelSerializer):
             "name_en",
             "hex",
             "price_override",
+            "compare_at_price",
             "display_order",
             "is_active",
             "image_count",
@@ -105,5 +112,27 @@ class AdminProductColorSerializer(serializers.ModelSerializer):
                 clash = clash.exclude(pk=self.instance.pk)
             if clash.exists():
                 raise serializers.ValidationError({field: [message]})
+
+        # ⚠️  Against the price the colour will have **after** this save: its own when it has
+        #     one, else the product's. A PATCH that clears `price_override` can leave an
+        #     unchanged compare-at below the product's price, so both sides are merged
+        #     with the stored values before judging.
+        instance = self.instance
+        price_override = (
+            attrs["price_override"]
+            if "price_override" in attrs
+            else getattr(instance, "price_override", None)
+        )
+        compare_at = (
+            attrs["compare_at_price"]
+            if "compare_at_price" in attrs
+            else getattr(instance, "compare_at_price", None)
+        )
+        errors = rules.compare_at_errors(
+            compare_at=compare_at,
+            price=price_override if price_override is not None else product.base_price,
+        )
+        if errors:
+            raise serializers.ValidationError(errors)
 
         return attrs

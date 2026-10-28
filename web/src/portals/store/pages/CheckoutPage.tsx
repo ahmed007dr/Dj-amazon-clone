@@ -183,6 +183,7 @@ function MemberCheckout() {
             <ShippingPicker
               governorate={governorate}
               subtotal={cart.totals.subtotal}
+              eligibleAmount={cart.totals.net_sales}
               value={shippingMethod}
               onChange={setShippingMethod}
             />
@@ -244,7 +245,11 @@ function MemberCheckout() {
           </section>
         </div>
 
-        <CartSummary totals={cart.totals} shippingKnown={Boolean(shippingMethod)}>
+        <CartSummary
+          totals={cart.totals}
+          shippingKnown={Boolean(shippingMethod)}
+          freeShipping={cart.free_shipping}
+        >
           <Button
             block
             size="lg"

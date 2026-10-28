@@ -25,6 +25,11 @@ urlpatterns = [
     #     database to do it. These routes put the same table behind the shipping
     #     permission, where the person who runs the deliveries already is.
     path("admin/coverage/", api.ShippingCoverageAPI.as_view(), name="admin-coverage"),
+    path(
+        "admin/free-shipping/",
+        api.AdminFreeShippingAPI.as_view(),
+        name="admin-free-shipping",
+    ),
     path("admin/zones/", api.AdminZoneListCreateAPI.as_view(), name="admin-zones"),
     path("admin/zones/<uuid:pk>/", api.AdminZoneDetailAPI.as_view(), name="admin-zone-detail"),
     path("admin/methods/", api.AdminMethodListCreateAPI.as_view(), name="admin-methods"),

@@ -47,7 +47,15 @@ class ProductColorInline(admin.TabularInline):
 
     model = ProductColor
     extra = 0
-    fields = ("name_ar", "name_en", "hex", "price_override", "display_order", "is_active")
+    fields = (
+        "name_ar",
+        "name_en",
+        "hex",
+        "price_override",
+        "compare_at_price",
+        "display_order",
+        "is_active",
+    )
     show_change_link = True
 
 
@@ -195,7 +203,7 @@ class ProductAdmin(SlugAdminMixin, DomainModelAdmin):
             _("التصنيف والانتماء"),
             {"fields": ("category", "brand", "manufacturer", "access_policy", "tax_class")},
         ),
-        (_("السعر الأساس"), {"fields": ("base_price",)}),
+        (_("السعر الأساس"), {"fields": ("base_price", "compare_at_price")}),
         (
             _("الخصائص التنظيمية والدوائية"),
             {
@@ -238,6 +246,7 @@ class ProductColorAdmin(DomainModelAdmin):
         "name_en",
         "hex",
         "price_override",
+        "compare_at_price",
         "display_order",
         "is_active",
         "is_deleted",

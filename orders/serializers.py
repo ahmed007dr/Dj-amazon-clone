@@ -154,6 +154,7 @@ class OrderDetailSerializer(OrderListSerializer):
             "coupon_code",
             "tax_total",
             "shipping_total",
+            "shipping_discount",
             "shipping_method_code",
             "recipient_name",
             "recipient_phone",

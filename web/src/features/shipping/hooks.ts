@@ -168,3 +168,34 @@ export function useSaveRate() {
 export function useDeleteRate() {
   return useShippingConfigMutation((id: string) => api.deleteRate(id));
 }
+
+/**
+ * The free-shipping switch and amount.
+ *
+ * ⚠️  Saving invalidates **the cart and the quotes too**, not only this card.
+ *
+ *     The cart payload carries the progress strip and the shipping line, and the
+ *     quote list carries the struck-through prices; both are cached, so without
+ *     this the owner flips the switch and the store keeps showing the old rule
+ *     until the next refetch — which reads as the save having done nothing.
+ */
+export function useFreeShippingSettings(enabled = true) {
+  return useQuery({
+    queryKey: [...CONFIG_KEY, 'free-shipping'],
+    queryFn: api.getFreeShippingSettings,
+    enabled,
+  });
+}
+
+export function useSaveFreeShipping() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: api.saveFreeShippingSettings,
+    onSuccess: (settings) => {
+      queryClient.setQueryData([...CONFIG_KEY, 'free-shipping'], settings);
+      void queryClient.invalidateQueries({ queryKey: ['cart'] });
+      void queryClient.invalidateQueries({ queryKey: ['shipping', 'quotes'] });
+    },
+  });
+}

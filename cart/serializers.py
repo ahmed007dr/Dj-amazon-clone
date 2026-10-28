@@ -10,7 +10,9 @@ Cart contracts.
 
 from rest_framework import serializers
 
+from catalog import compare_at
 from catalog.selectors import image_for
+from shipping.serializers import FreeShippingStatusSerializer
 
 
 class MoneyField(serializers.DecimalField):
@@ -66,6 +68,10 @@ class CartLineSerializer(serializers.Serializer):
     color = serializers.DictField(read_only=True, allow_null=True)
     image = serializers.CharField(read_only=True, allow_null=True)
     pricing = PricedLineSerializer(read_only=True)
+    #: The "price before discount" — present only while it is above this line's `unit_price`
+    compare_at_price = MoneyField(allow_null=True)
+    #: The saving as a whole percentage, rounded down; `null` with no compare-at price
+    discount_percent = serializers.IntegerField(read_only=True, allow_null=True)
 
 
 class LineIssueSerializer(serializers.Serializer):
@@ -129,6 +135,8 @@ class CartSnapshotSerializer(serializers.Serializer):
     totals = serializers.SerializerMethodField()
     issues = LineIssueSerializer(many=True, read_only=True)
     coupon = serializers.SerializerMethodField()
+    #: `{enabled, threshold, qualifies, remaining}` — the free-shipping rule against this cart
+    free_shipping = serializers.SerializerMethodField()
     is_checkoutable = serializers.BooleanField(read_only=True)
 
     def get_lines(self, snapshot) -> list:
@@ -145,6 +153,13 @@ class CartSnapshotSerializer(serializers.Serializer):
             # ⚠️  The colour's own photo first, then the product's — the line shows
             #     the item the customer actually chose, not the colour on the cover.
             picture = image_for(product, color)
+
+            # ⚠️  The "price before discount" is judged against `unit_price` — the very figure the
+            #     product page showed this customer (price list → colour → product → + variant
+            #     difference) — and shown only when it is above it. The server decides here too.
+            old_price = compare_at.display_facts(
+                compare_at.reference_compare_at(product, color, variant), priced.unit_price
+            )
 
             result.append(
                 {
@@ -170,6 +185,7 @@ class CartSnapshotSerializer(serializers.Serializer):
                     ),
                     "image": picture.image.url if picture else None,
                     "pricing": PricedLineSerializer(priced).data,
+                    **old_price,
                 }
             )
         return result
@@ -197,6 +213,13 @@ class CartSnapshotSerializer(serializers.Serializer):
         if snapshot.coupon_result is None:
             return None
         return CouponResultSerializer(snapshot.coupon_result).data
+
+    def get_free_shipping(self, snapshot) -> dict:
+        """
+        ⚠️  Computed by `revalidate` — the storefront never subtracts the cart from
+            the threshold itself, and `enabled=false` means it draws nothing.
+        """
+        return FreeShippingStatusSerializer(snapshot.free_shipping).data
 
 
 # ═══════════════════════════════════════════════════════════

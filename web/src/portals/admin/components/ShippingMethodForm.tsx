@@ -42,6 +42,7 @@ export function ShippingMethodForm({
     estimated_days_min: String(method?.estimated_days_min ?? 1),
     estimated_days_max: String(method?.estimated_days_max ?? 3),
     is_pickup: method?.is_pickup ?? false,
+    eligible_for_free_shipping: method?.eligible_for_free_shipping ?? true,
     display_order: String(method?.display_order ?? 0),
     is_active: method?.is_active ?? true,
   });
@@ -64,6 +65,7 @@ export function ShippingMethodForm({
       estimated_days_min: Number(form.estimated_days_min) || 0,
       estimated_days_max: Number(form.estimated_days_max) || 0,
       is_pickup: form.is_pickup,
+      eligible_for_free_shipping: form.eligible_for_free_shipping,
       display_order: Number(form.display_order) || 0,
       is_active: form.is_active,
     };
@@ -183,6 +185,21 @@ export function ShippingMethodForm({
       </label>
 
       {form.is_pickup ? <Alert tone="warning">{t('shipping.isPickupNote')}</Alert> : null}
+
+      {/* ⚠️  Meaningless for a pickup (already free) — hidden rather than left to mislead. */}
+      {!form.is_pickup ? (
+        <label className="shipping-form__check">
+          <input
+            type="checkbox"
+            checked={form.eligible_for_free_shipping}
+            onChange={(event) => set('eligible_for_free_shipping')(event.target.checked)}
+          />
+          <span>
+            {t('shipping.eligibleForFree')}
+            <small>{t('shipping.eligibleForFreeHint')}</small>
+          </span>
+        </label>
+      ) : null}
 
       <label className="shipping-form__check">
         <input

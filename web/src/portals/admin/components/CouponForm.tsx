@@ -8,6 +8,7 @@ import { Button } from '@/shared/ui/Button';
 import { Field } from '@/shared/ui/Field';
 import { useToast } from '@/shared/ui/useToast';
 
+import './CouponInsights.css';
 import './PricingForms.css';
 
 const ACCOUNT_TYPES = [
@@ -50,6 +51,8 @@ export function CouponForm({
     code: coupon?.code ?? '',
     name_ar: coupon?.name_ar ?? '',
     name_en: coupon?.name_en ?? '',
+    holder_name: coupon?.holder_name ?? '',
+    holder_note: coupon?.holder_note ?? '',
     kind: coupon?.kind ?? 'PERCENTAGE',
     value: coupon?.value ?? '',
     max_discount_amount: coupon?.max_discount_amount ?? '',
@@ -85,6 +88,8 @@ export function CouponForm({
     const body: Record<string, unknown> = {
       name_ar: form.name_ar,
       name_en: form.name_en,
+      holder_name: form.holder_name.trim(),
+      holder_note: form.holder_note,
       kind: form.kind,
       // ⚠️  Free shipping has no value — it is sent as zero rather than empty.
       value: needsValue ? form.value : '0',
@@ -149,6 +154,26 @@ export function CouponForm({
           {...errorFor('name_ar')}
         />
       </div>
+
+      {/* ⚠️  The holder is a label for reading sales against ("what did the code we gave
+          Dr. Sara bring in?") — it does not restrict who may use the code. */}
+      <Field
+        label={t('pricing.holderName')}
+        value={form.holder_name}
+        onChange={(event) => set('holder_name')(event.target.value)}
+        maxLength={120}
+        hint={t('pricing.holderNameHint')}
+        {...errorFor('holder_name')}
+      />
+      <label className="coupon-textarea">
+        <span>{t('pricing.holderNote')}</span>
+        <textarea
+          value={form.holder_note}
+          onChange={(event) => set('holder_note')(event.target.value)}
+          rows={3}
+        />
+        <small>{t('pricing.holderNoteHint')}</small>
+      </label>
 
       <label className="pricing-form__select">
         <span>{t('pricing.couponKind')}</span>

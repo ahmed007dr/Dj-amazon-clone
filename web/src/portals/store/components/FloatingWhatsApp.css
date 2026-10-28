@@ -1,0 +1,72 @@
+/*
+  The floating WhatsApp button.
+
+  ⚠️  A fixed brand green, not a theme token: it has to read as "WhatsApp" whatever palette
+      the admin picked. #128c7e carries 4.1:1 against the white glyph (3:1 is the bar for
+      a graphic), and the surface-coloured ring separates it from any page background —
+      light or dark.
+
+  ⚠️  `--floating-offset` is the hook for anything else pinned to the bottom edge (a
+      cookie notice, say): set it on `:root` and this button rides above it.
+*/
+.wa-float {
+  --wa-bg: #128c7e;
+  --wa-fg: #fff;
+
+  position: fixed;
+  /* Under the header and every overlay (drawer · modal · toast), over the page */
+  z-index: calc(var(--z-header) - 1);
+  inset-inline-end: var(--space-4);
+  inset-block-end: calc(max(var(--space-4), env(safe-area-inset-bottom)) + var(--floating-offset, 0px));
+
+  display: grid;
+  place-items: center;
+  inline-size: 3.5rem;
+  block-size: 3.5rem;
+
+  color: var(--wa-fg);
+  text-decoration: none;
+  background: var(--wa-bg);
+  border-radius: 50%;
+  box-shadow:
+    var(--shadow-lg),
+    0 0 0 3px var(--color-surface);
+  transition:
+    transform var(--transition),
+    filter var(--transition);
+  animation: wa-float-in 240ms ease;
+}
+
+.wa-float:hover {
+  color: var(--wa-fg);
+  text-decoration: none;
+  filter: brightness(1.08);
+  transform: scale(1.06);
+}
+
+@keyframes wa-float-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.9);
+  }
+}
+
+/* The cart's checkout button is a full-width bar on a phone — leave the corner to it */
+@media (max-width: 767px) {
+  .wa-float--no-phone {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wa-float {
+    animation: none;
+    transition: none;
+  }
+}
+
+@media print {
+  .wa-float {
+    display: none;
+  }
+}

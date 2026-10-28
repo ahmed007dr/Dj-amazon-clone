@@ -128,6 +128,9 @@ METHODS = [
         "estimated_days_min": 1,
         "estimated_days_max": 2,
         "is_pickup": False,
+        # ⚠️  Stays paid even when the owner turns on free shipping above an amount
+        #     (that switch ships OFF in every seed) — the usual reason to use the flag.
+        "eligible_for_free_shipping": False,
         "display_order": 20,
     },
     {

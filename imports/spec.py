@@ -194,6 +194,17 @@ PRODUCT_COLUMNS: list[Column] = [
         example="45.00",
         note="مرجع لمحرك التسعير — ليس السعر النهائي للعميل",
     ),
+    _c(
+        key="compare_at_price",
+        header="السعر قبل الخصم",
+        kind=Kind.MONEY,
+        width=16,
+        example="55.00",
+        note=(
+            "اختياري — يظهر مشطوبًا بجانب السعر الحالي في المتجر، ويجب أن يكون أعلى من السعر "
+            "المرجعي. فارغ = لا سعر قبل الخصم (ويمحو الموجود عند التحديث)"
+        ),
+    ),
     # ── The regulatory block — conditionally mandatory ─────
     _c(
         key="regulatory_class",

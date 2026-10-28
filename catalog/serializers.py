@@ -5,10 +5,13 @@ Catalogue contracts.
     displays both, and sending only the translated one forces a second call.
 """
 
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import models
 from rest_framework import serializers
 
-from catalog import audit
+from catalog import audit, compare_at
 from catalog.models import (
     Brand,
     Category,
@@ -19,6 +22,8 @@ from catalog.models import (
 )
 from core.color_facts import color_facts
 from core.files import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE, validate_upload
+from core.money import quantize
+from core.price_facts import viewer_prices
 
 
 class CategoryBriefSerializer(serializers.ModelSerializer):
@@ -112,15 +117,33 @@ class RatingSerializer(serializers.Serializer):
     distribution = serializers.DictField(read_only=True)
 
 
+class _PricedListSerializer(serializers.ListSerializer):
+    """
+    Prices the **whole page** in one go, then serialises each card from that.
+
+    ⚠️  The viewer's price comes from `pricing` through `core.price_facts`, and asking it
+        per card is the N+1 this class exists to prevent: it loads the page's rules in a
+        fixed number of queries and hands the result to the child serializer.
+    """
+
+    def to_representation(self, data):
+        # A manager is re-queried, a queryset or a page is used as it is (as DRF's own does):
+        # `.all()` on an evaluated queryset would throw away its prefetches.
+        items = list(data.all() if isinstance(data, models.manager.BaseManager) else data)
+        self.child.load_prices(items)
+        return [self.child.to_representation(item) for item in items]
+
+
 class ProductListSerializer(serializers.ModelSerializer):
     """
     The product card in lists.
 
-    ⚠️  **No final price and no quantity.**
+    ⚠️  **No quantity, and the price is `pricing`'s, not computed here.**
 
-        `pricing` computes the price per customer, and `inventory` answers
-        availability. Adding them here means the catalogue answering two
-        questions it does not own.
+        `inventory` answers availability, and `pricing` computes the price per customer.
+        `price` below is whatever the registered provider returned for *this viewer*
+        (`core.price_facts`) — the catalogue adds only what it owns: the owner-typed
+        "price before discount", shown when it is above that price (`catalog.compare_at`).
     """
 
     category = CategoryBriefSerializer(read_only=True)
@@ -148,6 +171,45 @@ class ProductListSerializer(serializers.ModelSerializer):
             "requires_prescription",
             "regulatory_class",
         ]
+        list_serializer_class = _PricedListSerializer
+
+    # ── Prices ─────────────────────────────────────────────
+
+    def load_prices(self, products, variants=()) -> None:
+        """
+        Ask `pricing` once for these products (and variants) and remember the answer.
+
+        Idempotent per key: a second call adds the keys it has not seen, so the detail
+        serializer can call it for the product and its variants without losing either.
+        """
+        found = viewer_prices(products, variants, user=self._price_user())
+        cache = getattr(self, "_viewer_prices", None) or {"products": {}, "variants": {}}
+        cache["products"].update(found["products"])
+        cache["variants"].update(found["variants"])
+        self._viewer_prices = cache
+
+    def _product_price(self, obj) -> Decimal:
+        cache = getattr(self, "_viewer_prices", None)
+        if cache is None or str(obj.pk) not in cache["products"]:
+            self.load_prices([obj])
+            cache = self._viewer_prices
+        # No provider (or it failed) → the reference price is the honest fallback
+        return cache["products"].get(str(obj.pk), obj.base_price)
+
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        price = self._product_price(obj)
+        data["price"] = format(quantize(price), "f")
+        data.update(compare_at.display_facts(compare_at.reference_compare_at(obj), price))
+        return data
+
+    def _price_user(self):
+        """Who is being priced: the preview user if there is one, else the requester."""
+        if "price_user" in self.context:
+            return self.context["price_user"]
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        return user if getattr(user, "is_authenticated", False) else None
 
     def get_primary_image(self, obj):
         """Reads from the `to_attr` the prefetch prepared — no query."""
@@ -166,7 +228,7 @@ class ProductListSerializer(serializers.ModelSerializer):
 class ProductDetailSerializer(ProductListSerializer):
     manufacturer = ManufacturerBriefSerializer(read_only=True)
     images = serializers.SerializerMethodField()
-    variants = ProductVariantSerializer(many=True, read_only=True)
+    variants = serializers.SerializerMethodField()
     colors = serializers.SerializerMethodField()
     rating = serializers.SerializerMethodField()
 
@@ -195,6 +257,48 @@ class ProductDetailSerializer(ProductListSerializer):
             "meta_description_ar",
             "meta_description_en",
         ]
+
+    def to_representation(self, obj):
+        # ⚠️  The prices of the product **and every variant** in one provider call, before any
+        #     field runs — `get_variants` and `get_colors` only read the answer.
+        #     A coloured variant is given its colour in memory: the engine looks it up to
+        #     apply the colour's own price, and fetching it per variant is the N+1 to avoid.
+        variants = list(obj.variants.all())
+        colors_by_id = {color.pk: color for color in obj.colors.all()}
+        for variant in variants:
+            if variant.color_id in colors_by_id:
+                variant.color = colors_by_id[variant.color_id]
+        self._variants = variants
+        self.load_prices([obj], variants)
+        return super().to_representation(obj)
+
+    def get_variants(self, obj):
+        """
+        The variants, each with **its own** price and "price before discount".
+
+        The page used to add a variant's `price_adjustment` to a price in the browser. Here
+        the figure is `pricing`'s for that exact variant, and the old price carries the same
+        difference (`catalog.compare_at.reference_compare_at`), so a size that costs more
+        also "was" worth more — and the saving reads the same on every size.
+        """
+        variants = self._variants
+        rows = ProductVariantSerializer(variants, many=True, context=self.context).data
+        prices = self._viewer_prices["variants"]
+
+        payload = []
+        for variant, row in zip(variants, rows, strict=True):
+            price = prices.get(str(variant.pk), obj.base_price + variant.price_adjustment)
+            color = variant.color if variant.color_id else None
+            payload.append(
+                {
+                    **row,
+                    "price": format(quantize(price), "f"),
+                    **compare_at.display_facts(
+                        compare_at.reference_compare_at(obj, color, variant), price
+                    ),
+                }
+            )
+        return payload
 
     def get_images(self, obj):
         """
@@ -251,6 +355,15 @@ class ProductDetailSerializer(ProductListSerializer):
                     "price_override": (
                         None if color.price_override is None else str(color.price_override)
                     ),
+                    # The colour's own "price before discount", judged against `price` — the
+                    # figure *this customer* pays for it — so a student price that is not
+                    # below the old figure shows no strike-through here either.
+                    **compare_at.display_facts(
+                        compare_at.reference_compare_at(
+                            obj, color, variants[0] if variants else None
+                        ),
+                        Decimal(price),
+                    ),
                     # No variant = nothing to put in the cart = sold out, whatever stock says
                     "is_available": bool(variants) and entry.get("is_available", True),
                     "is_low": entry.get("is_low", False),
@@ -262,14 +375,6 @@ class ProductDetailSerializer(ProductListSerializer):
                 }
             )
         return payload
-
-    def _price_user(self):
-        """Who is being priced: the preview user if there is one, else the requester."""
-        if "price_user" in self.context:
-            return self.context["price_user"]
-        request = self.context.get("request")
-        user = getattr(request, "user", None)
-        return user if getattr(user, "is_authenticated", False) else None
 
     def get_rating(self, obj):
         rating = getattr(obj, "rating", None)
@@ -401,6 +506,23 @@ class AdminProductSerializer(serializers.ModelSerializer):
             requires_prescription=attrs.get(
                 "requires_prescription", getattr(instance, "requires_prescription", False)
             ),
+        )
+        # ⚠️  "Price before discount" against the price **as it will be after this save** —
+        #     a PATCH that only raises `base_price` can strand an unchanged compare-at below
+        #     it, and a PATCH that only sets compare-at must be judged against the stored price.
+        errors.update(
+            rules.compare_at_errors(
+                compare_at=(
+                    attrs["compare_at_price"]
+                    if "compare_at_price" in attrs
+                    else getattr(instance, "compare_at_price", None)
+                ),
+                price=(
+                    attrs["base_price"]
+                    if "base_price" in attrs
+                    else getattr(instance, "base_price", Decimal("0"))
+                ),
+            )
         )
         if errors:
             raise serializers.ValidationError(errors)

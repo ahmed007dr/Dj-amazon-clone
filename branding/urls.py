@@ -24,4 +24,30 @@ urlpatterns = [
         name="palette-detail",
     ),
     path("admin/preview/", api.PreviewThemeAPI.as_view(), name="preview"),
+    # ── Contact channels (⚠️  `uuid`, never `int`) ──────────
+    path(
+        "admin/profiles/<uuid:pk>/contact-channels/",
+        api.ChannelListCreateAPI.as_view(),
+        name="channels",
+    ),
+    path(
+        "admin/profiles/<uuid:pk>/contact-channels/reorder/",
+        api.ChannelReorderAPI.as_view(),
+        name="channels-reorder",
+    ),
+    path(
+        "admin/profiles/<uuid:pk>/contact-channels/<uuid:channel_pk>/",
+        api.ChannelDetailAPI.as_view(),
+        name="channel-detail",
+    ),
+    path(
+        "admin/profiles/<uuid:pk>/contact-channels/<uuid:channel_pk>/toggle/",
+        api.ChannelToggleAPI.as_view(),
+        name="channel-toggle",
+    ),
+    path(
+        "admin/contact-channels/preview/",
+        api.ChannelPreviewAPI.as_view(),
+        name="channel-preview",
+    ),
 ]

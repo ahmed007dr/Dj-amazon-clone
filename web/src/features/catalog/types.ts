@@ -38,6 +38,19 @@ export interface ProductListItem {
   kind: string;
   /** ⚠️  A string, not a number — money crosses the network as text (ADR-31). */
   base_price: string;
+  /**
+   * What *this viewer* pays (price list → product), computed by the server. `base_price` is
+   * only the reference price — a student on the student list sees a lower `price`.
+   * Optional so a payload from before the field existed still renders.
+   */
+  price?: string;
+  /**
+   * The "price before discount". ⚠️  The server sends it **only while it is above `price`**
+   * and `null` otherwise — the card renders what it gets and never compares the two.
+   */
+  compare_at_price?: string | null;
+  /** The saving as a whole percentage, rounded down; `null` with no `compare_at_price`. */
+  discount_percent?: number | null;
   category: CategoryBrief | null;
   brand: BrandBrief | null;
   /**
@@ -87,6 +100,10 @@ export interface ProductVariant {
   display_order: number;
   /** The colour this variant belongs to — `null` for a plain one (a size, a strength) */
   color?: string | null;
+  /** What this viewer pays for exactly this variant (colour price, price list, difference) */
+  price?: string;
+  compare_at_price?: string | null;
+  discount_percent?: number | null;
 }
 
 /**
@@ -104,6 +121,9 @@ export interface ProductColor {
   hex: string;
   price: string;
   price_override: string | null;
+  /** The colour's "price before discount" — present only while above `price` */
+  compare_at_price?: string | null;
+  discount_percent?: number | null;
   is_available: boolean;
   is_low: boolean;
   /** An exact number only at or below the low-stock threshold, otherwise `null` */

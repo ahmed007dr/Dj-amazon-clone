@@ -64,6 +64,30 @@ ORDERS = [
         "standard",
         OrderStatus.CANCELLED,
     ),
+    # ── Orders through a code handed to a person (coupon analytics) ──
+    (
+        "customer@dev.local",
+        [("MSK-SRG", 3), ("ALC-70", 2)],
+        "DRSARA15",
+        "standard",
+        OrderStatus.DELIVERED,
+    ),
+    (
+        "pharmacy@dev.local",
+        [("GZE-BULK", 3), ("MSK-SRG", 5)],
+        "DRSARA15",
+        "standard",
+        OrderStatus.CONFIRMED,
+    ),
+    (
+        # ⚠️  Cancelled on purpose: analytics must show it apart from the sales,
+        #     and the redemption must come back off the coupon's counter.
+        "vip@dev.local",
+        [("ALC-70", 1)],
+        "DRSARA15",
+        "standard",
+        OrderStatus.CANCELLED,
+    ),
 ]
 
 #: The path from `PENDING` to the requested status — the transitions are governed

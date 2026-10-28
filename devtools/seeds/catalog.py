@@ -73,6 +73,8 @@ PRODUCTS = [
         "brand": "safeguard",
         "manufacturer": "ansell",
         "base_price": "185.00",
+        # "Price before discount" — struck through on the card (about -20 %)
+        "compare_at_price": "230.00",
         "pack_size": "100 قفاز",
         "weight_grams": 600,
         "is_featured": True,
@@ -94,6 +96,7 @@ PRODUCTS = [
         "brand": "medix",
         "manufacturer": "nile-medical",
         "base_price": "140.00",
+        "compare_at_price": "175.00",
         "pack_size": "100 قفاز",
         "weight_grams": 620,
     },
@@ -376,11 +379,13 @@ PRODUCTS = [
         "category": "apparel",
         "brand": "campus",
         "base_price": "280.00",
+        # The colours without a price of their own inherit this old price; the green carries its own
+        "compare_at_price": "340.00",
         "weight_grams": 300,
-        #: (Arabic, English, hex, the colour's own price or None)
+        #: (Arabic, English, hex, the colour's own price or None[, its own price before discount])
         "colors": [
             ("أزرق", "Blue", "#1E40AF", None),
-            ("أخضر", "Green", "#15803D", "300.00"),
+            ("أخضر", "Green", "#15803D", "300.00", "360.00"),
             ("خمري", "Burgundy", "#7F1D1D", None),
         ],
     },
@@ -392,6 +397,7 @@ PRODUCTS = [
         "category": "students",
         "brand": "campus",
         "base_price": "260.00",
+        "compare_at_price": "325.00",
         "weight_grams": 450,
     },
     {
@@ -402,6 +408,7 @@ PRODUCTS = [
         "category": "students",
         "brand": "campus",
         "base_price": "540.00",
+        "compare_at_price": "600.00",
         "weight_grams": 1400,
     },
 ]
@@ -476,6 +483,8 @@ def seed():
         payload["access_policy"] = policies.get(payload.get("access_policy"))
         payload["tax_class"] = tax_classes.get(payload.get("tax_class", "standard"))
         payload["base_price"] = Decimal(payload["base_price"])
+        if payload.get("compare_at_price"):
+            payload["compare_at_price"] = Decimal(payload["compare_at_price"])
         payload["is_active"] = True
 
         product, _created = Product.objects.update_or_create(sku=sku, defaults=payload)
@@ -504,7 +513,9 @@ def seed():
 
         # Colours go through the same service as the admin panel, so each gets its
         # variant (and its SKU) exactly as it would there. Idempotent by colour name.
-        for order, (color_ar, color_en, color_hex, color_price) in enumerate(color_specs):
+        for order, (color_ar, color_en, color_hex, color_price, *color_old) in enumerate(
+            color_specs
+        ):
             color, _created = ProductColor.objects.update_or_create(
                 product=product,
                 name_en=color_en,
@@ -512,6 +523,7 @@ def seed():
                     "name_ar": color_ar,
                     "hex": color_hex,
                     "price_override": Decimal(color_price) if color_price else None,
+                    "compare_at_price": Decimal(color_old[0]) if color_old else None,
                     "display_order": order * 10,
                     "is_active": True,
                 },

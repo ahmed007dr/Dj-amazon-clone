@@ -87,6 +87,14 @@ class ShippingMethod(BilingualNameMixin, BaseModel):
         default=False,
         help_text=_("بلا رسوم شحن وبلا عنوان"),
     )
+    eligible_for_free_shipping = models.BooleanField(
+        _("مؤهّلة للشحن المجاني"),
+        default=True,
+        help_text=_(
+            "عند تفعيل الشحن المجاني فوق مبلغ معيّن، تصبح هذه الطريقة مجانية للطلبات "
+            "التي تبلغ الحدّ. أوقفها لطريقة مثل الشحن السريع تريد أن تبقى مدفوعة."
+        ),
+    )
     display_order = models.PositiveIntegerField(_("الترتيب"), default=0)
     is_active = models.BooleanField(_("مفعّلة"), default=True, db_index=True)
 

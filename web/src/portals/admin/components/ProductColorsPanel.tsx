@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { AdminProduct } from '@/features/catalog/adminApi';
 import type { AdminColor } from '@/features/catalog/colorsApi';
+import { checkCompareAt } from '@/features/catalog/compareAt';
 import { ColorSwatch } from '@/features/catalog/components/ColorSwatch';
 import {
   useCreateColor,
@@ -23,7 +24,7 @@ import { Spinner } from '@/shared/ui/Spinner';
 import { StateMessage } from '@/shared/ui/StateMessage';
 import { Switch } from '@/shared/ui/Switch';
 import { useToast } from '@/shared/ui/useToast';
-import { formatMoney } from '@/shared/utils/format';
+import { formatMoney, formatNumber } from '@/shared/utils/format';
 
 import { ProductImagesPanel } from './ProductImagesPanel';
 
@@ -175,6 +176,10 @@ export function ProductColorsPanel({ product }: { product: AdminProduct }) {
                     })}
                   </span>
                 )}
+
+                {color.compare_at_price ? (
+                  <Badge tone="danger">{t('products.onSale')}</Badge>
+                ) : null}
 
                 {color.stock_available !== null ? (
                   <Badge tone={color.stock_available > 0 ? 'success' : 'warning'}>
@@ -377,10 +382,15 @@ function ColorForm({
   const [nameEn, setNameEn] = useState(color?.name_en ?? '');
   const [hex, setHex] = useState(color?.hex ?? startingHex(existingCount));
   const [price, setPrice] = useState(color?.price_override ?? '');
+  const [compareAt, setCompareAt] = useState(color?.compare_at_price ?? '');
   const [active, setActive] = useState(color?.is_active ?? true);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const pending = create.isPending || update.isPending;
+
+  // The price this colour is sold at: its own when typed, otherwise the product's
+  const effectivePrice = price.trim() !== '' ? price.trim() : product.base_price;
+  const compareCheck = checkCompareAt(compareAt, effectivePrice);
 
   const validate = (): Record<string, string> => {
     const next: Record<string, string> = {};
@@ -390,6 +400,9 @@ function ColorForm({
     if (price.trim() !== '' && !PRICE_PATTERN.test(price.trim())) {
       next.price_override = t('catalog.colors.invalidPrice');
     }
+    // ⚠️  Judged against the colour's own price, else the product's — the same rule the server applies
+    if (compareCheck.state === 'malformed') next.compare_at_price = t('catalog.colors.invalidPrice');
+    if (compareCheck.state === 'too-low') next.compare_at_price = t('catalog.colors.invalidCompareAt');
     return next;
   };
 
@@ -415,6 +428,8 @@ function ColorForm({
       hex: hex.toUpperCase(),
       // ⚠️  An empty field is `null` ("use the product's price"), never `"0"`.
       price_override: price.trim() === '' ? null : price.trim(),
+      // Same for the old price: `null` clears it, never `"0"`
+      compare_at_price: compareAt.trim() === '' ? null : compareAt.trim(),
       is_active: active,
     };
 
@@ -493,6 +508,24 @@ function ColorForm({
           hint={t('catalog.colors.priceHint')}
           onChange={(event) => setPrice(event.target.value)}
           error={errors.price_override}
+        />
+      </div>
+
+      <div className="colors-panel__fields">
+        <Field
+          label={t('catalog.colors.compareAt')}
+          value={compareAt}
+          dir="ltr"
+          inputMode="decimal"
+          hint={
+            compareCheck.state === 'ok'
+              ? t('products.compareAtPreview', {
+                  percent: formatNumber(compareCheck.percent, i18n.language),
+                })
+              : t('catalog.colors.compareAtHint')
+          }
+          onChange={(event) => setCompareAt(event.target.value)}
+          error={errors.compare_at_price}
         />
       </div>
 

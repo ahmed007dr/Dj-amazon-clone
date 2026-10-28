@@ -61,6 +61,7 @@ _PRODUCT_SOURCE = {
 #     being money is a fact about the column, not about which sheet it is on.
 _IMPORT_KIND = {
     "base_price": Kind.MONEY,
+    "compare_at_price": Kind.MONEY,
     "price_adjustment": Kind.MONEY,
     "price_override": Kind.MONEY,
     "weight_grams": Kind.INT,
@@ -153,6 +154,7 @@ def _catalogue_rows(filters: dict, include_contact: bool):
             "brand__name_ar",
             "manufacturer__name_ar",
             "base_price",
+            "compare_at_price",
             "regulatory_class",
             "requires_prescription",
             "active_ingredient_ar",
@@ -170,14 +172,14 @@ def _catalogue_rows(filters: dict, include_contact: bool):
         yield (
             *row[:4],
             _common.labelled(row[4], ProductKind.choices),
-            *row[5:9],
-            _common.labelled(row[9], RegulatoryClass.choices),
-            row[10],
-            *row[11:13],
-            _common.labelled(row[13], DosageForm.choices),
-            row[14],
-            _common.labelled(row[15], StorageCondition.choices),
-            *row[16:],
+            *row[5:10],
+            _common.labelled(row[10], RegulatoryClass.choices),
+            row[11],
+            *row[12:14],
+            _common.labelled(row[14], DosageForm.choices),
+            row[15],
+            _common.labelled(row[16], StorageCondition.choices),
+            *row[17:],
         )
 
 
@@ -204,6 +206,7 @@ register(
             Column("البراند", width=20),
             Column("الشركة المصنّعة", width=22),
             Column("السعر المرجعي", Kind.MONEY),
+            Column("السعر قبل الخصم", Kind.MONEY),
             Column("التصنيف التنظيمي", width=20),
             Column("يتطلب وصفة", Kind.BOOL),
             Column("المادة الفعّالة", width=28),

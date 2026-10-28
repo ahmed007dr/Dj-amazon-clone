@@ -17,6 +17,8 @@ export interface AdminColor {
   hex: string;
   /** `null` = "use the product's price" — and `"0.00"` is a real (free) price */
   price_override: string | null;
+  /** The colour's own "price before discount"; `null` = none (see `catalog/compare_at.py`) */
+  compare_at_price: string | null;
   display_order: number;
   is_active: boolean;
   image_count: number;
@@ -32,6 +34,7 @@ export interface ColorInput {
   name_en: string;
   hex: string;
   price_override: string | null;
+  compare_at_price: string | null;
   is_active: boolean;
 }
 
