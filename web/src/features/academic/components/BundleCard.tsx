@@ -34,7 +34,7 @@ export function BundleCard({ bundle }: { bundle: BundleSummary }) {
     <article className="bundle-card surface">
       <div className="bundle-card__head">
         <Badge tone={KIND_TONES[bundle.kind]}>{t(`bundleKind.${bundle.kind}`)}</Badge>
-        <span className="muted">{t('academic.year', { count: bundle.academic_year })}</span>
+        <span className="muted">{t('academic.yearNumber', { count: bundle.academic_year })}</span>
       </div>
 
       <Link to={`/bundles/${bundle.slug}`} className="bundle-card__name">

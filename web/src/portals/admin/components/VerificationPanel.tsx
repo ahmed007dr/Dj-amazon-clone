@@ -368,7 +368,7 @@ export function VerificationPanel() {
       ) : null}
 
       <DocumentPreviewModal
-        key={preview?.id ?? 'none'}
+        key={`preview-${preview?.id ?? 'none'}`}
         document={preview}
         onClose={() => {
           setPreview(null);
@@ -376,7 +376,7 @@ export function VerificationPanel() {
       />
 
       <RejectDocumentModal
-        key={rejecting?.id ?? 'none'}
+        key={`reject-${rejecting?.id ?? 'none'}`}
         document={rejecting}
         onClose={() => {
           setRejecting(null);

@@ -231,7 +231,7 @@ export function StudentProfileForm({
           <option value="">{t('academic.pickYear')}</option>
           {years.map((year) => (
             <option key={year} value={year}>
-              {t('academic.year', { count: year })}
+              {t('academic.yearNumber', { count: year })}
             </option>
           ))}
         </select>

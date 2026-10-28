@@ -1,10 +1,24 @@
-/* ⚠️  The buttons wrap rather than being squeezed: three actions in a narrow
-       cell on a medium screen used to run out of the table horizontally. */
+/* ⚠️  The actions are a fixed three-column grid (two short rows), not a free wrap.
+       A free wrap let the table squeeze this column to one button wide and stack all
+       five (rows 220px tall, History and Edit clipped); five on one line pushed the
+       table past a 1280px screen. A grid has a stable width either way. */
 .admin-products__actions {
-  display: inline-flex;
-  flex-wrap: wrap;
+  display: inline-grid;
+  grid-template-columns: repeat(3, auto);
   gap: var(--space-1);
-  justify-content: flex-end;
+  justify-items: end;
+  justify-content: end;
+}
+
+/* Name with its category beneath, like the audit cells. */
+.admin-products__name {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.admin-products__name .muted {
+  font-size: 0.75rem;
 }
 
 .admin-products__soft-note {

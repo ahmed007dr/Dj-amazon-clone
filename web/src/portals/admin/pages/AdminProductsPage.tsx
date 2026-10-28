@@ -28,7 +28,7 @@ import { FilterBar, FilterSearch, FilterSelect } from '@/shared/ui/FilterBar';
 import { Modal } from '@/shared/ui/Modal';
 import { Pagination } from '@/shared/ui/Pagination';
 import { useToast } from '@/shared/ui/useToast';
-import { formatDateTime, formatMoney } from '@/shared/utils/format';
+import { formatDate, formatDateTime, formatMoney } from '@/shared/utils/format';
 
 import './AdminProductsPage.css';
 
@@ -112,7 +112,10 @@ export function AdminProductsPage() {
   const auditCell = (who: AuditUser | null | undefined, when: string) => (
     <div className="admin-products__audit">
       <strong title={who?.email}>{who?.name ?? '—'}</strong>
-      <span className="muted">{formatDateTime(when, i18n.language)}</span>
+      {/* The date alone keeps the column narrow; the exact time is one hover away. */}
+      <span className="muted" title={formatDateTime(when, i18n.language)}>
+        {formatDate(when, i18n.language)}
+      </span>
     </div>
   );
 
@@ -128,17 +131,18 @@ export function AdminProductsPage() {
       render: (product) => (
         // ⚠️  The link goes to the public store page: the admin wants to see exactly
         //     what the customer sees before judging the product.
-        <Link to={`/products/${product.slug}`} target="_blank">
-          {localized(product, 'name')}
-        </Link>
+        // ⚠️  The category sits under the name instead of in a column of its own: with the
+        //     two audit columns the table no longer fits a 1280px screen, and the
+        //     category is the one field that reads fine as a caption.
+        <div className="admin-products__name">
+          <Link to={`/products/${product.slug}`} target="_blank">
+            {localized(product, 'name')}
+          </Link>
+          <span className="muted">
+            {(product.category ? categoryNames.get(product.category) : null) ?? '—'}
+          </span>
+        </div>
       ),
-    },
-    {
-      key: 'category',
-      header: t('catalog.category'),
-      secondary: true,
-      render: (product) =>
-        (product.category ? categoryNames.get(product.category) : null) ?? '—',
     },
     {
       key: 'price',

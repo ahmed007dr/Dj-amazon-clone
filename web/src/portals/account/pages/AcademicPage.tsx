@@ -107,7 +107,7 @@ export function AcademicPage() {
           ) : null}
           <div className="academic__row">
             <span className="muted">{t('academic.academicYear')}</span>
-            <span>{t('academic.year', { count: profile.academic_year })}</span>
+            <span>{t('academic.yearNumber', { count: profile.academic_year })}</span>
           </div>
           {profile.student_number ? (
             <div className="academic__row">
