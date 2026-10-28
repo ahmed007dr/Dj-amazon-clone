@@ -66,94 +66,117 @@ export function ReviewList({ slug, productId }: { slug: string; productId?: stri
         notify(isApiError(error) ? error.displayMessage : t('state.errorTitle'), 'danger'),
     });
 
-  return (
-    <>
-      {/* ⚠️  The live average above the reviews list: it is what the reader
-          looks for before reading a single line of text. */}
-      {rating.data && rating.data.count > 0 ? (
-        <div className="review-summary">
-          <StarRating value={Number(rating.data.average)} count={rating.data.count} />
-        </div>
-      ) : null}
+  const average = rating.data ? Number(rating.data.average) : 0;
 
-      {/* ── Writing ─────────────────────────────── */}
-      {!user ? (
-        <Alert tone="info">
-          <Link to="/login">{t('reviews.signInToWrite')}</Link>
-        </Alert>
-      ) : myReview && !writing ? (
-        <div className="review-mine">
-          <div className="review-mine__head">
-            <StarRating value={myReview.rating} />
-            <strong>{t('reviews.yours')}</strong>
-            {myReview.status === 'PENDING' ? (
-              <Badge tone="warning">{t('reviews.pending')}</Badge>
-            ) : myReview.status === 'REJECTED' ? (
-              <Badge tone="danger">{t('reviews.rejected')}</Badge>
-            ) : null}
+  return (
+    <div className="reviews">
+      <div className="reviews__aside">
+        {/* ⚠️  The live average above the reviews list: it is what the reader
+            looks for before reading a single line of text. */}
+        {rating.data && rating.data.count > 0 ? (
+          <div className="review-summary">
+            <span className="review-summary__score">
+              {new Intl.NumberFormat(i18n.language, {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1,
+              }).format(average)}
+            </span>
+            <StarRating value={average} count={rating.data.count} />
           </div>
-          {myReview.body ? <p className="review-mine__body">{myReview.body}</p> : null}
-          <Button size="sm" variant="ghost" onClick={() => setWriting(true)}>
-            {t('common.edit')}
-          </Button>
-        </div>
-      ) : writing || (user && !myReview) ? (
-        productId ? (
-          writing || !myReview ? (
-            <ReviewForm
-              key={myReview?.id ?? 'new'}
-              productId={productId}
-              existing={myReview}
-              {...(writing ? { onDone: () => setWriting(false) } : {})}
-            />
+        ) : null}
+
+        {/* ── Writing ─────────────────────────────── */}
+        {!user ? (
+          <Alert tone="info">
+            <Link to="/login">{t('reviews.signInToWrite')}</Link>
+          </Alert>
+        ) : myReview && !writing ? (
+          <div className="review-mine">
+            <div className="review-mine__head">
+              <StarRating value={myReview.rating} />
+              <strong>{t('reviews.yours')}</strong>
+              {myReview.status === 'PENDING' ? (
+                <Badge tone="warning">{t('reviews.pending')}</Badge>
+              ) : myReview.status === 'REJECTED' ? (
+                <Badge tone="danger">{t('reviews.rejected')}</Badge>
+              ) : null}
+            </div>
+            {myReview.body ? <p className="review-mine__body">{myReview.body}</p> : null}
+            <Button size="sm" variant="ghost" onClick={() => setWriting(true)}>
+              {t('common.edit')}
+            </Button>
+          </div>
+        ) : writing || (user && !myReview) ? (
+          productId ? (
+            writing || !myReview ? (
+              <ReviewForm
+                key={myReview?.id ?? 'new'}
+                productId={productId}
+                existing={myReview}
+                {...(writing ? { onDone: () => setWriting(false) } : {})}
+              />
+            ) : null
           ) : null
-        ) : null
-      ) : null}
+        ) : null}
+      </div>
 
       {/* ── The list ────────────────────────────── */}
-      {!reviews || reviews.length === 0 ? (
-        <p className="muted">{t('catalog.noReviews')}</p>
-      ) : (
-        <ul className="review-list">
-          {reviews.map((review) => (
-            <li key={review.id} className="review">
-              <div className="review__head">
-                <StarRating value={review.rating} />
-                <strong className="review__author">{review.author}</strong>
-                {review.is_verified_purchase ? (
-                  <Badge tone="success">{t('catalog.verifiedPurchase')}</Badge>
-                ) : null}
-              </div>
+      <div className="reviews__main">
+        {!reviews || reviews.length === 0 ? (
+          <p className="reviews__empty">{t('catalog.noReviews')}</p>
+        ) : (
+          <ul className="review-list">
+            {reviews.map((review) => (
+              <li key={review.id} className="review">
+                <div className="review__head">
+                  {/* A decorative initial — the name is printed beside it */}
+                  <span className="review__avatar" aria-hidden>
+                    {Array.from(review.author.trim())[0]?.toUpperCase() ?? '·'}
+                  </span>
 
-              {review.title ? <p className="review__title">{review.title}</p> : null}
-              {review.body ? <p className="review__body">{review.body}</p> : null}
+                  <div className="review__who">
+                    <div className="review__name">
+                      <strong className="review__author">{review.author}</strong>
+                      {review.is_verified_purchase ? (
+                        <Badge tone="success">{t('catalog.verifiedPurchase')}</Badge>
+                      ) : null}
+                    </div>
+                    <StarRating value={review.rating} />
+                  </div>
 
-              <div className="review__foot">
-                <span className="review__date muted">
-                  {formatDate(review.created_at, i18n.language)}
-                </span>
+                  <span className="review__date muted">
+                    {formatDate(review.created_at, i18n.language)}
+                  </span>
+                </div>
+
+                {review.title ? <p className="review__title">{review.title}</p> : null}
+                {review.body ? <p className="review__body">{review.body}</p> : null}
 
                 {/* ⚠️  No button on my own review: the server answers 403 to voting
                     on your own, and showing a button that fails when pressed is a bad experience. */}
                 {user && !review.is_mine ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={helpful.isPending}
-                    onClick={() => vote(review.id)}
-                  >
-                    {t('reviews.helpful', { count: review.helpful_count })}
-                  </Button>
+                  <div className="review__foot">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={helpful.isPending}
+                      onClick={() => vote(review.id)}
+                    >
+                      {t('reviews.helpful', { count: review.helpful_count })}
+                    </Button>
+                  </div>
                 ) : review.helpful_count > 0 ? (
-                  <span className="muted">
-                    {t('reviews.helpful', { count: review.helpful_count })}
-                  </span>
+                  <div className="review__foot">
+                    <span className="muted">
+                      {t('reviews.helpful', { count: review.helpful_count })}
+                    </span>
+                  </div>
                 ) : null}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }

@@ -26,8 +26,8 @@ interface AdminLink {
   to: string;
   key: string;
   end?: boolean;
-  /** The Django permission the server checks — or `null` for no condition. */
-  permission: string | null;
+  /** The Django permission the server checks — a list means any of them — or `null` for no condition. */
+  permission: string | readonly string[] | null;
   /** A count of work waiting behind this link — shown beside the label, hidden at zero. */
   badge?: number;
 }
@@ -116,13 +116,18 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
   {
     key: 'system',
     links: [
-      { to: '/admin/users', key: 'nav.users', permission: 'accounts.change_user' },
-      // ⚠️  Staff beside Users, not under finance: it used to sit among the money
-      //     screens because customer assignment is a daily commercial matter, but the
-      //     screen now also creates logins (including admin-panel ones) and edits the
-      //     roles that decide who can open what — account administration, which is
-      //     where someone looking for "add a person" goes first.
-      { to: '/admin/staff', key: 'staff.staffTitle', permission: 'employees.change_customerassignment' },
+      // ⚠️  Users and staff are one link, one screen with a tab for each: staff used to
+      //     sit among the money screens because customer assignment is a daily
+      //     commercial matter, but the screen also creates logins (including
+      //     admin-panel ones) and edits the roles that decide who can open what —
+      //     account administration, which is where someone looking for "add a
+      //     person" goes first. The link shows for either permission, as the screen
+      //     does; the tabs inside are filtered by what the user holds.
+      {
+        to: '/admin/users',
+        key: 'nav.usersAndStaff',
+        permission: ['accounts.change_user', 'employees.change_customerassignment'],
+      },
       { to: '/admin/tax', key: 'admin.tax', permission: 'inventory.change_stocklocation' },
       { to: '/admin/settings', key: 'nav.settings', permission: 'inventory.change_stocklocation' },
       { to: '/admin/payments', key: 'nav.payments', permission: 'payments.change_paymentprovider' },

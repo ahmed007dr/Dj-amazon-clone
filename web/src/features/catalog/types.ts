@@ -7,6 +7,20 @@ export interface CursorPage<T> {
   previous: string | null;
 }
 
+/**
+ * The storefront product grid — numbered pages.
+ *
+ * ⚠️  It carries `pages` but **never `count`**: ADR-32 softened for this one list so a pager
+ *     can say "page 3 of 9", without revealing the exact size of the catalogue.
+ */
+export interface PageResponse<T> {
+  results: T[];
+  page: number;
+  pages: number;
+  next: string | null;
+  previous: string | null;
+}
+
 export interface CategoryBrief {
   id: string;
   slug: string;
@@ -74,7 +88,8 @@ export interface ProductQuery {
   brand?: string;
   kind?: string;
   ordering?: string;
-  cursor?: string;
+  /** 1-based. An out-of-range page is a 404 — the caller falls back to page 1. */
+  page?: number;
   limit?: number;
 }
 

@@ -4,6 +4,7 @@ import { useLocalized } from '@/shared/i18n/useLocalized';
 
 import type { ProductVariant } from '../types';
 
+import './OptionChip.css';
 import './VariantPicker.css';
 
 /**
@@ -31,13 +32,14 @@ export function VariantPicker({
 
   return (
     <div className="variant-picker">
-      <h2 className="variant-picker__title">{t('catalog.variant')}</h2>
+      {/* A label, not a heading — see `ColorPicker` */}
+      <p className="variant-picker__title">{t('catalog.variant')}</p>
 
       <div className="variant-picker__options" role="radiogroup" aria-label={t('catalog.variant')}>
         {variants.map((variant) => (
           <label
             key={variant.id}
-            className={`variant-chip ${value === variant.id ? 'is-selected' : ''}`}
+            className={`option-chip variant-chip ${value === variant.id ? 'is-selected' : ''}`}
           >
             <input
               type="radio"

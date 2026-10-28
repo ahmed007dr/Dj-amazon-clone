@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
@@ -17,13 +17,61 @@ import { useLocalized } from '@/shared/i18n/useLocalized';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { PriceTag } from '@/shared/ui/PriceTag';
-import { Spinner } from '@/shared/ui/Spinner';
+import { Skeleton } from '@/shared/ui/Skeleton';
 import { StateMessage } from '@/shared/ui/StateMessage';
+import { StatusTabs, type TabOption } from '@/shared/ui/StatusTabs';
+import { TabPanel } from '@/shared/ui/TabPanel';
+import { tabDomId } from '@/shared/ui/tabIds';
+import { formatMoney } from '@/shared/utils/format';
 
 import './ProductDetailPage.css';
 
-export function ProductDetailPage() {
+type DetailTab = 'description' | 'specs' | 'reviews';
+
+/** The base of the tab/panel DOM ids — one definition, shared by the tab list and the panels. */
+const TABS_ID = 'pdp';
+
+/**
+ * The page's own loading state.
+ *
+ * ⚠️  A skeleton in the **same grid** as the real page, not a spinner in a blank page: the
+ *     gallery square and the buy box are reserved from the first frame, so the page does not
+ *     jump when the product arrives and the footer is not pulled up behind a spinner.
+ */
+function ProductDetailSkeleton() {
   const { t } = useTranslation();
+
+  return (
+    <div className="container pdp" aria-busy="true">
+      <span className="visually-hidden" role="status">
+        {t('common.loading')}
+      </span>
+
+      <div className="pdp__crumbs" aria-hidden>
+        <Skeleton width="14rem" height="1rem" />
+      </div>
+
+      <div className="pdp__grid" aria-hidden>
+        <div className="pdp__media">
+          <div className="pdp__skeleton-media">
+            <Skeleton height="auto" radius="var(--radius-lg)" />
+          </div>
+        </div>
+
+        <div className="pdp__info">
+          <Skeleton width="30%" height="1.5rem" radius="var(--radius-pill)" />
+          <Skeleton width="85%" height="2rem" />
+          <Skeleton width="35%" height="1.25rem" />
+          <Skeleton height="6.5rem" radius="var(--radius)" />
+          <Skeleton width="100%" height="3.25rem" radius="var(--radius)" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ProductDetailPage() {
+  const { t, i18n } = useTranslation();
   const localized = useLocalized();
   const { slug } = useParams<{ slug: string }>();
 
@@ -33,10 +81,13 @@ export function ProductDetailPage() {
   //     colour itself comes in several (a size matrix imported with colour columns).
   const [colorId, setColorId] = useState<string | null>(null);
   const [variantId, setVariantId] = useState<string | null>(null);
+  // `null` until the shopper picks one — the first tab that exists is then the default
+  const [tab, setTab] = useState<DetailTab | null>(null);
+  const detailsRef = useRef<HTMLDivElement>(null);
 
   const availability = useAvailability(product ? [product.id] : []);
 
-  if (isPending) return <Spinner />;
+  if (isPending) return <ProductDetailSkeleton />;
 
   if (error || !product) {
     /**
@@ -165,15 +216,61 @@ export function ProductDetailPage() {
     ? !needsColor && variants.length > 1 && !effectiveVariantId
     : variants.length > 0 && !variantId;
   const cartVariantId = hasColors ? effectiveVariantId : variantId;
+  const outOfStock = stock?.is_available === false;
   const cannotAdd =
     needsColor ||
     needsVariant ||
     (hasColors && selectedColor !== null && cartVariantId === null) ||
-    stock?.is_available === false;
+    outOfStock;
+
+  // What the disabled button is waiting for. At most one of the two applies: a variant is only
+  // asked for once a colour is settled.
+  const hint = needsColor
+    ? t('catalog.colors.pickColor')
+    : needsVariant
+      ? t('catalog.pickVariant')
+      : null;
+
+  const description = localized(product, 'description');
+  const shortDescription = localized(product, 'short_description');
+
+  // ── The tabs under the buy box ─────────────────────────────────────
+  // Description only when there is one — an empty tab is a dead end.
+  const tabs: (TabOption & { value: DetailTab })[] = [
+    ...(description ? [{ value: 'description' as const, label: t('catalog.description') }] : []),
+    { value: 'specs', label: t('catalog.specs') },
+    {
+      value: 'reviews',
+      label: t('catalog.reviews'),
+      ...(product.rating.count > 0 ? { count: product.rating.count } : {}),
+    },
+  ];
+  const activeTab = tabs.find((option) => option.value === tab)?.value ?? tabs[0]!.value;
+
+  // ⚠️  The rating under the title is a way *in* to the reviews, not a dead label: it opens the
+  //     reviews tab, brings the section into view and moves focus to the tab so a keyboard user
+  //     lands where the page took them (`preventScroll` — the smooth scroll below does the move).
+  const showReviews = () => {
+    setTab('reviews');
+    document.getElementById(tabDomId(TABS_ID, 'reviews'))?.focus({ preventScroll: true });
+    detailsRef.current?.scrollIntoView({ block: 'start' });
+  };
+
+  const money = (value: string) => formatMoney(value, i18n.language);
+  const was = priceSource.compare_at_price;
+
+  const addToCart = (
+    <AddToCartButton
+      productId={product.id}
+      {...(cartVariantId ? { variantId: cartVariantId } : {})}
+      block
+      disabled={cannotAdd}
+    />
+  );
 
   return (
-    <div className="container">
-      <nav className="breadcrumb" aria-label={t('common.back')}>
+    <div className="container pdp">
+      <nav className="breadcrumb pdp__crumbs" aria-label={t('common.back')}>
         <Link to="/products">{t('nav.catalog')}</Link>
         {product.category ? (
           <>
@@ -183,30 +280,45 @@ export function ProductDetailPage() {
             </Link>
           </>
         ) : null}
+        <span aria-hidden>/</span>
+        <span className="pdp__crumb-current truncate" aria-current="page">
+          {name}
+        </span>
       </nav>
 
-      <div className="product-page">
-        <div className="product-page__media">
+      <div className="pdp__grid">
+        <div className="pdp__media">
           <ProductGallery key={galleryKey} images={galleryImages} alt={name} />
         </div>
 
-        <div className="product-page__info">
-          <h1 className="product-page__title">{name}</h1>
+        <div className="pdp__info">
+          <header className="pdp__head">
+            <div className="pdp__meta">
+              {product.brand ? (
+                <Link to={`/products?brand=${product.brand.slug}`} className="pdp__brand">
+                  {localized(product.brand, 'name')}
+                </Link>
+              ) : null}
+              <span className="pdp__sku">
+                {t('catalog.sku')}: <bdi>{product.sku}</bdi>
+              </span>
+            </div>
 
-          {product.brand ? (
-            <Link
-              to={`/products?brand=${product.brand.slug}`}
-              className="product-page__brand muted"
-            >
-              {localized(product.brand, 'name')}
-            </Link>
-          ) : null}
+            <h1 className="pdp__title">{name}</h1>
 
-          {product.rating.count > 0 ? (
-            <StarRating value={product.rating.average} count={product.rating.count} />
-          ) : null}
+            {product.rating.count > 0 ? (
+              <button
+                type="button"
+                className="pdp__rating"
+                title={t('catalog.reviews')}
+                onClick={showReviews}
+              >
+                <StarRating value={product.rating.average} count={product.rating.count} />
+              </button>
+            ) : null}
+          </header>
 
-          <div className="product-page__price">
+          <div className="pdp__price-panel">
             <PriceTag
               variant="detail"
               price={shownPrice}
@@ -214,9 +326,11 @@ export function ProductDetailPage() {
               percent={priceSource.discount_percent}
               prefix={priceIsFrom ? t('catalog.colors.from') : undefined}
             />
-          </div>
 
-          <StockBadge availability={stock} />
+            <div className="pdp__status">
+              <StockBadge availability={stock} />
+            </div>
+          </div>
 
           {/* ⚠️  Prescriptions are outside the current scope of work, and the field
               exists to avoid a later migration. Showing it when it is true
@@ -226,62 +340,101 @@ export function ProductDetailPage() {
             <Alert tone="warning">{t('catalog.prescriptionRequired')}</Alert>
           ) : null}
 
-          {localized(product, 'short_description') ? (
-            <p className="product-page__summary">{localized(product, 'short_description')}</p>
+          {shortDescription ? <p className="pdp__summary">{shortDescription}</p> : null}
+
+          {hasColors || variants.length > 0 ? (
+            <div className="pdp__options">
+              <ColorPicker
+                colors={colors}
+                value={selectedColor?.id ?? null}
+                onChange={(next) => {
+                  setColorId(next);
+                  // A size chosen inside another colour does not carry over
+                  setVariantId(null);
+                }}
+              />
+
+              <VariantPicker variants={variants} value={variantId} onChange={setVariantId} />
+            </div>
           ) : null}
 
-          <ColorPicker
-            colors={colors}
-            value={selectedColor?.id ?? null}
-            onChange={(next) => {
-              setColorId(next);
-              // A size chosen inside another colour does not carry over
-              setVariantId(null);
-            }}
-          />
-
-          <VariantPicker variants={variants} value={variantId} onChange={setVariantId} />
-
-          <div className="product-page__action">
-            {needsColor ? (
-              <p className="product-page__hint muted">{t('catalog.colors.pickColor')}</p>
-            ) : null}
-            {needsVariant ? (
-              <p className="product-page__hint muted">{t('catalog.pickVariant')}</p>
-            ) : null}
-
-            <AddToCartButton
-              productId={product.id}
-              {...(cartVariantId ? { variantId: cartVariantId } : {})}
-              block
-              disabled={cannotAdd}
-            />
+          {/* ⚠️  Two homes for the buy button, one visible at a time (CSS, not state — no resize
+              listener, no flash). From a tablet up it sits in the card; on a phone it moves to the
+              bar pinned to the bottom edge, so it is never a scroll away from the options it
+              depends on. The bar carries the price too, since the card's has scrolled off. */}
+          <div className="pdp__action">
+            {hint ? <p className="pdp__hint">{hint}</p> : null}
+            {addToCart}
           </div>
         </div>
       </div>
 
-      {localized(product, 'description') ? (
-        <section className="product-page__section">
-          <h2 className="product-page__heading">{t('catalog.description')}</h2>
-          <p className="product-page__body">{localized(product, 'description')}</p>
-        </section>
-      ) : null}
+      <div ref={detailsRef} className="pdp__details">
+        <StatusTabs
+          id={TABS_ID}
+          label={t('catalog.details')}
+          options={tabs}
+          value={activeTab}
+          onChange={(next) => {
+            setTab(next as DetailTab);
+          }}
+        />
 
-      <section className="product-page__section">
-        <h2 className="product-page__heading">{t('catalog.specs')}</h2>
-        <ProductSpecs product={product} />
-      </section>
+        {description ? (
+          <TabPanel
+            id={TABS_ID}
+            value="description"
+            active={activeTab === 'description'}
+            className="pdp__panel"
+          >
+            <p className="pdp__body">{description}</p>
+          </TabPanel>
+        ) : null}
 
-      <section className="product-page__section">
-        <h2 className="product-page__heading">
-          {t('catalog.reviews')}
-          {product.rating.count > 0 ? ` (${product.rating.count})` : ''}
-        </h2>
-        {/* ⚠️  The id is required for writing: the server links the review to the
-            product by its id rather than by `slug` — and the latter is
-            theoretically changeable. */}
-        {slug ? <ReviewList slug={slug} productId={product.id} /> : null}
-      </section>
+        <TabPanel id={TABS_ID} value="specs" active={activeTab === 'specs'} className="pdp__panel">
+          <ProductSpecs product={product} />
+        </TabPanel>
+
+        {/* ⚠️  `keepMounted`: the panel holds a half-written review. Unmounting it on a tab
+            change would throw that text away, and a shopper comparing the specs mid-sentence
+            would come back to an empty form. */}
+        <TabPanel
+          id={TABS_ID}
+          value="reviews"
+          active={activeTab === 'reviews'}
+          keepMounted
+          className="pdp__panel"
+        >
+          {/* ⚠️  The id is required for writing: the server links the review to the
+              product by its id rather than by `slug` — and the latter is
+              theoretically changeable. */}
+          {slug ? <ReviewList slug={slug} productId={product.id} /> : null}
+        </TabPanel>
+      </div>
+
+      {/* The phone's buy bar — see the note on `pdp__action` */}
+      <div className="pdp__bar">
+        <div className="pdp__bar-info">
+          <span className="pdp__bar-price" aria-hidden>
+            {priceIsFrom ? (
+              <span className="pdp__bar-from">{t('catalog.colors.from')} </span>
+            ) : null}
+            {money(shownPrice)}
+          </span>
+
+          {hint ? (
+            <span className="pdp__bar-note">{hint}</span>
+          ) : outOfStock ? (
+            <span className="pdp__bar-note pdp__bar-note--bad">{t('catalog.outOfStock')}</span>
+          ) : was ? (
+            <s className="pdp__bar-was" aria-hidden>
+              {money(was)}
+            </s>
+          ) : null}
+        </div>
+
+        <div className="pdp__bar-action">{addToCart}</div>
+      </div>
     </div>
   );
 }

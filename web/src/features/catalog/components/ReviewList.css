@@ -1,3 +1,44 @@
+/*
+  Reviews: the summary and the write box beside the list on a wide screen, above it on a phone.
+
+  ⚠️  The aside comes **first in the DOM**: on a phone it is what the reader meets before the
+      list (the average, then "write yours"), and the grid only moves it sideways from `lg` up.
+*/
+.reviews {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.reviews__aside {
+  display: grid;
+  gap: var(--space-4);
+  min-inline-size: 0;
+}
+
+.reviews__aside:empty {
+  display: none;
+}
+
+.reviews__main {
+  min-inline-size: 0;
+}
+
+.reviews__empty {
+  padding: var(--space-6) var(--space-4);
+  color: var(--color-text-muted);
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+}
+
+@media (min-width: 992px) {
+  .reviews {
+    grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+    gap: var(--space-8);
+  }
+}
+
 .review-list {
   display: grid;
   gap: var(--space-4);
@@ -6,16 +47,39 @@
 
 .review {
   display: grid;
-  gap: var(--space-1);
-  padding-block-end: var(--space-4);
-  border-block-end: 1px solid var(--color-border);
-}
-
-.review:last-child {
-  border-block-end: none;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--color-text) 3%, var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
 }
 
 .review__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.review__avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
+  border-radius: 50%;
+}
+
+.review__who {
+  display: grid;
+  flex: 1;
+  gap: 0.125rem;
+  min-inline-size: 0;
+}
+
+.review__name {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -27,25 +91,31 @@
 }
 
 .review__title {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .review__body {
   color: var(--color-text);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 
 .review__date {
+  align-self: start;
   font-size: 0.8125rem;
+  white-space: nowrap;
 }
 
-/* ⚠️  The date and the "helpful" button on one line: the button below the text
-       alone looks like an action on the page rather than on this review. */
+/* ⚠️  The "helpful" button under the text it votes on, set off by a rule: a button beside
+       the date alone looks like an action on the page rather than on this review. */
 .review__foot {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
   align-items: center;
-  margin-block-start: var(--space-2);
+  padding-block-start: var(--space-3);
+  margin-block-start: var(--space-1);
+  border-block-start: 1px solid var(--color-border);
 }
 
 /* My review — distinguished by a border, not by a loud background */
@@ -55,7 +125,6 @@
   gap: var(--space-2);
   align-items: flex-start;
   padding: var(--space-4);
-  margin-block-end: var(--space-4);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-inline-start: 3px solid var(--color-primary);
@@ -74,10 +143,21 @@
   color: var(--color-text);
 }
 
-/* ⚠️  The live average above the list: it is read before any text, and it moves
+/* ⚠️  The live average sits above everything else: it is read before any text, and it moves
    the moment a review is submitted instead of waiting for the product page cache to expire. */
 .review-summary {
-  padding-block-end: var(--space-3);
-  margin-block-end: var(--space-3);
-  border-block-end: 1px solid var(--color-border);
+  display: grid;
+  justify-items: start;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, var(--color-border));
+  border-radius: var(--radius);
+}
+
+.review-summary__score {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }

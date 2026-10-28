@@ -103,7 +103,11 @@ export function AdminAcademicPage() {
 
       <div className="academic-panels">
         <TabPanel id={TABS_ID} value="verification" active={tab === 'verification'}>
-          <VerificationPanel />
+          <VerificationPanel
+            onOpenStudents={() => {
+              setTab('students');
+            }}
+          />
         </TabPanel>
         <TabPanel id={TABS_ID} value="universities" active={tab === 'universities'}>
           <UniversityPanel />

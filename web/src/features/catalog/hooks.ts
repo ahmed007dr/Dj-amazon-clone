@@ -8,7 +8,7 @@
  *     defects. Caching and invalidation happen here.
  */
 
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import {
   getAvailability,
@@ -25,20 +25,20 @@ import {
 } from './api';
 import type { CategoryBrief, ProductQuery, Review } from './types';
 
-/** The raw cursor from the next-page URL. */
-function cursorFrom(next: string | null): string | undefined {
-  if (!next) return undefined;
-  // The server returns the full URL; we need the parameter alone to pass to our own client
-  return new URL(next).searchParams.get('cursor') ?? undefined;
-}
-
-export function useProducts(query: Omit<ProductQuery, 'cursor'>) {
-  return useInfiniteQuery({
+/**
+ * One page of the product list. The page number is part of the query, so it is part of the key.
+ *
+ * ⚠️  `keepPreviousData`: while page 3 loads, page 2 stays on screen.
+ *
+ *     Without it every click on the pager swaps the grid for a skeleton and back — the
+ *     page jumps, the scroll position is lost, and a slow connection looks broken. The
+ *     previous page is shown (`isPlaceholderData`) and replaced the moment the new one lands.
+ */
+export function useProducts(query: ProductQuery) {
+  return useQuery({
     queryKey: ['catalog', 'products', query],
-    queryFn: ({ pageParam, signal }) =>
-      listProducts({ ...query, ...(pageParam ? { cursor: pageParam } : {}) }, signal),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => cursorFrom(last.next),
+    queryFn: ({ signal }) => listProducts(query, signal),
+    placeholderData: keepPreviousData,
     // ⚠️  Products change on the scale of minutes, not seconds. Refetching on
     //     every window focus loads the server with no benefit to the user.
     staleTime: 2 * 60 * 1000,

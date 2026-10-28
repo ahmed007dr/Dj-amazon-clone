@@ -1,3 +1,12 @@
+/*
+  The product page.
+
+  ⚠️  `.breadcrumb` stays as it was, un-prefixed: `BundleDetailPage` uses the same class and
+      relies on this file for it.
+
+  ⚠️  Colours are tokens only (and `color-mix` over them), so the brand colour and the dark
+      palette carry the page with no override here. Every directional rule is logical.
+*/
 .breadcrumb {
   display: flex;
   flex-wrap: wrap;
@@ -8,66 +17,322 @@
   color: var(--color-text-muted);
 }
 
-.product-page {
-  display: grid;
-  gap: var(--space-6);
-  align-items: start;
-}
-
-.product-page__media {
+/* The page's own crumb row also names where you are — truncated, so a long product name
+   never wraps the trail onto three lines on a phone. */
+.pdp__crumbs {
+  flex-wrap: nowrap;
   min-inline-size: 0;
 }
 
-.product-page__info {
+.pdp__crumbs > a {
+  flex: none;
+}
+
+/* ⚠️  `contain: inline-size`, not just `min-inline-size: 0`: the store shell is a one-column grid
+   whose track grows to its widest child's *min-content*, and a no-wrap line of text reports its
+   full length there however hard it is clipped — one long product name would widen the whole
+   page and make it scroll sideways. */
+.pdp__crumb-current {
+  flex: 1 1 0;
+  min-inline-size: 4rem;
+  contain: inline-size;
+  color: var(--color-text);
+}
+
+/* ── The grid: photos | buy box ─────────────────────────── */
+.pdp__grid {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.pdp__media {
+  min-inline-size: 0;
+  /* One column (a phone, or a wide phone on its side): a photo as wide as the screen is
+     a screen of photo, so it stops growing and centres. */
+  inline-size: 100%;
+  max-inline-size: 32rem;
+  margin-inline: auto;
+}
+
+/* ── The buy box ────────────────────────────────────────── */
+.pdp__info {
+  display: grid;
+  gap: var(--space-4);
   align-content: start;
+  min-inline-size: 0;
+  padding: var(--space-4);
+
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
-.product-page__title {
-  font-size: clamp(1.25rem, 3vw, 1.75rem);
-  font-weight: 700;
-}
-
-.product-page__brand {
-  font-size: 0.9375rem;
-  text-decoration: none;
-  justify-self: start;
-}
-
-/* Size, weight and colour belong to `PriceTag` (shared/ui) */
-.product-page__price {
-  margin-block: var(--space-1);
-}
-
-.product-page__summary {
-  color: var(--color-text-muted);
-}
-
-.product-page__action {
+.pdp__head {
   display: grid;
   gap: var(--space-2);
-  margin-block-start: var(--space-2);
+  justify-items: start;
 }
 
-.product-page__hint {
+.pdp__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  inline-size: 100%;
   font-size: 0.8125rem;
 }
 
-.product-page__section {
-  margin-block-start: var(--space-10);
+.pdp__brand {
+  padding: 0.125rem var(--space-3);
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  border-radius: var(--radius-pill);
+  transition: background var(--transition);
 }
 
-.product-page__heading {
-  margin-block-end: var(--space-4);
-  padding-block-end: var(--space-2);
-  font-size: 1.125rem;
+.pdp__brand:hover {
+  text-decoration: none;
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.pdp__sku {
+  color: var(--color-text-muted);
+}
+
+.pdp__title {
+  font-size: clamp(1.375rem, 1.1rem + 1.2vw, 2rem);
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+/* The stars are a way down to the reviews — a button that looks like the line it replaces */
+.pdp__rating {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-sm);
+}
+
+.pdp__rating:hover .stars__count {
+  text-decoration: underline;
+}
+
+/*
+  The price on a tinted panel — the one number the page is for.
+  Size, weight and colour of the figures stay with `PriceTag`; this only lifts the "detail"
+  variant a step and gives it room.
+*/
+.pdp__price-panel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, var(--color-border));
+  border-radius: var(--radius);
+}
+
+.pdp__price-panel .price-tag--detail .price-tag__now {
+  font-size: clamp(1.875rem, 1.5rem + 1.6vw, 2.5rem);
+  letter-spacing: -0.01em;
+}
+
+.pdp__price-panel .price-tag--detail .price-tag__was {
+  font-size: 1.0625rem;
+}
+
+.pdp__price-panel .price-tag--detail .price-tag__badge {
+  padding-block: 0.125rem;
+  font-size: 0.8125rem;
+}
+
+/* ⚠️  A flex row, not a grid cell: a grid item stretches to the panel's width and turns the
+   status pill into a full-width bar. */
+.pdp__status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pdp__status .badge {
+  padding: 0.2rem var(--space-3);
+  font-size: 0.8125rem;
+}
+
+.pdp__summary {
+  color: var(--color-text-muted);
+  line-height: 1.7;
+}
+
+/* The pickers: a rule above separates "what it is" from "which one" */
+.pdp__options {
+  display: grid;
+  gap: var(--space-4);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--color-border);
+}
+
+/* ── The buy button (card) ──────────────────────────────── */
+.pdp__action {
+  display: none;
+  gap: var(--space-3);
+}
+
+.pdp__action .btn {
+  min-block-size: 3.25rem;
+  font-size: 1.0625rem;
   font-weight: 700;
-  border-block-end: 1px solid var(--color-border);
 }
 
-.product-page__body {
+/* What the disabled button is waiting for — said next to it, not in the margin of the page */
+.pdp__hint {
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-text-muted) 10%, transparent);
+  border-radius: var(--radius);
+}
+
+/* ── The buy bar (phone) ────────────────────────────────── */
+/*
+  ⚠️  Pinned to the bottom edge on a phone, and everything else that lives there makes room:
+        · the floating WhatsApp button rides above it through its own `--floating-offset` hook;
+        · toasts (bottom, start corner) are lifted above it;
+        · the page gains the bar's height at the bottom so the footer is not hidden behind it.
+      All three are keyed on the bar being in the DOM (`:has`), so nothing outside this page
+      changes when the page is not open.
+*/
+.pdp__bar {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  /* Under the header and the WhatsApp button, over the page; drawers, modals and toasts stay above */
+  z-index: calc(var(--z-header) - 2);
+
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  padding-block-end: max(var(--space-3), env(safe-area-inset-bottom, 0px));
+
+  background: var(--color-surface);
+  border-block-start: 1px solid var(--color-border);
+  box-shadow: 0 -6px 20px rgb(0 0 0 / 10%);
+}
+
+.pdp__bar-info {
+  display: grid;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  line-height: 1.3;
+}
+
+.pdp__bar-price {
+  font-size: 1.1875rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.pdp__bar-from {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.pdp__bar-was,
+.pdp__bar-note {
+  overflow: hidden;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdp__bar-note {
+  font-weight: 600;
+}
+
+.pdp__bar-note--bad {
+  color: var(--color-danger);
+}
+
+.pdp__bar-action {
+  flex: 0 1 12rem;
+  min-inline-size: 8.5rem;
+}
+
+.pdp__bar-action .btn {
+  min-block-size: 3rem;
+  padding-inline: var(--space-3);
+  font-weight: 700;
+}
+
+/* A refusal ("only 3 available") is the thing to read — it rises above the bar as a card
+   instead of stretching the bar and shoving the WhatsApp button's clearance out of true. */
+.pdp__bar-action .add-to-cart__error {
+  position: absolute;
+  inset-inline: var(--space-4);
+  inset-block-end: calc(100% + var(--space-2));
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, transparent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+
+@media (max-width: 767px) {
+  :root:has(.pdp__bar) {
+    --pdp-bar-h: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+    --floating-offset: var(--pdp-bar-h);
+  }
+
+  body:has(.pdp__bar) {
+    padding-block-end: var(--pdp-bar-h);
+  }
+
+  :root:has(.pdp__bar) .toasts {
+    inset-block-end: calc(var(--pdp-bar-h) + var(--space-2));
+  }
+}
+
+/* ── Below the fold: description · specs · reviews ──────── */
+.pdp__details {
+  margin-block-start: var(--space-6);
+  overflow: hidden;
+
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  /* The sticky header must not cover the tabs when the rating link scrolls here */
+  scroll-margin-block-start: calc(var(--header-height) + var(--space-4));
+}
+
+.pdp__details .status-tabs {
+  padding-inline: var(--space-2);
+}
+
+.pdp__panel {
+  padding: var(--space-5) var(--space-4);
+}
+
+/* A line of text longer than ~70 characters is hard to follow; the card is allowed to be wide */
+.pdp__body {
+  max-inline-size: 70ch;
+  line-height: 1.85;
   white-space: pre-line;
+}
+
+/* ── Loading ────────────────────────────────────────────── */
+.pdp__skeleton-media .skeleton {
+  aspect-ratio: 1;
 }
 
 .product-page__link {
@@ -76,15 +341,50 @@
 }
 
 @media (min-width: 768px) {
-  .product-page {
+  .pdp__grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: var(--space-8);
+  }
+
+  .pdp__media {
+    max-inline-size: none;
+    margin-inline: 0;
+  }
+
+  .pdp__info {
+    gap: var(--space-5);
+    padding: var(--space-6);
+  }
+
+  .pdp__action {
+    display: grid;
+  }
+
+  .pdp__bar {
+    display: none;
+  }
+
+  .pdp__details {
+    margin-block-start: var(--space-8);
+  }
+
+  .pdp__panel {
+    padding: var(--space-6);
   }
 }
 
 @media (min-width: 1200px) {
-  .product-page {
+  .pdp__grid {
     grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
   }
 }
 
+/* The photos follow the shopper down a tall buy box (many options) — but only when the
+   window is tall enough to show them whole; a taller-than-the-window sticky box can't be
+   scrolled to its bottom edge. */
+@media (min-width: 768px) and (min-height: 760px) {
+  .pdp__media {
+    position: sticky;
+    inset-block-start: calc(var(--header-height) + var(--space-4));
+  }
+}

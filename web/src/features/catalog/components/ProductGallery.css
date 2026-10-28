@@ -1,6 +1,12 @@
 .gallery {
   display: grid;
   gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+/* The frame the track and its position dots share — the dots sit over the photo, not under it */
+.gallery__stage {
+  position: relative;
 }
 
 /*
@@ -26,7 +32,8 @@
 
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .gallery__main::-webkit-scrollbar {
@@ -38,6 +45,7 @@
   display: grid;
   place-items: center;
   block-size: 100%;
+  padding: var(--space-3);
   scroll-snap-align: center;
   scroll-snap-stop: always;
 }
@@ -52,21 +60,34 @@
 
 /* The position indicator — a phone has no thumbnail in view while swiping */
 .gallery__dots {
+  position: absolute;
+  inset-block-end: var(--space-3);
+  inset-inline: 0;
   display: flex;
   justify-content: center;
   gap: var(--space-2);
+  inline-size: fit-content;
+  margin-inline: auto;
+  padding: var(--space-1) var(--space-2);
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  pointer-events: none;
 }
 
 .gallery__dot {
-  inline-size: 0.5rem;
-  block-size: 0.5rem;
+  inline-size: 0.4375rem;
+  block-size: 0.4375rem;
   border-radius: 50%;
-  background: var(--color-border);
-  transition: background 150ms ease;
+  background: color-mix(in srgb, var(--color-text-muted) 45%, transparent);
+  transition:
+    background var(--transition),
+    transform var(--transition);
 }
 
 .gallery__dot.is-active {
   background: var(--color-primary);
+  transform: scale(1.25);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -75,36 +96,88 @@
   }
 }
 
+/* The thumbnail strip already says where you are — the dots are for the phone */
+@media (min-width: 768px) {
+  .gallery__dots {
+    display: none;
+  }
+}
+
+/*
+  The "no photo" state.
+
+  ⚠️  Shorter than a photo's square on a phone: a 1:1 empty tile is a whole screen of nothing
+      that pushes the price and the buy button below the fold. From a tablet up it is the same
+      square, so the two states line up in the grid.
+*/
 .gallery--empty {
   display: grid;
   place-items: center;
-  aspect-ratio: 1;
-  font-size: 4rem;
-  color: var(--color-text-muted);
-  opacity: 0.35;
+  aspect-ratio: 4 / 3;
 
-  background: var(--color-surface);
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      color-mix(in srgb, var(--color-primary) 11%, var(--color-surface)),
+      var(--color-surface) 68%
+    );
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
+@media (min-width: 768px) {
+  .gallery--empty {
+    aspect-ratio: 1;
+  }
+}
+
+.gallery__placeholder {
+  display: grid;
+  place-items: center;
+  inline-size: 5.5rem;
+  block-size: 5.5rem;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  border: 1px dashed color-mix(in srgb, var(--color-primary) 40%, transparent);
+  border-radius: 50%;
+}
+
+.gallery__placeholder-icon {
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  fill: currentcolor;
+  opacity: 0.75;
+}
+
+/*
+  ⚠️  The strip scrolls sideways when there are more photos than fit; the block padding keeps
+      the focus ring and the active thumbnail's border from being clipped by that overflow.
+*/
 .gallery__thumbs {
   display: flex;
   gap: var(--space-2);
+  padding: 3px;
+  margin: -3px;
   overflow-x: auto;
   scrollbar-width: thin;
 }
 
 .gallery__thumb {
   flex: 0 0 auto;
-  inline-size: 4rem;
-  block-size: 4rem;
-  padding: 2px;
+  inline-size: 4.5rem;
+  block-size: 4.5rem;
+  padding: var(--space-1);
   overflow: hidden;
 
   background: var(--color-surface);
   border: 2px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
+  transition: border-color var(--transition);
+}
+
+.gallery__thumb:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 55%, var(--color-border));
 }
 
 .gallery__thumb.is-active {

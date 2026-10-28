@@ -19,6 +19,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.models import User
 from core import files
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
@@ -227,6 +228,8 @@ def _filtered_documents(request, *, with_status: bool = True):
         queryset = queryset.filter(status=params["status"])
     if "document_type" in params:
         queryset = queryset.filter(document_type=params["document_type"])
+    if "user" in params:
+        queryset = queryset.filter(customer__user_id=params["user"])
     if term := params.get("search", "").strip():
         queryset = queryset.filter(
             Q(customer__user__email__icontains=term)
@@ -392,6 +395,51 @@ class AdminDocumentRejectAPI(APIView):
         return Response(
             s.AdminDocumentSerializer(get_object_or_404(_document_queryset(), pk=pk)).data
         )
+
+
+class _AdminStudentDecisionAPI(APIView):
+    """
+    Decide a student from their data, with no document needed.
+
+    ⚠️  Lives beside the document endpoints, not in `academic`: the decision moves
+        the account's verification *and* the student's waiting ID cards, and
+        `customers` and `academic` are independent siblings. The student list that
+        offers the buttons is in `academic`; the screen calls these endpoints, the
+        same way it already calls the document queue.
+
+    The answer is the account's new state — the screen refetches the list.
+    """
+
+    permission_classes = [CanManageAcademic]
+    verified: bool
+
+    def decide(self, request, user_id, *, reason: str = ""):
+        user = services.decide_student_verification(
+            get_object_or_404(User, pk=user_id),
+            verified=self.verified,
+            reviewer=request.user,
+            reason=reason,
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+        return Response({"id": str(user.pk), "verification_status": user.verification_status})
+
+
+class AdminStudentVerifyAPI(_AdminStudentDecisionAPI):
+    verified = True
+
+    def post(self, request, user_id):
+        return self.decide(request, user_id)
+
+
+class AdminStudentRejectAPI(_AdminStudentDecisionAPI):
+    """Reject a waiting request, or revoke a verified student — the reason is mandatory."""
+
+    verified = False
+
+    def post(self, request, user_id):
+        payload = s.RejectDocumentSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        return self.decide(request, user_id, reason=payload.validated_data["reason"])
 
 
 class AdminDocumentBulkApproveAPI(APIView):

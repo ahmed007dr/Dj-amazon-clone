@@ -10,30 +10,42 @@
   color: var(--color-text-muted);
 }
 
+/* ⚠️  A sub-navigation inside the page's "staff" tab, so it is drawn as pills.
+   Another underlined tab bar directly under the page's own reads as one confusing
+   double row — and it scrolls sideways on a phone instead of wrapping its labels
+   onto two lines ("customers with no owner" did, at 390px). */
 .staff-tabs {
   display: flex;
   gap: var(--space-2);
-  margin-block: var(--space-3);
-  border-block-end: 1px solid var(--color-border);
+  margin-block-end: var(--space-3);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.staff-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .staff-tabs button {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: var(--space-2);
   min-block-size: var(--touch-target);
   padding-inline: var(--space-4);
   font-size: 0.9375rem;
   color: var(--color-text-muted);
-  background: transparent;
-  border: none;
-  border-block-end: 2px solid transparent;
+  white-space: nowrap;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
   cursor: pointer;
 }
 
 .staff-tabs button.is-active {
   color: var(--color-primary);
-  border-block-end-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  border-color: var(--color-primary);
   font-weight: 600;
 }
 

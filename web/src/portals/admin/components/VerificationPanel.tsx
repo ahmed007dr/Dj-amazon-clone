@@ -21,6 +21,7 @@ import { Button } from '@/shared/ui/Button';
 import { FilterBar, FilterSearch, FilterSelect } from '@/shared/ui/FilterBar';
 import { Modal } from '@/shared/ui/Modal';
 import { Pagination } from '@/shared/ui/Pagination';
+import { StateMessage } from '@/shared/ui/StateMessage';
 import { StatusTabs } from '@/shared/ui/StatusTabs';
 import { useToast } from '@/shared/ui/useToast';
 import { formatDate } from '@/shared/utils/format';
@@ -47,11 +48,19 @@ const STATUS_TONE = { PENDING: 'warning', APPROVED: 'success', REJECTED: 'danger
  *     always review them. Every other verification notice stays hidden while the
  *     switch is off — this queue is the one exception.
  *
+ * ⚠️  **This queue only knows students who uploaded something.**
+ *
+ *     A student with no document at all is not a row here, so an empty queue
+ *     looked like "there is nothing to review" — while the student the admin was
+ *     looking for sat unverified in the Students tab with no button. The empty
+ *     state says where those students are decided (`onOpenStudents` switches to
+ *     that tab), and the hint says it even when the queue is not empty.
+ *
  * ⚠️  Only `PENDING` rows can be selected or decided. A decided document cannot be
  *     decided again (the server answers `409`), so offering the buttons on it would
  *     be offering a button that fails.
  */
-export function VerificationPanel() {
+export function VerificationPanel({ onOpenStudents }: { onOpenStudents: () => void }) {
   const { t, i18n } = useTranslation();
   const localized = useLocalized();
   const { notify } = useToast();
@@ -85,6 +94,9 @@ export function VerificationPanel() {
   const allSelected = pendingRows.length > 0 && pendingRows.every((row) => selected.has(row.id));
 
   const hasFilters = documentType !== '' || search !== '';
+
+  /** An empty *waiting* queue with no filter: nothing to review here, but maybe elsewhere. */
+  const nothingWaiting = status === 'PENDING' && !hasFilters && list.isSuccess && rows.length === 0;
 
   /** ⚠️  Any change of view clears the selection: ticks must never apply to rows that are no longer on screen. */
   function resetView() {
@@ -346,15 +358,28 @@ export function VerificationPanel() {
         </div>
       ) : null}
 
-      <DataTable
-        columns={columns}
-        rows={rows}
-        isLoading={list.isPending}
-        error={list.error}
-        rowKey={(row) => row.id}
-        emptyTitle={t('academic.review.noRequests')}
-        emptyBody={t('academic.review.noRequestsBody')}
-      />
+      {nothingWaiting ? (
+        <StateMessage
+          icon="▤"
+          title={t('academic.review.noRequests')}
+          body={t('academic.review.noPendingBody')}
+          action={
+            <Button variant="secondary" onClick={onOpenStudents}>
+              {t('academic.review.openStudents')}
+            </Button>
+          }
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={rows}
+          isLoading={list.isPending}
+          error={list.error}
+          rowKey={(row) => row.id}
+          emptyTitle={t('academic.review.noRequests')}
+          emptyBody={t('academic.review.noRequestsBody')}
+        />
+      )}
 
       {list.data ? (
         <Pagination

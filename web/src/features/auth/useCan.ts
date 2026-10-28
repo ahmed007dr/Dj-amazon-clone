@@ -21,8 +21,15 @@ import { useAuth } from './useAuth';
  *
  *     Before `/auth/me` arrives the list is empty; showing everything until it
  *     does makes the links flicker on every startup.
+ *
+ * ⚠️  A list means **any of them**, not all.
+ *
+ *     It exists for the screen that merges two others (users + staff): it must
+ *     open for someone who holds either permission, and then show each part only
+ *     to the one who holds it. Requiring all of them would lock out exactly the
+ *     person who used to reach one of the two screens before they were merged.
  */
-export function useCan(): (permission?: string | null) => boolean {
+export function useCan(): (permission?: string | readonly string[] | null) => boolean {
   const { user } = useAuth();
 
   return useCallback(
@@ -33,7 +40,10 @@ export function useCan(): (permission?: string | null) => boolean {
       // ⚠️  `null` = no condition: a screen anyone who reaches it may open.
       if (permission === undefined || permission === null) return true;
 
-      return (user.permissions ?? []).includes(permission);
+      const held = user.permissions ?? [];
+      return typeof permission === 'string'
+        ? held.includes(permission)
+        : permission.some((candidate) => held.includes(candidate));
     },
     [user],
   );

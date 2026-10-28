@@ -22,7 +22,8 @@ export function RequirePermission({
   screen,
   children,
 }: {
-  permission: string;
+  /** One permission — or a list, any of which opens the screen (see `useCan`). */
+  permission: string | readonly string[];
   /** The translation key for the screen's name — named in the message so it can be requested by name. */
   screen?: string;
   children: ReactNode;

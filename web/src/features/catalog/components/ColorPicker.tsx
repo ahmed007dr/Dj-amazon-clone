@@ -6,6 +6,7 @@ import type { ProductColor } from '../types';
 
 import { ColorSwatch } from './ColorSwatch';
 
+import './OptionChip.css';
 import './ColorPicker.css';
 
 /**
@@ -40,12 +41,14 @@ export function ColorPicker({
 
   return (
     <div className="color-picker">
-      <h2 className="color-picker__title">
+      {/* ⚠️  A label, not a heading: it names a field inside the buy box, and an `h2` here put
+          "Colour" and "Size" into the page outline as if they were sections of the page. */}
+      <p className="color-picker__title">
         {t('catalog.colors.color')}
         {selected ? (
           <span className="color-picker__chosen"> · {localized(selected, 'name')}</span>
         ) : null}
-      </h2>
+      </p>
 
       <div className="color-picker__options" role="radiogroup" aria-label={t('catalog.colors.color')}>
         {colors.map((color) => {
@@ -56,6 +59,7 @@ export function ColorPicker({
             <label
               key={color.id}
               className={[
+                'option-chip',
                 'color-option',
                 value === color.id ? 'is-selected' : '',
                 soldOut ? 'is-sold-out' : '',
@@ -77,6 +81,7 @@ export function ColorPicker({
                 }}
               />
               <ColorSwatch hex={color.hex} size="lg" />
+              <span className="color-option__name">{name}</span>
               {soldOut ? (
                 <span className="color-option__sold-out">{t('catalog.colors.soldOut')}</span>
               ) : null}

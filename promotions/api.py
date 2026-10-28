@@ -357,9 +357,7 @@ class CouponOrdersAPI(APIView):
 
         paginator = AdminPageNumberPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
-        return paginator.get_paginated_response(
-            public([analytics.order_row(row) for row in page])
-        )
+        return paginator.get_paginated_response(public([analytics.order_row(row) for row in page]))
 
 
 class CouponBulkCreateAPI(APIView):

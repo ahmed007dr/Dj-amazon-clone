@@ -27,8 +27,9 @@ export function HomePage() {
   const ctaLabel = hero.ctaLabel || t('nav.catalog');
 
   // ⚠️  Featured only — we do not fetch every product for a page that shows eight.
+  //     Page 1 and no pager: the strip ends in a "more" link to the paged list.
   const query = useProducts({ ordering: '-created_at', limit: 8 });
-  const products = query.data?.pages[0]?.results ?? [];
+  const products = query.data?.results ?? [];
 
   return (
     <div className="container stack">

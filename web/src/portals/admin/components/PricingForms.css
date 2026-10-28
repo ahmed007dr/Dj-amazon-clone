@@ -8,6 +8,9 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--space-3);
+  /* ⚠️  Top-aligned: a field with a hint beneath it is taller than its neighbour, and
+     stretching pushed the neighbour's input lower than the one beside it. */
+  align-items: start;
 }
 
 @media (min-width: 40rem) {

@@ -33,7 +33,7 @@ from catalog.models import (
     RegulatoryClass,
     StorageCondition,
 )
-from core.api.pagination import AdminPageNumberPagination
+from core.api.pagination import AdminPageNumberPagination, NumberedPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
 from core.models.tax import TaxClass
@@ -77,6 +77,11 @@ class ProductListAPI(PublicCatalogMixin, generics.ListAPIView):
     """
 
     serializer_class = s.ProductListSerializer
+
+    # ⚠️  Numbered pages (`?page=3`), not the cursor default — the storefront grid has a
+    #     "page 3 of 9" pager. It returns `pages` and still no `count`; see the class for why
+    #     that is a bounded softening of ADR-32 rather than a hole in it.
+    pagination_class = NumberedPagination
 
     def get_serializer_context(self):
         # ⚠️  The card's price is computed for **whoever is being evaluated** — the preview
@@ -140,10 +145,17 @@ class ProductListAPI(PublicCatalogMixin, generics.ListAPIView):
             "rating__average",
             "-rating__average",
         }
-        if ordering in allowed:
-            queryset = queryset.order_by(ordering)
+        if ordering not in allowed:
+            ordering = "-created_at"
 
-        return queryset
+        # ⚠️  **The order must be total, or a numbered page repeats and drops rows.**
+        #
+        #     A price, a name and a rating all tie constantly (thirty items at 50.00), and
+        #     the database is free to order equal rows differently on page 2's query than it
+        #     did on page 1's — so one product shows on both pages and another on neither.
+        #     The unique `id` goes last, in the same direction as the key it follows.
+        tie_breaker = "-id" if ordering.startswith("-") else "id"
+        return queryset.order_by(ordering, tie_breaker)
 
 
 class ProductDetailAPI(PublicCatalogMixin, generics.RetrieveAPIView):

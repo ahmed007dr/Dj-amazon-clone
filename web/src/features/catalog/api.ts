@@ -14,6 +14,7 @@ import type {
   CategoryDetail,
   CursorPage,
   Manufacturer,
+  PageResponse,
   ProductDetail,
   ProductListItem,
   ProductQuery,
@@ -21,7 +22,7 @@ import type {
 } from './types';
 
 export const listProducts = (params: ProductQuery, signal?: AbortSignal) =>
-  http.get<CursorPage<ProductListItem>>('/catalog/products/', {
+  http.get<PageResponse<ProductListItem>>('/catalog/products/', {
     params: { ...params },
     ...(signal ? { signal } : {}),
   });

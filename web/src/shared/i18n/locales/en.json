@@ -221,6 +221,7 @@
   "admin": {
     "dashboardHint": "What needs your attention right now.",
     "total": "Total: {{count}}",
+    "peopleSubtitle": "Customer and staff accounts, who is online, staff roles, and who looks after which customer",
     "status": "Status",
     "actions": "Actions",
     "createdAt": "Date",
@@ -406,6 +407,7 @@
     "payments": "Payment gateways",
     "branding": "Branding",
     "users": "Users",
+    "usersAndStaff": "Users & staff",
     "settings": "Locations and settings",
     "pos": "Point of sale",
     "reference": "Reference data",
@@ -443,6 +445,7 @@
     "pickVariant": "Choose a variant first",
     "description": "Description",
     "specs": "Specifications",
+    "details": "Product details",
     "reviews": "Reviews",
     "noReviews": "No reviews yet — be the first to review.",
     "verifiedPurchase": "Verified purchase",
@@ -469,6 +472,8 @@
     "brandNotFound": "No brand by that name",
     "categoryNotFound": "No category by that name",
     "subcategories": "Subcategories",
+    "pager": "Product pages",
+    "goToPage": "Page {{page}}",
     "price": {
       "wasNow": "Was {{was}}, now {{now}}",
       "now": "Price: {{now}}",
@@ -707,7 +712,7 @@
     },
     "review": {
       "title": "Verification requests",
-      "hint": "Documents students upload to verify their account. Approving a student card verifies the student; student pricing follows once verification is enforced.",
+      "hint": "Documents students upload to verify their account. Approving a student card verifies the student; student pricing follows once verification is enforced. A student who uploaded nothing is reviewed from the Students tab.",
       "tabsLabel": "Request status",
       "status": {
         "PENDING": "Pending",
@@ -749,7 +754,28 @@
       "noRequestsBody": "Documents students upload for verification appear here.",
       "pendingBadge": "{{count}} pending",
       "dashboardLabel": "Verification requests",
-      "dashboardHint": "Documents awaiting your review"
+      "dashboardHint": "Documents awaiting your review",
+      "noPendingBody": "No uploaded documents are waiting. A student who has not uploaded a document does not appear here — review their data and verify or reject them from the Students tab.",
+      "openStudents": "Open the Students tab"
+    },
+    "student": {
+      "review": "Review",
+      "verify": "Verify",
+      "revoke": "Revoke verification",
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "registered": "Registered",
+      "reviewTitle": "Review student — {{name}}",
+      "documents": "Uploaded documents",
+      "noDocuments": "This student has not uploaded any document. You can still decide from the data above.",
+      "verifyHint": "Verifying marks this account as a verified student and notifies them.",
+      "verifyHintCard": "Verifying also approves the student card that is still waiting, and notifies the student.",
+      "rejectHint": "The student receives this reason and can upload a new document. A student card still waiting is rejected with it.",
+      "revokeHint": "The student stops being verified and receives this reason. Documents already approved are kept; a card still waiting is rejected.",
+      "verifiedDone": "Student verified",
+      "rejectedDone": "Student rejected",
+      "revokedDone": "Verification revoked"
     },
     "bundle": "Bundle",
     "faculties": "Faculties",
@@ -810,6 +836,11 @@
     "noStudents": "No students match this filter",
     "pending": "Awaiting review",
     "pendingOnly": "Unverified only"
+  },
+  "couponKind": {
+    "PERCENTAGE": "Percentage off",
+    "FIXED": "Fixed amount off",
+    "FREE_SHIPPING": "Free shipping"
   },
   "bundleKind": {
     "REQUIRED": "Required",
@@ -1150,6 +1181,7 @@
     "dashboard": "My dashboard",
     "myCustomers": "My customers",
     "staffTitle": "Staff",
+    "listTab": "Staff list",
     "employee": "Employee",
     "role": "Role",
     "manager": "Manager",

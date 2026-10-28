@@ -1,0 +1,13 @@
+.product-listing {
+  /* ⚠️  Scrolling to the grid must land below the sticky header, not under it. */
+  scroll-margin-block-start: calc(var(--header-height) + var(--space-4));
+}
+
+.product-listing__grid {
+  transition: opacity var(--transition);
+}
+
+/* The previous page, still showing while the next one loads */
+.product-listing__grid.is-stale {
+  opacity: 0.55;
+}

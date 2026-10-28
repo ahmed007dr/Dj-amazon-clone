@@ -272,11 +272,13 @@ POST /api/v1/auth/password/reset/            ← رد موحّد دائمًا
 POST /api/v1/auth/password/reset/confirm/
 POST /api/v1/auth/password/change/
 GET  /api/v1/auth/me/
-GET  /api/v1/auth/sessions/
+GET  /api/v1/auth/sessions/?page=1           ← ترقيم برقم الصفحة، ١٠ أجهزة للصفحة
 POST /api/v1/auth/sessions/{uuid}/revoke/
 ```
 
 > `password/reset/` يعيد **`200` دائمًا** سواء كان البريد مسجلًا أو لا. رد مختلف = أداة لكشف الحسابات.
+
+> `sessions/` يعيد `{ results, page, pages, next, previous }` — **بلا `count`** — والترتيب بـ `login_at` تنازليًا (لا يتغير بين طلبين، بخلاف `last_activity`). صفحة بعد الأخيرة ⟵ `404`.
 
 ---
 

@@ -8,7 +8,7 @@ Identity domain endpoints.
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
-from rest_framework import status
+from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
@@ -18,6 +18,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from accounts import serializers as s
 from accounts import services
 from accounts.models import TokenPurpose, UserSession
+from core.api.pagination import NumberedPagination
 from core.errors import BusinessError, ErrorCode
 from mailing import services as mail_services
 from mailing import templates as mail_templates
@@ -340,21 +341,45 @@ class MeAPI(APIView):
         return Response(serializer.data)
 
 
-class SessionListAPI(APIView):
+class SessionPagination(NumberedPagination):
+    """Ten devices a page — a personal list, not a catalogue; most users never reach page 2."""
+
+    page_size = 10
+
+
+class SessionListAPI(generics.ListAPIView):
     """The user's sessions — so they can see their devices and end any they do not recognise."""
 
     permission_classes = [IsAuthenticated]
     serializer_class = s.UserSessionSerializer
+    pagination_class = SessionPagination
 
-    def get(self, request):
-        sessions = UserSession.objects.filter(user=request.user, logout_at__isnull=True)
-        return Response(
-            s.UserSessionSerializer(
-                sessions,
-                many=True,
-                context={"current_session_key": getattr(request.auth, "payload", {}).get("jti")},
-            ).data
+    def get_queryset(self):
+        # ⚠️  Filtering by user is mandatory — without it this lists everyone's devices.
+        #
+        # ⚠️  The order is `login_at`, not `last_activity` (the model's default).
+        #
+        #     `last_activity` is flushed from Redis in bulk every 60 seconds (ADR-17),
+        #     so it moves under the reader's feet: a device used between two clicks
+        #     jumps to page 1 and the row that took its place is shown twice — or
+        #     never. `login_at` never changes, and `id` breaks a tie between two
+        #     sign-ins in the same instant, so every page is a fixed slice.
+        #
+        #     It also suits the question this screen answers: "did someone sign in
+        #     that I do not recognise?" — the newest sign-in is first, not buried
+        #     under a long-lived device that is simply busy.
+        #
+        #     The current device is **not** pinned to the top: `is_current` is
+        #     computed per row, so it is flagged wherever it falls.
+        return UserSession.objects.filter(user=self.request.user, logout_at__isnull=True).order_by(
+            "-login_at", "-id"
         )
+
+    def get_serializer_context(self):
+        return {
+            **super().get_serializer_context(),
+            "current_session_key": getattr(self.request.auth, "payload", {}).get("jti"),
+        }
 
 
 class SessionRevokeAPI(APIView):

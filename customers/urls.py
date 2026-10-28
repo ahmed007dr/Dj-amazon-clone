@@ -61,4 +61,15 @@ urlpatterns = [
         api.AdminDocumentRejectAPI.as_view(),
         name="admin-document-reject",
     ),
+    # Admin — deciding a student without a document (`CanManageAcademic`)
+    path(
+        "admin/students/<uuid:user_id>/verify/",
+        api.AdminStudentVerifyAPI.as_view(),
+        name="admin-student-verify",
+    ),
+    path(
+        "admin/students/<uuid:user_id>/reject/",
+        api.AdminStudentRejectAPI.as_view(),
+        name="admin-student-reject",
+    ),
 ]

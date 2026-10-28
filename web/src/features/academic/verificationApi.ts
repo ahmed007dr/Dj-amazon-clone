@@ -66,6 +66,8 @@ export interface DocumentQuery {
   status?: DocumentStatus;
   document_type?: DocumentType;
   search?: string;
+  /** One account's documents — the student review window. */
+  user?: string;
   page?: number;
 }
 
@@ -162,5 +164,48 @@ export function useRejectDocument() {
 export function useBulkApproveDocuments() {
   return useReviewMutation((ids: string[]) =>
     http.post<BulkApproveResult>(`${BASE}/bulk-approve/`, { ids }),
+  );
+}
+
+// ── Deciding a student from their data ────────────────────
+
+export interface StudentDecision {
+  /** The account id — the same `user_id` the student list carries. */
+  id: string;
+  verification_status: 'NOT_REQUIRED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
+}
+
+export type StudentVerificationStatus = StudentDecision['verification_status'];
+
+/**
+ * The transitions the server accepts (`decide_student_verification`), mirrored so no
+ * screen offers a button that answers `409`.
+ */
+export const canVerifyStudent = (status: StudentVerificationStatus) => status !== 'VERIFIED';
+
+/** Rejects a waiting request — or, for a verified student, revokes the verification. */
+export const canRejectStudent = (status: StudentVerificationStatus) =>
+  status === 'PENDING' || status === 'VERIFIED';
+
+const STUDENTS = '/customers/admin/students';
+
+/**
+ * Verify a student without a document.
+ *
+ * ⚠️  The queue above can only decide a student who uploaded something; a student
+ *     with no card at all was unreachable from every screen. The server also
+ *     approves whatever student card that student still has waiting, so the same
+ *     invalidation applies (queue, counts, student list).
+ */
+export function useVerifyStudent() {
+  return useReviewMutation((userId: string) =>
+    http.post<StudentDecision>(`${STUDENTS}/${userId}/verify/`, {}),
+  );
+}
+
+/** Reject a waiting student, or revoke a verified one — the reason is mandatory. */
+export function useRejectStudent() {
+  return useReviewMutation(({ userId, reason }: { userId: string; reason: string }) =>
+    http.post<StudentDecision>(`${STUDENTS}/${userId}/reject/`, { reason }),
   );
 }

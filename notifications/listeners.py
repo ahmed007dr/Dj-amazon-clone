@@ -253,7 +253,7 @@ _DOCUMENT_LABELS = {
 
 
 def _register_document_listeners():
-    from customers.events import document_reviewed
+    from customers.events import document_reviewed, student_verification_decided
 
     @receiver(document_reviewed, weak=False)
     @_safe
@@ -304,6 +304,41 @@ def _register_document_listeners():
             reference_type="customer_document",
             reference_id=document.pk,
             priority=NotificationPriority.NORMAL if approved else NotificationPriority.HIGH,
+        )
+
+    @receiver(student_verification_decided, weak=False)
+    @_safe
+    def on_student_verification_decided(sender, user, verified, reason="", **kwargs):
+        """
+        ⚠️  A reviewer decided the student from their data, with no document to tell
+            them about — so there is no `document_reviewed` notice.
+
+            In-app only: there is no mail template for a decision that is not about
+            a document, and the notice carries the reason, which is the part that
+            tells the student what to do next.
+        """
+        english = getattr(user, "preferred_language", "ar") == "en"
+
+        if verified:
+            title = "Your student verification was approved" if english else "تم توثيق حسابك كطالب"
+            body = (
+                "Your account is now verified as a student." if english else "تم توثيق حسابك كطالب."
+            )
+        else:
+            title = (
+                "Your student verification was not approved" if english else "لم يُعتمد توثيقك كطالب"
+            )
+            body = reason
+
+        services.notify(
+            user,
+            category=NotificationCategory.ACCOUNT,
+            title=title,
+            body=body,
+            action_url="/account/documents",
+            reference_type="student_verification",
+            reference_id=user.pk,
+            priority=NotificationPriority.NORMAL if verified else NotificationPriority.HIGH,
         )
 
 

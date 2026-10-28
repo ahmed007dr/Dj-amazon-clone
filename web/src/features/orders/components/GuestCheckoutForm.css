@@ -6,6 +6,10 @@
 .guest-form__grid {
   display: grid;
   gap: var(--space-4);
+  /* ⚠️  Top-aligned, not stretched: a field with a hint under it (the phone) is taller than its
+     neighbour, and stretching pushed the neighbour's input down so the two inputs sat at
+     different heights. */
+  align-items: start;
 }
 
 .guest-form__select-field {

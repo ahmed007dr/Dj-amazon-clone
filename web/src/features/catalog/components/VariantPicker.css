@@ -12,36 +12,10 @@
 .variant-picker__options {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
+/* The chip's frame is `OptionChip.css` — a size or strength is short text, so it is centred */
 .variant-chip {
-  display: inline-flex;
-  align-items: center;
-  min-block-size: var(--touch-target);
-  padding-inline: var(--space-4);
-  cursor: pointer;
-
-  font-weight: 600;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  transition: border-color var(--transition), color var(--transition);
-}
-
-.variant-chip:hover {
-  border-color: var(--color-primary);
-}
-
-.variant-chip.is-selected {
-  color: var(--color-on-primary);
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-/* ⚠️  The radio button is visually hidden rather than removed — keyboard
-   navigation depends on it, and `display:none` takes it out of the tab order */
-.variant-chip:focus-within {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
+  text-align: center;
 }

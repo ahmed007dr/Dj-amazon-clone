@@ -19,59 +19,33 @@
   gap: var(--space-3);
 }
 
-/* A touch-sized target around a 2rem dot: the ring is the selection, the padding is the hit area. */
+/* The chip's frame is `OptionChip.css`; what is specific to a colour is the dot and the name */
 .color-option {
-  position: relative;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  min-inline-size: var(--touch-target);
-  min-block-size: var(--touch-target);
-  padding: var(--space-1);
-  cursor: pointer;
-  border: 2px solid transparent;
-  border-radius: var(--radius);
-  transition: border-color var(--transition);
+  padding-inline: var(--space-3) var(--space-4);
 }
 
-.color-option:hover {
-  border-color: var(--color-border);
+.color-option .color-swatch {
+  --swatch-size: 1.5rem;
 }
 
-.color-option.is-selected {
-  border-color: var(--color-primary);
+.color-option__name {
+  white-space: nowrap;
 }
 
-.color-option:focus-within {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-.color-option.is-sold-out {
-  cursor: not-allowed;
-  color: var(--color-text-muted);
-}
-
-/* The diagonal strike across a sold-out swatch — a second cue besides the printed word. */
 .color-option.is-sold-out .color-swatch {
   opacity: 0.45;
 }
 
-.color-option.is-sold-out::after {
-  content: '';
-  position: absolute;
-  inset-inline: 22%;
-  inset-block-start: calc(var(--space-1) + 1rem - 1px);
-  block-size: 2px;
-  background: var(--color-text-muted);
-  transform: rotate(-45deg);
-  pointer-events: none;
+.color-option.is-sold-out .color-option__name {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
 }
 
 .color-option__sold-out {
+  padding: 0 var(--space-2);
   font-size: 0.6875rem;
-  line-height: 1.1;
-  text-align: center;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-text-muted) 14%, transparent);
+  border-radius: var(--radius-pill);
 }

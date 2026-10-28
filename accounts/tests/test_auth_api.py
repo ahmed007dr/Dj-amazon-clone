@@ -5,10 +5,13 @@ They cover the full lifecycle: register ← activate ← log in ← forgot ← r
 and guard the security properties that were broken in the legacy code.
 """
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from django.core import mail as django_mail
 from django.urls import reverse
 from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import AccessToken
 
 from accounts.models import AccountStatus, SecurityToken, TokenPurpose, User, UserSession
 
@@ -389,7 +392,7 @@ class TestSessions:
         response = client.get(reverse("v1:accounts:sessions"))
 
         assert response.status_code == 200
-        assert len(response.data) == 1
+        assert len(response.data["results"]) == 1
 
     def test_cannot_revoke_another_users_session(self, client, active_user):
         """
@@ -407,6 +410,196 @@ class TestSessions:
         assert response.status_code == 404
         victim_session.refresh_from_db()
         assert victim_session.logout_at is None
+
+    # ── Pagination ───────────────────────────────────────────
+
+    @staticmethod
+    def _open_many(user, count, *, prefix="s"):
+        """
+        `count` open sessions with distinct, increasing sign-in times (oldest first).
+
+        `login_at` is `auto_now_add`, so it is rewritten after creation — otherwise a
+        fast loop could give several rows the same instant and the ordering
+        assertions would be exercising the tie-break by accident.
+        """
+        from accounts import services
+
+        base = datetime(2026, 1, 1, tzinfo=UTC)
+        sessions = []
+        for i in range(count):
+            session = services.open_session(user, session_key=f"{prefix}-{i}")
+            UserSession.objects.filter(pk=session.pk).update(login_at=base + timedelta(minutes=i))
+            sessions.append(session)
+        return sessions
+
+    @staticmethod
+    def _page(client, page=None, **params):
+        if page is not None:
+            params["page"] = page
+        return client.get(reverse("v1:accounts:sessions"), params)
+
+    def test_response_is_paginated_without_count(self, client, active_user):
+        """⚠️  `pages` is exposed, `count` is not (ADR-32)."""
+        self._open_many(active_user, 3)
+
+        client.force_authenticate(user=active_user)
+        response = self._page(client)
+
+        assert response.status_code == 200
+        assert set(response.data) == {"results", "page", "pages", "next", "previous"}
+        assert response.data["page"] == 1
+        assert response.data["pages"] == 1
+        assert response.data["next"] is None
+        assert response.data["previous"] is None
+        assert {"session_key", "user_agent"}.isdisjoint(response.data["results"][0])
+
+    def test_pages_hold_ten_and_cover_every_session_exactly_once(self, client, active_user):
+        sessions = self._open_many(active_user, 25)
+        client.force_authenticate(user=active_user)
+
+        pages = [self._page(client, n) for n in (1, 2, 3)]
+
+        assert [len(r.data["results"]) for r in pages] == [10, 10, 5]
+        assert {r.data["pages"] for r in pages} == {3}
+        assert pages[0].data["next"] and not pages[0].data["previous"]
+        assert pages[1].data["next"] and pages[1].data["previous"]
+        assert not pages[2].data["next"] and pages[2].data["previous"]
+
+        ids = [row["id"] for r in pages for row in r.data["results"]]
+        # Newest sign-in first, straight across the page boundaries, nothing repeated.
+        assert ids == [session.pk for session in reversed(sessions)]
+
+    def test_page_defaults_to_first(self, client, active_user):
+        sessions = self._open_many(active_user, 12)
+        client.force_authenticate(user=active_user)
+
+        response = self._page(client)
+
+        assert response.data["page"] == 1
+        assert response.data["results"][0]["id"] == sessions[-1].pk
+
+    def test_order_does_not_move_when_a_device_is_used_between_pages(self, client, active_user):
+        """
+        ⚠️  `last_activity` is flushed in bulk, so it changes between two clicks.
+            Ordering by it would shift rows across the page boundary — one shown
+            twice, another never. `login_at` does not move.
+        """
+        from django.utils import timezone
+
+        sessions = self._open_many(active_user, 15)
+        newest_first = [session.pk for session in reversed(sessions)]
+        client.force_authenticate(user=active_user)
+
+        assert [r["id"] for r in self._page(client, 2).data["results"]] == newest_first[10:]
+
+        # The oldest device is used right now, and the presence flush writes it.
+        UserSession.objects.filter(pk=sessions[0].pk).update(last_activity=timezone.now())
+
+        assert [r["id"] for r in self._page(client, 1).data["results"]] == newest_first[:10]
+        assert [r["id"] for r in self._page(client, 2).data["results"]] == newest_first[10:]
+
+    def test_equal_sign_in_times_still_order_deterministically(self, client, active_user):
+        sessions = self._open_many(active_user, 12)
+        UserSession.objects.filter(user=active_user).update(login_at=sessions[0].login_at)
+
+        client.force_authenticate(user=active_user)
+        ids = [row["id"] for n in (1, 2) for row in self._page(client, n).data["results"]]
+
+        assert ids == sorted((session.pk for session in sessions), reverse=True)
+
+    def test_other_users_sessions_never_appear_on_any_page(self, client, active_user):
+        other = User.objects.create_user(email="other2@test.local", password=PASSWORD)
+        other.is_active = True
+        other.save()
+        mine = self._open_many(active_user, 11, prefix="mine")
+        theirs = self._open_many(other, 30, prefix="theirs")
+
+        client.force_authenticate(user=active_user)
+        first, second = self._page(client, 1), self._page(client, 2)
+
+        ids = {row["id"] for r in (first, second) for row in r.data["results"]}
+        assert ids == {session.pk for session in mine}
+        assert ids.isdisjoint({session.pk for session in theirs})
+        # The other user's 30 rows must not inflate the page count either.
+        assert first.data["pages"] == 2
+        assert self._page(client, 3).status_code == 404
+
+    def test_ended_sessions_are_not_listed(self, client, active_user):
+        from django.utils import timezone
+
+        sessions = self._open_many(active_user, 12)
+        UserSession.objects.filter(pk__in=[sessions[0].pk, sessions[1].pk]).update(
+            logout_at=timezone.now()
+        )
+
+        client.force_authenticate(user=active_user)
+        first = self._page(client, 1)
+
+        assert len(first.data["results"]) == 10
+        assert first.data["pages"] == 1
+        assert self._page(client, 2).status_code == 404
+
+    def test_page_past_the_end_is_404(self, client, active_user):
+        self._open_many(active_user, 10)
+        client.force_authenticate(user=active_user)
+
+        assert self._page(client, 1).status_code == 200
+        assert self._page(client, 2).status_code == 404
+        assert self._page(client, 0).status_code == 404
+
+    def test_no_sessions_is_one_empty_page_not_404(self, client, active_user):
+        client.force_authenticate(user=active_user)
+
+        response = self._page(client)
+
+        assert response.status_code == 200
+        assert response.data["results"] == []
+        assert response.data["pages"] == 1
+
+    def test_limit_is_honoured_and_capped(self, client, active_user):
+        self._open_many(active_user, 12)
+        client.force_authenticate(user=active_user)
+
+        small = self._page(client, limit=4)
+        assert len(small.data["results"]) == 4
+        assert small.data["pages"] == 3
+        assert len(self._page(client, limit=500).data["results"]) == 12
+
+    def test_requires_authentication(self, client):
+        assert self._page(client).status_code == 401
+
+    def test_current_device_is_flagged_wherever_its_page_is(self, client, active_user):
+        """
+        The current device is not pinned to the first page — the flag is on the
+        row, so it is marked on page 2 as well.
+        """
+        from accounts import services
+
+        token = AccessToken.for_user(active_user)
+        current = services.open_session(active_user, session_key=token["jti"])
+        UserSession.objects.filter(pk=current.pk).update(login_at=datetime(2025, 1, 1, tzinfo=UTC))
+        self._open_many(active_user, 12)
+
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        first, second = self._page(client, 1), self._page(client, 2)
+
+        assert not any(row["is_current"] for row in first.data["results"])
+        assert [row["id"] for row in second.data["results"] if row["is_current"]] == [current.pk]
+
+    def test_revoking_removes_the_session_from_the_pages(self, client, active_user):
+        sessions = self._open_many(active_user, 11)
+        client.force_authenticate(user=active_user)
+        assert self._page(client).data["pages"] == 2
+
+        response = client.post(reverse("v1:accounts:session-revoke", args=[sessions[0].pk]))
+        assert response.status_code == 204
+
+        first = self._page(client, 1)
+        assert sessions[0].pk not in [row["id"] for row in first.data["results"]]
+        # Ending the only row of the last page removes the page itself: the client
+        # has to step back (or restart at page 1), because page 2 is now a 404.
+        assert first.data["pages"] == 1
+        assert self._page(client, 2).status_code == 404
 
 
 # ═══════════════════════════════════════════════════════════

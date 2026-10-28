@@ -1,12 +1,12 @@
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
-import { ProductGrid } from '@/features/catalog/components/ProductGrid';
+import { ProductListing } from '@/features/catalog/components/ProductListing';
 import { useCategory, useProducts } from '@/features/catalog/hooks';
+import { useProductPaging } from '@/features/catalog/useProductPaging';
 import { isApiError } from '@/shared/http/errors';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { ListLayout } from '@/shared/layouts/ListLayout';
-import { Button } from '@/shared/ui/Button';
 import { Skeleton } from '@/shared/ui/Skeleton';
 import { StateMessage } from '@/shared/ui/StateMessage';
 
@@ -32,9 +32,11 @@ export function CategoryPage() {
   const { slug } = useParams<{ slug: string }>();
 
   const category = useCategory(slug);
-  const query = useProducts(slug ? { category: slug } : {});
-
-  const products = query.data?.pages.flatMap((page) => page.results) ?? [];
+  const paging = useProductPaging();
+  const query = useProducts({
+    ...(slug ? { category: slug } : {}),
+    ...(paging.page > 1 ? { page: paging.page } : {}),
+  });
 
   if (category.isPending) {
     return (
@@ -82,28 +84,12 @@ export function CategoryPage() {
         </nav>
       ) : null}
 
-      <ListLayout
-        footer={
-          query.hasNextPage ? (
-            <Button
-              variant="secondary"
-              loading={query.isFetchingNextPage}
-              onClick={() => {
-                void query.fetchNextPage();
-              }}
-            >
-              {t('common.more')}
-            </Button>
-          ) : null
-        }
-      >
-        <ProductGrid
-          products={products}
-          isLoading={query.isPending}
-          error={query.error}
-          onRetry={() => {
-            void query.refetch();
-          }}
+      <ListLayout>
+        <ProductListing
+          query={query}
+          page={paging.page}
+          onPageChange={paging.onPageChange}
+          onOutOfRange={paging.onOutOfRange}
         />
       </ListLayout>
     </div>

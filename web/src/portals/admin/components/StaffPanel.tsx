@@ -19,7 +19,6 @@ import {
 } from '@/portals/admin/components/StaffAdminPanel';
 import { AssignmentsPanel } from '@/portals/admin/components/AssignmentsPanel';
 import { CreateStaffForm } from '@/portals/admin/components/CreateStaffForm';
-import { PageHeader } from '@/shared/layouts/PageHeader';
 import { Drawer } from '@/shared/ui/Drawer';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
 import { Alert } from '@/shared/ui/Alert';
@@ -30,12 +29,12 @@ import { Pagination } from '@/shared/ui/Pagination';
 import { StateMessage } from '@/shared/ui/StateMessage';
 import { useToast } from '@/shared/ui/useToast';
 
-import './AdminStaffPage.css';
+import './StaffPanel.css';
 
 type Tab = 'staff' | 'unassigned' | 'roles' | 'assignments';
 
 /**
- * Employees and customer assignment.
+ * Employees and customer assignment — the "staff" tab of the users-and-staff page.
  *
  * ⚠️  **"Customers with no owner" is a tab, not a buried screen.**
  *
@@ -44,7 +43,7 @@ type Tab = 'staff' | 'unassigned' | 'roles' | 'assignments';
  *     the employees list makes distributing them a daily act rather than a task
  *     to be remembered.
  */
-export function AdminStaffPage() {
+export function StaffPanel() {
   const { t } = useTranslation();
   const localized = useLocalized();
   const { notify } = useToast();
@@ -57,12 +56,25 @@ export function AdminStaffPage() {
 
   // ⚠️  "Add staff member" is driven by `?add=1`, not by local state alone.
   //
-  //     The Users screen links here ("Add staff member"), and a link can only carry
-  //     a URL — so the URL is the source of truth and the button just sets it.
-  //     `replace` keeps the back button from stepping through open/closed states.
+  //     The page header's button sits above both tabs (and the old `/admin/staff?add=1`
+  //     links are forwarded here), and a link can only carry a URL — so the URL is the
+  //     source of truth and the button just sets it. `replace` keeps the back button
+  //     from stepping through open/closed states.
+  //
+  //     Only `add` is touched: this page's `?tab=staff` lives in the same query string,
+  //     and replacing the whole of it on close would drop the user onto the first tab.
   const [searchParams, setSearchParams] = useSearchParams();
   const creating = searchParams.get('add') === '1';
-  const setCreating = (open: boolean) => setSearchParams(open ? { add: '1' } : {}, { replace: true });
+  const setCreating = (open: boolean) =>
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (open) next.set('add', '1');
+        else next.delete('add');
+        return next;
+      },
+      { replace: true },
+    );
 
   const resendInvite = useResendInvite();
 
@@ -72,12 +84,7 @@ export function AdminStaffPage() {
   const assign = useAssignCustomer();
 
   if (isApiError(staff.error) && staff.error.status === 403) {
-    return (
-      <>
-        <PageHeader title={t('staff.staffTitle')} />
-        <StateMessage icon="🔒" title={t('staff.noAccess')} body={t('staff.noAccessBody')} />
-      </>
-    );
+    return <StateMessage icon="🔒" title={t('staff.noAccess')} body={t('staff.noAccessBody')} />;
   }
 
   const staffColumns: Column<EmployeeProfile>[] = [
@@ -223,11 +230,6 @@ export function AdminStaffPage() {
 
   return (
     <>
-      <PageHeader
-        title={t('staff.staffTitle')}
-        actions={<Button onClick={() => setCreating(true)}>{t('staff.addStaff')}</Button>}
-      />
-
       <div className="staff-tabs" role="tablist">
         <button
           type="button"
@@ -239,7 +241,9 @@ export function AdminStaffPage() {
             setPage(1);
           }}
         >
-          {t('staff.staffTitle')}
+          {/* ⚠️  "Staff list", not "Staff": the page's own tab above is already called
+              "Staff", and two bars both saying it read as one tab repeated. */}
+          {t('staff.listTab')}
         </button>
         <button
           type="button"

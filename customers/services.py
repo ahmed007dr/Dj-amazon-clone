@@ -8,7 +8,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.utils import timezone
 
-from accounts.models import AccountType, VerificationStatus
+from accounts.models import AccountType, User, VerificationStatus
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
 from customers import events
@@ -221,6 +221,98 @@ def review_document(
         reason=reason,
     )
     return document
+
+
+@transaction.atomic
+def decide_student_verification(
+    user,
+    *,
+    verified: bool,
+    reviewer,
+    reason: str = "",
+    ip_address: str | None = None,
+) -> User:
+    """
+    Decide a student's verification from the student, not from a document.
+
+    ⚠️  The review queue can only decide a student who uploaded something. A student
+        with no card at all — `PENDING` from an import, a Django-admin edit or a
+        deleted upload — had no button anywhere, and nothing else in the system
+        could verify them. This is that button: the reviewer looked at the student's
+        data (and documents, if any) and decides the **account**.
+
+    ⚠️  One entry for both directions. `verified=False` is a rejection of a waiting
+        request *and* the revocation of a verified student — the same transition
+        from the account's point of view, and the same mandatory reason: the student
+        reads it.
+
+    ⚠️  The student's waiting ID cards are decided with them.
+
+        Leaving a card `PENDING` under an account that was just decided keeps it in
+        the queue and on the sidebar badge, asking the reviewer for a second
+        decision on a question they already answered — and approving it later would
+        silently undo a rejection. Each card goes through `review_document`, so its
+        own audit row, the reason the student reads and its notification come for
+        free. Cards that were **already decided stay as they are**: a revocation
+        does not rewrite history, it adds the account-level row below.
+
+    Refused with `409` when it would change nothing or does not apply: a non-student
+    account (its verification depends on a different set of documents, see
+    `review_document`), verifying a verified student, rejecting one who never asked
+    (`NOT_REQUIRED`) or was already rejected.
+    """
+    # ⚠️  Locked first: two reviewers deciding the same student must not both pass the
+    #     transition check below and write two audit rows.
+    user = User.objects.select_for_update().get(pk=user.pk)
+
+    if user.account_type != AccountType.STUDENT:
+        raise BusinessError(ErrorCode.CONFLICT, detail="هذا الحساب ليس حساب طالب", status_code=409)
+
+    before = user.verification_status
+    if verified and before == VerificationStatus.VERIFIED:
+        raise BusinessError(ErrorCode.CONFLICT, detail="هذا الطالب موثّق بالفعل", status_code=409)
+    if not verified and before == VerificationStatus.REJECTED:
+        raise BusinessError(ErrorCode.CONFLICT, detail="سبق رفض هذا الطالب", status_code=409)
+    if not verified and before == VerificationStatus.NOT_REQUIRED:
+        raise BusinessError(
+            ErrorCode.CONFLICT, detail="لم يطلب هذا الطالب التوثيق بعد", status_code=409
+        )
+
+    profile = CustomerProfile.objects.filter(user=user).first()
+    cards = list(_pending_student_cards(profile)) if profile else []
+    for card in cards:
+        review_document(
+            card, approved=verified, reviewer=reviewer, reason=reason, ip_address=ip_address
+        )
+
+    # ⚠️  Re-read: `review_document` changed the account through *its* copy of the row.
+    #     It moves the account when a card was approved, but leaves a verified student
+    #     verified when their newer card is rejected — and a revocation must end
+    #     rejected either way.
+    user.refresh_from_db(fields=["verification_status"])
+    target = VerificationStatus.VERIFIED if verified else VerificationStatus.REJECTED
+    _set_verification_status(user, target)
+
+    AuditLog.objects.create(
+        actor=reviewer,
+        action=AuditAction.APPROVE if verified else AuditAction.REJECT,
+        content_type=ContentType.objects.get_for_model(User),
+        object_id=str(user.pk),
+        object_repr=str(user),
+        changes={
+            "verification_status": {"old": before, "new": target},
+            "reason": reason,
+            "documents": [str(card.pk) for card in cards],
+        },
+        ip_address=ip_address,
+    )
+
+    # ⚠️  Told only when no card carried the news already (see the event's docstring)
+    if not cards:
+        events.student_verification_decided.send(
+            sender=User, user=user, verified=verified, reviewer=reviewer, reason=reason
+        )
+    return user
 
 
 def bulk_approve_documents(

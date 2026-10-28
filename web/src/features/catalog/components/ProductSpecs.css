@@ -1,27 +1,37 @@
+/*
+  The specifications as a grid of small cards — label over value.
+
+  ⚠️  Not a two-column table: inside the product page's wide card a `label | value` row left
+      the value stranded in the middle of an empty line, and the eye had to cross the gap to
+      pair them. Stacked, each pair stays together at any width, and a long value (a storage
+      condition, a registration number) wraps inside its own card.
+*/
 .specs {
   display: grid;
-  gap: 0;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-3);
 }
 
 .specs__row {
   display: grid;
-  grid-template-columns: minmax(8rem, 35%) 1fr;
-  gap: var(--space-3);
+  align-content: start;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  padding: var(--space-3) var(--space-4);
 
-  padding-block: var(--space-2);
-  border-block-end: 1px solid var(--color-border);
-}
-
-.specs__row:last-child {
-  border-block-end: none;
+  background: color-mix(in srgb, var(--color-text) 3.5%, var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
 }
 
 .specs__row dt {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--color-text-muted);
 }
 
 .specs__row dd {
-  font-size: 0.9375rem;
+  font-size: 1rem;
   font-weight: 600;
+  /* A code or a registration number has no spaces to break on */
+  overflow-wrap: anywhere;
 }

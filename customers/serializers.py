@@ -220,6 +220,9 @@ class AdminDocumentFilterSerializer(serializers.Serializer):
     status = serializers.ChoiceField(required=False, choices=DocumentStatus.choices)
     document_type = serializers.ChoiceField(required=False, choices=DocumentType.choices)
     search = serializers.CharField(required=False, max_length=100)
+    #: ⚠️  One account's documents — the student review window lists exactly these.
+    #:     `search` cannot stand in for it: an email fragment matches other people too.
+    user = serializers.UUIDField(required=False)
 
 
 class RejectDocumentSerializer(serializers.Serializer):

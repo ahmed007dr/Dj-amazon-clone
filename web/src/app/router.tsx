@@ -5,6 +5,7 @@ import { RequirePermission } from '@/features/auth/components/RequirePermission'
 import { RequireAuth } from '@/features/auth/components/RequireAuth';
 import { isAdmin, isStaff } from '@/features/auth/permissions';
 import { ImportJobRedirect, ImportJobsRedirect } from '@/portals/admin/pages/AdminImportRedirects';
+import { StaffRedirect } from '@/portals/admin/pages/AdminPeopleRedirects';
 import { AccountShell } from '@/portals/account/AccountShell';
 import { AcademicPage } from '@/portals/account/pages/AcademicPage';
 import { TradeAccountPage } from '@/portals/account/pages/TradeAccountPage';
@@ -101,9 +102,9 @@ const AdminInventoryPage = lazy(() =>
     default: module.AdminInventoryPage,
   })),
 );
-const AdminAccountsPage = lazy(() =>
-  import('@/portals/admin/pages/AdminAccountsPage').then((module) => ({
-    default: module.AdminAccountsPage,
+const AdminPeoplePage = lazy(() =>
+  import('@/portals/admin/pages/AdminPeoplePage').then((module) => ({
+    default: module.AdminPeoplePage,
   })),
 );
 const AdminReferencePage = lazy(() =>
@@ -167,11 +168,6 @@ const StaffDashboardPage = lazy(() =>
 const StaffCustomersPage = lazy(() =>
   import('@/portals/staff/pages/StaffCustomersPage').then((module) => ({
     default: module.StaffCustomersPage,
-  })),
-);
-const AdminStaffPage = lazy(() =>
-  import('@/portals/admin/pages/AdminStaffPage').then((module) => ({
-    default: module.AdminStaffPage,
   })),
 );
 const AdminSuppliersPage = lazy(() =>
@@ -455,15 +451,24 @@ const router = createBrowserRouter([
         ),
       },
       {
+        // One page, two tabs (`?tab=accounts|staff`) — see AdminPeoplePage.
+        //
+        // ⚠️  Opens for either permission; the page shows only the tabs the user holds.
         path: 'users',
         element: (
-          <RequirePermission permission="accounts.change_user" screen="nav.users">
+          <RequirePermission
+            permission={['accounts.change_user', 'employees.change_customerassignment']}
+            screen="nav.usersAndStaff"
+          >
             <Lazy>
-              <AdminAccountsPage />
+              <AdminPeoplePage />
             </Lazy>
           </RequirePermission>
         ),
       },
+      // ⚠️  The former URL is kept alive as a redirect: it is in bookmarks, support
+      //     notes and browser history.
+      { path: 'staff', element: <StaffRedirect /> },
       {
         path: 'reference',
         element: (
@@ -561,16 +566,6 @@ const router = createBrowserRouter([
           <RequirePermission permission="b2b.change_businessprofile" screen="b2b.businesses">
             <Lazy>
               <AdminBusinessesPage />
-            </Lazy>
-          </RequirePermission>
-        ),
-      },
-      {
-        path: 'staff',
-        element: (
-          <RequirePermission permission="employees.change_customerassignment" screen="staff.staffTitle">
-            <Lazy>
-              <AdminStaffPage />
             </Lazy>
           </RequirePermission>
         ),

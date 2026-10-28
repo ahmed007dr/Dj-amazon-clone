@@ -7,20 +7,36 @@ import {
   useUniversities,
   type StudentRow,
 } from '@/features/academic/adminApi';
+import {
+  canRejectStudent,
+  canVerifyStudent,
+  useVerifyStudent,
+} from '@/features/academic/verificationApi';
 import { useDebounced } from '@/shared/hooks/useDebounced';
+import { isApiError } from '@/shared/http';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
 import { Badge } from '@/shared/ui/Badge';
+import { Button } from '@/shared/ui/Button';
 import { Pagination } from '@/shared/ui/Pagination';
+import { useToast } from '@/shared/ui/useToast';
+
+import { StudentReviewModal } from './StudentReviewModal';
 
 import './AcademicPanels.css';
 
 /**
- * Students — **display and filtering only**.
+ * Students — filtering, and **deciding a student from their data**.
  *
- * ⚠️  Verification happens on the *Verification requests* tab, not here: it is a
- *     decision about an uploaded document, not about a row in a table. And
- *     duplicating it in two places makes two decisions for the same student.
+ * ⚠️  The *Verification requests* tab decides uploaded documents; this tab decides
+ *     the **student**. They are not two copies of one action: a student with no
+ *     document never appears in that queue, so without a button here nothing could
+ *     verify them. Both end in the same account write on the server, and deciding a
+ *     student also decides their waiting student card, so the two cannot disagree.
+ *
+ * ⚠️  "Review" opens the student's data and documents before anything is decided;
+ *     "Verify" on the row is the shortcut for a reviewer who already knows the
+ *     student. "Reject" always opens the window — it needs a reason the student reads.
  *
  * ⚠️  The row says **who** the student is (name and email). Without them this was
  *     a list of faculties and years with no way to tell which student a row was —
@@ -39,6 +55,12 @@ export function StudentPanel() {
   const [pendingOnly, setPendingOnly] = useState(false);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [reviewing, setReviewing] = useState<{ student: StudentRow; rejecting: boolean } | null>(
+    null,
+  );
+
+  const { notify } = useToast();
+  const verify = useVerifyStudent();
 
   // ⚠️  A pause in typing, not a request per keystroke
   const term = useDebounced(search.trim());
@@ -56,6 +78,17 @@ export function StudentPanel() {
   });
 
   const reset = () => setPage(1);
+
+  function verifyOne(row: StudentRow) {
+    verify.mutate(row.user_id, {
+      onSuccess: () => {
+        notify(t('academic.student.verifiedDone'));
+      },
+      onError: (cause) => {
+        notify(isApiError(cause) ? cause.displayMessage : t('state.errorTitle'), 'danger');
+      },
+    });
+  }
 
   const columns: Column<StudentRow>[] = [
     {
@@ -104,6 +137,51 @@ export function StudentPanel() {
             ? t('academic.verified')
             : t(`verification.${row.verification_status}`)}
         </Badge>
+      ),
+    },
+    {
+      key: 'actions',
+      header: t('academic.review.decision'),
+      align: 'end',
+      render: (row) => (
+        <div className="academic-actions">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setReviewing({ student: row, rejecting: false });
+            }}
+          >
+            {t('academic.student.review')}
+          </Button>
+
+          {canVerifyStudent(row.verification_status) ? (
+            <Button
+              size="sm"
+              loading={verify.isPending && verify.variables === row.user_id}
+              disabled={verify.isPending}
+              onClick={() => {
+                verifyOne(row);
+              }}
+            >
+              {t('academic.student.verify')}
+            </Button>
+          ) : null}
+
+          {canRejectStudent(row.verification_status) ? (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => {
+                setReviewing({ student: row, rejecting: true });
+              }}
+            >
+              {row.verification_status === 'VERIFIED'
+                ? t('academic.student.revoke')
+                : t('academic.review.reject')}
+            </Button>
+          ) : null}
+        </div>
       ),
     },
   ];
@@ -202,6 +280,17 @@ export function StudentPanel() {
 
       {students.data ? (
         <Pagination page={students.data.page} pages={students.data.pages} onChange={setPage} />
+      ) : null}
+
+      {reviewing ? (
+        <StudentReviewModal
+          key={`${reviewing.student.id}-${String(reviewing.rejecting)}`}
+          student={reviewing.student}
+          startRejecting={reviewing.rejecting}
+          onClose={() => {
+            setReviewing(null);
+          }}
+        />
       ) : null}
     </>
   );

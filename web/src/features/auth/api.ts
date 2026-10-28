@@ -74,7 +74,22 @@ export interface UserSession {
   is_current: boolean;
 }
 
-export const listSessions = () => http.get<UserSession[]>('/auth/sessions/');
+/**
+ * One page of devices.
+ *
+ * ⚠️  **No `count`** — the server hands out `pages` only (`NumberedPagination`, ADR-32).
+ *     A page past the end is a `404`, not an empty list: see `SessionList`.
+ */
+export interface SessionsPage {
+  results: UserSession[];
+  page: number;
+  pages: number;
+  next: string | null;
+  previous: string | null;
+}
+
+export const listSessions = (page = 1) =>
+  http.get<SessionsPage>('/auth/sessions/', { params: { page } });
 
 /**
  * End a device's session.

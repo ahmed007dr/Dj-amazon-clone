@@ -1,0 +1,6 @@
+/* ⚠️  The tabs themselves are the shared `StatusTabs`; this is only the gap under
+   them. The staff panel carries its own sub-tabs, and without the gap the two
+   bars read as one tab row. */
+.people-panels {
+  margin-block-start: var(--space-4);
+}

@@ -1,0 +1,76 @@
+/*
+  The choice chip shared by the colour and variant pickers on the product page.
+
+  ⚠️  The selection is carried by **three** cues, never by colour alone: a thicker brand border,
+      a tinted fill and a tick on the corner. The border is always 2px (only its colour changes),
+      so choosing a chip never nudges its neighbours.
+
+  ⚠️  The tick is a pseudo-element hung on the corner, not a character in the text — a chip that
+      grew by a glyph when selected would reflow the whole row on every tap. It is not mirrored:
+      a check mark reads the same in both directions, so it sits on the *end* corner and the
+      border/outline logic does the mirroring.
+*/
+.option-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-block-size: var(--touch-target);
+  min-inline-size: var(--touch-target);
+  padding-inline: var(--space-4);
+  cursor: pointer;
+
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  transition:
+    border-color var(--transition),
+    background var(--transition),
+    box-shadow var(--transition);
+}
+
+.option-chip:hover:not(.is-sold-out) {
+  border-color: color-mix(in srgb, var(--color-primary) 55%, var(--color-border));
+}
+
+.option-chip.is-selected {
+  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface));
+  border-color: var(--color-primary);
+}
+
+.option-chip.is-selected::after {
+  content: '✓';
+  content: '✓' / '';
+  position: absolute;
+  inset-block-start: -0.5rem;
+  inset-inline-end: -0.5rem;
+  display: grid;
+  place-items: center;
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border: 2px solid var(--color-surface);
+  border-radius: 50%;
+}
+
+/* ⚠️  The radio is visually hidden, so the ring is drawn on the chip — and only for keyboard
+   focus: `:focus-within` would also paint it after every mouse click. */
+.option-chip:has(input:focus-visible) {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* A sold-out choice stays visible but plainly out of play: dashed, dimmed, struck through */
+.option-chip.is-sold-out {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  background: transparent;
+  border-style: dashed;
+}

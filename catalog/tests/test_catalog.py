@@ -213,9 +213,10 @@ class TestNoNPlusOne:
             )
 
         client = APIClient()
+        # ⚠️  Numbered pages add the `COUNT(*)` a cursor never ran — one query, not one per row
         with django_assert_max_num_queries(10):
             response = client.get(reverse("v1:catalog:products"))
-            assert len(response.data["results"]) == 20
+            assert len(response.data["results"]) == 24
 
     def test_category_tree_is_one_query(self, db, django_assert_max_num_queries):
         root = Category.objects.create(name_ar="جذر", name_en="Root")
@@ -460,9 +461,9 @@ class TestStockVisibility:
         ⚠️  Filtering in the serializer would read the row and then hide it, and
             the page would come back one item shorter than it should be.
 
-            The list is cursor-paginated, so the symptom is not a wrong count but
-            a page that quietly loses rows — harder to notice and worse to debug.
-            Filtering in the queryset means the page is full of what qualifies.
+            The symptom is not only a wrong `pages` but a page that quietly loses
+            rows — harder to notice and worse to debug. Filtering in the queryset
+            means the page is full of what qualifies.
         """
         self.out_of_stock(category, policies)
 
