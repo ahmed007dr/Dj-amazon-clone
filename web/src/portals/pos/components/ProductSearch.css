@@ -58,3 +58,71 @@
   font-size: 0.8125rem;
   color: var(--color-text-muted);
 }
+
+/* ── Choosing a colour ─────────────────────────────────── */
+
+.pos-search__variants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: stretch;
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius);
+}
+
+.pos-search__variants-title {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.pos-search__variant {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: center;
+  min-inline-size: 5.5rem;
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text);
+  cursor: pointer;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.pos-search__variant:hover:not(:disabled) {
+  border-color: var(--color-primary);
+}
+
+.pos-search__variant:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.pos-search__variant-name {
+  font-weight: 600;
+}
+
+.pos-search__variant-stock {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.pos-search__variants-cancel {
+  align-self: center;
+  margin-inline-start: auto;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.pos-search__dots {
+  display: inline-flex;
+  gap: var(--space-1);
+}

@@ -23,7 +23,9 @@ import { BundleDetailPage } from '@/portals/store/pages/BundleDetailPage';
 import { BundlesPage } from '@/portals/store/pages/BundlesPage';
 import { CartPage } from '@/portals/store/pages/CartPage';
 import { CheckoutPage } from '@/portals/store/pages/CheckoutPage';
+import { FindOrderPage } from '@/portals/store/pages/FindOrderPage';
 import { ForgotPasswordPage } from '@/portals/store/pages/ForgotPasswordPage';
+import { GuestOrderPage } from '@/portals/store/pages/GuestOrderPage';
 import { HomePage } from '@/portals/store/pages/HomePage';
 import { LoginPage } from '@/portals/store/pages/LoginPage';
 import { RegisterPage } from '@/portals/store/pages/RegisterPage';
@@ -274,15 +276,16 @@ const router = createBrowserRouter([
       //     them to register to add an item loses the sale at peak purchase intent.
       { path: 'cart', element: <CartPage /> },
 
-      // Checkout alone needs an account — an order requires an owner
-      {
-        path: 'checkout',
-        element: (
-          <RequireAuth>
-            <CheckoutPage />
-          </RequireAuth>
-        ),
-      },
+      // ⚠️  Checkout is **public** (guest checkout): a visitor buys without an
+      //     account, a signed-in customer gets the full flow. `CheckoutPage`
+      //     picks the right one itself; "my orders" below still need a login.
+      { path: 'checkout', element: <CheckoutPage /> },
+
+      // ⚠️  The guest's way back to an order — the signed token in the URL is the
+      //     credential (it is also the link in the confirmation email), so it is
+      //     public by design. `find` is the "I lost the email" form.
+      { path: 'order/guest/:token', element: <GuestOrderPage /> },
+      { path: 'order/find', element: <FindOrderPage /> },
       {
         path: 'orders',
         element: (

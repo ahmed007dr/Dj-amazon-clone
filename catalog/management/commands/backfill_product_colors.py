@@ -26,6 +26,8 @@ alone. Re-running is safe: a colour that already exists by name is reused.
 
 from __future__ import annotations
 
+from collections import Counter
+
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
@@ -86,16 +88,21 @@ def plan(queryset=None) -> list[dict]:
             continue
         group = groups.setdefault(
             (variant.product_id, _key(text)),
-            {"product": variant.product, "name": " ".join(text.split()), "variants": []},
+            {"product": variant.product, "spellings": Counter(), "variants": []},
         )
+        group["spellings"][" ".join(text.split())] += 1
         group["variants"].append(variant)
 
     proposals = []
     for group in groups.values():
-        name = group["name"]
+        # The spelling most variants use; on a tie the capitalised one ("Blue" over "blue")
+        spellings = group["spellings"]
+        name = max(spellings, key=lambda text: (spellings[text], text[:1].isupper()))
         proposals.append(
             {
-                **group,
+                "product": group["product"],
+                "variants": group["variants"],
+                "name": name,
                 # No translation is guessed: both names start as the text typed, and the
                 # admin corrects the other language in the panel.
                 "name_ar": name,
@@ -111,17 +118,20 @@ def apply_plan(proposals: list[dict]) -> dict:
     created = linked = reused = 0
     for proposal in proposals:
         product = proposal["product"]
-        color = ProductColor.objects.filter(
-            product=product, name_en__iexact=proposal["name_en"]
-        ).first() or ProductColor.objects.filter(
-            product=product, name_ar__iexact=proposal["name_ar"]
-        ).first()
+        color = (
+            ProductColor.objects.filter(
+                product=product, name_en__iexact=proposal["name_en"]
+            ).first()
+            or ProductColor.objects.filter(
+                product=product, name_ar__iexact=proposal["name_ar"]
+            ).first()
+        )
 
         if color is None:
-            top = max(
-                ProductColor.objects.filter(product=product).values_list("display_order", flat=True),
-                default=-10,
+            orders = ProductColor.objects.filter(product=product).values_list(
+                "display_order", flat=True
             )
+            top = max(orders, default=-10)
             color = ProductColor.objects.create(
                 product=product,
                 name_ar=proposal["name_ar"],

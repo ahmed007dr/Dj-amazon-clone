@@ -9,12 +9,22 @@ import {
   type ProductImage,
 } from './imagesApi';
 
-const key = (productId: string) => ['admin', 'product-images', productId];
+/**
+ * ⚠️  The colour is part of the key: the base gallery and each colour's gallery are
+ *     different lists, and sharing a key would show one colour's photos in another's panel.
+ *     Invalidating the bare product prefix still refreshes all of them.
+ */
+const key = (productId: string, colorId?: string) => [
+  'admin',
+  'product-images',
+  productId,
+  colorId ?? 'base',
+];
 
-export function useProductImages(productId: string, enabled = true) {
+export function useProductImages(productId: string, enabled = true, colorId?: string) {
   return useQuery({
-    queryKey: key(productId),
-    queryFn: () => listProductImages(productId),
+    queryKey: key(productId, colorId),
+    queryFn: () => listProductImages(productId, colorId),
     enabled,
     // ⚠️  No `staleTime`: uploading changes the list, and the admin expects to
     //     see their image immediately, not a minute later.
@@ -38,14 +48,19 @@ function useImagesMutation<TArgs>(
 
   return useMutation({
     mutationFn: run,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: key(productId) }),
+    onSuccess: () => {
+      // The whole product prefix: a colour's image count and thumbnail live in the
+      // colours list, and the base gallery may have been affected too.
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'product-images', productId] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'product-colors', productId] });
+    },
   });
 }
 
-export function useUploadImage(productId: string) {
+export function useUploadImage(productId: string, colorId?: string) {
   return useImagesMutation<{ file: File; ar: string; en: string }>(
     productId,
-    ({ file, ar, en }) => uploadProductImage(productId, file, { ar, en }),
+    ({ file, ar, en }) => uploadProductImage(productId, file, { ar, en }, colorId),
   );
 }
 
@@ -61,9 +76,9 @@ export function useSetPrimary(productId: string) {
   );
 }
 
-export function useReorderImages(productId: string) {
+export function useReorderImages(productId: string, colorId?: string) {
   return useImagesMutation<string[]>(productId, (order) =>
-    reorderProductImages(productId, order),
+    reorderProductImages(productId, order, colorId),
   );
 }
 

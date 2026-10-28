@@ -20,7 +20,7 @@ import { ProductImageTile } from './ProductImageTile';
 
 import './ProductImagesPanel.css';
 
-/** Matches `MAX_IMAGES_PER_PRODUCT` on the server. */
+/** Matches `MAX_IMAGES_PER_PRODUCT` on the server — which applies it **per gallery**. */
 const MAX_IMAGES = 8;
 
 /**
@@ -32,19 +32,33 @@ const MAX_IMAGES = 8;
  *     image with no alt text is unreadable to a screen reader user and unseen
  *     by a search engine. Placing it above the select button makes it part of a
  *     single act.
+ *
+ * ⚠️  With `colorId` it manages **that colour's own gallery**; without, the product's
+ *     base one. Same panel, same rules — the cap of eight, the single primary, the
+ *     promotion on delete are all per gallery on the server — so a colour's photos can
+ *     never appear in the main-images panel or the other way round.
  */
-export function ProductImagesPanel({ productId }: { productId: string }) {
+export function ProductImagesPanel({
+  productId,
+  colorId,
+  emptyBody,
+}: {
+  productId: string;
+  colorId?: string;
+  /** Replaces the default "a product without an image…" line — a colour explains the fallback */
+  emptyBody?: string;
+}) {
   const { t } = useTranslation();
   const { notify } = useToast();
 
   const [altAr, setAltAr] = useState('');
   const [altEn, setAltEn] = useState('');
 
-  const query = useProductImages(productId);
-  const upload = useUploadImage(productId);
+  const query = useProductImages(productId, true, colorId);
+  const upload = useUploadImage(productId, colorId);
   const remove = useDeleteImage(productId);
   const primary = useSetPrimary(productId);
-  const reorder = useReorderImages(productId);
+  const reorder = useReorderImages(productId, colorId);
 
   const images = query.data ?? [];
   const busy =
@@ -111,7 +125,11 @@ export function ProductImagesPanel({ productId }: { productId: string }) {
       {upload.isPending ? <Spinner /> : null}
 
       {images.length === 0 ? (
-        <StateMessage icon="▣" title={t('images.empty')} body={t('images.emptyBody')} />
+        <StateMessage
+          icon="▣"
+          title={t('images.empty')}
+          body={emptyBody ?? t('images.emptyBody')}
+        />
       ) : (
         <div className="images-panel__grid">
           {images.map((image, index) => (

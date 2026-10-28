@@ -72,7 +72,9 @@ def _requested_color(request, product) -> ProductColor | None:
 def _scope(product_id, color) -> "models.QuerySet":
     """The images of one scope: a colour's own, or the product's base gallery."""
     queryset = ProductImage.objects.filter(product_id=product_id)
-    return queryset.filter(color=color) if color is not None else queryset.filter(color__isnull=True)
+    if color is not None:
+        return queryset.filter(color=color)
+    return queryset.filter(color__isnull=True)
 
 
 def _watermark_if_present(serializer) -> None:

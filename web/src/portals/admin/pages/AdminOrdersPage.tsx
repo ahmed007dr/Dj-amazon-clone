@@ -11,7 +11,8 @@ import {
 import { useDebounced } from '@/shared/hooks/useDebounced';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
-import { FilterBar, FilterSearch } from '@/shared/ui/FilterBar';
+import { Badge } from '@/shared/ui/Badge';
+import { FilterBar, FilterSearch, FilterSelect } from '@/shared/ui/FilterBar';
 import { Pagination } from '@/shared/ui/Pagination';
 import { StatusTabs } from '@/shared/ui/StatusTabs';
 import { formatDate, formatMoney } from '@/shared/utils/format';
@@ -41,6 +42,9 @@ export function AdminOrdersPage() {
 
   const [status, setStatus] = useState('PENDING');
   const [search, setSearch] = useState('');
+  // ⚠️  "Guest orders" is the list the owner works from by phone — it is a filter
+  //     on the server, not a client-side cut of whatever page happens to be loaded.
+  const [buyer, setBuyer] = useState('');
   const [page, setPage] = useState(1);
 
   const debouncedSearch = useDebounced(search);
@@ -48,6 +52,7 @@ export function AdminOrdersPage() {
   const query = useAdminOrders({
     ...(status ? { status } : {}),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    ...(buyer ? { guest: buyer } : {}),
     page,
   });
 
@@ -60,11 +65,23 @@ export function AdminOrdersPage() {
     {
       key: 'customer',
       header: t('admin.customer'),
-      render: (order) => (
-        <span className="truncate" style={{ direction: 'ltr', display: 'inline-block' }}>
-          {order.customer_email}
-        </span>
-      ),
+      render: (order) =>
+        order.is_guest ? (
+          // A guest has no account: the badge says so, and the name + phone are
+          // what the person confirming the order by phone actually needs.
+          <span style={{ display: 'inline-grid', gap: '0.15rem' }}>
+            <span>
+              <Badge tone="info">{t('guest.badge')}</Badge> {order.recipient_name}
+            </span>
+            <span className="muted" style={{ direction: 'ltr' }}>
+              {order.recipient_phone}
+            </span>
+          </span>
+        ) : (
+          <span className="truncate" style={{ direction: 'ltr', display: 'inline-block' }}>
+            {order.customer_email}
+          </span>
+        ),
     },
     {
       key: 'status',
@@ -111,9 +128,10 @@ export function AdminOrdersPage() {
       />
 
       <FilterBar
-        hasFilters={Boolean(search)}
+        hasFilters={Boolean(search) || Boolean(buyer)}
         onClear={() => {
           setSearch('');
+          setBuyer('');
           setPage(1);
         }}
       >
@@ -124,6 +142,18 @@ export function AdminOrdersPage() {
             setPage(1);
           }}
           placeholder={t('admin.searchOrders')}
+        />
+        <FilterSelect
+          value={buyer}
+          onChange={(next) => {
+            setBuyer(next);
+            setPage(1);
+          }}
+          label={t('guest.filterLabel')}
+          options={[
+            { value: 'true', label: t('guest.filterGuests') },
+            { value: 'false', label: t('guest.filterMembers') },
+          ]}
         />
       </FilterBar>
 

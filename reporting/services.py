@@ -500,10 +500,7 @@ def customer_behaviour(start: date, end: date, limit: int = 20) -> dict:
         "returning_customers": returning,
         "active_customers": guest_services.count_distinct_buyers(sold),
         # Of those, how many bought without an account (a subset, shown separately)
-        "guest_customers": sold.filter(guest_services.guest_orders_q())
-        .values("contact_email")
-        .distinct()
-        .count(),
+        "guest_customers": guest_services.count_guest_buyers(sold),
         "top_customers": [
             {
                 "customer": str(profile.pk),

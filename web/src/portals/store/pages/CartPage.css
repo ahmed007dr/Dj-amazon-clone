@@ -29,3 +29,12 @@
     gap: var(--space-8);
   }
 }
+
+.cart-page__guest-note {
+  font-size: 0.875rem;
+}
+
+.cart-page__guest-note a {
+  font-weight: 600;
+  color: var(--color-primary);
+}

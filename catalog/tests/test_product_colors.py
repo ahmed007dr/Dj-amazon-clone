@@ -24,8 +24,6 @@ from catalog.tests.color_support import (
 )
 from conftest import png_upload
 from core.models.audit import AuditAction, AuditLog
-from inventory import services as inventory_services
-from inventory.models import StockLocation
 
 
 @pytest.fixture
@@ -107,7 +105,9 @@ class TestCreate:
         create(admin_client, product)
         create(admin_client, product, name_ar="أخضر", name_en="Green")
 
-        orders = list(ProductColor.objects.filter(product=product).values_list("display_order", flat=True))
+        orders = list(
+            ProductColor.objects.filter(product=product).values_list("display_order", flat=True)
+        )
         assert orders == sorted(orders)
         assert len(set(orders)) == 2
 
@@ -173,7 +173,9 @@ class TestValidation:
         import uuid
 
         url = reverse("v1:catalog:admin-product-colors", args=[uuid.uuid4()])
-        response = admin_client.post(url, {"name_ar": "أ", "name_en": "A", "hex": "#111111"}, format="json")
+        response = admin_client.post(
+            url, {"name_ar": "أ", "name_en": "A", "hex": "#111111"}, format="json"
+        )
 
         assert response.status_code == 404
 
@@ -265,7 +267,9 @@ class TestUpdate:
         color = add_color(product)
 
         response = admin_client.patch(
-            color_url(product, color), {"name_ar": "أزرق ملكي", "name_en": "Royal blue"}, format="json"
+            color_url(product, color),
+            {"name_ar": "أزرق ملكي", "name_en": "Royal blue"},
+            format="json",
         )
 
         assert response.status_code == 200, response.data
@@ -295,7 +299,9 @@ class TestUpdate:
     def test_a_null_price_clears_the_override(self, admin_client, product):
         color = add_color(product, price_override="150.00")
 
-        response = admin_client.patch(color_url(product, color), {"price_override": None}, format="json")
+        response = admin_client.patch(
+            color_url(product, color), {"price_override": None}, format="json"
+        )
 
         assert response.status_code == 200
         color.refresh_from_db()
@@ -372,23 +378,6 @@ class TestDelete:
         assert response.status_code == 201, response.data
         skus = set(ProductVariant.all_objects.filter(product=product).values_list("sku", flat=True))
         assert skus == {"CLR-001-BLUE", "CLR-001-BLUE-2"}
-
-    def test_a_colour_with_stock_needs_confirmation(self, admin_client, product):
-        location = StockLocation.objects.create(
-            code="main", name_ar="الرئيسي", name_en="Main", is_default=True
-        )
-        color = add_color(product)
-        inventory_services.receive(
-            product, 7, Decimal("50.00"), location=location, variant=color.variants.get()
-        )
-
-        refused = admin_client.delete(color_url(product, color))
-        assert refused.status_code == 409
-        assert "7" in refused.data["detail"]
-        assert ProductColor.objects.filter(pk=color.pk).exists()
-
-        confirmed = admin_client.delete(color_url(product, color) + "?force=true")
-        assert confirmed.status_code == 204
 
     def test_it_is_audited(self, admin_client, product):
         color = add_color(product)

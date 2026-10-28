@@ -70,7 +70,7 @@ export function CashierPage() {
   return (
     <div className="cashier">
       <div className="cashier__search">
-        <ProductSearch onPick={(product) => cart.add(product)} />
+        <ProductSearch onPick={(product, variant) => cart.add(product, 1, variant)} />
       </div>
 
       <div className="cashier__lines">

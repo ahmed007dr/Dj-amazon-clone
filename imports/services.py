@@ -856,7 +856,8 @@ def _resolve_variant_colors(clean_rows) -> dict:
                 if cells["hex"] and color.hex != cells["hex"]:
                     color.hex = cells["hex"]
                     changed.append("hex")
-                if cells["price_override"] is not None and color.price_override != cells["price_override"]:
+                new_price = cells["price_override"]
+                if new_price is not None and color.price_override != new_price:
                     color.price_override = cells["price_override"]
                     changed.append("price_override")
                 if changed:
@@ -1002,7 +1003,9 @@ def _chunk_stock(job, rows, data, *, dry_run: bool) -> None:
         [product_id for product_id in known.values() if product_id is not None]
     )
     offers_variants = {
-        sku for sku, product_id in known.items() if product_id is not None and str(product_id) in offering
+        sku
+        for sku, product_id in known.items()
+        if product_id is not None and str(product_id) in offering
     }
 
     result = validators.validate_stock(

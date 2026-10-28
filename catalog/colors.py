@@ -150,7 +150,7 @@ def create_color(
     *,
     name_ar: str,
     name_en: str,
-    hex: str = "#9CA3AF",  # noqa: A002 — the column's own name
+    hex: str = "#9CA3AF",  # the column's own name
     price_override: Decimal | None = None,
     display_order: int | None = None,
     is_active: bool = True,
@@ -282,7 +282,9 @@ def reorder_colors(product: Product, ordered_ids: list) -> list[ProductColor]:
 
     ⚠️  Validated before anything is written — see `image_api.ReorderImagesAPI`.
     """
-    owned = {str(pk) for pk in ProductColor.objects.filter(product=product).values_list("pk", flat=True)}
+    owned = {
+        str(pk) for pk in ProductColor.objects.filter(product=product).values_list("pk", flat=True)
+    }
     unknown = [str(pk) for pk in ordered_ids if str(pk) not in owned]
     if unknown:
         raise BusinessError(

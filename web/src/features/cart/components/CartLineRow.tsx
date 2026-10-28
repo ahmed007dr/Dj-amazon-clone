@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
+import { VariantTag } from '@/features/catalog/components/VariantTag';
 import { mediaUrl } from '@/shared/http';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { formatMoney } from '@/shared/utils/format';
@@ -47,6 +48,14 @@ export function CartLineRow({ line }: { line: CartLine }) {
           {name}
         </Link>
         <p className="cart-line__sku muted">{line.product_sku}</p>
+
+        {/* ⚠️  The colour the customer chose, beside the name: two lines of the same
+            product in different colours must be told apart at a glance. */}
+        <VariantTag
+          hex={line.color?.hex}
+          color={line.color ? localized(line.color, 'name') : null}
+          variant={line.variant_id ? localized(line, 'variant_name') : null}
+        />
 
         {/* ⚠️  The pre-discount price appears only when there is a real discount —
             striking through a price equal to the current one is a visual deception */}

@@ -20,9 +20,7 @@ PASSWORD = "Str0ng-Test-Pass!23"
 
 
 def make_admin_client(email: str = "color-admin@test.local") -> APIClient:
-    admin = User.objects.create_user(
-        email=email, password=PASSWORD, account_type=AccountType.ADMIN
-    )
+    admin = User.objects.create_user(email=email, password=PASSWORD, account_type=AccountType.ADMIN)
     admin.is_active = True
     admin.save()
     apps.get_model("administration", "AdminProfile").objects.create(user=admin)

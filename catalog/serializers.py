@@ -237,7 +237,8 @@ class ProductDetailSerializer(ProductListSerializer):
             entry = facts.get(str(color.pk), {})
             price = entry.get("price")
             if price is None:
-                price = str(color.price_override if color.price_override is not None else obj.base_price)
+                own = color.price_override
+                price = str(own if own is not None else obj.base_price)
             variants = color.active_variants
 
             payload.append(

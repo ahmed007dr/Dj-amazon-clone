@@ -58,7 +58,9 @@ def upload(client, product, color=None, name="photo.png"):
 
 def primary_ids(product, color=None):
     queryset = ProductImage.objects.filter(product=product, is_primary=True)
-    queryset = queryset.filter(color=color) if color is not None else queryset.filter(color__isnull=True)
+    queryset = (
+        queryset.filter(color=color) if color is not None else queryset.filter(color__isnull=True)
+    )
     return list(queryset.values_list("pk", flat=True))
 
 
@@ -71,7 +73,7 @@ class TestUploadIntoAScope:
         assert base.status_code == 201 and own.status_code == 201
         assert base.data["is_primary"] is True and base.data["color"] is None
         assert own.data["is_primary"] is True, "أول صورة للون هي رئيسيته حتى لو للمنتج صور"
-        assert own.data["color"] == str(blue.pk)
+        assert str(own.data["color"]) == str(blue.pk)
 
     def test_the_second_image_of_a_scope_is_not_primary(self, admin_client, product, blue):
         upload(admin_client, product, blue, "a.png")
@@ -96,7 +98,9 @@ class TestUploadIntoAScope:
         assert upload(admin_client, product, name="extra.png").status_code == 409
         assert upload(admin_client, product, blue, "own.png").status_code == 201
 
-    def test_a_full_colour_gallery_is_refused_with_its_own_message(self, admin_client, product, blue):
+    def test_a_full_colour_gallery_is_refused_with_its_own_message(
+        self, admin_client, product, blue
+    ):
         for index in range(MAX_IMAGES_PER_PRODUCT):
             upload(admin_client, product, blue, f"c-{index}.png")
 
@@ -145,7 +149,7 @@ class TestListing:
 
         rows = admin_client.get(images_url(product), {"color": str(blue.pk)}).data
 
-        assert [row["color"] for row in rows] == [str(blue.pk)]
+        assert [str(row["color"]) for row in rows] == [str(blue.pk)]
 
     def test_all_returns_every_gallery(self, admin_client, product, blue):
         upload(admin_client, product, name="base.png")
@@ -162,9 +166,9 @@ class TestListing:
 @pytest.mark.django_db
 class TestPrimaryAndOrder:
     def test_setting_a_primary_only_unsets_within_its_scope(self, admin_client, product, blue):
-        base_primary = upload(admin_client, product, name="base.png").data["id"]
+        base_primary = str(upload(admin_client, product, name="base.png").data["id"])
         upload(admin_client, product, blue, "a.png")
-        second = upload(admin_client, product, blue, "b.png").data["id"]
+        second = str(upload(admin_client, product, blue, "b.png").data["id"])
 
         response = admin_client.post(
             reverse("v1:catalog:admin-product-image-primary", args=[product.pk, second])
@@ -177,9 +181,9 @@ class TestPrimaryAndOrder:
     def test_deleting_a_colours_primary_promotes_within_that_colour(
         self, admin_client, product, blue
     ):
-        base = upload(admin_client, product, name="base.png").data["id"]
-        first = upload(admin_client, product, blue, "a.png").data["id"]
-        second = upload(admin_client, product, blue, "b.png").data["id"]
+        base = str(upload(admin_client, product, name="base.png").data["id"])
+        first = str(upload(admin_client, product, blue, "a.png").data["id"])
+        second = str(upload(admin_client, product, blue, "b.png").data["id"])
 
         response = admin_client.delete(
             reverse("v1:catalog:admin-product-image-detail", args=[product.pk, first])
@@ -196,17 +200,19 @@ class TestPrimaryAndOrder:
         ⚠️  The replacement search used to be "any image of the product". With colours
             that would pick the blue photo and trip the per-scope unique constraint.
         """
-        base = upload(admin_client, product, name="base.png").data["id"]
+        base = str(upload(admin_client, product, name="base.png").data["id"])
         upload(admin_client, product, blue, "own.png")
 
-        admin_client.delete(reverse("v1:catalog:admin-product-image-detail", args=[product.pk, base]))
+        admin_client.delete(
+            reverse("v1:catalog:admin-product-image-detail", args=[product.pk, base])
+        )
 
         assert primary_ids(product) == []
         assert len(primary_ids(product, blue)) == 1
 
     def test_reorder_works_inside_a_colour(self, admin_client, product, blue):
-        first = upload(admin_client, product, blue, "a.png").data["id"]
-        second = upload(admin_client, product, blue, "b.png").data["id"]
+        first = str(upload(admin_client, product, blue, "a.png").data["id"])
+        second = str(upload(admin_client, product, blue, "b.png").data["id"])
 
         response = admin_client.post(
             reverse("v1:catalog:admin-product-images-reorder", args=[product.pk]),
@@ -215,11 +221,11 @@ class TestPrimaryAndOrder:
         )
 
         assert response.status_code == 200
-        assert [row["id"] for row in response.data] == [second, first]
+        assert [str(row["id"]) for row in response.data] == [second, first]
 
     def test_reorder_refuses_ids_from_another_scope(self, admin_client, product, blue):
-        base = upload(admin_client, product, name="base.png").data["id"]
-        own = upload(admin_client, product, blue, "own.png").data["id"]
+        base = str(upload(admin_client, product, name="base.png").data["id"])
+        own = str(upload(admin_client, product, blue, "own.png").data["id"])
 
         # The colour's id sent without naming the colour is "not in the base gallery"
         response = admin_client.post(
@@ -253,4 +259,6 @@ class TestConstraints:
         )
         first.delete()
 
-        ProductImage.objects.create(product=product, color=blue, image=png_upload(), is_primary=True)
+        ProductImage.objects.create(
+            product=product, color=blue, image=png_upload(), is_primary=True
+        )

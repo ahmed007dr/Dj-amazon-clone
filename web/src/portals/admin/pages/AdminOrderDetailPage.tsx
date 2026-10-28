@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
+import { VariantTag } from '@/features/catalog/components/VariantTag';
 import { useAdminOrder } from '@/features/orders/adminHooks';
 import {
   OrderStatusBadge,
@@ -9,6 +10,8 @@ import {
 import { OrderTransitions } from '@/features/orders/components/OrderTransitions';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { PageHeader } from '@/shared/layouts/PageHeader';
+import { Alert } from '@/shared/ui/Alert';
+import { Badge } from '@/shared/ui/Badge';
 import { Spinner } from '@/shared/ui/Spinner';
 import { StateMessage } from '@/shared/ui/StateMessage';
 import { formatDateTime, formatMoney } from '@/shared/utils/format';
@@ -53,8 +56,15 @@ export function AdminOrderDetailPage() {
           <h2 className="admin-order__heading">{t('admin.items')}</h2>
           {order.lines.map((line) => (
             <div key={line.id} className="admin-order__line">
-              <span>{localized(line, 'product_name')}</span>
-              <span className="muted">{line.product_sku}</span>
+              <span>
+                {localized(line, 'product_name')}{' '}
+                <VariantTag
+                  hex={line.color_hex}
+                  color={localized(line, 'color_name')}
+                  variant={localized(line, 'variant_name')}
+                />
+              </span>
+              <span className="muted">{line.variant_sku || line.product_sku}</span>
               <span className="muted">
                 {line.quantity} × {money(line.unit_price)}
               </span>
@@ -66,16 +76,55 @@ export function AdminOrderDetailPage() {
         <aside className="admin-order__side">
           <section className="surface admin-order__box">
             <h2 className="admin-order__heading">{t('admin.customer')}</h2>
-            <dl className="admin-order__facts">
-              <div>
-                <dt>{t('auth.email')}</dt>
-                <dd style={{ direction: 'ltr' }}>{order.customer_email}</dd>
-              </div>
-              <div>
-                <dt>{t('admin.customerNumber')}</dt>
-                <dd style={{ direction: 'ltr' }}>{order.customer_number}</dd>
-              </div>
-            </dl>
+
+            {/* ⚠️  A guest order has no account to look up — the contact block is
+                the whole customer, and the phone is the point: the owner rings it
+                to confirm before the order moves on. */}
+            {order.is_guest ? (
+              <>
+                <p>
+                  <Badge tone="info">{t('guest.badge')}</Badge>
+                </p>
+                <Alert tone="warning">{t('guest.adminHint')}</Alert>
+                <dl className="admin-order__facts">
+                  <div>
+                    <dt>{t('account.recipientName')}</dt>
+                    <dd>{order.recipient_name}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('auth.phone')}</dt>
+                    <dd style={{ direction: 'ltr' }}>
+                      <a href={`tel:${order.recipient_phone}`}>{order.recipient_phone}</a>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{t('auth.email')}</dt>
+                    <dd style={{ direction: 'ltr' }}>{order.contact_email}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('guest.adminLanguage')}</dt>
+                    <dd>{order.contact_language === 'en' ? 'English' : 'العربية'}</dd>
+                  </div>
+                </dl>
+              </>
+            ) : (
+              <dl className="admin-order__facts">
+                <div>
+                  <dt>{t('auth.email')}</dt>
+                  <dd style={{ direction: 'ltr' }}>{order.customer_email}</dd>
+                </div>
+                <div>
+                  <dt>{t('admin.customerNumber')}</dt>
+                  <dd style={{ direction: 'ltr' }}>{order.customer_number}</dd>
+                </div>
+                {order.claimed_at ? (
+                  <div>
+                    <dt>{t('guest.adminClaimed')}</dt>
+                    <dd>{formatDateTime(order.claimed_at, i18n.language)}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            )}
           </section>
 
           <section className="surface admin-order__box">

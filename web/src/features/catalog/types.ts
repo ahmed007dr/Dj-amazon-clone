@@ -72,6 +72,8 @@ export interface ProductImage {
   alt_text_en: string;
   display_order: number;
   is_primary: boolean;
+  /** `null` = one of the product's base images; set = that colour's own image */
+  color?: string | null;
 }
 
 export interface ProductVariant {
@@ -83,6 +85,32 @@ export interface ProductVariant {
   attributes: Record<string, string>;
   price_adjustment: string;
   display_order: number;
+  /** The colour this variant belongs to — `null` for a plain one (a size, a strength) */
+  color?: string | null;
+}
+
+/**
+ * A colour of a product, as the storefront gets it.
+ *
+ * ⚠️  `images` are the colour's **own** — empty means "show the product's base images".
+ *     And `price` is what *this customer* pays for the colour (price list → colour →
+ *     product → variant difference, computed by the server); `price_override` is the raw
+ *     figure and is only for explaining a difference, never for adding up.
+ */
+export interface ProductColor {
+  id: string;
+  name_ar: string;
+  name_en: string;
+  hex: string;
+  price: string;
+  price_override: string | null;
+  is_available: boolean;
+  is_low: boolean;
+  /** An exact number only at or below the low-stock threshold, otherwise `null` */
+  available: number | null;
+  /** The variant that goes in the cart for this colour */
+  variant_id: string | null;
+  images: ProductImage[];
 }
 
 export interface ManufacturerBrief {
@@ -99,6 +127,8 @@ export interface ProductDetail extends ProductListItem {
   manufacturer: ManufacturerBrief | null;
   images: ProductImage[];
   variants: ProductVariant[];
+  /** Empty for a product without colours — it then behaves exactly as before */
+  colors: ProductColor[];
   barcode: string;
   /** The pharmaceutical fields — meaningful for medicines alone */
   active_ingredient_ar: string;

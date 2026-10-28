@@ -1,0 +1,7 @@
+.variant-tag {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}

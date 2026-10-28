@@ -42,7 +42,13 @@ export function Receipt({
           <tbody>
             {order.lines.map((line) => (
               <tr key={line.id}>
-                <td>{localized(line, 'product_name')}</td>
+                <td>
+                  {localized(line, 'product_name')}
+                  {/* The colour is on the paper: the customer checks it against what they hold */}
+                  {line.color_name_ar || line.color_name_en ? (
+                    <small> · {localized(line, 'color_name')}</small>
+                  ) : null}
+                </td>
 
                 <td dir="ltr">×{line.quantity}</td>
                 <td dir="ltr">{line.total}</td>

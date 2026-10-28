@@ -26,9 +26,7 @@ def location(db):
 @pytest.fixture
 def product(db):
     category = Category.objects.create(name_ar="فئة", name_en="Category")
-    return Product.objects.create(
-        sku="VS-001", name_ar="سكراب", name_en="Scrub", category=category
-    )
+    return Product.objects.create(sku="VS-001", name_ar="سكراب", name_en="Scrub", category=category)
 
 
 @pytest.fixture

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 
 import { isApiError } from '@/shared/http';
 import { Alert } from '@/shared/ui/Alert';
@@ -29,8 +30,13 @@ import './RegisterForm.css';
 export function RegisterForm({ onSuccess }: { onSuccess: (email: string) => void }) {
   const { t, i18n } = useTranslation();
 
+  // ⚠️  `?email=` pre-fills the address — the guest order page links here so a
+  //     buyer who just checked out as a guest can register with the same
+  //     address (their earlier orders attach once it is verified).
+  const [params] = useSearchParams();
+
   const [form, setForm] = useState({
-    email: '',
+    email: params.get('email') ?? '',
     password: '',
     first_name: '',
     last_name: '',

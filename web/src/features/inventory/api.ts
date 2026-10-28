@@ -13,6 +13,11 @@ export interface Stock {
   product_sku: string;
   product_name: string;
   variant: string | null;
+  /** The variant's SKU / names / colour swatch — `null` for stock on no variant */
+  variant_sku?: string | null;
+  variant_name_ar?: string | null;
+  variant_name_en?: string | null;
+  color_hex?: string | null;
   location: string;
   location_code: string;
   quantity_physical: number;
@@ -162,6 +167,9 @@ export interface StockMovement {
   product: string;
   product_sku: string;
   variant: string | null;
+  variant_sku?: string | null;
+  variant_name_ar?: string | null;
+  variant_name_en?: string | null;
   location: string;
   location_code: string;
   batch: string | null;
@@ -191,6 +199,8 @@ export const listMovements = (params: {
 
 export interface ReceiveBody {
   product: string;
+  /** Required once the product has colours or sizes — stock on "no variant" is unsellable */
+  variant?: string | null;
   location?: string | null;
   quantity: number;
   unit_cost: string;
@@ -200,6 +210,7 @@ export interface ReceiveBody {
 
 export interface AdjustBody {
   product: string;
+  variant?: string | null;
   location?: string | null;
   /** Positive for an increase · negative for a decrease — and zero is refused */
   quantity: number;
@@ -208,6 +219,7 @@ export interface AdjustBody {
 
 export interface TransferBody {
   product: string;
+  variant?: string | null;
   from_location: string;
   to_location: string;
   quantity: number;
@@ -215,6 +227,7 @@ export interface TransferBody {
 
 export interface DamageBody {
   product: string;
+  variant?: string | null;
   location?: string | null;
   quantity: number;
   reason: string;
@@ -266,6 +279,73 @@ export function useTransferStock() {
 
 export function useMarkDamaged() {
   return useInventoryMutation((body: DamageBody) => http.post('/inventory/damage/', body));
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Variants and colours
+// ═══════════════════════════════════════════════════════════
+
+/** A variant a stock command can target — with what it holds right now (exact: admin screen). */
+export interface VariantChoice {
+  id: string;
+  sku: string;
+  name_ar: string;
+  name_en: string;
+  available: number;
+  color: { id: string; name_ar: string; name_en: string; hex: string } | null;
+}
+
+export const listVariantChoices = (productId: string) =>
+  http.get<VariantChoice[]>('/inventory/product-variants/', { params: { product: productId } });
+
+/**
+ * The variants of the product chosen in the movement form.
+ *
+ * ⚠️  Behind the *inventory* permission, not the catalogue one — whoever receives a
+ *     delivery may not be allowed to edit products and still has to say which colour arrived.
+ */
+export function useVariantChoices(productId: string | null) {
+  return useQuery({
+    queryKey: ['inventory', 'variant-choices', productId],
+    queryFn: () => listVariantChoices(productId ?? ''),
+    enabled: productId !== null,
+    staleTime: 0,
+  });
+}
+
+/** Units a product holds on **no variant**, per location — what the "assign to a colour" step moves. */
+export interface UnassignedStock {
+  product: string;
+  total: number;
+  locations: { location: string; location_code: string; quantity: number }[];
+}
+
+export const getUnassignedStock = (productId: string) =>
+  http.get<UnassignedStock>('/inventory/unassigned-stock/', { params: { product: productId } });
+
+/**
+ * ⚠️  Quiet on failure: someone who manages colours but not stock gets a `403` here, and
+ *     the colours screen must simply not offer the step — never show an error for it.
+ */
+export function useUnassignedStock(productId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['inventory', 'unassigned-stock', productId],
+    queryFn: () => getUnassignedStock(productId),
+    enabled,
+    staleTime: 0,
+    retry: false,
+  });
+}
+
+export interface AssignStockResult {
+  moved: number;
+  locations: { location_code: string; quantity: number }[];
+}
+
+export function useAssignStock() {
+  return useInventoryMutation((body: { product: string; color: string; location?: string }) =>
+    http.post<AssignStockResult>('/inventory/assign-stock/', body),
+  );
 }
 
 // ═══════════════════════════════════════════════════════════

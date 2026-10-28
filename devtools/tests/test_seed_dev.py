@@ -312,4 +312,5 @@ class TestSeededColors:
         from catalog.models import ProductColor, ProductVariant
 
         assert not ProductColor.objects.filter(product__sku="SCR-SET").exists()
-        assert ProductVariant.objects.filter(product__sku="SCR-SET", color__isnull=True).count() == 3
+        legacy = ProductVariant.objects.filter(product__sku="SCR-SET", color__isnull=True)
+        assert legacy.count() == 3

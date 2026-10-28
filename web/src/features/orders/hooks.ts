@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { CART_KEY } from '@/features/cart/hooks';
+import { clearGuestCartSession } from '@/shared/http/guestSession';
 
 import * as api from './api';
-import type { CheckoutPayload } from './types';
+import type { CheckoutPayload, GuestCheckoutPayload } from './types';
 
 export function useMyOrders() {
   return useQuery({
@@ -63,6 +64,67 @@ export function useCheckout() {
       void queryClient.invalidateQueries({ queryKey: CART_KEY });
       void queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Guest checkout
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Placing an order without an account.
+ *
+ * ⚠️  The cart session is **rotated** on success.
+ *
+ *     The server converted the cart behind this key; keeping the key means the
+ *     next product the visitor adds lands in a fresh cart under the *same*
+ *     identifier — harmless, but it also means the old key (now sitting in the
+ *     browser's history of requests) keeps naming a live cart. A new key per
+ *     purchase keeps "one browser, one basket" true.
+ */
+export function useGuestCheckout() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: GuestCheckoutPayload) => api.guestCheckout(payload),
+    onSuccess: () => {
+      clearGuestCartSession();
+      void queryClient.invalidateQueries({ queryKey: CART_KEY });
+    },
+  });
+}
+
+export function guestOrderKey(token: string | undefined) {
+  return ['orders', 'guest', token] as const;
+}
+
+export function useGuestOrder(token: string | undefined) {
+  return useQuery({
+    queryKey: guestOrderKey(token),
+    queryFn: () => api.getGuestOrder(token as string),
+    enabled: Boolean(token),
+    // ⚠️  A 404 / 410 on a link is final: retrying a tampered or expired token
+    //     three times only delays the explanation.
+    retry: false,
+  });
+}
+
+export function useCancelGuestOrder(token: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (reason: string) => api.cancelGuestOrder(token as string, reason),
+    // The response is the order in its cancelled state — written straight in
+    onSuccess: (order) => {
+      queryClient.setQueryData(guestOrderKey(token), order);
+    },
+  });
+}
+
+export function useLookupGuestOrder() {
+  return useMutation({
+    mutationFn: (args: { orderNumber: string; phone: string }) =>
+      api.lookupGuestOrder(args.orderNumber, args.phone),
   });
 }
 

@@ -82,7 +82,9 @@ class CartLinesAPI(CartMixin, APIView):
             get_object_or_404(Product, pk=data["product"]),
             data["quantity"],
             variant=(
-                get_object_or_404(ProductVariant.objects.select_related("color"), pk=data["variant"])
+                get_object_or_404(
+                    ProductVariant.objects.select_related("color"), pk=data["variant"]
+                )
                 if data.get("variant")
                 else None
             ),

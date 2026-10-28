@@ -79,6 +79,10 @@ def _register():
             return
 
         if instance.status in (OrderStatus.COMPLETED, OrderStatus.DELIVERED):
+            # A claimed guest order earns neither points nor a referral reward —
+            # the purchase predates the account (see `award_for_order`).
+            if getattr(instance, "claimed_at", None) is not None:
+                return
             services.award_for_order(instance)
             services.reward_referral(instance)
 

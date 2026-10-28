@@ -105,7 +105,9 @@ class TestVariantLines:
 
         assert cart.lines.get().quantity == 3
 
-    def test_stock_is_checked_on_the_variant_not_the_product(self, cart, product, small, large, user):
+    def test_stock_is_checked_on_the_variant_not_the_product(
+        self, cart, product, small, large, user
+    ):
         """Large has 20 in stock — Small's 4 is still the limit for a Small line."""
         with pytest.raises(BusinessError) as failure:
             services.add_line(cart, product, 5, variant=small, user=user)

@@ -203,6 +203,13 @@ def award_for_order(order) -> PointsEntry | None:
         # A counter sale with no registered customer — there is nobody to reward
         return None
 
+    # ⚠️  A claimed guest order was bought before the account existed.
+    #     Claiming it (email verified) attaches the customer without paying
+    #     points, but any later save — completion, a panel edit — would reach
+    #     this point with a customer set. The marker is what keeps it unpaid.
+    if getattr(order, "claimed_at", None) is not None:
+        return None
+
     program = program_for(customer.user, customer)
     if program is None:
         return None

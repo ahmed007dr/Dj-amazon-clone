@@ -119,7 +119,9 @@ class TestVariantSale:
         line = Order.objects.get(pk=result.order.pk).lines.get()
         assert line.variant_id == variant.pk
         assert line.unit_price == Decimal("60.00")
-        assert inventory_services.available_quantity(product, location=location, variant=variant) == 8
+        assert (
+            inventory_services.available_quantity(product, location=location, variant=variant) == 8
+        )
 
     def test_a_variant_with_no_stock_cannot_be_sold(self, session, product, variant):
         from core.errors import BusinessError
@@ -134,4 +136,6 @@ class TestVariantSale:
 
         services.refund_sale(session, result.order, reason="مرتجع")
 
-        assert inventory_services.available_quantity(product, location=location, variant=variant) == 10
+        assert (
+            inventory_services.available_quantity(product, location=location, variant=variant) == 10
+        )

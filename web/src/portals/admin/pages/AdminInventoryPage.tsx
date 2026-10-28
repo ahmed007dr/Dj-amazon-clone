@@ -15,6 +15,7 @@ import {
   type StockMovement,
   type UnstockedProduct,
 } from '@/features/inventory/api';
+import { VariantTag } from '@/features/catalog/components/VariantTag';
 import { BatchesTab } from '@/portals/admin/components/BatchesTab';
 import { StockCountsTab } from '@/portals/admin/components/StockCountsTab';
 import {
@@ -285,7 +286,10 @@ export function AdminInventoryPage() {
       header: t('catalog.product'),
       render: (row) => (
         <span>
-          <code style={{ direction: 'ltr' }}>{row.product_sku}</code> — {row.product_name}
+          <code style={{ direction: 'ltr' }}>{row.product_sku}</code> — {row.product_name}{' '}
+          {/* ⚠️  A row is a product *in a colour* at a location — without the colour,
+              three rows of the same product at one location look like duplicates. */}
+          <VariantTag hex={row.color_hex} color={null} variant={localized(row, 'variant_name')} />
         </span>
       ),
     },
@@ -392,7 +396,12 @@ export function AdminInventoryPage() {
     {
       key: 'product',
       header: t('catalog.product'),
-      render: (row) => <code style={{ direction: 'ltr' }}>{row.product_sku}</code>,
+      render: (row) => (
+        <span>
+          <code style={{ direction: 'ltr' }}>{row.product_sku}</code>{' '}
+          <VariantTag variant={localized(row, 'variant_name')} />
+        </span>
+      ),
     },
     {
       key: 'location',

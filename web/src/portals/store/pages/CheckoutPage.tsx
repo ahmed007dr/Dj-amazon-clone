@@ -6,6 +6,7 @@ import { useCreditCheckout, useMyAccount } from '@/features/b2b/api';
 import { CartIssues } from '@/features/cart/components/CartIssues';
 import { CartSummary } from '@/features/cart/components/CartSummary';
 import { useCart } from '@/features/cart/hooks';
+import { useAuth } from '@/features/auth/useAuth';
 import { AddressPicker } from '@/features/orders/components/AddressPicker';
 import { PaymentPicker } from '@/features/orders/components/PaymentPicker';
 import { ShippingPicker } from '@/features/orders/components/ShippingPicker';
@@ -17,6 +18,8 @@ import { Button } from '@/shared/ui/Button';
 import { CartIcon } from '@/shared/ui/CartIcon';
 import { Spinner } from '@/shared/ui/Spinner';
 import { StateMessage } from '@/shared/ui/StateMessage';
+
+import { GuestCheckoutPage } from './GuestCheckoutPage';
 
 import { formatMoney } from '@/shared/utils/format';
 
@@ -41,7 +44,7 @@ const CREDIT_METHOD = '__credit__';
  *     shipping locally and adding it to the total produces a figure that
  *     contradicts the invoice.
  */
-export function CheckoutPage() {
+function MemberCheckout() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
 
@@ -257,4 +260,22 @@ export function CheckoutPage() {
       </div>
     </div>
   );
+}
+
+/**
+ * Checkout is public: a visitor buys without an account, a signed-in customer
+ * keeps everything they had (saved addresses, credit, coupons).
+ *
+ * ⚠️  Decided here, once, rather than inside either page: the two flows share
+ *     almost nothing but the cart summary, and a component that forks on every
+ *     other line is how a guest ends up shown a saved-address picker.
+ *     `isRestoring` waits out the session restore so a signed-in customer never
+ *     flashes the guest form on a reload.
+ */
+export function CheckoutPage() {
+  const { user, isRestoring } = useAuth();
+
+  if (isRestoring) return <Spinner />;
+
+  return user ? <MemberCheckout /> : <GuestCheckoutPage />;
 }

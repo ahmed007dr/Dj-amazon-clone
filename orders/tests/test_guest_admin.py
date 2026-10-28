@@ -10,6 +10,7 @@ Guest orders in the admin API.
 from __future__ import annotations
 
 import pytest
+from django.conf import settings
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
@@ -223,7 +224,7 @@ class TestDjangoAdmin:
         assert changelist.status_code == 200
         assert "زائر" in changelist.content.decode()
 
-        form = client.get(ff"/{settings.ADMIN_URL}/orders/order/{guest_order.pk}/change/")
+        form = client.get(f"/{settings.ADMIN_URL}/orders/order/{guest_order.pk}/change/")
         assert form.status_code == 200
         assert "ahmed.buyer@example.com" in form.content.decode()
 

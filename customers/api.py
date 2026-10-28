@@ -256,9 +256,12 @@ class AdminDocumentListAPI(generics.ListAPIView):
 
     def get_queryset(self):
         queryset, params = _filtered_documents(self.request)
+        # ⚠️  The id breaks ties in the same direction as the timestamp. Ids are
+        #     time-ordered (UUIDv7), so two documents created in the same instant
+        #     still come out oldest-first in the queue and newest-first in history.
         if params.get("status") == DocumentStatus.PENDING:
             return queryset.order_by("created_at", "id")
-        return queryset.order_by("-created_at", "id")
+        return queryset.order_by("-created_at", "-id")
 
 
 class AdminDocumentCountsAPI(APIView):

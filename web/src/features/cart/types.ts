@@ -29,6 +29,12 @@ export interface CartLine {
   product_name_ar: string;
   product_name_en: string;
   variant_id: string | null;
+  variant_sku?: string | null;
+  variant_name_ar?: string | null;
+  variant_name_en?: string | null;
+  /** The colour the line is for — `null` for a plain product or a size-only variant */
+  color?: { id: string; name_ar: string; name_en: string; hex: string } | null;
+  /** The colour's own photo when it has one, else the product's */
   image: string | null;
   pricing: PricedLine;
 }

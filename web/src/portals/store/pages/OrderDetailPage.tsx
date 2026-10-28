@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
+import { VariantTag } from '@/features/catalog/components/VariantTag';
 import { CancelOrderButton } from '@/features/orders/components/CancelOrderButton';
 import {
   OrderStatusBadge,
@@ -58,6 +59,12 @@ export function OrderDetailPage() {
               <div className="order-line__info">
                 <strong>{localized(line, 'product_name')}</strong>
                 <span className="muted">{line.product_sku}</span>
+                {/* From the line's snapshot — the colour as it was sold, even if renamed since */}
+                <VariantTag
+                  hex={line.color_hex}
+                  color={localized(line, 'color_name')}
+                  variant={localized(line, 'variant_name')}
+                />
               </div>
 
               <span className="order-line__qty muted">

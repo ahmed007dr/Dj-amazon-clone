@@ -212,7 +212,9 @@ class ProductByBarcodeAPI(PublicCatalogMixin, generics.RetrieveAPIView):
         matched = next(
             (v for v in product.variants.all() if v.barcode and v.barcode == barcode), None
         )
-        data["matched_variant"] = str(matched.pk) if matched is not None and product.barcode != barcode else None
+        # The product's own barcode wins: a scan of it names no particular colour
+        own = product.barcode == barcode
+        data["matched_variant"] = str(matched.pk) if matched is not None and not own else None
         return Response(data)
 
 

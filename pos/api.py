@@ -70,7 +70,9 @@ def _resolve_lines(entries: list[dict]) -> list[services.SaleLine]:
         #     still on sale, and present whenever the product offers one. Without it
         #     "sell the blue" and "sell the product" are one tap apart on the terminal.
         assert_variant_choice(product, variant)
-        lines.append(services.SaleLine(product=product, quantity=entry["quantity"], variant=variant))
+        lines.append(
+            services.SaleLine(product=product, quantity=entry["quantity"], variant=variant)
+        )
     return lines
 
 

@@ -9,6 +9,7 @@ import {
   useMarkDamaged,
   useReceiveStock,
   useTransferStock,
+  useVariantChoices,
   type StockLocation,
 } from '@/features/inventory/api';
 import { isApiError } from '@/shared/http/errors';
@@ -84,6 +85,9 @@ export function StockMovementForm({
   const hasDefault = defaultLocation(locations) !== '';
 
   const [product, setProduct] = useState<AdminProduct | null>(null);
+  // ⚠️  The colour / variant the movement is about. Empty = "no variant", which is only
+  //     meaningful for a product that has none (or for cleaning up old un-assigned stock).
+  const [variantId, setVariantId] = useState('');
   const [location, setLocation] = useState(() => defaultLocation(locations));
   const [toLocation, setToLocation] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -97,6 +101,9 @@ export function StockMovementForm({
 
   const pending =
     receive.isPending || adjust.isPending || transfer.isPending || damage.isPending;
+
+  const variants = useVariantChoices(product?.id ?? null).data ?? [];
+  const hasVariants = variants.length > 0;
 
   const onError = (error: unknown) => {
     if (isApiError(error)) {
@@ -124,6 +131,7 @@ export function StockMovementForm({
       receive.mutate(
         {
           product: product.id,
+          variant: variantId || null,
           location: location || null,
           quantity: count,
           unit_cost: unitCost,
@@ -139,6 +147,7 @@ export function StockMovementForm({
       adjust.mutate(
         {
           product: product.id,
+          variant: variantId || null,
           location: location || null,
           // ⚠️  The sign comes from the two direction buttons, not from typing `-` in the field.
           //     A hand-written minus gets forgotten, so an increase is recorded in place of a decrease.
@@ -154,6 +163,7 @@ export function StockMovementForm({
       transfer.mutate(
         {
           product: product.id,
+          variant: variantId || null,
           from_location: location,
           to_location: toLocation,
           quantity: count,
@@ -166,6 +176,7 @@ export function StockMovementForm({
     damage.mutate(
       {
         product: product.id,
+        variant: variantId || null,
         location: location || null,
         quantity: count,
         reason,
@@ -174,11 +185,16 @@ export function StockMovementForm({
     );
   };
 
+  // ⚠️  Adding stock to a product that has colours must name the colour: units added to
+  //     "no variant" cannot be put in a cart. Moving or removing old un-assigned stock
+  //     may leave it empty.
+  const addsStock = action === 'receive' || (action === 'adjust' && direction === 'up');
   const needsReason = action === 'adjust' || action === 'damage';
   const positiveCount = Number(quantity) > 0;
 
   const ready =
     product !== null &&
+    (!hasVariants || !addsStock || variantId !== '') &&
     quantity !== '' &&
     positiveCount &&
     (action !== 'receive' || unitCost !== '') &&
@@ -233,9 +249,31 @@ export function StockMovementForm({
 
       <ProductPicker
         value={product}
-        onChange={setProduct}
+        onChange={(next) => {
+          setProduct(next);
+          setVariantId('');
+        }}
         {...(fieldErrors.product ? { error: fieldErrors.product } : {})}
       />
+
+      {hasVariants ? (
+        <Select
+          label={t('inventory.variant')}
+          value={variantId}
+          onChange={setVariantId}
+          options={variants.map((variant) => ({
+            value: variant.id,
+            // "Blue" for a colour's own variant, "Blue · L" when the colour has sizes
+            label: `${[variant.color, variant]
+              .filter((part) => part !== null)
+              .map((part) => localized(part, 'name'))
+              .filter((name, index, all) => all.indexOf(name) === index)
+              .join(' · ')} — ${t('inventory.holds', { count: variant.available })}`,
+          }))}
+          placeholder={addsStock ? t('common.choose') : t('inventory.noVariant')}
+          {...(fieldErrors.variant ? { error: fieldErrors.variant } : {})}
+        />
+      ) : null}
 
       {action === 'transfer' ? (
         <div className="stock-form__row">

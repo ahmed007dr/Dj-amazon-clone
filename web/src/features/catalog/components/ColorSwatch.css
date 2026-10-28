@@ -1,0 +1,22 @@
+.color-swatch {
+  --swatch-size: 1.25rem;
+
+  display: inline-block;
+  flex: none;
+  inline-size: var(--swatch-size);
+  block-size: var(--swatch-size);
+  background: var(--swatch-color, transparent);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  /* A hairline of the opposite polarity inside the border: white-on-white and
+     black-on-dark both stay visible without choosing a colour per swatch. */
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+}
+
+.color-swatch--sm {
+  --swatch-size: 0.875rem;
+}
+
+.color-swatch--lg {
+  --swatch-size: 2rem;
+}

@@ -1,0 +1,79 @@
+.guest-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.guest-form__grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.guest-form__select-field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.guest-form__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.guest-form__select {
+  inline-size: 100%;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.guest-form__select:focus {
+  border-color: var(--color-primary);
+}
+
+.guest-form__select.has-error {
+  border-color: var(--color-danger);
+}
+
+.guest-form__error {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-danger);
+}
+
+.guest-form__note {
+  inline-size: 100%;
+  padding: var(--space-3);
+  resize: vertical;
+
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.guest-form__note:focus {
+  border-color: var(--color-primary);
+}
+
+/*
+  ⚠️  The honeypot is moved out of sight, not hidden with `display: none`.
+      Some scripts skip inputs they can tell are hidden; an off-screen,
+      zero-sized, unfocusable input looks like any other to them and like
+      nothing to a person or a screen reader (`aria-hidden`).
+*/
+.guest-form__trap {
+  position: absolute;
+  inset-inline-start: -10000px;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+}
+
+@media (min-width: 576px) {
+  .guest-form__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

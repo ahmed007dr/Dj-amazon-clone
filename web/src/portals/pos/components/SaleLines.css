@@ -20,7 +20,9 @@
 }
 
 .sale-lines__name {
+  display: flex;
   flex: 1;
+  flex-direction: column;
   min-inline-size: 0;
 }
 

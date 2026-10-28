@@ -16,6 +16,15 @@ export interface AdminOrder extends OrderDetail {
   customer: string;
   customer_email: string;
   customer_number: string;
+  /**
+   * A guest order: no account, but a contact. `customer_email` falls back to
+   * `contact_email` for these, so a screen that prints it never shows a blank.
+   */
+  is_guest: boolean;
+  contact_email: string;
+  contact_language: string;
+  /** When an account (after verifying the email) took the order over, if one did. */
+  claimed_at: string | null;
   location: string | null;
   created_by: string | null;
   owner_employee: string | null;
@@ -37,6 +46,8 @@ export interface AdminOrderQuery {
   payment_status?: string;
   channel?: string;
   search?: string;
+  /** `'true'` = guest orders only · `'false'` = everything else. */
+  guest?: string;
   page?: number;
 }
 

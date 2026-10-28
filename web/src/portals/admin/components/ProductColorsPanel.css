@@ -1,0 +1,156 @@
+.colors-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.colors-panel__intro {
+  font-size: 0.875rem;
+}
+
+.colors-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One colour: its facts on top, then actions, then the switch — it wraps rather than
+   squeezes, because this lives in a sliding panel as narrow as a phone. */
+.colors-panel__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.colors-panel__row.is-inactive {
+  opacity: 0.75;
+}
+
+.colors-panel__main {
+  display: flex;
+  flex: 1 1 14rem;
+  gap: var(--space-3);
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.colors-panel__names {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.colors-panel__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-inline-start: auto;
+  font-size: 0.875rem;
+}
+
+.colors-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.colors-panel__images {
+  display: flex;
+  flex-direction: column;
+  flex-basis: 100%;
+  gap: var(--space-3);
+  padding-block-start: var(--space-3);
+  border-block-start: 1px dashed var(--color-border);
+}
+
+.colors-panel__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius);
+}
+
+.colors-panel__fields {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.colors-panel__hex {
+  display: flex;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.colors-panel__hex .field {
+  flex: 1;
+}
+
+.colors-panel__picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.colors-panel__picker input[type='color'] {
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.colors-panel__form-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.colors-panel__assign {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.colors-panel__assign-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.colors-panel__select {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 10rem;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.colors-panel__select select {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+@media (min-width: 640px) {
+  .colors-panel__fields {
+    grid-template-columns: 1fr 1fr;
+  }
+}

@@ -35,6 +35,7 @@ urlpatterns = [
     path("transfer/", api.TransferStockAPI.as_view(), name="transfer"),
     path("damage/", api.MarkDamagedAPI.as_view(), name="damage"),
     # Stock held on no variant → a colour (after a product's first colour is added)
+    path("product-variants/", api.ProductVariantChoicesAPI.as_view(), name="product-variants"),
     path("unassigned-stock/", api.UnassignedStockAPI.as_view(), name="unassigned-stock"),
     path("assign-stock/", api.AssignStockAPI.as_view(), name="assign-stock"),
     path("maintenance/", api.RunMaintenanceAPI.as_view(), name="maintenance"),

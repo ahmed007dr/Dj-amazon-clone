@@ -79,7 +79,7 @@ def make_variant(product, sku="V-001-M", adjustment="0.00", **extra):
 def make_color(product, name_en="Blue", price=None, hex_="#1E40AF"):
     color = ProductColor.objects.create(
         product=product,
-        name_ar="أزرق" if name_en == "Blue" else "أحمر",
+        name_ar="أزرق" if name_en == "Blue" else f"ar-{name_en}",
         name_en=name_en,
         hex=hex_,
         price_override=Decimal(price) if price is not None else None,
@@ -259,3 +259,74 @@ class TestColourPrice:
         plain = make_variant(product, sku="V-001-PLAIN")
 
         assert services.price_for(product, 1, variant=plain).unit_price == Decimal("100.00")
+
+
+# ═══════════════════════════════════════════════════════════
+#  The batched book gives the very same answers
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.django_db
+class TestPriceBook:
+    def test_book_and_single_calls_agree_for_every_combination(
+        self, product, retail, student_list, student
+    ):
+        """
+        ⚠️  The product page prices every swatch through one `PriceBook`; the cart prices a
+            line with plain lookups. They share the selection rules, and this is the test
+            that stops them drifting apart.
+        """
+        blue, blue_variant = make_color(product, price="120.00")
+        red, red_variant = make_color(product, name_en="Red", price=None, hex_="#B91C1C")
+        sized = make_variant(
+            product, sku="V-001-BLUE-L", adjustment="10.00", name_en="L", color=blue
+        )
+        plain = make_variant(product, sku="V-001-PLAIN")
+        PriceRule.objects.create(
+            price_list=student_list, product=product, unit_price=Decimal("75.00")
+        )
+        PriceRule.objects.create(
+            price_list=student_list,
+            product=product,
+            variant=red_variant,
+            min_quantity=5,
+            unit_price=Decimal("60.00"),
+        )
+        PriceOverride.objects.create(
+            product=product,
+            variant=blue_variant,
+            discount_kind=DiscountKind.PERCENTAGE,
+            discount_value=Decimal("10.00"),
+            starts_at=timezone.now() - timedelta(days=1),
+        )
+
+        for user in (None, student):
+            price_list = services.resolve_price_list(user)
+            book = services.PriceBook(product, price_list)
+            for variant in (None, blue_variant, red_variant, sized, plain):
+                for quantity in (1, 5, 12):
+                    direct = services.price_for(
+                        product, quantity, user=user, variant=variant, price_list=price_list
+                    )
+                    batched = services.price_for(
+                        product,
+                        quantity,
+                        user=user,
+                        variant=variant,
+                        price_list=price_list,
+                        book=book,
+                    )
+                    assert direct == batched, (user, variant, quantity)
+
+    def test_the_book_costs_a_fixed_number_of_queries(self, product, retail):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        variants = [make_color(product, name_en=f"C{n}", hex_="#111111")[1] for n in range(6)]
+        book = services.PriceBook(product, retail)
+
+        with CaptureQueriesContext(connection) as queries:
+            for variant in variants:
+                services.price_for(product, 1, variant=variant, price_list=retail, book=book)
+
+        assert len(queries) == 0, "كل شيء حُمِّل مرة واحدة في الدفتر"

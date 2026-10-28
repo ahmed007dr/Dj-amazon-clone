@@ -1,11 +1,17 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import type { POSProduct, SaleLineInput } from './api';
+import type { POSProduct, POSVariant, SaleLineInput } from './api';
 
 export interface CartLine {
+  /** `product:variant` — a line is a product *in a colour*, not a product */
+  key: string;
   product: POSProduct;
+  variant: POSVariant | null;
   quantity: number;
 }
+
+export const lineKey = (productId: string, variantId: string | null) =>
+  `${productId}:${variantId ?? ''}`;
 
 /**
  * The counter basket — **local state, not a query**.
@@ -23,14 +29,21 @@ export interface CartLine {
  *     The cashier scans three identical boxes with three consecutive scans.
  *     Three lines of quantity one make the receipt unreadable and make removing
  *     one of them awkward.
+ *
+ * ⚠️  "The same item" means the same product **in the same colour**.
+ *
+ *     Keyed by product alone, selling a blue and a red scrub top would merge into one
+ *     line of the first colour scanned — and the stock of the other would never move.
  */
 export function useSaleCart() {
   const [lines, setLines] = useState<CartLine[]>([]);
 
-  const add = useCallback((product: POSProduct, quantity = 1) => {
+  const add = useCallback((product: POSProduct, quantity = 1, variant: POSVariant | null = null) => {
+    const key = lineKey(product.id, variant?.id ?? null);
+
     setLines((current) => {
-      const index = current.findIndex((line) => line.product.id === product.id);
-      if (index === -1) return [...current, { product, quantity }];
+      const index = current.findIndex((line) => line.key === key);
+      if (index === -1) return [...current, { key, product, variant, quantity }];
 
       const next = [...current];
       next[index] = { ...next[index]!, quantity: next[index]!.quantity + quantity };
@@ -38,26 +51,30 @@ export function useSaleCart() {
     });
   }, []);
 
-  const setQuantity = useCallback((productId: string, quantity: number) => {
+  const setQuantity = useCallback((key: string, quantity: number) => {
     setLines((current) =>
       // ⚠️  A quantity of zero removes the line: it is what the cashier types when
       //     they want it gone, and leaving it means a zero-quantity line the server refuses.
       quantity <= 0
-        ? current.filter((line) => line.product.id !== productId)
-        : current.map((line) =>
-            line.product.id === productId ? { ...line, quantity } : line,
-          ),
+        ? current.filter((line) => line.key !== key)
+        : current.map((line) => (line.key === key ? { ...line, quantity } : line)),
     );
   }, []);
 
-  const remove = useCallback((productId: string) => {
-    setLines((current) => current.filter((line) => line.product.id !== productId));
+  const remove = useCallback((key: string) => {
+    setLines((current) => current.filter((line) => line.key !== key));
   }, []);
 
   const clear = useCallback(() => setLines([]), []);
 
   const payload = useMemo<SaleLineInput[]>(
-    () => lines.map((line) => ({ product: line.product.id, quantity: line.quantity })),
+    () =>
+      lines.map((line) => ({
+        product: line.product.id,
+        // ⚠️  The server refuses a product that offers colours when none is named.
+        variant: line.variant?.id ?? null,
+        quantity: line.quantity,
+      })),
     [lines],
   );
 

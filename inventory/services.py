@@ -23,7 +23,7 @@ from django.db.models import Exists, F, OuterRef, Q, Sum, Value
 from django.db.models.functions import Greatest
 from django.utils import timezone
 
-from catalog.models import ProductColor, ProductVariant
+from catalog.models import ProductVariant
 from core.errors import BusinessError, ErrorCode
 from inventory.models import (
     AlertType,

@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { CartIssues } from '@/features/cart/components/CartIssues';
 import { CartLineRow } from '@/features/cart/components/CartLineRow';
 import { CartSummary } from '@/features/cart/components/CartSummary';
+import { useAuth } from '@/features/auth/useAuth';
 import { CouponBox } from '@/features/cart/components/CouponBox';
 import { useCart } from '@/features/cart/hooks';
 import { PageHeader } from '@/shared/layouts/PageHeader';
@@ -17,7 +18,13 @@ import './CartPage.css';
 export function CartPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user, isRestoring } = useAuth();
   const { data: cart, isPending, error, refetch } = useCart();
+
+  // ⚠️  A visitor, not merely "not yet known": during the session restore `user` is
+  //     still null for someone who is in fact signed in.
+  const isGuest = !isRestoring && !user;
 
   if (isPending) return <Spinner />;
 
@@ -70,8 +77,19 @@ export function CartPage() {
             <CartLineRow key={line.id ?? line.product_id} line={line} />
           ))}
 
+          {/* ⚠️  Coupons belong to accounts. A guest is told so, with the way in,
+              rather than shown a box the server would only refuse. */}
           <div className="cart-page__coupon">
-            <CouponBox snapshot={cart} />
+            {isGuest ? (
+              <p className="cart-page__guest-note muted">
+                {t('guest.couponsNeedAccount')}{' '}
+                <Link to="/login" state={{ from: location.pathname }}>
+                  {t('auth.signIn')}
+                </Link>
+              </p>
+            ) : (
+              <CouponBox snapshot={cart} />
+            )}
           </div>
         </section>
 
@@ -85,8 +103,21 @@ export function CartPage() {
             disabled={!cart.is_checkoutable}
             onClick={() => void navigate('/checkout')}
           >
-            {t('cart.checkout')}
+            {isGuest ? t('guest.continueAsGuest') : t('cart.checkout')}
           </Button>
+
+          {/* Guest checkout is the primary path (no friction); signing in is
+              offered beside it, with the way back to the cart's next step. */}
+          {isGuest ? (
+            <Button
+              block
+              variant="secondary"
+              disabled={!cart.is_checkoutable}
+              onClick={() => void navigate('/login', { state: { from: '/checkout' } })}
+            >
+              {t('guest.signInToCheckout')}
+            </Button>
+          ) : null}
 
           {!cart.is_checkoutable ? (
             <p className="cart-page__blocked muted">{t('cart.blockedHint')}</p>

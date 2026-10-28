@@ -259,7 +259,15 @@ class ProductImageAdmin(DomainModelAdmin):
 
 @admin.register(ProductVariant)
 class ProductVariantAdmin(DomainModelAdmin):
-    list_display = ("sku", "product", "name_ar", "color", "price_adjustment", "is_active", "is_deleted")
+    list_display = (
+        "sku",
+        "product",
+        "name_ar",
+        "color",
+        "price_adjustment",
+        "is_active",
+        "is_deleted",
+    )
     list_filter = ("is_active", DeletedListFilter)
     list_select_related = ("product",)
     search_fields = ("sku", "barcode", "name_ar", "name_en", "product__name_ar", "product__sku")

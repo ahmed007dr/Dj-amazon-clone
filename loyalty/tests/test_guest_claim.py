@@ -92,5 +92,11 @@ def test_claimed_orders_carry_the_marker_loyalty_needs_to_skip_them(
 
     order.refresh_from_db()
     assert order.claimed_at is not None
-    # The guard for later saves (completion, panel edits) is one line in
-    # `loyalty.services.award_for_order`: `if order.claimed_at: return None`.
+
+    # A later save (completion, a panel edit) reaches the loyalty listener with the
+    # customer now attached — the claim marker is what keeps the old purchase unpaid.
+    with django_capture_on_commit_callbacks(execute=True):
+        order.save()
+
+    assert PointsEntry.objects.count() == 0
+    assert services.award_for_order(order) is None

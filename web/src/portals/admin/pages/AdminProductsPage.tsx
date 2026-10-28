@@ -12,6 +12,7 @@ import {
   type AuditUser,
 } from '@/features/catalog/adminApi';
 import { ExportButton } from '@/portals/admin/components/ExportButton';
+import { ProductColorsPanel } from '@/portals/admin/components/ProductColorsPanel';
 import { ProductForm } from '@/portals/admin/components/ProductForm';
 import { ProductHistoryPanel } from '@/portals/admin/components/ProductHistoryPanel';
 import { ProductImagesPanel } from '@/portals/admin/components/ProductImagesPanel';
@@ -36,6 +37,7 @@ type Panel =
   | { mode: 'create' }
   | { mode: 'edit'; product: AdminProduct }
   | { mode: 'images'; product: AdminProduct }
+  | { mode: 'colors'; product: AdminProduct }
   | { mode: 'history'; product: AdminProduct };
 
 export function AdminProductsPage() {
@@ -219,6 +221,13 @@ export function AdminProductsPage() {
             <Button
               size="sm"
               variant="ghost"
+              onClick={() => setPanel({ mode: 'colors', product })}
+            >
+              {t('catalog.colors.manage')}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
               onClick={() => setPanel({ mode: 'history', product })}
             >
               {t('products.history.open')}
@@ -238,9 +247,11 @@ export function AdminProductsPage() {
       ? t('products.create')
       : panel?.mode === 'history'
         ? `${t('products.history.title')} · ${localized(panel.product, 'name')}`
-        : panel
-          ? localized(panel.product, 'name')
-          : '';
+        : panel?.mode === 'colors'
+          ? `${t('catalog.colors.title')} · ${localized(panel.product, 'name')}`
+          : panel
+            ? localized(panel.product, 'name')
+            : '';
 
   return (
     <>
@@ -351,6 +362,10 @@ export function AdminProductsPage() {
             and shows the previous product's images for a moment when the next one opens. */}
         {panel?.mode === 'images' ? (
           <ProductImagesPanel key={panel.product.id} productId={panel.product.id} />
+        ) : null}
+
+        {panel?.mode === 'colors' ? (
+          <ProductColorsPanel key={panel.product.id} product={panel.product} />
         ) : null}
 
         {panel?.mode === 'history' ? (

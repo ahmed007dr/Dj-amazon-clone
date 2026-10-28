@@ -240,7 +240,9 @@ def _rule_for(price_list, product, variant, quantity: int, *, book=None) -> Pric
         return queryset.filter(variant__isnull=True).order_by("-min_quantity").first()
 
     return _most_specific(
-        list(queryset.filter(Q(variant=variant) | Q(variant__isnull=True)).order_by("-min_quantity")),
+        list(
+            queryset.filter(Q(variant=variant) | Q(variant__isnull=True)).order_by("-min_quantity")
+        ),
         variant,
     )
 
@@ -263,7 +265,9 @@ def _override_for(product, variant, price_list, *, book=None) -> PriceOverride |
     if variant is None:
         return queryset.filter(variant__isnull=True).first()
 
-    return _most_specific(list(queryset.filter(Q(variant=variant) | Q(variant__isnull=True))), variant)
+    return _most_specific(
+        list(queryset.filter(Q(variant=variant) | Q(variant__isnull=True))), variant
+    )
 
 
 class PriceBook:
@@ -383,7 +387,12 @@ def price_for(
     if quantity < 1:
         quantity = 1
 
-    price_list = price_list or resolve_price_list(user)
+    # ⚠️  With a `book` the list is already decided — including "there is none". A falsy
+    #     `price_list` must not send the engine off to resolve it again for every variant.
+    if book is not None:
+        price_list = book.price_list
+    else:
+        price_list = price_list or resolve_price_list(user)
 
     # 1 — the base price
     rule = _rule_for(price_list, product, variant, quantity, book=book)

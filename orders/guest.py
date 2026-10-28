@@ -709,3 +709,8 @@ def count_returning_buyers(orders) -> int:
         _guest_emails(orders).values("_buyer_email").annotate(n=Count("id")).filter(n__gt=1).count()
     )
     return accounts + guests
+
+
+def count_guest_buyers(orders) -> int:
+    """Distinct guest emails (case-insensitively) among `orders` — no accounts."""
+    return _guest_emails(orders).values("_buyer_email").distinct().count()

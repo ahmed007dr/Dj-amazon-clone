@@ -439,6 +439,55 @@ class MarkDamagedAPI(APIView):
         return Response(s.StockMovementSerializer(movement).data, status=201)
 
 
+class ProductVariantChoicesAPI(APIView):
+    """
+    The variants a stock command can target, with what each holds — for the movement form.
+
+        GET /inventory/product-variants/?product=<id>
+
+    Behind `CanManageInventory`, not the catalogue permission: the person receiving a
+    delivery may not be allowed to edit products, and still needs to say *which colour*
+    arrived. Exact figures, since this is an admin screen.
+    """
+
+    permission_classes = [CanManageInventory]
+
+    def get(self, request):
+        product = get_object_or_404(Product.all_objects, pk=request.query_params.get("product"))
+        variants = (
+            ProductVariant.objects.filter(product=product, is_active=True)
+            .select_related("color")
+            .order_by("display_order", "sku")
+        )
+        stock = services.availability_by_variant([product.pk])[str(product.pk)]
+
+        rows = []
+        for variant in variants:
+            if not variant.is_sellable:
+                continue
+            color = variant.color if variant.color_id else None
+            rows.append(
+                {
+                    "id": str(variant.pk),
+                    "sku": variant.sku,
+                    "name_ar": variant.name_ar,
+                    "name_en": variant.name_en,
+                    "available": stock.get(variant.pk, 0),
+                    "color": (
+                        {
+                            "id": str(color.pk),
+                            "name_ar": color.name_ar,
+                            "name_en": color.name_en,
+                            "hex": color.hex,
+                        }
+                        if color is not None
+                        else None
+                    ),
+                }
+            )
+        return Response(rows)
+
+
 class UnassignedStockAPI(APIView):
     """
     Stock a product holds on **no variant** — the number the "assign to a colour"

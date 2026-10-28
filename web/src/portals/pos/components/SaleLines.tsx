@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
+import { VariantTag } from '@/features/catalog/components/VariantTag';
 import type { CartLine } from '@/features/pos/useSaleCart';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { StateMessage } from '@/shared/ui/StateMessage';
@@ -23,8 +24,8 @@ export function SaleLines({
   onRemove,
 }: {
   lines: CartLine[];
-  onQuantity: (productId: string, quantity: number) => void;
-  onRemove: (productId: string) => void;
+  onQuantity: (key: string, quantity: number) => void;
+  onRemove: (key: string) => void;
 }) {
   const { t } = useTranslation();
   const localized = useLocalized();
@@ -36,16 +37,25 @@ export function SaleLines({
   return (
     <ul className="sale-lines">
       {lines.map((line) => (
-        <li key={line.product.id} className="sale-lines__row">
-          <span className="sale-lines__name truncate">
-            {localized(line.product, 'name')}
+        <li key={line.key} className="sale-lines__row">
+          <span className="sale-lines__name">
+            <span className="truncate">{localized(line.product, 'name')}</span>
+            {/* ⚠️  The colour is on the line: two lines of the same product in different
+                colours must not look alike to the cashier handing over the goods. */}
+            {line.variant ? (
+              <VariantTag
+                hex={line.variant.color?.hex}
+                color={line.variant.color ? localized(line.variant.color, 'name') : null}
+                variant={localized(line.variant, 'name')}
+              />
+            ) : null}
           </span>
 
           <div className="sale-lines__qty">
             <button
               type="button"
               aria-label={t('pos.decrease')}
-              onClick={() => onQuantity(line.product.id, line.quantity - 1)}
+              onClick={() => onQuantity(line.key, line.quantity - 1)}
             >
               −
             </button>
@@ -58,13 +68,13 @@ export function SaleLines({
               value={line.quantity}
               aria-label={t('pos.quantity')}
               onChange={(event) =>
-                onQuantity(line.product.id, Number(event.target.value) || 0)
+                onQuantity(line.key, Number(event.target.value) || 0)
               }
             />
             <button
               type="button"
               aria-label={t('pos.increase')}
-              onClick={() => onQuantity(line.product.id, line.quantity + 1)}
+              onClick={() => onQuantity(line.key, line.quantity + 1)}
             >
               +
             </button>
@@ -74,7 +84,7 @@ export function SaleLines({
             type="button"
             className="sale-lines__remove"
             aria-label={t('common.delete')}
-            onClick={() => onRemove(line.product.id)}
+            onClick={() => onRemove(line.key)}
           >
             ✕
           </button>

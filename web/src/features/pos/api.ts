@@ -45,6 +45,31 @@ export interface Session {
   note: string;
 }
 
+/**
+ * A colour / size the cashier can pick.
+ *
+ * ⚠️  `available` is the **exact** count at this register's location — at the counter the
+ *     cashier needs "2 left in the blue", unlike the storefront, which masks big numbers.
+ *     There is deliberately no price: the quote is the one source of the total, and the
+ *     colour's own price / the size difference are shown only as the *reason* a price differs.
+ */
+export interface POSVariant {
+  id: string;
+  sku: string;
+  barcode: string;
+  name_ar: string;
+  name_en: string;
+  price_adjustment: string;
+  available: number;
+  color: {
+    id: string;
+    name_ar: string;
+    name_en: string;
+    hex: string;
+    price_override: string | null;
+  } | null;
+}
+
 export interface POSProduct {
   id: string;
   sku: string;
@@ -53,10 +78,15 @@ export interface POSProduct {
   name_en: string;
   base_price: string;
   kind: string;
+  /** Empty for a product without colours or sizes — it then sells exactly as before */
+  variants: POSVariant[];
+  /** Set when the search term *was* one variant's SKU / barcode — a scanned colour label */
+  matched_variant: string | null;
 }
 
 export interface QuoteLine {
   product: string;
+  variant?: string | null;
   quantity: number;
   unit_price: string;
   tax_rate: string;

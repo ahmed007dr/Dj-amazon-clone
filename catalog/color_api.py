@@ -42,15 +42,19 @@ def _annotated(queryset):
     """The colour rows with what the admin list shows, in a fixed handful of queries."""
     # ⚠️  An explicit `order_by`: an aggregate annotation drops `Meta.ordering`, and the
     #     swatches would come back in whatever order the database felt like.
-    return queryset.annotate(
-        image_count=Count("images", filter=Q(images__deleted_at__isnull=True), distinct=True)
-    ).order_by("display_order", "created_at").prefetch_related(
-        Prefetch(
-            "images",
-            queryset=ProductImage.objects.filter(is_primary=True),
-            to_attr="primary_images",
-        ),
-        Prefetch("variants", to_attr="color_variants"),
+    return (
+        queryset.annotate(
+            image_count=Count("images", filter=Q(images__deleted_at__isnull=True), distinct=True)
+        )
+        .order_by("display_order", "created_at")
+        .prefetch_related(
+            Prefetch(
+                "images",
+                queryset=ProductImage.objects.filter(is_primary=True),
+                to_attr="primary_images",
+            ),
+            Prefetch("variants", to_attr="color_variants"),
+        )
     )
 
 
@@ -120,7 +124,9 @@ class ProductColorListCreateAPI(_ProductColorMixin, generics.ListCreateAPIView):
             {
                 "color": color.name_en,
                 "hex": color.hex,
-                "price_override": None if color.price_override is None else str(color.price_override),
+                "price_override": (
+                    None if color.price_override is None else str(color.price_override)
+                ),
             },
             object_repr=_object_repr(product),
         )
