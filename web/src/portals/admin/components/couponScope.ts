@@ -101,8 +101,9 @@ export function scopeTooltip(coupon: Coupon, t: TFunction, locale: string): stri
   for (const category of summary.categories ?? []) {
     lines.push(arabic ? category.name_ar : category.name_en || category.name_ar);
   }
-  if ((summary.categories_more ?? 0) > 0) {
-    lines.push(t('pricing.scope.andMore', { count: summary.categories_more }));
+  const categoriesMore = summary.categories_more ?? 0;
+  if (categoriesMore > 0) {
+    lines.push(t('pricing.scope.andMore', { count: categoriesMore }));
   }
   return lines.length > 0 ? lines.join('\n') : undefined;
 }

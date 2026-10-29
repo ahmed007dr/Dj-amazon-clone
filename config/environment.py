@@ -13,15 +13,11 @@ IS_PRODUCTION = True    # production
 
 DEVELOPMENT = {
     "SCHEME": "http",
-    #: The Vite dev server — the port is part of the origin the browser sees
     "SITE_DOMAIN": "localhost:5173",
-    #: The Django dev server
     "API_DOMAIN": "127.0.0.1:8000",
     "API_PREFIX": "/api/v1",
-    #: Empty = media follows the API server
     "MEDIA_ORIGIN": "",
     "DEFAULT_LOCALE": "ar",
-    
     "EXTRA_HOSTS": ["localhost", "127.0.0.1", "[::1]"],
     
     "EXTRA_ORIGINS": [

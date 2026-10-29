@@ -79,7 +79,7 @@ function InsightsBody({ target, period }: { target: InsightsTarget; period: Coup
   const money = (value: string) => formatMoney(value, locale);
   const unused = summary.times_used === 0 && summary.cancelled_redemptions === 0;
   const excluded = summary.cancelled_orders + summary.refunded_orders + summary.failed_orders;
-  const split = customerReport(summary, insights.data);
+  const split = customerReport(summary);
 
   const productColumns: Column<CouponProductRow>[] = [
     {
