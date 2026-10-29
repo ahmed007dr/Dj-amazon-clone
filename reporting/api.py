@@ -100,6 +100,24 @@ class SalesReportAPI(APIView):
         )
 
 
+class SalesDiscountsAPI(APIView):
+    """
+    Sales with their discounts — gross, discounts by source and by coupon, net.
+
+    ⚠️  Under **the same reporting permission** as `/reports/sales/`, not a lighter
+        one: it is the same orders, and the coupon table names which codes the
+        owner handed out and what each one cost.
+    """
+
+    permission_classes = [CanViewReports]
+
+    def get(self, request):
+        start, end = _period(request)
+        return Response(
+            services.sales_discounts(start, end, limit=_positive_int(request, "limit", 20, 200))
+        )
+
+
 class InventoryReportAPI(APIView):
     permission_classes = [CanViewReports]
 

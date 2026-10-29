@@ -1,0 +1,709 @@
+/*
+  The in-app guide.
+
+  ⚠️  Mobile-first like the rest: the contents fold above the article on a phone,
+      and sit beside it from 1200px — not 992px. At 992 the admin sidebar already
+      takes 16rem, and a second column on top of it leaves the article ~450px wide.
+
+  ⚠️  Everything here is logical (`inline-start`, `inset-block-start`…): the
+      article is always RTL, the chrome follows the interface language, and one
+      stylesheet has to serve both.
+*/
+
+.docs-page {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+}
+
+/* ⚠️  The content is Arabic-only. In English mode the interface font (Inter) has
+       no Arabic glyphs and the browser would fall back to a system face for it. */
+.docs-page [lang='ar'] {
+  font-family: var(--font-ar);
+}
+
+.docs {
+  display: grid;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.docs__main,
+.docs__side {
+  min-inline-size: 0;
+}
+
+@media (min-width: 1200px) {
+  .docs {
+    grid-template-columns: 17rem minmax(0, 1fr);
+    gap: var(--space-6);
+  }
+
+  .docs__side {
+    position: sticky;
+    inset-block-start: calc(var(--header-height) + var(--space-4));
+    max-block-size: calc(100dvh - var(--header-height) - var(--space-8));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+/* ── Search ────────────────────────────────────────────── */
+
+.docs-nav {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.docs-search {
+  position: relative;
+}
+
+.docs-search__input {
+  inline-size: 100%;
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3) calc(var(--space-3) + 1.75rem);
+
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.docs-search__input:focus {
+  border-color: var(--color-primary);
+}
+
+/* The browser's own clear button varies by engine; ours is the same everywhere. */
+.docs-search__input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.docs-search__clear {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  display: grid;
+  place-items: center;
+  inline-size: var(--touch-target);
+  font-size: 1.25rem;
+  color: var(--color-text-muted);
+}
+
+.docs-search__clear:hover {
+  color: var(--color-text);
+}
+
+/* ── Contents tree ─────────────────────────────────────── */
+
+.docs-nav__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+
+  font-weight: 700;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.docs-nav__chevron::before {
+  content: '▾';
+  display: inline-block;
+  font-size: 0.875rem;
+  line-height: 1;
+  transition: transform var(--transition);
+}
+
+[aria-expanded='true'] > .docs-nav__chevron::before,
+[aria-expanded='true'] > .docs-problem__chevron::before {
+  transform: rotate(180deg);
+}
+
+.docs-nav__body {
+  display: none;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.docs-nav__body.is-open {
+  display: block;
+}
+
+@media (min-width: 1200px) {
+  .docs-nav__toggle {
+    display: none;
+  }
+
+  .docs-nav__body {
+    display: block;
+  }
+}
+
+.docs-nav__sections,
+.docs-nav__topics,
+.docs-toc ul,
+.docs-card__topics,
+.docs-results__list,
+.docs-related,
+.docs-problems {
+  list-style: none;
+}
+
+.docs-nav__sections {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.docs-nav__row {
+  display: flex;
+  align-items: center;
+}
+
+.docs-nav__section-link {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-2);
+
+  font-weight: 700;
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+}
+
+.docs-nav__section-link:hover,
+.docs-nav__topic:hover {
+  text-decoration: none;
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+
+.docs-nav__fold {
+  display: grid;
+  place-items: center;
+  inline-size: var(--touch-target);
+  block-size: var(--touch-target);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+}
+
+.docs-nav__fold:hover {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+
+.docs-nav__topics {
+  display: grid;
+  margin-inline-start: var(--space-4);
+  padding-inline-start: var(--space-2);
+  border-inline-start: 1px solid var(--color-border);
+}
+
+/* `hidden` is overridden by the `display: grid` above — restore it explicitly. */
+.docs-nav__topics[hidden] {
+  display: none;
+}
+
+.docs-nav__topic {
+  display: block;
+  padding: var(--space-2);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+}
+
+.docs-nav__section-link[aria-current='page'],
+.docs-nav__topic[aria-current='page'] {
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+.docs-nav__topic[aria-current='page'] {
+  font-weight: 700;
+}
+
+/* ── Welcome ───────────────────────────────────────────── */
+
+.docs-welcome {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.docs-welcome__title,
+.docs-section__title {
+  font-size: 1.375rem;
+  font-weight: 800;
+}
+
+.docs-welcome__body,
+.docs-section__desc {
+  color: var(--color-text-muted);
+}
+
+.docs-cards {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  list-style: none;
+}
+
+.docs-card {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.docs-card__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 1.0625rem;
+  font-weight: 800;
+}
+
+.docs-card__desc,
+.docs-card__count {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.docs-card__topics {
+  display: grid;
+  gap: var(--space-1);
+  font-size: 0.9375rem;
+}
+
+/* ── A section ─────────────────────────────────────────── */
+
+.docs-section {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.docs-section__head {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.docs-section__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.docs-section__topics {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.docs-toc ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.docs-toc a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.25rem;
+  padding-inline: var(--space-3);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+}
+
+.docs-toc a:hover {
+  text-decoration: none;
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* ── A topic ───────────────────────────────────────────── */
+
+.docs-topic {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-4);
+  line-height: 1.85;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+
+  /* ⚠️  The header is sticky: without this margin a deep link scrolls the title
+         underneath it. */
+  scroll-margin-block-start: calc(var(--header-height) + var(--space-4));
+}
+
+@media (min-width: 768px) {
+  .docs-topic {
+    padding: var(--space-6);
+  }
+}
+
+.docs-topic__head {
+  display: grid;
+  gap: var(--space-2);
+  padding-block-end: var(--space-4);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.docs-topic__title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  outline-offset: 4px;
+}
+
+.docs-topic__summary {
+  font-size: 1.0625rem;
+  color: var(--color-text-muted);
+}
+
+.docs-topic__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.docs-topic__open {
+  text-decoration: none;
+}
+
+.docs-topic__open:hover {
+  text-decoration: none;
+}
+
+.docs-topic__perm {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.docs-topic__perm code {
+  padding: 0.1rem var(--space-2);
+  font-size: 0.8125rem;
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+  border-radius: var(--radius-sm);
+}
+
+.docs-block {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.docs-block__title {
+  font-size: 1.0625rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.docs-list {
+  display: grid;
+  gap: var(--space-2);
+  list-style: none;
+}
+
+.docs-list > li {
+  position: relative;
+  padding-inline-start: 1.75rem;
+}
+
+.docs-list > li::before {
+  position: absolute;
+  inset-inline-start: 0;
+  font-weight: 800;
+}
+
+.docs-list--check > li::before {
+  content: '✓';
+  color: var(--color-success);
+}
+
+.docs-list--tip > li::before {
+  content: '💡';
+  font-weight: 400;
+}
+
+/* ── Steps ─────────────────────────────────────────────── */
+
+.docs-steps {
+  display: grid;
+  gap: var(--space-3);
+  list-style: none;
+  counter-reset: docs-step;
+}
+
+.docs-step {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  padding-inline-start: 2.5rem;
+  counter-increment: docs-step;
+}
+
+/* The list already announces its own numbering; the empty alt keeps this one visual. */
+.docs-step::before {
+  content: counter(docs-step);
+  content: counter(docs-step) / '';
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: 0.2rem;
+
+  display: grid;
+  place-items: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+
+  font-size: 0.875rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-radius: 50%;
+}
+
+.docs-step__title {
+  font-weight: 600;
+}
+
+.docs-step__detail {
+  color: var(--color-text-muted);
+}
+
+/* ── Problems (accordion) ──────────────────────────────── */
+
+.docs-problems {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.docs-problem {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.docs-problem.is-open {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+}
+
+.docs-problem__heading {
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
+
+.docs-problem__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  inline-size: 100%;
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+
+  font-weight: 600;
+  line-height: 1.6;
+  text-align: start;
+  border-radius: var(--radius);
+}
+
+.docs-problem__trigger:hover {
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+}
+
+.docs-problem__chevron {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+}
+
+.docs-problem__chevron::before {
+  content: '▾';
+  display: inline-block;
+  transition: transform var(--transition);
+}
+
+.docs-problem__body {
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-block-start: 1px dashed var(--color-border);
+}
+
+.docs-problem__facts {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.docs-problem__facts dt {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--color-text-muted);
+}
+
+.docs-problem__facts div:last-child dt {
+  color: var(--color-success);
+}
+
+/* ── Related ───────────────────────────────────────────── */
+
+.docs-related {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.docs-related li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.docs-related__section {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* ── Search results ────────────────────────────────────── */
+
+.docs-results {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.docs-results__count {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.docs-results__list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.docs-result {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.docs-result__title {
+  font-size: 1.0625rem;
+  font-weight: 800;
+}
+
+.docs-result__section {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.docs-result__snippet {
+  color: var(--color-text-muted);
+}
+
+.docs-result__field {
+  display: inline-block;
+  margin-inline-end: var(--space-1);
+  padding: 0 var(--space-2);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-info);
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  border-radius: var(--radius-pill);
+}
+
+.docs-page mark {
+  padding: 0 0.1em;
+  color: inherit;
+  background: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  border-radius: 2px;
+}
+
+/* ── Print: one section on paper / PDF ──────────────────── */
+/*
+  ⚠️  Every selector that reaches into the shell is scoped with `:has(.docs-page)`.
+      This stylesheet stays loaded after the reader leaves the guide (lazy CSS is
+      never removed), so an unscoped `.sidebar-layout__aside { display: none }`
+      would blank the admin menu from every later print of every other screen.
+*/
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  .sidebar-layout:has(.docs-page) {
+    display: block;
+  }
+
+  .sidebar-layout:has(.docs-page) .sidebar-layout__aside,
+  .sidebar-layout:has(.docs-page) .sidebar-layout__header,
+  .sidebar-layout:has(.docs-page) .preview-banner,
+  .docs-page .page-header,
+  .docs-page .alert,
+  .docs__side,
+  .docs-section__toolbar,
+  .docs-toc,
+  .docs-topic__open,
+  .docs-problem__chevron {
+    display: none !important;
+  }
+
+  .sidebar-layout:has(.docs-page) .sidebar-layout__content {
+    padding: 0;
+  }
+
+  .docs {
+    display: block;
+  }
+
+  .docs-page,
+  .docs-page .docs-topic {
+    color: #000;
+    background: #fff;
+  }
+
+  .docs-topic {
+    padding: 0 0 var(--space-4);
+    border: 0;
+    border-block-end: 1px solid #999;
+    border-radius: 0;
+  }
+
+  .docs-topic__head,
+  .docs-block__title {
+    break-after: avoid;
+  }
+
+  .docs-step,
+  .docs-problem {
+    break-inside: avoid;
+  }
+
+  /* ⚠️  A printed page cannot click: every solution is shown, whatever was folded on screen. */
+  .docs-problem__body[hidden] {
+    display: block !important;
+  }
+
+  .docs-problem,
+  .docs-problem__body {
+    border-color: #999;
+  }
+
+  .docs-problem__trigger {
+    padding-inline: 0;
+  }
+}

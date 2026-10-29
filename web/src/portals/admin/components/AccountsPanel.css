@@ -42,12 +42,3 @@
 .account-cell span {
   font-size: 0.8125rem;
 }
-
-/* ⚠️  The buttons wrap rather than being squeezed: two buttons in a narrow
-   column on a tablet crop their text and become unreadable. */
-.admin-accounts__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  justify-content: end;
-}

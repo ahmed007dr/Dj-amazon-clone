@@ -51,6 +51,7 @@ from decimal import Decimal
 from django.apps import apps
 from django.db.models import (
     BooleanField,
+    CharField,
     Count,
     DecimalField,
     ExpressionWrapper,
@@ -64,7 +65,7 @@ from django.db.models import (
     UUIDField,
     Value,
 )
-from django.db.models.functions import Coalesce, TruncDate, TruncMonth
+from django.db.models.functions import Cast, Coalesce, Lower, NullIf, Trim, TruncDate, TruncMonth
 from django.utils import timezone
 
 from core.errors import BusinessError, ErrorCode
@@ -156,6 +157,24 @@ def _is_sale_q() -> Q:
     return ~_is_cancelled_q() & ~Q(status=STATUS_REFUNDED) & ~Q(payment_status=PAYMENT_FAILED)
 
 
+def net_expr():
+    """`subtotal − discount_total` — products after every discount, before tax and shipping."""
+    return _net_expr()
+
+
+def plain_sale_q() -> Q:
+    """
+    The same sale rule for an order **with no redemption link** — "did this order count?".
+
+    ⚠️  Used where the order is not necessarily a coupon order: a customer's earlier
+        purchases (new vs returning) and the orders an invited customer placed
+        (referral report). The redemption's own cancelled flag is not part of it —
+        an order has no redemption to ask — but a cancelled redemption always comes
+        with a cancelled order in practice, so the two readings agree.
+    """
+    return ~Q(status__in=(STATUS_CANCELLED, STATUS_REFUNDED)) & ~Q(payment_status=PAYMENT_FAILED)
+
+
 def _gross_expr():
     return ExpressionWrapper(
         F("subtotal") - F("discount_total") + F("coupon_discount"), output_field=_MONEY
@@ -177,6 +196,22 @@ def tagged_orders(coupon_ids, date_from=None, date_to=None):
     link = CouponRedemption.objects.filter(order_ref=OuterRef("pk")).order_by("created_at")
     scoped = _redemptions(coupon_ids, date_from, date_to).filter(order_ref__isnull=False)
 
+    # ⚠️  The guest identity the redemption itself recorded (package K): used only as a
+    #     fallback when the order carries no contact of its own. Resolved by field
+    #     presence so this module keeps working on a schema without them.
+    extra = {}
+    link_fields = _link_guest_fields()
+    if "guest_email" in link_fields:
+        extra["link_guest_email"] = Subquery(
+            link.values("guest_email")[:1], output_field=CharField()
+        )
+    if "guest_phone" in link_fields:
+        extra["link_guest_phone"] = Subquery(
+            link.values("guest_phone")[:1], output_field=CharField()
+        )
+    if "is_guest" in link_fields:
+        extra["link_is_guest"] = Subquery(link.values("is_guest")[:1], output_field=BooleanField())
+
     return (
         _order_model()
         .objects.filter(pk__in=scoped.values("order_ref"))
@@ -187,7 +222,62 @@ def tagged_orders(coupon_ids, date_from=None, date_to=None):
             coupon_ref=Subquery(link.values("coupon_id")[:1], output_field=UUIDField()),
             redeemer=Subquery(link.values("user_id")[:1], output_field=UUIDField()),
             link_cancelled=Subquery(link.values("is_cancelled")[:1], output_field=BooleanField()),
+            **extra,
         )
+    )
+
+
+def _link_guest_fields() -> set[str]:
+    """The guest columns `CouponRedemption` actually has (package K added them in 0004)."""
+    names = {field.name for field in CouponRedemption._meta.get_fields()}
+    return {name for name in ("is_guest", "guest_email", "guest_phone") if name in names}
+
+
+# ═══════════════════════════════════════════════════════════
+#  Who bought: an account, or a guest
+# ═══════════════════════════════════════════════════════════
+#
+# ⚠️  **REGISTERED = the order has a customer account; GUEST = it has none.**
+#
+#     That is read from the ORDER (`customer` NULL ⇒ guest), which is the fact that
+#     cannot be edited later. A guest order that is afterwards *claimed* by an account
+#     gets its `customer` filled in (and `claimed_at` set), so it counts as REGISTERED
+#     here — the account owns it now — while the customers list still shows
+#     `purchased_as: "GUEST"` for it, so both facts stay visible.
+#
+#     Distinct buyers: a registered buyer is their customer profile id; a guest is a
+#     normalised e-mail (trimmed, lower-cased), else a phone, else — an order that
+#     left neither, like an anonymous counter sale — the order itself, so it neither
+#     merges with nor hides another buyer.
+
+
+def buyer_email_expr():
+    """The guest's normalised e-mail, or NULL. The order's own contact wins."""
+    parts = [NullIf(Lower(Trim(F("contact_email"))), Value(""), output_field=CharField())]
+    if "guest_email" in _link_guest_fields():
+        parts.append(
+            NullIf(Lower(Trim(F("link_guest_email"))), Value(""), output_field=CharField())
+        )
+    parts.append(Value(None, output_field=CharField()))
+    return Coalesce(*parts, output_field=CharField())
+
+
+def buyer_phone_expr():
+    """The guest's phone as typed on the order (trimmed), or NULL."""
+    parts = [NullIf(Trim(F("recipient_phone")), Value(""), output_field=CharField())]
+    if "guest_phone" in _link_guest_fields():
+        parts.append(NullIf(Trim(F("link_guest_phone")), Value(""), output_field=CharField()))
+    parts.append(Value(None, output_field=CharField()))
+    return Coalesce(*parts, output_field=CharField())
+
+
+def guest_key_expr():
+    """One text key per distinct guest: e-mail, else phone, else the order's own id."""
+    return Coalesce(
+        buyer_email_expr(),
+        buyer_phone_expr(),
+        Cast("pk", CharField()),
+        output_field=CharField(),
     )
 
 
@@ -199,7 +289,14 @@ def _order_aggregates() -> dict:
     sale = _is_sale_q()
     return {
         "orders": Count("pk", filter=sale),
-        "customers": Count("redeemer", filter=sale, distinct=True),
+        # ⚠️  Distinct buyers = registered accounts + distinct guests (see "Who bought").
+        #     Counted off the ORDER, not the redemption: a guest redemption has no user.
+        "registered_customers": Count(
+            "customer_id", filter=sale & Q(customer_id__isnull=False), distinct=True
+        ),
+        "guest_customers": Count(
+            guest_key_expr(), filter=sale & Q(customer_id__isnull=True), distinct=True
+        ),
         "gross_sales": _sum(_gross_expr(), sale),
         "discount_given": _sum(F("coupon_discount"), sale),
         "net_sales": _sum(_net_expr(), sale),
@@ -218,7 +315,7 @@ _MONEY_KEYS = (
     "order_total",
     "refunded_amount",
 )
-_COUNT_KEYS = ("orders", "customers", "cancelled_orders", "refunded_orders", "failed_orders")
+_COUNT_KEYS = ("orders", "cancelled_orders", "refunded_orders", "failed_orders")
 
 
 def _finish(raw: dict | None) -> dict:
@@ -226,6 +323,9 @@ def _finish(raw: dict | None) -> dict:
     raw = raw or {}
     row = {key: quantize(raw.get(key) or ZERO) for key in _MONEY_KEYS}
     row.update({key: int(raw.get(key) or 0) for key in _COUNT_KEYS})
+    row["customers"] = int(raw.get("registered_customers") or 0) + int(
+        raw.get("guest_customers") or 0
+    )
     row["average_order_value"] = (
         quantize(row["order_total"] / row["orders"]) if row["orders"] else ZERO
     )
@@ -374,8 +474,10 @@ def remaining_uses(coupon: Coupon, times_used_by_owner: int | None = None) -> di
 
 def customers_at_limit(coupon: Coupon) -> int:
     """How many customers have used this coupon up to their personal limit."""
+    # ⚠️  Guest redemptions have no user: grouping them would read as one customer
+    #     "at the limit". Registered customers only — guests are limited per e-mail.
     per_user = (
-        CouponRedemption.objects.filter(coupon=coupon, is_cancelled=False)
+        CouponRedemption.objects.filter(coupon=coupon, is_cancelled=False, user__isnull=False)
         .order_by()
         .values("user_id")
         .annotate(n=Count("pk"))

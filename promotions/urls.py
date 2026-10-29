@@ -29,6 +29,11 @@ urlpatterns = [
         name="coupon-analytics",
     ),
     path("admin/coupons/<uuid:pk>/orders/", api.CouponOrdersAPI.as_view(), name="coupon-orders"),
+    path(
+        "admin/coupons/<uuid:pk>/customers/",
+        api.CouponCustomersAPI.as_view(),
+        name="coupon-customers",
+    ),
     # The redemption log — read-only
     path("admin/redemptions/", api.CouponRedemptionListAPI.as_view(), name="redemptions"),
 ]

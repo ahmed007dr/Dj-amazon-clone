@@ -47,8 +47,8 @@ function ProductDetailSkeleton() {
         {t('common.loading')}
       </span>
 
-      <div className="pdp__crumbs" aria-hidden>
-        <Skeleton width="14rem" height="1rem" />
+      <div className="breadcrumb pdp__crumbs" aria-hidden>
+        <Skeleton width="14rem" height="1.375rem" />
       </div>
 
       <div className="pdp__grid" aria-hidden>
@@ -62,7 +62,9 @@ function ProductDetailSkeleton() {
           <Skeleton width="30%" height="1.5rem" radius="var(--radius-pill)" />
           <Skeleton width="85%" height="2rem" />
           <Skeleton width="35%" height="1.25rem" />
-          <Skeleton height="6.5rem" radius="var(--radius)" />
+          <Skeleton height="8rem" radius="var(--radius)" />
+          <Skeleton width="25%" height="1rem" />
+          <Skeleton height="2.75rem" radius="var(--radius)" />
           <Skeleton width="100%" height="3.25rem" radius="var(--radius)" />
         </div>
       </div>
@@ -354,7 +356,15 @@ export function ProductDetailPage() {
                 }}
               />
 
-              <VariantPicker variants={variants} value={variantId} onChange={setVariantId} />
+              {/* ⚠️  Under a colour, one variant is not a choice: it goes in the cart by itself
+                  (`colorVariantId`), so a lone "Choose a variant" chip would only invite a
+                  tap that changes nothing. Plain variants (no colours) keep the picker even
+                  at one, because there the shopper must still pick it. */}
+              <VariantPicker
+                variants={hasColors && variants.length <= 1 ? [] : variants}
+                value={variantId}
+                onChange={setVariantId}
+              />
             </div>
           ) : null}
 

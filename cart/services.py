@@ -70,6 +70,14 @@ class CartSnapshot:
         return not self.issues and bool(self.lines)
 
     @property
+    def coupon_line_ids(self) -> tuple:
+        """The ids of the cart lines the coupon's discount was calculated on."""
+        result = self.coupon_result
+        if result is None or not result.is_valid:
+            return ()
+        return tuple(ref for ref in result.eligible_refs if isinstance(ref, str))
+
+    @property
     def has_issues(self) -> bool:
         return bool(self.issues)
 
@@ -320,9 +328,15 @@ def revalidate(
     coupon_code: str | None = None,
     governorate: str = "",
     shipping_method_code: str = "",
+    guest: promotion_services.GuestIdentity | None = None,
 ) -> CartSnapshot:
     """
     Full re-validation + pricing.
+
+    `guest` is the buyer's identity **at guest checkout only** (see `orders.guest`): with it
+    the coupon's per-buyer rules (once per email / phone, first order only) are enforced as
+    well. On every other call it is `None` — a visitor browsing the cart has no identity yet,
+    and only the identity-free coupon rules run.
 
     ⚠️  **Called on every display, every operation, and before creating the order.**
 
@@ -358,6 +372,8 @@ def revalidate(
 
     issues: list[LineIssue] = []
     valid_items: list = []
+    #: Parallel to `valid_items` — lets the coupon report which *cart lines* it covers
+    valid_line_ids: list[str] = []
 
     for line in lines:
         product = line.product
@@ -430,6 +446,7 @@ def revalidate(
             continue
 
         valid_items.append((product, line.quantity, line.variant))
+        valid_line_ids.append(str(line.pk))
 
     # 4 — pricing from the source
     priced_lines = pricing_services.price_many(valid_items, user=user)
@@ -440,10 +457,19 @@ def revalidate(
     coupon_discount = ZERO
 
     if code:
+        # ⚠️  One calculation for everyone: this call prices the cart page, the checkout
+        #     and (through `orders.services.create_from_cart`) the stored order, so the
+        #     discount the customer saw is the discount on the invoice.
         coupon_result = promotion_services.validate(
             code,
             user,
-            [(item[0], line) for item, line in zip(valid_items, priced_lines, strict=True)],
+            [
+                (item[0], line, line_id)
+                for item, line, line_id in zip(
+                    valid_items, priced_lines, valid_line_ids, strict=True
+                )
+            ],
+            guest=guest,
         )
         if coupon_result.is_valid:
             coupon_discount = coupon_result.discount_amount

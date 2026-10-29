@@ -23,7 +23,19 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum, Value
+from django.db.models import (
+    Count,
+    DecimalField,
+    Exists,
+    ExpressionWrapper,
+    F,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+    UUIDField,
+    Value,
+)
 from django.db.models.functions import (
     Coalesce,
     ExtractHour,
@@ -33,7 +45,7 @@ from django.db.models.functions import (
 from django.utils import timezone
 
 from core.errors import BusinessError, ErrorCode
-from core.money import ZERO, quantize
+from core.money import ZERO, percentage_of, quantize
 from orders import guest as guest_services
 
 #: ⚠️  `unit_price × quantity` mixes `Decimal` with an integer.
@@ -270,6 +282,228 @@ def sales_by_category(start: date, end: date, limit: int = 20) -> list[dict]:
         }
         for row in rows
     ]
+
+
+# ═══════════════════════════════════════════════════════════
+#  Sales and discounts
+# ═══════════════════════════════════════════════════════════
+
+#: Wide enough for any total the shop will ever produce (`MoneyField` is 12 digits).
+_MONEY = DecimalField(max_digits=18, decimal_places=2)
+
+#: The products' value after every discount — before tax and shipping.
+_NET_OF_DISCOUNT = ExpressionWrapper(F("subtotal") - F("discount_total"), output_field=_MONEY)
+
+#: The kinds of discount an order can tell apart, in the order they are shown.
+DISCOUNT_SOURCES = ("coupon", "loyalty_points", "item_promotion", "manual")
+
+
+def _total(expression, *, only: Q | None = None):
+    """A `SUM` that reads zero rather than `None` over no rows."""
+    return Coalesce(Sum(expression, filter=only), Value(ZERO), output_field=_MONEY)
+
+
+def sales_discounts(start: date, end: date, limit: int = 20) -> dict:
+    """
+    What the period sold, what was given away, and through which door.
+
+    ⚠️  **The same orders as every other sales figure** — `_sold_orders`, so
+        cancelled and refunded orders are out and everything else is in.
+
+    ⚠️  **"Gross" here is `Order.subtotal`, not `grand_total`.**
+
+        `grand_total` carries tax and shipping, and it is what `/reports/sales/`
+        and the Overview call "gross sales". Taking a discount percentage of that
+        would divide by money that was never discountable. So the waterfall is
+        spelled out and every step is returned:
+
+            gross_before_discount − discount_total = net_after_discount
+            net_after_discount + tax_total + shipping_total = invoiced_total
+
+        and `invoiced_total` **is** the Sales tab's `gross_sales` (the same sum of
+        `grand_total` over the same orders), which is how the two screens meet.
+
+    ⚠️  `unreconciled` is what the waterfall fails to explain — shown, never hidden.
+
+        It is zero for every online order. It is not for a counter sale that
+        carries a promotional price: `pos.services.quote` deducts only the
+        cashier's manual percentage from the total while recording the line
+        discount in `discount_total`, so the till charged more than this report
+        says the customer should have paid. Folding that gap into one of the
+        other figures would make the report agree with itself and disagree with
+        the cash drawer.
+
+    ⚠️  The discount is split by **what the order recorded**, no further:
+
+            coupon          `coupon_discount` of an ordinary campaign coupon
+            loyalty_points  `coupon_discount` of a personal coupon (`Coupon.owner`
+                            is set) — loyalty turns points into one, nothing else does
+            item_promotion  Σ `OrderLine.discount_amount` (a `PriceOverride`)
+            manual          the remainder: the discount the cashier typed at the till
+
+        `manual` is derived, so any discount the order cannot attribute lands there
+        rather than vanishing; the four always add up to `discount_total`.
+
+    ⚠️  **Discounts that no order records cannot be reported.**
+
+            · a price-list price (student · wholesale): `list_price` is copied from
+              the already-resolved `unit_price`, so the saving against the base
+              price is never stored
+            · a FREE_SHIPPING coupon: it waives the fee but writes no amount —
+              `shipping_discount` is set only by the store-wide free-shipping rule
+
+        The first is simply absent from every figure here. The second shows as a
+        coupon order with a zero discount. `shipping_waived` is a memo of the
+        rule's waiver and sits **outside** the product discount: it is not part
+        of `subtotal`, so adding it would break the waterfall above.
+
+    ⚠️  A coupon is identified by its **redemption**, not by `Order.coupon_code`.
+
+        The cart keeps its code even when the code stops being valid at checkout,
+        so an order can carry a code and no discount. The redemption is written
+        only when the coupon was actually applied. The per-coupon table lists
+        ordinary coupons only: each loyalty coupon is a single-use code, and one
+        row per customer redeeming points would bury the campaigns the table is
+        read for (their total is on the `loyalty_points` line instead). An order
+        discounted by a coupon that has no redemption row — which no current
+        write path produces — is therefore in `by_source` and not in `by_coupon`.
+    """
+    from orders.models import OrderLine
+    from promotions.models import Coupon, CouponRedemption
+
+    assert_period(start, end)
+
+    sold = _sold_orders(start, end)
+
+    redemption = CouponRedemption.objects.filter(order_ref=OuterRef("pk"), is_cancelled=False)
+    tagged = sold.annotate(
+        has_redemption=Exists(redemption),
+        uses_points=Exists(redemption.filter(coupon__owner__isnull=False)),
+    )
+
+    totals = tagged.aggregate(
+        orders=Count("pk"),
+        discounted=Count("pk", filter=Q(discount_total__gt=0)),
+        with_coupon=Count("pk", filter=Q(has_redemption=True) | Q(coupon_discount__gt=0)),
+        subtotal=_total("subtotal"),
+        discount=_total("discount_total"),
+        coupon=_total("coupon_discount"),
+        points=_total("coupon_discount", only=Q(uses_points=True)),
+        tax=_total("tax_total"),
+        shipping=_total("shipping_total"),
+        shipping_waived=_total("shipping_discount"),
+        invoiced=_total("grand_total"),
+    )
+
+    gross = quantize(totals["subtotal"])
+    discount = quantize(totals["discount"])
+    net = quantize(gross - discount)
+    tax = quantize(totals["tax"])
+    shipping = quantize(totals["shipping"])
+    invoiced = quantize(totals["invoiced"])
+
+    coupon_all = quantize(totals["coupon"])
+    points = quantize(totals["points"])
+    item_promotion = _money(OrderLine.objects.filter(order__in=sold), "discount_amount")
+    amounts = {
+        "coupon": quantize(coupon_all - points),
+        "loyalty_points": points,
+        "item_promotion": item_promotion,
+        "manual": quantize(discount - coupon_all - item_promotion),
+    }
+
+    # ── By coupon ──────────────────────────────────────────
+    per_coupon = (
+        tagged.filter(has_redemption=True, uses_points=False)
+        .annotate(
+            # ⚠️  `output_field` is explicit: without it SQLite returns the raw 32-digit hex
+            #     string instead of a UUID and no row matches the coupon it is looked up by.
+            coupon_ref=Subquery(redemption.values("coupon_id")[:1], output_field=UUIDField())
+        )
+        .values("coupon_ref")
+        .annotate(
+            orders=Count("pk"),
+            gross=Sum("subtotal"),
+            given=Sum("coupon_discount"),
+            net=Sum(_NET_OF_DISCOUNT),
+        )
+        .order_by("-given", "-orders")
+    )
+    coupon_rows = list(per_coupon[:limit])
+    coupons = Coupon.all_objects.in_bulk([row["coupon_ref"] for row in coupon_rows])
+
+    by_coupon = []
+    for row in coupon_rows:
+        coupon = coupons.get(row["coupon_ref"])
+        row_gross = quantize(row["gross"] or ZERO)
+        row_given = quantize(row["given"] or ZERO)
+        by_coupon.append(
+            {
+                "coupon": str(row["coupon_ref"]),
+                # ⚠️  A coupon deleted since the sale still has its orders in the period.
+                "code": coupon.code if coupon else "—",
+                "name_ar": coupon.name_ar if coupon else "",
+                "name_en": coupon.name_en if coupon else "",
+                "kind": coupon.kind if coupon else "",
+                "holder_name": coupon.holder_name if coupon else "",
+                "orders": row["orders"],
+                "gross": str(row_gross),
+                "discount": str(row_given),
+                "discount_percent": str(percentage_of(row_given, row_gross)),
+                # After *every* discount on those orders, not only this coupon's
+                "net": str(quantize(row["net"] or ZERO)),
+            }
+        )
+
+    # ── By day ─────────────────────────────────────────────
+    # ⚠️  One aggregated query, and only days with a sale — like `sales_by_day`.
+    days = (
+        sold.annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(orders=Count("id"), gross=Sum("subtotal"), given=Sum("discount_total"))
+        .order_by("day")
+    )
+    by_day = []
+    for row in days:
+        day_gross = quantize(row["gross"] or ZERO)
+        day_given = quantize(row["given"] or ZERO)
+        by_day.append(
+            {
+                "day": row["day"].isoformat(),
+                "orders": row["orders"],
+                "gross": str(day_gross),
+                "discount": str(day_given),
+                "net": str(quantize(day_gross - day_given)),
+            }
+        )
+
+    return {
+        "start": str(start),
+        "end": str(end),
+        "orders_count": totals["orders"],
+        "discounted_orders": totals["discounted"],
+        "coupon_orders": totals["with_coupon"],
+        "coupons_used": per_coupon.count(),
+        "gross_before_discount": str(gross),
+        "discount_total": str(discount),
+        "discount_percent": str(percentage_of(discount, gross)),
+        "net_after_discount": str(net),
+        "tax_total": str(tax),
+        "shipping_total": str(shipping),
+        "invoiced_total": str(invoiced),
+        "unreconciled": str(quantize(invoiced - (net + tax + shipping))),
+        "shipping_waived": str(quantize(totals["shipping_waived"])),
+        "by_source": [
+            {
+                "source": source,
+                "amount": str(amounts[source]),
+                "share": str(percentage_of(amounts[source], discount)),
+            }
+            for source in DISCOUNT_SOURCES
+        ],
+        "by_coupon": by_coupon,
+        "by_day": by_day,
+    }
 
 
 # ═══════════════════════════════════════════════════════════

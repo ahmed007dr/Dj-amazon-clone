@@ -1,0 +1,76 @@
+/* ═══════════════════════════════════════════════════════════
+   The referral members report (admin Loyalty page → "Referral members").
+
+   ⚠️  Logical properties and design tokens only: Arabic-first (RTL), dark-mode safe.
+   ═══════════════════════════════════════════════════════════ */
+
+.referral-report {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.referral-report__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-3);
+}
+
+.referral-report__note {
+  max-inline-size: 70ch;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+.referral-member-cell {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+}
+
+.referral-member-cell small {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* End-aligned columns keep their sub-lines at the end edge too */
+td.is-end .referral-member-cell {
+  justify-items: end;
+}
+
+/* ── The member drawer ────────────────────────────────────── */
+
+/* ⚠️  The shared Drawer is narrow — right for a form, too narrow for a table of invitees.
+       Widened from here with `:has()` so the shared component stays untouched. */
+.drawer__panel:has(.referral-member) {
+  inline-size: min(46rem, 96vw);
+}
+
+.referral-member {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-block-end: var(--space-6);
+}
+
+.referral-member__who {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.referral-member__who small {
+  color: var(--color-text-muted);
+}
+
+.referral-member__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
+  gap: var(--space-2);
+}
+
+.referral-member section > h3 {
+  margin-block: 0 var(--space-2);
+  font-size: 1rem;
+}

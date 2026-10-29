@@ -136,7 +136,9 @@ export function ReviewList({ slug, productId }: { slug: string; productId?: stri
 
                   <div className="review__who">
                     <div className="review__name">
-                      <strong className="review__author">{review.author}</strong>
+                      <strong className="review__author">
+                        <bdi>{review.author}</bdi>
+                      </strong>
                       {review.is_verified_purchase ? (
                         <Badge tone="success">{t('catalog.verifiedPurchase')}</Badge>
                       ) : null}

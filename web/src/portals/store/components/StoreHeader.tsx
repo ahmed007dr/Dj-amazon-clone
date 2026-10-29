@@ -58,7 +58,7 @@ export function StoreHeader() {
 
         <div className="store-header__actions">
           {isDesktop && <LanguageSwitch />}
-          <ThemeSwitch />
+          {isDesktop && <ThemeSwitch />}
           <NotificationBell />
           <CartBadge />
           <AccountMenu />
@@ -68,10 +68,13 @@ export function StoreHeader() {
       {!isDesktop && (
         <Drawer open={menuOpen} onClose={closeMenu} title={t('common.menu')}>
           <StoreNav onNavigate={closeMenu} />
-          {/* ⚠️  The language switcher lives inside the menu on a phone rather than
-              in the header — a narrow header would otherwise push the logo off the screen */}
+          {/* ⚠️  The language and theme switchers live inside the menu on a phone rather
+              than in the header. The theme switch alone is 136px of touch targets: with
+              it in the header the row needs 467px, so every phone (360–430px) widened the
+              whole page and scrolled sideways. */}
           <div className="store-header__drawer-tools">
             <LanguageSwitch />
+            <ThemeSwitch />
           </div>
         </Drawer>
       )}

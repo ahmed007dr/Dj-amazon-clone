@@ -299,13 +299,35 @@ class TestBundleNeedsAnAccount:
 
 
 # ═══════════════════════════════════════════════════════════
-#  Coupons are for accounts
+#  Coupons for guests
+#
+#  ⚠️  Used to be "coupons are for accounts" (every code refused to every visitor with
+#      `COUPON_LOGIN_REQUIRED`). The owner hands codes to public figures whose followers
+#      buy without registering, so a guest may use a coupon unless that coupon is closed
+#      to guests. The full matrix lives in `promotions/tests/test_guest_coupons.py`.
 # ═══════════════════════════════════════════════════════════
+
+
+def _guest_with_item(product):
+    guest = APIClient()
+    guest.post(
+        reverse("v1:cart:lines"),
+        {"product": str(product.pk), "quantity": 1},
+        format="json",
+        HTTP_X_CART_SESSION=KEY,
+    )
+    return guest
+
+
+def _apply(guest, code):
+    return guest.post(
+        reverse("v1:cart:coupon"), {"code": code}, format="json", HTTP_X_CART_SESSION=KEY
+    )
 
 
 @pytest.mark.django_db
 class TestGuestCoupons:
-    def test_applying_a_coupon_as_a_guest_is_refused_clearly(self, product):
+    def test_a_guest_can_apply_an_open_coupon(self, product):
         from promotions.models import Coupon, CouponKind
 
         Coupon.objects.create(
@@ -315,39 +337,53 @@ class TestGuestCoupons:
             kind=CouponKind.PERCENTAGE,
             value=Decimal("20.00"),
         )
-        guest = APIClient()
-        guest.post(
-            reverse("v1:cart:lines"),
-            {"product": str(product.pk), "quantity": 1},
-            format="json",
-            HTTP_X_CART_SESSION=KEY,
-        )
+        guest = _guest_with_item(product)
 
-        response = guest.post(
-            reverse("v1:cart:coupon"), {"code": "SAVE20"}, format="json", HTTP_X_CART_SESSION=KEY
+        response = _apply(guest, "SAVE20")
+
+        assert response.status_code == 200
+        assert response.data["coupon"]["is_valid"] is True
+        assert response.data["totals"]["coupon_discount"] == "20.00"
+        assert Cart.objects.get().coupon_code == "SAVE20"
+
+    def test_a_coupon_closed_to_guests_says_to_sign_in(self, product):
+        from promotions.models import Coupon, CouponKind
+
+        Coupon.objects.create(
+            code="MEMBERS",
+            name_ar="خصم",
+            name_en="Discount",
+            kind=CouponKind.PERCENTAGE,
+            value=Decimal("20.00"),
+            allow_guests=False,
         )
+        guest = _guest_with_item(product)
+
+        response = _apply(guest, "MEMBERS")
 
         assert response.status_code == 200  # a refused coupon is still a 200
         assert response.data["coupon"]["is_valid"] is False
-        assert response.data["coupon"]["reason"] == "COUPON_LOGIN_REQUIRED"
+        assert response.data["coupon"]["reason"] == "COUPON_REGISTERED_ONLY"
         assert response.data["totals"]["coupon_discount"] == "0.00"
         assert Cart.objects.get().coupon_code == ""
 
     def test_a_guest_learns_nothing_about_which_codes_exist(self, product):
-        guest = APIClient()
-        guest.post(
-            reverse("v1:cart:lines"),
-            {"product": str(product.pk), "quantity": 1},
-            format="json",
-            HTTP_X_CART_SESSION=KEY,
+        """An unknown code and a switched-off one are answered identically."""
+        from promotions.models import Coupon, CouponKind
+
+        Coupon.objects.create(
+            code="OFF",
+            name_ar="خصم",
+            name_en="Discount",
+            kind=CouponKind.PERCENTAGE,
+            value=Decimal("20.00"),
+            is_active=False,
         )
+        guest = _guest_with_item(product)
+
         answers = {
-            guest.post(
-                reverse("v1:cart:coupon"),
-                {"code": code},
-                format="json",
-                HTTP_X_CART_SESSION=KEY,
-            ).data["coupon"]["reason"]
-            for code in ("NOPE", "SAVE20", "WELCOME")
+            (data["coupon"]["reason"], data["coupon"]["message"])
+            for data in (_apply(guest, code).data for code in ("NOPE", "OFF", "WELCOME"))
         }
-        assert answers == {"COUPON_LOGIN_REQUIRED"}
+
+        assert answers == {("COUPON_NOT_FOUND", "الكوبون غير موجود")}

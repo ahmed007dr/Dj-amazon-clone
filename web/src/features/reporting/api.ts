@@ -59,6 +59,60 @@ export interface SalesReport {
   by_category: CategoryRow[]; top_products: ProductRow[];
 }
 
+/**
+ * The kinds of discount an order can tell apart.
+ *
+ * ⚠️  `manual` is the remainder (the discount the cashier typed at the till), so the
+ *     four always add up to the total discount.
+ */
+export type DiscountSource = 'coupon' | 'loyalty_points' | 'item_promotion' | 'manual';
+
+export interface DiscountSourceRow {
+  source: DiscountSource;
+  amount: string;
+  /** Percent of the total discount — text, like every other figure the server sends. */
+  share: string;
+}
+
+export interface DiscountCouponRow {
+  coupon: string;
+  code: string;
+  name_ar: string;
+  name_en: string;
+  kind: string;
+  holder_name: string;
+  orders: number;
+  gross: string;
+  /** What this coupon alone took off. */
+  discount: string;
+  discount_percent: string;
+  /** The same orders after *every* discount, not only this coupon's. */
+  net: string;
+}
+
+export interface DiscountDayRow {
+  day: string; orders: number; gross: string; discount: string; net: string;
+}
+
+/**
+ * ⚠️  `invoiced_total` is the Sales tab's `gross_sales` (it carries tax and shipping);
+ *     `gross_before_discount` is the products alone. Different names on purpose.
+ */
+export interface SalesDiscountsReport {
+  start: string; end: string;
+  orders_count: number; discounted_orders: number; coupon_orders: number; coupons_used: number;
+  gross_before_discount: string; discount_total: string; discount_percent: string;
+  net_after_discount: string;
+  tax_total: string; shipping_total: string; invoiced_total: string;
+  /** Non-zero = the figures above do not explain the invoiced total (see the server comment). */
+  unreconciled: string;
+  /** A memo outside the discount: the fee the free-shipping rule waived. */
+  shipping_waived: string;
+  by_source: DiscountSourceRow[];
+  by_coupon: DiscountCouponRow[];
+  by_day: DiscountDayRow[];
+}
+
 export interface ExpiryRow {
   batch: string; product: string; sku: string;
   name_ar: string; name_en: string; location: string;
@@ -158,6 +212,21 @@ export const useSalesReport = (period: Period, by: TopProductsBy = 'revenue') =>
     queryKey: ['reports', 'sales', period, by],
     queryFn: () =>
       http.get<SalesReport>('/reports/sales/', { params: { ...period, by } }),
+  });
+
+/**
+ * ⚠️  `enabled` is a real gate, not a different key.
+ *
+ *     The sales tab swaps in an empty period while closed, which keeps the query
+ *     key stable but still sends the request (the server then defaults to this
+ *     month). This one does not fire until its tab is open.
+ */
+export const useSalesDiscountsReport = (period: Period, enabled: boolean) =>
+  useQuery({
+    queryKey: ['reports', 'sales-discounts', period],
+    queryFn: () =>
+      http.get<SalesDiscountsReport>('/reports/sales-discounts/', { params: { ...period } }),
+    enabled,
   });
 
 export const usePeakHours = (period: Period) =>

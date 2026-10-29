@@ -26,6 +26,30 @@ from core.models.base import BaseModel
 from core.models.translatable import BilingualNameMixin
 from core.money import MoneyField
 
+#: Arabic-Indic and Extended Arabic-Indic digits → ASCII (a customer on an Arabic keyboard)
+_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
+
+
+def normalise_phone_digits(raw) -> str:
+    """
+    A phone number as digits only, in one spelling: `+20 100 123 4567`,
+    `01001234567` and `00201001234567` are all `201001234567`.
+
+    ⚠️  The coupon limits compare phones by equality, so two spellings of one number
+        would be two buyers. Egyptian local forms (`0…`, a bare 10-digit mobile)
+        gain the `20` country code; anything else keeps its digits as typed.
+        Pure and database-free on purpose — `promotions` cannot import the checkout's
+        own phone validator (it sits in `orders`, above this app).
+    """
+    digits = "".join(ch for ch in str(raw or "").translate(_DIGITS) if ch.isdigit())
+    if digits.startswith("00"):
+        digits = digits[2:]
+    if digits.startswith("0") and len(digits) == 11:
+        digits = "20" + digits[1:]
+    elif len(digits) == 10 and digits.startswith("1"):
+        digits = "20" + digits
+    return digits[:20]
+
 
 class CouponKind(models.TextChoices):
     PERCENTAGE = "PERCENTAGE", _("نسبة مئوية")
@@ -77,6 +101,19 @@ class Coupon(BilingualNameMixin, BaseModel):
     )
     first_order_only = models.BooleanField(_("للطلب الأول فقط"), default=False)
 
+    #: ⚠️  May a **visitor with no account** use this code? Default yes.
+    #:
+    #:     The owner hands codes to public figures whose followers often buy without
+    #:     registering, so the default is open and a coupon is closed to guests
+    #:     deliberately (`allow_guests=False` → "sign in to use this coupon").
+    #:     A coupon restricted by `account_types` is registered-only regardless: a
+    #:     guest has no account type to match.
+    allow_guests = models.BooleanField(
+        _("متاح للزوار"),
+        default=True,
+        help_text=_("يسمح بالشراء بهذا الكود دون حساب · الكوبونات المقيّدة بنوع حساب للمسجّلين فقط"),
+    )
+
     #: ⚠️  A coupon **owned by a specific person** — empty = a general campaign.
     #:
     #:     A points-redemption coupon was paid for with a balance actually consumed
@@ -116,6 +153,13 @@ class Coupon(BilingualNameMixin, BaseModel):
         help_text=_("نص حر داخلي — لا يراه العميل ولا يدخل في التصدير"),
     )
 
+    #: ⚠️  **The scope** — which cart lines the discount is calculated on.
+    #:
+    #:     No products and no categories = ALL products. Otherwise only the lines
+    #:     whose product is listed here (or whose product's category is) get the
+    #:     discount; the rest of the cart is priced as usual. Products are the
+    #:     primary concept ("this code is for the lab coat"); categories stay for
+    #:     "everything in Anatomy".
     products = models.ManyToManyField(
         "catalog.Product",
         blank=True,
@@ -206,12 +250,26 @@ class CouponRedemption(BaseModel):
         related_name="redemptions",
         verbose_name=_("الكوبون"),
     )
+    #: ⚠️  **Null for a guest purchase** (`is_guest`). The buyer's identity then lives
+    #:     in `guest_email` / `guest_phone`, which the per-buyer limits count. When the
+    #:     guest later verifies their email and claims the order, `user` is filled in
+    #:     (see `attach_user`) and `is_guest` stays True — it records *how the
+    #:     purchase was made*, not who owns it now.
     user = models.ForeignKey(
         "accounts.User",
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="coupon_redemptions",
         verbose_name=_("المستخدم"),
     )
+
+    is_guest = models.BooleanField(_("شراء كزائر"), default=False)
+    #: Lower-cased. The limit is per *identity*: a repeat with either the email or the
+    #: phone is the same buyer, so both are stored and both are indexed.
+    guest_email = models.EmailField(_("بريد الزائر"), blank=True, db_index=True)
+    #: Digits only, with the country code (`201001234567`) — see `normalise_phone_digits`
+    guest_phone = models.CharField(_("هاتف الزائر"), max_length=20, blank=True, db_index=True)
 
     discount_amount = MoneyField(_("قيمة الخصم"))
     order_amount = MoneyField(_("قيمة الطلب"), default=0)
@@ -245,11 +303,15 @@ class CouponRedemption(BaseModel):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["coupon", "user"]),
+            # The per-buyer limit asks "has this email / phone used THIS coupon?"
+            models.Index(fields=["coupon", "guest_email"]),
+            models.Index(fields=["coupon", "guest_phone"]),
             models.Index(fields=["reference_type", "reference_id"]),
         ]
 
     def __str__(self):
-        return f"{self.coupon.code} · {self.user} · {self.discount_amount}"
+        buyer = self.user or self.guest_email or self.guest_phone or "-"
+        return f"{self.coupon.code} · {buyer} · {self.discount_amount}"
 
     def save(self, *args, **kwargs):
         """
@@ -257,6 +319,12 @@ class CouponRedemption(BaseModel):
             knows `reference_type="order"` / `reference_id=<pk>` keeps working and
             the analytics join keeps finding its rows.
         """
+        # ⚠️  The guest identity is stored in one canonical spelling, here, so no writer
+        #     can leave `Ahmed@X.com` beside `ahmed@x.com` — the per-buyer limit
+        #     compares these columns by equality.
+        self.guest_email = (self.guest_email or "").strip().lower()
+        self.guest_phone = normalise_phone_digits(self.guest_phone)
+
         if self.order_ref is None and self.reference_type == "order" and self.reference_id:
             try:
                 self.order_ref = uuid.UUID(str(self.reference_id))

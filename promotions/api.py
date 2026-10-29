@@ -14,7 +14,7 @@ Coupon endpoints.
 
 from decimal import Decimal
 
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
@@ -25,7 +25,7 @@ from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
 from core.permissions import CanManagePricing
-from promotions import analytics, services
+from promotions import analytics, analytics_customers, analytics_report, services
 from promotions import serializers as s
 from promotions.models import Coupon, CouponRedemption
 
@@ -63,6 +63,29 @@ def filter_coupons(queryset, params):
     if params.get("has_holder") == "true":
         queryset = queryset.exclude(holder_name="")
 
+    # ⚠️  The scope: `all` = the whole catalogue, `products` = limited to chosen products,
+    #     `categories` = limited to categories, `scoped` = either. Judged on the stored rows
+    #     (the through tables, a deleted product included — the engine does the same), with
+    #     `EXISTS` rather than a join so a coupon with ten products is still one row and the
+    #     analytics ranking that shares this filter never double-counts it.
+    scope = params.get("scope")
+    if scope in ("all", "products", "categories", "scoped"):
+        has_products = Exists(Coupon.products.through.objects.filter(coupon_id=OuterRef("pk")))
+        has_categories = Exists(Coupon.categories.through.objects.filter(coupon_id=OuterRef("pk")))
+        if scope == "all":
+            queryset = queryset.filter(~has_products, ~has_categories)
+        elif scope == "products":
+            queryset = queryset.filter(has_products)
+        elif scope == "categories":
+            queryset = queryset.filter(has_categories)
+        else:
+            queryset = queryset.filter(has_products | has_categories)
+
+    # Open to visitors or not (`?guests=allowed` / `?guests=blocked`)
+    guests = params.get("guests")
+    if guests in ("allowed", "blocked"):
+        queryset = queryset.filter(allow_guests=(guests == "allowed"))
+
     return queryset
 
 
@@ -72,7 +95,8 @@ class CouponListCreateAPI(generics.ListCreateAPIView):
     pagination_class = AdminPageNumberPagination
 
     def get_queryset(self):
-        queryset = Coupon.objects.prefetch_related("products", "categories")
+        # ⚠️  `scope_prefetch` keeps the scope summary at a constant number of queries per page
+        queryset = Coupon.objects.prefetch_related(*s.scope_prefetch())
         return filter_coupons(queryset, self.request.query_params).order_by("-created_at")
 
     def list(self, request, *args, **kwargs):
@@ -112,7 +136,7 @@ class CouponListCreateAPI(generics.ListCreateAPIView):
 class CouponDetailAPI(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [CanManagePricing]
     serializer_class = s.CouponSerializer
-    queryset = Coupon.objects.prefetch_related("products", "categories")
+    queryset = Coupon.objects.prefetch_related(*s.scope_prefetch())
 
     def perform_update(self, serializer):
         coupon = serializer.save()
@@ -208,6 +232,9 @@ _RANKING_KEYS = {
     "code",
     "holder_name",
     "created_at",
+    "new_customers",
+    "new_customer_rate",
+    "discount_share_of_gross",
 }
 
 
@@ -228,7 +255,45 @@ def _coupon_meta(coupon: Coupon) -> dict:
         "is_expired": coupon.is_expired,
         "is_exhausted": coupon.is_exhausted,
         "created_at": coupon.created_at,
+        # The member a personal coupon belongs to ("who distributed this"); null for a campaign
+        "owner": analytics_report.owner_payload(coupon),
     }
+
+
+#: The keys a holder row may be ordered by (`?group_by=holder`)
+_HOLDER_KEYS = {
+    "net_sales",
+    "gross_sales",
+    "discount_given",
+    "order_total",
+    "orders",
+    "customers",
+    "times_used",
+    "last_used_at",
+    "holder_name",
+    "coupons",
+    "guest_orders",
+    "registered_orders",
+    "new_customers",
+}
+
+
+def _sort_value(row, key):
+    value = row[key]
+    return value["count"] if isinstance(value, dict) else value
+
+
+def _ranked(rows, ordering, allowed, tie_break):
+    """Order `rows` by `ordering`; a missing value (never used) sorts last either way."""
+    descending = ordering.startswith("-")
+    key = ordering.lstrip("-")
+    if key not in allowed:
+        raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="ترتيب غير مدعوم")
+
+    present = [row for row in rows if _sort_value(row, key) is not None]
+    absent = [row for row in rows if _sort_value(row, key) is None]
+    present.sort(key=lambda row: (_sort_value(row, key), row[tie_break]), reverse=descending)
+    return present + absent
 
 
 class CouponAnalyticsOverviewAPI(APIView):
@@ -238,6 +303,13 @@ class CouponAnalyticsOverviewAPI(APIView):
         ?date_from=2026-10-01&date_to=2026-10-31   the period (inclusive, optional)
         ?search=&status=&has_holder=true            the same filters as the coupon list
         ?ordering=-net_sales                        default; any key in `_RANKING_KEYS`
+        ?group_by=holder                            one row per holder (their codes combined);
+                                                    ordering then takes `_HOLDER_KEYS`
+
+    Every coupon row, every holder row and `totals` carry the buyer split: `by_customer_type`
+    (registered / guest), `new_customers` / `returning_customers`, `new_customer_rate`,
+    `discount_by_customer_type` and `discount_share_of_gross`; the page also carries
+    `discount_series` (discount volume over the period, split registered / guest).
 
     ⚠️  `totals` covers **all** coupons whatever the search says: the cards above a
         filtered table must not change when someone types in the search box.
@@ -250,39 +322,53 @@ class CouponAnalyticsOverviewAPI(APIView):
         date_from, date_to = analytics.parse_period(params)
 
         ordering = params.get("ordering") or "-net_sales"
-        descending = ordering.startswith("-")
-        key = ordering.lstrip("-")
-        if key not in _RANKING_KEYS:
-            raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="ترتيب غير مدعوم")
+        group_by = params.get("group_by") or ""
+        if group_by not in ("", "coupon", "holder"):
+            raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="group_by غير مدعوم")
+        by_holder = group_by == "holder"
 
-        coupons = list(filter_coupons(Coupon.objects.all(), params))
+        coupons = list(filter_coupons(Coupon.objects.select_related("owner"), params))
         stats = analytics.summaries([coupon.pk for coupon in coupons], date_from, date_to)
+        # One grouped query for the buyer figures of every coupon (registered / guest, new)
+        breakdown = analytics_customers.Breakdown.load(None, date_from, date_to)
 
-        rows = []
-        for coupon in coupons:
-            row = _coupon_meta(coupon)
-            row.update(stats[coupon.pk])
-            row["usage_limit"] = coupon.usage_limit
-            row["usage_count"] = coupon.usage_count
-            row["remaining_total"] = (
-                max(coupon.usage_limit - coupon.usage_count, 0)
-                if coupon.usage_limit is not None
-                else None
+        if by_holder:
+            rows = _ranked(
+                analytics_report.holder_rows(coupons, stats, breakdown),
+                ordering,
+                _HOLDER_KEYS,
+                "holder_name",
             )
-            rows.append(row)
-
-        # None sorts last in either direction: "never used" is not the biggest or the smallest
-        present = [row for row in rows if row[key] is not None]
-        absent = [row for row in rows if row[key] is None]
-        present.sort(key=lambda row: (row[key], row["code"]), reverse=descending)
-        rows = present + absent
+        else:
+            rows = []
+            for coupon in coupons:
+                row = _coupon_meta(coupon)
+                row.update(stats[coupon.pk])
+                row.update(breakdown.block([coupon.pk]))
+                row["usage_limit"] = coupon.usage_limit
+                row["usage_count"] = coupon.usage_count
+                row["remaining_total"] = (
+                    max(coupon.usage_limit - coupon.usage_count, 0)
+                    if coupon.usage_limit is not None
+                    else None
+                )
+                rows.append(row)
+            # None sorts last in either direction: "never used" is not the biggest or smallest
+            rows = _ranked(rows, ordering, _RANKING_KEYS, "code")
 
         paginator = AdminPageNumberPagination()
         page = paginator.paginate_queryset(rows, request, view=self)
         response = paginator.get_paginated_response(public(page))
-        response.data["totals"] = public(analytics.totals(date_from, date_to))
+        totals = analytics.totals(date_from, date_to)
+        totals.update(breakdown.block())
+        response.data["totals"] = public(totals)
         response.data["counts"] = analytics.coupon_counts()
         response.data["period"] = {"date_from": date_from, "date_to": date_to}
+        response.data["group_by"] = "holder" if by_holder else "coupon"
+        # Discount volume over the period, split registered / guest — the overview chart
+        response.data["discount_series"] = public(
+            analytics_report.discount_series(None, date_from, date_to)
+        )
         return response
 
 
@@ -311,6 +397,7 @@ class CouponAnalyticsDetailAPI(APIView):
             ).count()
         summary.update(analytics.remaining_uses(coupon, owner_used))
         summary["customers_at_limit"] = analytics.customers_at_limit(coupon)
+        summary.update(analytics_customers.Breakdown.load([coupon.pk], date_from, date_to).block())
 
         meta = _coupon_meta(coupon)
         meta.update(
@@ -327,6 +414,9 @@ class CouponAnalyticsDetailAPI(APIView):
                     "summary": summary,
                     "products": analytics.product_breakdown(coupon, date_from, date_to),
                     "series": analytics.series(coupon, date_from, date_to),
+                    "discount_series": analytics_report.discount_series(
+                        [coupon.pk], date_from, date_to
+                    ),
                 }
             )
         )
@@ -358,6 +448,53 @@ class CouponOrdersAPI(APIView):
         paginator = AdminPageNumberPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
         return paginator.get_paginated_response(public([analytics.order_row(row) for row in page]))
+
+
+class CouponCustomersAPI(APIView):
+    """
+    `GET` — the buyers who used this coupon: registered accounts and guests, paginated.
+
+        ?search=         name · e-mail · phone
+        ?ordering=       -net_sales (default) · net_sales · gross_sales · discount · orders ·
+                         first_used_at · last_used_at · name · customer_type  (`-` = descending)
+        ?customer_type=  REGISTERED | GUEST
+        ?new=true|false  only new / only returning customers
+        ?date_from= &date_to=   the same period as every other figure
+
+    ⚠️  Unlike the orders list this shows the **full** name, e-mail and phone: it is the
+        report of who the code's buyers are. It sits behind the same pricing permission as
+        the rest of the coupon admin, and counted orders only (cancelled, refunded and
+        payment-failed ones are not buyers of the code — see the module docstring of
+        `promotions.analytics`).
+    """
+
+    permission_classes = [CanManagePricing]
+
+    def get(self, request, pk):
+        coupon = get_object_or_404(Coupon, pk=pk)
+        params = request.query_params
+        date_from, date_to = analytics.parse_period(params)
+
+        kind = (params.get("customer_type") or "").upper()
+        if kind not in ("", "REGISTERED", "GUEST"):
+            raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="customer_type غير مدعوم")
+        new = params.get("new")
+        if new not in (None, "", "true", "false"):
+            raise BusinessError(ErrorCode.VALIDATION_ERROR, detail="new غير مدعوم")
+
+        queryset = analytics_report.customers_queryset(
+            coupon,
+            date_from,
+            date_to,
+            search=params.get("search") or "",
+            ordering=params.get("ordering") or "-net_sales",
+            kind=kind.lower() or None,
+            new=None if not new else new == "true",
+        )
+
+        paginator = AdminPageNumberPagination()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        return paginator.get_paginated_response(public(analytics_report.customer_rows(page)))
 
 
 class CouponBulkCreateAPI(APIView):

@@ -21,6 +21,7 @@ import { isApiError } from '@/shared/http/errors';
 import { useLocalized } from '@/shared/i18n/useLocalized';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
+import { ActionMenu } from '@/shared/ui/ActionMenu';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Drawer } from '@/shared/ui/Drawer';
@@ -192,66 +193,65 @@ export function AdminProductsPage() {
       key: 'actions',
       header: t('admin.actions'),
       align: 'end',
-      render: (product) =>
-        // ⚠️  A deleted one shows **restore alone** (and its history, which is where
-        //     "who deleted it" is answered).
-        //
-        //     Editing a deleted product or uploading its images is wasted work: nobody
-        //     sees it while it is deleted. The first step is to bring it back.
-        product.deleted_at ? (
-          <span className="admin-products__actions">
-            <Button
-              size="sm"
-              variant="ghost"
-              loading={restore.isPending}
-              onClick={() =>
-                restore.mutate(product.id, {
-                  onSuccess: () => notify(t('products.restored'), 'success'),
-                  onError: fail,
-                })
-              }
-            >
-              {t('products.restore')}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setPanel({ mode: 'history', product })}
-            >
-              {t('products.history.open')}
-            </Button>
-          </span>
-        ) : (
-          <span className="admin-products__actions">
-            <Button size="sm" variant="ghost" onClick={() => setPanel({ mode: 'edit', product })}>
-              {t('common.edit')}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setPanel({ mode: 'images', product })}
-            >
-              {t('images.manage')}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setPanel({ mode: 'colors', product })}
-            >
-              {t('catalog.colors.manage')}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setPanel({ mode: 'history', product })}
-            >
-              {t('products.history.open')}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setPendingDelete(product)}>
-              {t('common.delete')}
-            </Button>
-          </span>
-        ),
+      // ⚠️  One dropdown per row, not a row of buttons — five ghost buttons made this the
+      //     widest cell in the table and gave "delete" the same weight as "edit". The
+      //     destructive item is set last behind a divider by the menu itself.
+      render: (product) => {
+        const deleted = Boolean(product.deleted_at);
+        return (
+          <ActionMenu
+            menuLabel={`${t('admin.actions')} · ${localized(product, 'name')}`}
+            items={[
+              // ⚠️  A deleted one shows **restore alone** (and its history, which is where
+              //     "who deleted it" is answered).
+              //
+              //     Editing a deleted product or uploading its images is wasted work: nobody
+              //     sees it while it is deleted. The first step is to bring it back.
+              {
+                key: 'restore',
+                label: t('products.restore'),
+                hidden: !deleted,
+                disabled: restore.isPending,
+                onSelect: () =>
+                  restore.mutate(product.id, {
+                    onSuccess: () => notify(t('products.restored'), 'success'),
+                    onError: fail,
+                  }),
+              },
+              {
+                key: 'edit',
+                label: t('common.edit'),
+                hidden: deleted,
+                onSelect: () => setPanel({ mode: 'edit', product }),
+              },
+              {
+                key: 'images',
+                label: t('images.manage'),
+                hidden: deleted,
+                onSelect: () => setPanel({ mode: 'images', product }),
+              },
+              {
+                key: 'colors',
+                label: t('catalog.colors.manage'),
+                hidden: deleted,
+                onSelect: () => setPanel({ mode: 'colors', product }),
+              },
+              {
+                key: 'history',
+                label: t('products.history.open'),
+                onSelect: () => setPanel({ mode: 'history', product }),
+              },
+              {
+                key: 'delete',
+                label: t('common.delete'),
+                tone: 'danger',
+                hidden: deleted,
+                onSelect: () => setPendingDelete(product),
+              },
+            ]}
+          />
+        );
+      },
     },
   ];
 

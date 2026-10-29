@@ -24,11 +24,12 @@ import { useToast } from '@/shared/ui/useToast';
 import { LoyaltyProgramCard } from '@/portals/admin/components/LoyaltyProgramCard';
 import { NewProgramForm } from '@/portals/admin/components/NewProgramForm';
 import { PointsAdjustPanel } from '@/portals/admin/components/PointsAdjustPanel';
+import { ReferralMembersReport } from '@/portals/admin/components/ReferralMembersReport';
 import { ReferralProgramCard } from '@/portals/admin/components/ReferralProgramCard';
 
 import './AdminLoyaltyPage.css';
 
-type Tab = 'programs' | 'referral' | 'ledger';
+type Tab = 'programs' | 'referral' | 'members' | 'ledger';
 
 const LEDGER_KINDS: PointsKind[] = [
   'EARN',
@@ -198,7 +199,7 @@ export function AdminLoyaltyPage() {
       </div>
 
       <div className="loyalty-tabs" role="tablist">
-        {(['programs', 'referral', 'ledger'] as const).map((value) => (
+        {(['programs', 'referral', 'members', 'ledger'] as const).map((value) => (
           <button
             key={value}
             type="button"
@@ -311,6 +312,10 @@ export function AdminLoyaltyPage() {
           />
         </div>
       ) : null}
+
+      {/* ⚠️  Mounted only while selected: its queries (and the period it holds) belong to this
+          tab, so the programmes tab does not pay for a report nobody opened. */}
+      {tab === 'members' ? <ReferralMembersReport /> : null}
 
       {tab === 'ledger' ? (
         <>

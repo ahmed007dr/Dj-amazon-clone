@@ -2,10 +2,18 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useSaveCoupon, type Coupon } from '@/features/pricing/api';
+import { CouponScopeSection } from '@/portals/admin/components/CouponScopeSection';
+import {
+  initialScope,
+  scopeBody,
+  scopeProblem,
+  type ScopeState,
+} from '@/portals/admin/components/couponScope';
 import { isApiError } from '@/shared/http/errors';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { Field } from '@/shared/ui/Field';
+import { Switch } from '@/shared/ui/Switch';
 import { useToast } from '@/shared/ui/useToast';
 
 import './CouponInsights.css';
@@ -34,6 +42,14 @@ const VALUE_KINDS = ['PERCENTAGE', 'FIXED'];
  * ⚠️  And **the discount cap is for percentages alone**: "50%" on a
  *     ten-thousand order means five thousand out of the store's pocket. The cap
  *     is what prevents that.
+ *
+ * ⚠️  **The scope is its own section and its own state** (`ScopeState`), not more fields in
+ *     `form`: what is *sent* (`scopeBody`) differs from what is *held* — an "All products"
+ *     coupon still remembers the products picked a moment ago, so a mis-click costs nothing.
+ *
+ * ⚠️  "Selected products" with nothing selected is refused **before** the request. The server
+ *     reads an empty list as "every product", so letting it through would quietly turn a
+ *     "one product only" coupon into a store-wide discount.
  */
 export function CouponForm({
   coupon,
@@ -64,8 +80,12 @@ export function CouponForm({
     starts_at: coupon?.starts_at?.slice(0, 16) ?? '',
     ends_at: coupon?.ends_at?.slice(0, 16) ?? '',
     is_active: coupon?.is_active ?? true,
+    // ⚠️  Default on: a code that quietly refuses guests is the surprise, not the other way round.
+    allow_guests: coupon?.allow_guests ?? true,
   });
+  const [scope, setScope] = useState<ScopeState>(() => initialScope(coupon));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [scopeChecked, setScopeChecked] = useState(false);
 
   const set = <K extends keyof typeof form>(key: K) => (value: (typeof form)[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -82,10 +102,19 @@ export function CouponForm({
 
   const needsValue = VALUE_KINDS.includes(form.kind);
 
+  const problemKey = scopeProblem(scope);
+
   const submit = () => {
     setFieldErrors({});
 
+    if (problemKey) {
+      setScopeChecked(true);
+      return;
+    }
+
     const body: Record<string, unknown> = {
+      ...scopeBody(scope),
+      allow_guests: form.allow_guests,
       name_ar: form.name_ar,
       name_en: form.name_en,
       holder_name: form.holder_name.trim(),
@@ -215,6 +244,17 @@ export function CouponForm({
         </div>
       ) : null}
 
+      <CouponScopeSection
+        value={scope}
+        onChange={(next) => {
+          setScope(next);
+          setScopeChecked(false);
+        }}
+        productsError={fieldErrors.products}
+        categoriesError={fieldErrors.categories}
+        problem={scopeChecked && problemKey ? t(problemKey) : undefined}
+      />
+
       <h4 className="pricing-form__legend">{t('pricing.eligibility')}</h4>
 
       <Field
@@ -249,6 +289,20 @@ export function CouponForm({
         />
         <span>{t('pricing.firstOrderOnly')}</span>
       </label>
+
+      {/* ⚠️  Guests: customers who buy without an account. A code handed to an influencer
+          is usually meant for exactly them — and a code that needs a login loses the sale. */}
+      <Switch
+        checked={form.allow_guests}
+        onChange={set('allow_guests')}
+        label={t('pricing.scope.allowGuests')}
+        description={t('pricing.scope.allowGuestsHint')}
+      />
+      {fieldErrors.allow_guests ? (
+        <p className="pricing-form__error" role="alert">
+          {fieldErrors.allow_guests}
+        </p>
+      ) : null}
 
       <h4 className="pricing-form__legend">{t('pricing.limits')}</h4>
 

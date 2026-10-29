@@ -2,12 +2,15 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
+  customerReport,
   useCouponInsights,
   useCouponOrders,
   type CouponOrderRow,
   type CouponPeriod,
   type CouponProductRow,
 } from '@/features/pricing/api';
+import { CouponCustomersSection } from '@/portals/admin/components/CouponCustomersSection';
+import { CouponCustomerSplit } from '@/portals/admin/components/CouponCustomerSplit';
 import { CouponDailyChart } from '@/portals/admin/components/CouponDailyChart';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
 import { Alert } from '@/shared/ui/Alert';
@@ -76,6 +79,7 @@ function InsightsBody({ target, period }: { target: InsightsTarget; period: Coup
   const money = (value: string) => formatMoney(value, locale);
   const unused = summary.times_used === 0 && summary.cancelled_redemptions === 0;
   const excluded = summary.cancelled_orders + summary.refunded_orders + summary.failed_orders;
+  const split = customerReport(summary, insights.data);
 
   const productColumns: Column<CouponProductRow>[] = [
     {
@@ -233,6 +237,15 @@ function InsightsBody({ target, period }: { target: InsightsTarget; period: Coup
             </div>
 
             <ul className="coupon-insights__facts">
+              {split.present ? (
+                <li>
+                  <span>{t('pricing.report.cardNew')}</span>
+                  <strong>
+                    {formatNumber(split.newCustomers.count, locale)} ·{' '}
+                    {money(split.newCustomers.net_sales)}
+                  </strong>
+                </li>
+              ) : null}
               <li>
                 <span>{t('pricing.insights.aov')}</span>
                 <strong>{money(summary.average_order_value)}</strong>
@@ -270,6 +283,25 @@ function InsightsBody({ target, period }: { target: InsightsTarget; period: Coup
               ) : null}
             </ul>
 
+            {/* ⚠️  How this coupon's sales divide between account holders and guests — the
+                same two-segment bar as the report, scoped to one code. Only when the server
+                sent the breakdown: a bar of zeros would read as "no guests". */}
+            {split.present ? (
+              <CouponCustomerSplit
+                title={t('pricing.report.splitOrders')}
+                registered={{
+                  weight: split.registered.orders,
+                  headline: `${t('pricing.insights.orders')}: ${formatNumber(split.registered.orders, locale)}`,
+                  detail: `${t('pricing.insights.customers')}: ${formatNumber(split.registered.customers, locale)} · ${money(split.registered.net)}`,
+                }}
+                guest={{
+                  weight: split.guest.orders,
+                  headline: `${t('pricing.insights.orders')}: ${formatNumber(split.guest.orders, locale)}`,
+                  detail: `${t('pricing.insights.customers')}: ${formatNumber(split.guest.customers, locale)} · ${money(split.guest.net)}`,
+                }}
+              />
+            ) : null}
+
             {excluded > 0 ? (
               <Alert tone="info">
                 <strong>{t('pricing.insights.excluded')}:</strong>{' '}
@@ -299,6 +331,9 @@ function InsightsBody({ target, period }: { target: InsightsTarget; period: Coup
               emptyTitle={t('pricing.insights.noProducts')}
             />
           </section>
+
+          {/* ── Customers ───────────────────────────── */}
+          <CouponCustomersSection couponId={target.id} code={target.code} period={period} />
         </>
       )}
 

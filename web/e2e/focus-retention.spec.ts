@@ -108,12 +108,15 @@ test.describe('Drawer/Modal forms keep focus while typing', () => {
     await page.getByRole('menuitem', { name: /admin/i }).click();
     await page.waitForLoadState('networkidle');
     await settle(page);
-    await page.getByRole('link', { name: /^users$/i }).click();
+    // "Users" and "Staff" are one sidebar entry now ("Users & staff").
+    await page.getByRole('link', { name: /^users & staff$/i }).click();
     await page.waitForLoadState('networkidle');
     await settle(page);
 
-    const suspendBtn = page.getByRole('button', { name: /suspend|block|activate/i }).first();
-    await suspendBtn.click();
+    // The row's actions are a dropdown now — open the first row's menu, then pick the item.
+    await page.getByRole('button', { name: /الإجراءات|Actions/ }).first().click();
+    await settle(page);
+    await page.getByRole('menuitem', { name: /suspend|block|activate|إيقاف|تفعيل/i }).click();
     await settle(page);
 
     const reason = page.locator('#suspend-reason');

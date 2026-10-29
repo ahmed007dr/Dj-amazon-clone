@@ -23,6 +23,8 @@ import {
   type InsightsTarget,
 } from '@/portals/admin/components/CouponInsightsDrawer';
 import { CouponRedemptionsDrawer } from '@/portals/admin/components/CouponRedemptionsDrawer';
+import { CouponReport } from '@/portals/admin/components/CouponReport';
+import { scopeLabel, scopeTooltip } from '@/portals/admin/components/couponScope';
 import { CouponPeriodFilter, CouponStatsBar } from '@/portals/admin/components/CouponStatsBar';
 import {
   ALL_TIME,
@@ -32,9 +34,11 @@ import {
 import { PriceListForm } from '@/portals/admin/components/PriceListForm';
 import { PriceRuleForm } from '@/portals/admin/components/PriceRuleForm';
 import { useDebounced } from '@/shared/hooks/useDebounced';
+import { useTabParam } from '@/shared/hooks/useTabParam';
 import { isApiError } from '@/shared/http/errors';
 import { PageHeader } from '@/shared/layouts/PageHeader';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
+import { ActionMenu } from '@/shared/ui/ActionMenu';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Drawer } from '@/shared/ui/Drawer';
@@ -47,6 +51,9 @@ import { formatDate, formatMoney } from '@/shared/utils/format';
 import './AdminPricingPage.css';
 
 type Tab = 'lists' | 'overrides' | 'coupons';
+
+/** The coupons tab's two views: the table, and the customer/discount report (`?view=`). */
+const COUPON_VIEWS = ['list', 'report'] as const;
 
 /**
  * Pricing and offers.
@@ -69,6 +76,9 @@ export function AdminPricingPage() {
   const [selectedList, setSelectedList] = useState<string>('');
   const [search, setSearch] = useState('');
   const [couponStatus, setCouponStatus] = useState('');
+  const [couponScope, setCouponScope] = useState('');
+  const [couponGuests, setCouponGuests] = useState('');
+  const [couponView, setCouponView] = useTabParam(COUPON_VIEWS, 'list', 'view');
   const [page, setPage] = useState(1);
 
   const [editingList, setEditingList] = useState<PriceList | null>(null);
@@ -97,10 +107,12 @@ export function AdminPricingPage() {
     {
       ...(debouncedSearch ? { search: debouncedSearch } : {}),
       ...(couponStatus ? { status: couponStatus } : {}),
+      ...(couponScope ? { scope: couponScope } : {}),
+      ...(couponGuests ? { guests: couponGuests } : {}),
       ...periodQuery,
       page,
     },
-    tab === 'coupons',
+    tab === 'coupons' && couponView === 'list',
   );
 
   const removeList = useDeletePriceList();
@@ -184,30 +196,36 @@ export function AdminPricingPage() {
       key: 'actions',
       header: t('admin.actions'),
       align: 'end',
+      // ⚠️  One dropdown per row. The default list gets no "delete" item at all (hidden, not
+      //     merely disabled), exactly as it got no delete button before.
       render: (row) => (
-        <span className="pricing-actions">
-          <Button size="sm" variant="ghost" onClick={() => setSelectedList(row.id)}>
-            {t('pricing.openRules')}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setEditingList(row)}>
-            {t('common.edit')}
-          </Button>
-          {!row.is_default ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              loading={removeList.isPending}
-              onClick={() =>
+        <ActionMenu
+          menuLabel={`${t('admin.actions')} · ${row.name_ar}`}
+          items={[
+            {
+              key: 'rules',
+              label: t('pricing.openRules'),
+              onSelect: () => setSelectedList(row.id),
+            },
+            {
+              key: 'edit',
+              label: t('common.edit'),
+              onSelect: () => setEditingList(row),
+            },
+            {
+              key: 'delete',
+              label: t('common.delete'),
+              tone: 'danger',
+              hidden: row.is_default,
+              disabled: removeList.isPending,
+              onSelect: () =>
                 removeList.mutate(row.id, {
                   onSuccess: () => notify(t('pricing.deleted'), 'success'),
                   onError: fail,
-                })
-              }
-            >
-              {t('common.delete')}
-            </Button>
-          ) : null}
-        </span>
+                }),
+            },
+          ]}
+        />
       ),
     },
   ];
@@ -240,24 +258,27 @@ export function AdminPricingPage() {
       header: t('admin.actions'),
       align: 'end',
       render: (row) => (
-        <span className="pricing-actions">
-          <Button size="sm" variant="ghost" onClick={() => setEditingRule(row)}>
-            {t('common.edit')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            loading={removeRule.isPending}
-            onClick={() =>
-              removeRule.mutate(row.id, {
-                onSuccess: () => notify(t('pricing.deleted'), 'success'),
-                onError: fail,
-              })
-            }
-          >
-            {t('common.delete')}
-          </Button>
-        </span>
+        <ActionMenu
+          menuLabel={`${t('admin.actions')} · ${row.product_name}`}
+          items={[
+            {
+              key: 'edit',
+              label: t('common.edit'),
+              onSelect: () => setEditingRule(row),
+            },
+            {
+              key: 'delete',
+              label: t('common.delete'),
+              tone: 'danger',
+              disabled: removeRule.isPending,
+              onSelect: () =>
+                removeRule.mutate(row.id, {
+                  onSuccess: () => notify(t('pricing.deleted'), 'success'),
+                  onError: fail,
+                }),
+            },
+          ]}
+        />
       ),
     },
   ];
@@ -304,20 +325,25 @@ export function AdminPricingPage() {
       key: 'actions',
       header: t('admin.actions'),
       align: 'end',
+      // A single action, kept in a menu like every other row here: the same trigger in the
+      // same place on every tab, and "delete" is never one stray click from the status badge.
       render: (row) => (
-        <Button
-          size="sm"
-          variant="ghost"
-          loading={removeOverride.isPending}
-          onClick={() =>
-            removeOverride.mutate(row.id, {
-              onSuccess: () => notify(t('pricing.deleted'), 'success'),
-              onError: fail,
-            })
-          }
-        >
-          {t('common.delete')}
-        </Button>
+        <ActionMenu
+          menuLabel={`${t('admin.actions')} · ${row.product_name}`}
+          items={[
+            {
+              key: 'delete',
+              label: t('common.delete'),
+              tone: 'danger',
+              disabled: removeOverride.isPending,
+              onSelect: () =>
+                removeOverride.mutate(row.id, {
+                  onSuccess: () => notify(t('pricing.deleted'), 'success'),
+                  onError: fail,
+                }),
+            },
+          ]}
+        />
       ),
     },
   ];
@@ -329,7 +355,7 @@ export function AdminPricingPage() {
       render: (row) => (
         <span>
           {/* ⚠️  The code opens the insights: it is the cell the eye lands on, and a
-              row-wide click would fight the edit and delete buttons beside it. */}
+              row-wide click would fight the actions menu beside it. */}
           <button
             type="button"
             className="coupon-code-link"
@@ -350,12 +376,32 @@ export function AdminPricingPage() {
       key: 'value',
       header: t('pricing.discount'),
       align: 'end',
-      render: (row) =>
-        row.kind === 'FREE_SHIPPING'
-          ? t('couponKind.FREE_SHIPPING')
-          : row.kind === 'PERCENTAGE'
-            ? `${row.value}%`
-            : formatMoney(row.value, i18n.language),
+      // ⚠️  The scope rides in this cell rather than a column of its own: "10% — on 5 products"
+      //     is one fact, and the table is already seven columns wide at 1280px. The tooltip
+      //     lists the first products; the full list is one click away in the edit form.
+      render: (row) => (
+        <span>
+          {row.kind === 'FREE_SHIPPING'
+            ? t('couponKind.FREE_SHIPPING')
+            : row.kind === 'PERCENTAGE'
+              ? `${row.value}%`
+              : formatMoney(row.value, i18n.language)}
+          <span className="coupon-scope-cell" title={scopeTooltip(row, t, i18n.language)}>
+            <Badge
+              tone={
+                (row.scope_summary?.type ?? 'ALL') === 'ALL' &&
+                row.products.length + row.categories.length === 0
+                  ? 'neutral'
+                  : 'info'
+              }
+            >
+              {scopeLabel(row, t, i18n.language)}
+            </Badge>
+            {/* Text, not colour: the restriction must be readable without the badge tone */}
+            {row.allow_guests === false ? <small>{t('pricing.scope.registeredOnly')}</small> : null}
+          </span>
+        </span>
+      ),
     },
     {
       key: 'usage',
@@ -403,44 +449,44 @@ export function AdminPricingPage() {
       header: t('admin.actions'),
       align: 'end',
       render: (row) => (
-        <span className="pricing-actions">
-          <Button size="sm" variant="ghost" onClick={() => setEditingCoupon(row)}>
-            {t('common.edit')}
-          </Button>
-
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setInsightsOf({ id: row.id, code: row.code })}
-          >
-            {t('pricing.insights.open')}
-          </Button>
-
-          {/* ⚠️  "Usage" appears for used ones alone: a coupon with zero redemptions
-              opens an empty panel that says nothing. */}
-          {row.usage_count > 0 ? (
-            <Button size="sm" variant="ghost" onClick={() => setUsageOf(row)}>
-              {t('pricing.usage')}
-            </Button>
-          ) : null}
-          {/* ⚠️  A used one is not deleted — the server answers 409 with a message
-              counting the uses, and hiding the button is clearer than a refusal after the press. */}
-          {row.usage_count === 0 ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              loading={removeCoupon.isPending}
-              onClick={() =>
+        <ActionMenu
+          menuLabel={`${t('admin.actions')} · ${row.code}`}
+          items={[
+            {
+              key: 'edit',
+              label: t('common.edit'),
+              onSelect: () => setEditingCoupon(row),
+            },
+            {
+              key: 'insights',
+              label: t('pricing.insights.open'),
+              onSelect: () => setInsightsOf({ id: row.id, code: row.code }),
+            },
+            // ⚠️  "Usage" appears for used ones alone: a coupon with zero redemptions
+            //     opens an empty panel that says nothing.
+            {
+              key: 'usage',
+              label: t('pricing.usage'),
+              hidden: row.usage_count === 0,
+              onSelect: () => setUsageOf(row),
+            },
+            // ⚠️  A used one is not deleted — the server answers 409 with a message
+            //     counting the uses, and leaving the item out is clearer than a refusal
+            //     after the press.
+            {
+              key: 'delete',
+              label: t('common.delete'),
+              tone: 'danger',
+              hidden: row.usage_count > 0,
+              disabled: removeCoupon.isPending,
+              onSelect: () =>
                 removeCoupon.mutate(row.id, {
                   onSuccess: () => notify(t('pricing.deleted'), 'success'),
                   onError: fail,
-                })
-              }
-            >
-              {t('common.delete')}
-            </Button>
-          ) : null}
-        </span>
+                }),
+            },
+          ]}
+        />
       ),
     },
   ];
@@ -456,15 +502,17 @@ export function AdminPricingPage() {
           <>
             {tab === 'coupons' ? (
               <>
-                <Button
-                  variant="secondary"
-                  loading={exporting}
-                  onClick={() => {
-                    void exportCoupons();
-                  }}
-                >
-                  {t('pricing.insights.export')}
-                </Button>
+                {couponView === 'list' ? (
+                  <Button
+                    variant="secondary"
+                    loading={exporting}
+                    onClick={() => {
+                      void exportCoupons();
+                    }}
+                  >
+                    {t('pricing.insights.export')}
+                  </Button>
+                ) : null}
                 <Button variant="secondary" onClick={() => setBulkOpen(true)}>
                   {t('pricing.insights.bulkOpen')}
                 </Button>
@@ -566,6 +614,22 @@ export function AdminPricingPage() {
       {/* ── Coupons ───────────────────────────────── */}
       {tab === 'coupons' ? (
         <>
+          {/* ⚠️  Two views of the same coupons, kept in the URL (`?view=report`): the table is
+              for managing codes, the report is for reading what they brought in and from whom.
+              One period feeds both, so switching view never changes the dates under the reader. */}
+          <StatusTabs
+            label={t('pricing.report.views')}
+            options={[
+              { value: 'list', label: t('pricing.report.viewList') },
+              { value: 'report', label: t('pricing.report.viewReport') },
+            ]}
+            value={couponView}
+            onChange={(next) => {
+              setCouponView(next as (typeof COUPON_VIEWS)[number]);
+              setPage(1);
+            }}
+          />
+
           <CouponPeriodFilter
             value={period}
             onChange={(next) => {
@@ -573,52 +637,86 @@ export function AdminPricingPage() {
               setPage(1);
             }}
           />
-          <CouponStatsBar period={period} params={periodQuery} onOpen={setInsightsOf} />
 
-          <FilterBar
-            hasFilters={Boolean(search || couponStatus)}
-            onClear={() => {
-              setSearch('');
-              setCouponStatus('');
-              setPage(1);
-            }}
-          >
-            <FilterSearch
-              value={search}
-              onChange={(next) => {
-                setSearch(next);
-                setPage(1);
-              }}
-              placeholder={t('pricing.searchCoupons')}
-            />
-            <FilterSelect
-              value={couponStatus}
-              label={t('admin.status')}
-              options={[
-                { value: 'running', label: t('pricing.running') },
-                { value: 'scheduled', label: t('pricing.scheduled') },
-                { value: 'expired', label: t('pricing.expired') },
-              ]}
-              onChange={(next) => {
-                setCouponStatus(next);
-                setPage(1);
-              }}
-            />
-          </FilterBar>
+          {couponView === 'report' ? (
+            <CouponReport period={period} params={periodQuery} onOpen={setInsightsOf} />
+          ) : (
+            <>
+              <CouponStatsBar period={period} params={periodQuery} onOpen={setInsightsOf} />
 
-          <DataTable
-            columns={couponColumns}
-            rows={coupons.data?.results ?? []}
-            rowKey={(row) => row.id}
-            isLoading={coupons.isPending}
-            error={coupons.error}
-            emptyTitle={t('pricing.noCoupons')}
-            emptyBody={t('pricing.noCouponsBody')}
-          />
+              <FilterBar
+                hasFilters={Boolean(search || couponStatus || couponScope || couponGuests)}
+                onClear={() => {
+                  setSearch('');
+                  setCouponStatus('');
+                  setCouponScope('');
+                  setCouponGuests('');
+                  setPage(1);
+                }}
+              >
+                <FilterSearch
+                  value={search}
+                  onChange={(next) => {
+                    setSearch(next);
+                    setPage(1);
+                  }}
+                  placeholder={t('pricing.searchCoupons')}
+                />
+                <FilterSelect
+                  value={couponStatus}
+                  label={t('admin.status')}
+                  options={[
+                    { value: 'running', label: t('pricing.running') },
+                    { value: 'scheduled', label: t('pricing.scheduled') },
+                    { value: 'expired', label: t('pricing.expired') },
+                  ]}
+                  onChange={(next) => {
+                    setCouponStatus(next);
+                    setPage(1);
+                  }}
+                />
+                <FilterSelect
+                  value={couponScope}
+                  label={t('pricing.scope.filterLabel')}
+                  options={[
+                    { value: 'all', label: t('pricing.scope.all') },
+                    { value: 'products', label: t('pricing.scope.filterSpecific') },
+                    { value: 'categories', label: t('pricing.scope.filterCategories') },
+                  ]}
+                  onChange={(next) => {
+                    setCouponScope(next);
+                    setPage(1);
+                  }}
+                />
+                <FilterSelect
+                  value={couponGuests}
+                  label={t('pricing.scope.filterGuests')}
+                  options={[
+                    { value: 'allowed', label: t('pricing.scope.guestsAllowed') },
+                    { value: 'blocked', label: t('pricing.scope.registeredOnly') },
+                  ]}
+                  onChange={(next) => {
+                    setCouponGuests(next);
+                    setPage(1);
+                  }}
+                />
+              </FilterBar>
 
-          {coupons.data ? (
-            <Pagination page={coupons.data.page} pages={coupons.data.pages} onChange={setPage} />
-          ) : null}
+              <DataTable
+                columns={couponColumns}
+                rows={coupons.data?.results ?? []}
+                rowKey={(row) => row.id}
+                isLoading={coupons.isPending}
+                error={coupons.error}
+                emptyTitle={t('pricing.noCoupons')}
+                emptyBody={t('pricing.noCouponsBody')}
+              />
+
+              {coupons.data ? (
+                <Pagination page={coupons.data.page} pages={coupons.data.pages} onChange={setPage} />
+              ) : null}
+            </>
+          )}
         </>
       ) : null}
 

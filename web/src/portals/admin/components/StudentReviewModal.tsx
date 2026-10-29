@@ -212,7 +212,9 @@ export function StudentReviewModal({
           {facts.map((fact) => (
             <div key={fact.label} className="student-review__fact">
               <dt>{fact.label}</dt>
-              <dd {...(fact.ltr ? { dir: 'ltr' } : {})}>{fact.value}</dd>
+              {/* ⚠️  `bdi`, not `dir` on the cell: an LTR cell in an RTL grid also flips its
+                  alignment, so emails and numbers sat at the opposite edge from the names. */}
+              <dd>{fact.ltr ? <bdi dir="ltr">{fact.value}</bdi> : fact.value}</dd>
             </div>
           ))}
         </dl>

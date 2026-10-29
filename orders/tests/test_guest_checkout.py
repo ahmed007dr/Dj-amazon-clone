@@ -354,14 +354,17 @@ def test_checkout_per_seeded_access_policy(
 
 
 # ═══════════════════════════════════════════════════════════
-#  Coupons and loyalty are for accounts
+#  Coupons for guests (loyalty is not)
+#
+#  ⚠️  A guest may use a coupon the owner has not closed to guests; the per-buyer limits
+#      and the abuse cases are in `promotions/tests/test_guest_coupons.py`.
 # ═══════════════════════════════════════════════════════════
 
 
 @pytest.mark.django_db
-class TestNoCouponsForGuests:
-    def test_a_stale_coupon_on_a_guest_cart_gives_no_discount_and_is_not_stamped(self, world):
-        from promotions.models import Coupon, CouponKind
+class TestCouponsForGuests:
+    def test_a_coupon_on_the_guest_cart_discounts_the_order_and_is_recorded(self, world):
+        from promotions.models import Coupon, CouponKind, CouponRedemption
 
         Coupon.objects.create(
             code="SAVE20",
@@ -372,20 +375,50 @@ class TestNoCouponsForGuests:
         )
         client = guest_client()
         add_to_cart(client, world)
-        # Planted as if from before the rule existed — the apply endpoint refuses it now
-        Cart.objects.filter(session_key=SESSION).update(coupon_code="SAVE20")
+        applied = client.post(reverse("v1:cart:coupon"), {"code": "SAVE20"}, format="json")
+        assert applied.data["coupon"]["is_valid"] is True
 
         response = checkout(client)
 
         assert response.status_code == 201, response.data
         order = Order.objects.get()
-        assert order.coupon_discount == 0
-        assert order.coupon_code == ""
-        assert response.data["totals"]["grand_total"] == "144.00"
-        from promotions.models import CouponRedemption
+        assert order.coupon_discount == Decimal("20.00")
+        assert order.coupon_code == "SAVE20"
+        assert response.data["totals"]["grand_total"] == "124.00"
 
+        redemption = CouponRedemption.objects.get()
+        assert redemption.user_id is None
+        assert redemption.is_guest is True
+        assert redemption.guest_email == "ahmed.buyer@example.com"
+        assert redemption.guest_phone == "201001234567"
+        assert redemption.order_ref == order.pk
+        assert Coupon.objects.get(code="SAVE20").usage_count == 1
+
+    def test_a_code_that_never_applied_is_not_stamped_on_the_order(self, world):
+        """A cart carrying a code the engine refuses gives no discount — and no stamp."""
+        from promotions.models import Coupon, CouponKind, CouponRedemption
+
+        Coupon.objects.create(
+            code="MEMBERS",
+            name_ar="خصم",
+            name_en="Discount",
+            kind=CouponKind.PERCENTAGE,
+            value=Decimal("20.00"),
+            allow_guests=False,
+        )
+        client = guest_client()
+        add_to_cart(client, world)
+        # Planted directly: the apply endpoint would refuse it
+        Cart.objects.filter(session_key=SESSION).update(coupon_code="MEMBERS")
+
+        response = checkout(client)
+
+        # The guest saw no discount and is told why instead of being repriced silently
+        assert response.status_code == 400
+        assert response.data["code"] == "COUPON_REGISTERED_ONLY"
+        assert not Order.objects.exists()
         assert not CouponRedemption.objects.exists()
-        assert Coupon.objects.get(code="SAVE20").usage_count == 0
+        assert Cart.objects.get(session_key=SESSION).coupon_code == "MEMBERS"  # cart intact
 
 
 # ═══════════════════════════════════════════════════════════

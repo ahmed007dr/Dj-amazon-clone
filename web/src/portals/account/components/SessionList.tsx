@@ -57,11 +57,17 @@ export function SessionList() {
     mutationFn: revokeSession,
     onSuccess: () => {
       notify(t('account.sessionRevoked'), 'success');
-      // ⚠️  Ending the only row on the last page leaves that page empty, and the refetch
-      //     below would ask for a page that no longer exists. Step back first. (A full
-      //     page is never the last one, so `length === 1` on page > 1 is exactly that case.)
-      if (page > 1 && sessions.length === 1) setPage(page - 1);
-      void queryClient.invalidateQueries({ queryKey: ['auth', 'sessions'] });
+      // ⚠️  Ending the only row on the last page leaves that page empty, so the page that
+      //     is on screen no longer exists — refetching it would be a guaranteed `404`.
+      //     Step back and only mark the pages stale: the previous page, now the active
+      //     one, refetches itself because it is invalidated. (A full page is never the
+      //     last one, so `length === 1` on page > 1 is exactly that case.)
+      const stepBack = page > 1 && sessions.length === 1;
+      if (stepBack) setPage(page - 1);
+      void queryClient.invalidateQueries({
+        queryKey: ['auth', 'sessions'],
+        refetchType: stepBack ? 'none' : 'active',
+      });
     },
     onError: (error) =>
       notify(isApiError(error) ? error.displayMessage : t('state.errorTitle'), 'danger'),

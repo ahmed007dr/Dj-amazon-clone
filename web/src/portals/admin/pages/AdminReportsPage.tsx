@@ -6,6 +6,7 @@ import {
   useInventoryReport,
   useOverview,
   usePerformanceReport,
+  useSalesDiscountsReport,
   useSalesReport,
 } from '@/features/reporting/api';
 import { isApiError } from '@/shared/http/errors';
@@ -23,9 +24,9 @@ import { TrendBars } from '../components/TrendBars';
 
 import './AdminReportsPage.css';
 
-type Tab = 'overview' | 'sales' | 'inventory' | 'customers' | 'performance';
+type Tab = 'overview' | 'sales' | 'discounts' | 'inventory' | 'customers' | 'performance';
 
-const TABS: Tab[] = ['overview', 'sales', 'inventory', 'customers', 'performance'];
+const TABS: Tab[] = ['overview', 'sales', 'discounts', 'inventory', 'customers', 'performance'];
 
 /**
  * Reports.
@@ -51,6 +52,8 @@ export function AdminReportsPage() {
   const overview = useOverview(period);
   // ⚠️  `enabled` through a stable key: the query does not fire before its tab opens.
   const sales = useSalesReport(tab === 'sales' ? period : { start: '', end: '' });
+  // ⚠️  A real `enabled` gate: unlike the sales query above, nothing is sent until the tab opens.
+  const discounts = useSalesDiscountsReport(period, tab === 'discounts');
   const inventory = useInventoryReport(90);
   const customers = useCustomersReport(period);
   const performance = usePerformanceReport(period);
@@ -175,6 +178,135 @@ export function AdminReportsPage() {
               />
             </div>
           </>
+        ) : null
+      ) : null}
+
+      {tab === 'discounts' ? (
+        discounts.isPending ? (
+          <Spinner />
+        ) : discounts.data ? (
+          discounts.data.orders_count === 0 ? (
+            <StateMessage
+              icon="—"
+              title={t('reports.discounts.emptyTitle')}
+              body={t('reports.discounts.emptyBody')}
+            />
+          ) : (
+            <>
+              {/* ⚠️  A gap the waterfall cannot explain is said before the figures, like
+                  the profit warning: reading the numbers first means they are already trusted. */}
+              {Number(discounts.data.unreconciled) !== 0 ? (
+                <Alert tone="warning">
+                  {t('reports.discounts.unreconciled', { amount: discounts.data.unreconciled })}
+                </Alert>
+              ) : null}
+
+              <div className="reports-grid">
+                <StatCard
+                  label={t('reports.discounts.gross')}
+                  value={discounts.data.gross_before_discount}
+                  hint={t('reports.discounts.grossHint')}
+                />
+                <StatCard
+                  label={t('reports.discounts.total')}
+                  value={discounts.data.discount_total}
+                />
+                <StatCard
+                  label={t('reports.discounts.net')}
+                  value={discounts.data.net_after_discount}
+                />
+                <StatCard
+                  label={t('reports.discounts.percent')}
+                  value={`${discounts.data.discount_percent}%`}
+                  hint={t('reports.discounts.percentHint', {
+                    discounted: discounts.data.discounted_orders,
+                    total: discounts.data.orders_count,
+                  })}
+                />
+                <StatCard
+                  label={t('reports.discounts.couponOrders')}
+                  value={String(discounts.data.coupon_orders)}
+                  hint={t('reports.discounts.couponsUsedHint', {
+                    count: discounts.data.coupons_used,
+                  })}
+                />
+              </div>
+
+              {/* ⚠️  How this meets the other tabs: the invoiced total carries tax and
+                  shipping, so it is larger than the "gross" card above on purpose. */}
+              <p className="reports-note">
+                {t('reports.discounts.reconcile', {
+                  net: discounts.data.net_after_discount,
+                  tax: discounts.data.tax_total,
+                  shipping: discounts.data.shipping_total,
+                  invoiced: discounts.data.invoiced_total,
+                })}
+              </p>
+
+              <div className="reports-columns">
+                <section>
+                  <h2 className="reports-heading">{t('reports.discounts.netByDay')}</h2>
+                  <TrendBars
+                    rows={discounts.data.by_day.map((row) => ({
+                      label: row.day.slice(5),
+                      value: Number(row.net),
+                    }))}
+                  />
+                </section>
+                <section>
+                  <h2 className="reports-heading">{t('reports.discounts.discountByDay')}</h2>
+                  <TrendBars
+                    rows={discounts.data.by_day.map((row) => ({
+                      label: row.day.slice(5),
+                      value: Number(row.discount),
+                    }))}
+                  />
+                </section>
+              </div>
+
+              <div className="reports-columns reports-columns--spaced">
+                <RankedList
+                  title={t('reports.discounts.byCoupon')}
+                  rows={discounts.data.by_coupon.map((row) => {
+                    const name = localized(row, 'name');
+                    return {
+                      key: row.coupon,
+                      label: row.code,
+                      meta: [
+                        name !== row.code ? name : '',
+                        row.holder_name,
+                        `${row.orders} ${t('reports.orders')}`,
+                        `${t('reports.discounts.net')} ${row.net}`,
+                      ]
+                        .filter(Boolean)
+                        .join(' · '),
+                      value: row.discount,
+                    };
+                  })}
+                />
+                <div>
+                  <RankedList
+                    title={t('reports.discounts.bySource')}
+                    rows={discounts.data.by_source.map((row) => ({
+                      key: row.source,
+                      label: t(`reports.discounts.source.${row.source}`),
+                      meta: `${row.share}%`,
+                      value: row.amount,
+                    }))}
+                  />
+                  {/* ⚠️  Outside the split on purpose: the waived fee is not part of the
+                      products' value, so adding it to the discount would break the waterfall. */}
+                  {Number(discounts.data.shipping_waived) > 0 ? (
+                    <p className="reports-note">
+                      {t('reports.discounts.shippingWaived', {
+                        amount: discounts.data.shipping_waived,
+                      })}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </>
+          )
         ) : null
       ) : null}
 

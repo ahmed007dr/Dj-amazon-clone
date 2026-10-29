@@ -11,8 +11,8 @@ import { SuspendAccountModal } from '@/features/administration/components/Suspen
 import { useDebounced } from '@/shared/hooks/useDebounced';
 import { AccountHistoryDrawer } from '@/portals/admin/components/AccountHistoryDrawer';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
+import { ActionMenu } from '@/shared/ui/ActionMenu';
 import { Badge } from '@/shared/ui/Badge';
-import { Button } from '@/shared/ui/Button';
 import { FilterBar, FilterSearch, FilterSelect } from '@/shared/ui/FilterBar';
 import { Pagination } from '@/shared/ui/Pagination';
 import { StatCard } from '@/shared/ui/StatCard';
@@ -130,26 +130,33 @@ export function AccountsPanel() {
       key: 'actions',
       header: t('admin.actions'),
       align: 'end',
-      render: (account) => (
-        <div className="admin-accounts__actions">
-          {/* ⚠️  "History" before "suspend": whoever is about to suspend an account
-              needs to see what its owner did first — and the order leads to
-              reading before deciding. */}
-          <Button variant="ghost" size="sm" onClick={() => setHistoryOf(account)}>
-            {t('admin.history.title')}
-          </Button>
+      render: (account) => {
+        const isActive = account.status === 'ACTIVE';
 
-          <Button
-            variant={account.status === 'ACTIVE' ? 'secondary' : 'primary'}
-            size="sm"
-            onClick={() => {
-              setTarget(account);
-            }}
-          >
-            {account.status === 'ACTIVE' ? t('admin.suspend') : t('admin.activate')}
-          </Button>
-        </div>
-      ),
+        return (
+          <ActionMenu
+            menuLabel={`${t('admin.actions')} · ${account.full_name || account.email}`}
+            items={[
+              // ⚠️  "History" before "suspend": whoever is about to suspend an account
+              //     needs to see what its owner did first — and the order leads to
+              //     reading before deciding.
+              {
+                key: 'history',
+                label: t('admin.history.title'),
+                onSelect: () => setHistoryOf(account),
+              },
+              // One item whose label follows the account's state. Either way it only
+              // opens SuspendAccountModal — the confirmation and the reason live there.
+              {
+                key: 'status',
+                label: isActive ? t('admin.suspend') : t('admin.activate'),
+                tone: isActive ? 'danger' : 'default',
+                onSelect: () => setTarget(account),
+              },
+            ]}
+          />
+        );
+      },
     },
   ];
 

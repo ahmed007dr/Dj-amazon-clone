@@ -25,8 +25,8 @@ from rest_framework.views import APIView
 from core.api.pagination import AdminPageNumberPagination
 from core.errors import BusinessError, ErrorCode
 from core.models.audit import AuditAction, AuditLog
+from loyalty import report, services
 from loyalty import serializers as s
-from loyalty import services
 from loyalty.models import (
     LoyaltyProgram,
     PointsEntry,
@@ -515,6 +515,100 @@ class AdminReferralListAPI(generics.ListAPIView):
         if value := self.request.query_params.get("status"):
             queryset = queryset.filter(status=value)
         return queryset
+
+
+def _public_member(value):
+    """Money to strings (ADR-31); everything else untouched — recursively."""
+    from decimal import Decimal
+
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _public_member(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_public_member(item) for item in value]
+    return value
+
+
+class ReferralMembersAPI(APIView):
+    """
+    `GET` — the members through whom new customers were invited, ranked.
+
+        ?date_from=2026-10-01&date_to=2026-10-31   the referrals created in the period
+        ?search=         member name · e-mail · referral code
+        ?ordering=-qualified   default; any key in `report.ORDERING_KEYS`; `-` = descending
+
+    ⚠️  `totals` covers **every** member in the period whatever the search says, so the
+        cards above a filtered table do not change while someone types.
+        The figures are defined in `loyalty.report`.
+    """
+
+    permission_classes = [CanManageLoyalty]
+
+    def get(self, request):
+        from promotions.analytics import parse_period
+
+        params = request.query_params
+        date_from, date_to = parse_period(params)
+
+        stats = report.member_stats(date_from, date_to)
+        ranked = report.ranking(
+            stats,
+            ordering=params.get("ordering") or "-qualified",
+            only=report.matching_referrers(params.get("search")),
+        )
+
+        paginator = AdminPageNumberPagination()
+        page = paginator.paginate_queryset(ranked, request, view=self)
+        people = report.referrers(pk for pk, _entry in page)
+        offset = (paginator.page.number - 1) * paginator.get_page_size(request)
+        rows = [
+            report.member_row(pk, entry, people, offset + index + 1)
+            for index, (pk, entry) in enumerate(page)
+        ]
+
+        response = paginator.get_paginated_response(_public_member(rows))
+        response.data["totals"] = _public_member(report.totals(stats))
+        response.data["period"] = {"date_from": date_from, "date_to": date_to}
+        return response
+
+
+class ReferralMemberDetailAPI(APIView):
+    """
+    `GET` — one member: their summary and the customers they invited, paginated.
+
+        ?date_from= &date_to=   the same cohort window as the ranking
+    """
+
+    permission_classes = [CanManageLoyalty]
+
+    def get(self, request, referrer_id):
+        from promotions.analytics import parse_period
+
+        date_from, date_to = parse_period(request.query_params)
+
+        people = report.referrers([referrer_id])
+        if referrer_id not in people:
+            raise BusinessError(ErrorCode.NOT_FOUND, detail="العضو غير موجود", status_code=404)
+
+        stats = report.member_stats(date_from, date_to)
+        entry = stats.get(referrer_id) or report.blank()
+        row = report.member_row(referrer_id, entry, people, 0)
+
+        paginator = AdminPageNumberPagination()
+        page = paginator.paginate_queryset(
+            report.invitees_queryset(referrer_id, date_from, date_to), request, view=self
+        )
+        response = paginator.get_paginated_response(
+            _public_member([report.invitee_row(referral) for referral in page])
+        )
+        response.data["referrer"] = _public_member(row["referrer"])
+        response.data["code"] = row["code"]
+        response.data["summary"] = _public_member(
+            {key: value for key, value in row.items() if key not in ("rank", "referrer", "code")}
+        )
+        response.data["period"] = {"date_from": date_from, "date_to": date_to}
+        return response
 
 
 class LoyaltyOverviewAPI(APIView):

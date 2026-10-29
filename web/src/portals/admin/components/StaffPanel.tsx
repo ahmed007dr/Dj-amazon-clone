@@ -21,6 +21,7 @@ import { AssignmentsPanel } from '@/portals/admin/components/AssignmentsPanel';
 import { CreateStaffForm } from '@/portals/admin/components/CreateStaffForm';
 import { Drawer } from '@/shared/ui/Drawer';
 import { DataTable, type Column } from '@/shared/tables/DataTable';
+import { ActionMenu } from '@/shared/ui/ActionMenu';
 import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -145,16 +146,19 @@ export function StaffPanel() {
       header: t('admin.actions'),
       align: 'end',
       render: (row) => (
-        <span className="staff-cell__actions">
-          {/* ⚠️  Only while the invite is unused: the server refuses it afterwards
-              (an active person uses "forgot password"), so offering it would be a
-              button that always fails. */}
-          {row.is_active && row.invite_pending ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              loading={resendInvite.isPending && resendInvite.variables === row.id}
-              onClick={() =>
+        <ActionMenu
+          menuLabel={`${t('admin.actions')} · ${row.full_name}`}
+          items={[
+            // ⚠️  Only while the invite is unused: the server refuses it afterwards
+            //     (an active person uses "forgot password"), so offering it would be an
+            //     item that always fails. It is disabled, not hidden, while this row's
+            //     resend is in flight — a second press would send a second email.
+            {
+              key: 'resend-invite',
+              label: t('staff.resendInvite'),
+              hidden: !(row.is_active && row.invite_pending),
+              disabled: resendInvite.isPending && resendInvite.variables === row.id,
+              onSelect: () =>
                 resendInvite.mutate(row.id, {
                   onSuccess: () => notify(t('staff.inviteResent', { email: row.email }), 'success'),
                   onError: (error) =>
@@ -162,16 +166,15 @@ export function StaffPanel() {
                       isApiError(error) ? error.displayMessage : t('state.errorTitle'),
                       'danger',
                     ),
-                })
-              }
-            >
-              {t('staff.resendInvite')}
-            </Button>
-          ) : null}
-          <Button size="sm" variant="ghost" onClick={() => setEditing(row)}>
-            {t('common.edit')}
-          </Button>
-        </span>
+                }),
+            },
+            {
+              key: 'edit',
+              label: t('common.edit'),
+              onSelect: () => setEditing(row),
+            },
+          ]}
+        />
       ),
     },
   ];

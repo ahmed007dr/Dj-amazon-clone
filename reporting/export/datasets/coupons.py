@@ -20,7 +20,8 @@ from django.db.models import Q
 from django.utils import timezone
 
 from core.permissions import CanManagePricing
-from promotions import analytics
+from promotions import analytics, analytics_report
+from promotions.analytics_customers import Breakdown
 from promotions.models import Coupon, CouponKind
 from reporting.export.datasets import _common
 from reporting.export.registry import Column, Dataset, Filter, Group, register
@@ -66,11 +67,16 @@ def _status(coupon: Coupon, now) -> str:
 def _rows(filters: dict, include_contact: bool):
     start, end = _common.period(filters)
     coupons = list(_coupon_qs(filters))
-    stats = analytics.summaries([coupon.pk for coupon in coupons], start, end)
+    ids = [coupon.pk for coupon in coupons]
+    stats = analytics.summaries(ids, start, end)
+    # ⚠️  The same grouped query the screen uses, so "guest orders" and "new customers"
+    #     here are the numbers on the screen.
+    buyers = Breakdown.load(ids, start, end)
     now = timezone.now()
 
     for coupon in coupons:
         row = stats[coupon.pk]
+        block = buyers.block([coupon.pk])
         yield (
             coupon.code,
             coupon.name_ar,
@@ -93,6 +99,10 @@ def _rows(filters: dict, include_contact: bool):
             row["last_used_at"],
             coupon.starts_at,
             coupon.ends_at,
+            block["by_customer_type"]["registered"]["orders"],
+            block["by_customer_type"]["guest"]["orders"],
+            block["new_customers"]["count"],
+            block["discount_share_of_gross"],
         )
 
 
@@ -135,8 +145,123 @@ register(
             Column("آخر استخدام", Kind.DATETIME),
             Column("يبدأ", Kind.DATETIME),
             Column("ينتهي", Kind.DATETIME),
+            # Appended, so a saved pivot on the earlier columns keeps working
+            Column("طلبات المسجّلين", Kind.INT),
+            Column("طلبات الزوار", Kind.INT),
+            Column("عملاء جدد", Kind.INT),
+            Column("نسبة الخصم من المبيعات (%)", Kind.MONEY),
         ],
         rows=_rows,
         count=_count,
+    )
+)
+
+
+# ═══════════════════════════════════════════════════════════
+#  Who used the codes — one row per coupon and buyer
+# ═══════════════════════════════════════════════════════════
+
+_TYPE_LABELS = {"REGISTERED": "مسجّل", "GUEST": "زائر"}
+
+
+def _buyer_columns(include_contact: bool) -> list[Column]:
+    columns = [
+        Column("الكود", width=18),
+        Column("الحامل", width=24),
+        Column("نوع العميل", width=12),
+        Column("اشترى كـ", width=12),
+        Column("الطلبات", Kind.INT),
+        Column("المبيعات قبل الكوبون", Kind.MONEY),
+        Column("الخصم الممنوح", Kind.MONEY),
+        Column("صافي المبيعات", Kind.MONEY),
+        Column("عميل جديد", Kind.BOOL),
+        Column("أول استخدام", Kind.DATETIME),
+        Column("آخر استخدام", Kind.DATETIME),
+    ]
+    if include_contact:
+        # ⚠️  Appended at the end: the file with contact details and the one without are
+        #     otherwise column-for-column identical.
+        #     Without them the sheet is analysis (who is registered, who is new, how much);
+        #     with them it is a list of named people — a separate, audited act.
+        columns += [
+            Column("الاسم", width=26, sensitive=True),
+            Column("البريد", width=30, sensitive=True),
+            Column("الهاتف", width=18, sensitive=True),
+        ]
+    return columns
+
+
+def _buyer_rows(filters: dict, include_contact: bool):
+    start, end = _common.period(filters)
+    coupons = {coupon.pk: coupon for coupon in _coupon_qs(filters)}
+    if not coupons:
+        return
+
+    queryset = analytics_report.customers_queryset(
+        list(coupons), start, end, ordering="-net_sales"
+    ).order_by("coupon_ref", "-net", "customer_id", "guest_key")
+
+    for page in _chunks(queryset.iterator(chunk_size=_common.CHUNK), _common.CHUNK):
+        shaped = analytics_report.customer_rows(page)
+        for raw, row in zip(page, shaped, strict=True):
+            coupon = coupons[raw["coupon_ref"]]
+            values = [
+                coupon.code,
+                coupon.holder_name,
+                _TYPE_LABELS[row["customer_type"]],
+                _TYPE_LABELS[row["purchased_as"]],
+                row["orders"],
+                row["gross_sales"],
+                row["discount"],
+                row["net_sales"],
+                row["is_new_customer"],
+                row["first_used_at"],
+                row["last_used_at"],
+            ]
+            if include_contact:
+                values += [row["name"], row["email"], row["phone"]]
+            yield tuple(values)
+
+
+def _chunks(iterator, size: int):
+    batch = []
+    for item in iterator:
+        batch.append(item)
+        if len(batch) >= size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
+
+
+def _buyer_count(filters: dict) -> int:
+    start, end = _common.period(filters)
+    ids = list(_coupon_qs(filters).values_list("pk", flat=True))
+    if not ids:
+        return 0
+    return analytics_report.customers_queryset(ids, start, end).count()
+
+
+register(
+    Dataset(
+        key="coupon_customers",
+        label="عملاء الكوبونات",
+        group=Group.SALES,
+        permission=CanManagePricing,
+        has_contact=True,
+        note=(
+            "صف لكل كوبون وعميل: مسجّل أم زائر، عدد الطلبات والخصم والمبيعات، وهل هو عميل جديد. "
+            "الاسم والبريد والهاتف خيار منفصل مسجَّل. "
+            "تُحتسب الطلبات المؤهلة فقط (بلا الملغاة والمستردة وفاشلة الدفع)"
+        ),
+        filters=[
+            Filter(key="start", label="من تاريخ", kind="date"),
+            Filter(key="end", label="إلى تاريخ", kind="date"),
+            Filter(key="search", label="بحث (كود · اسم · حامل)", kind="text"),
+            Filter(key="has_holder", label="له حامل فقط", kind="bool"),
+        ],
+        columns=_buyer_columns,
+        rows=_buyer_rows,
+        count=_buyer_count,
     )
 )

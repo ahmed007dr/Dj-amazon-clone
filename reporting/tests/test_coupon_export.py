@@ -208,3 +208,221 @@ def test_a_bad_date_is_a_clear_400(admin_client):
     make_coupon("DATES")
     assert download(admin_client, start="2026-13-45").status_code == 400
     assert download(admin_client, start="2026-10-10", end="2026-10-01").status_code == 400
+
+
+# ═══════════════════════════════════════════════════════════
+#  Registered vs guest, new customers — the extra columns and the buyers sheet
+# ═══════════════════════════════════════════════════════════
+
+
+def table_of(response):
+    """The first sheet as `(headers, [row dicts])`, found by the "الكود" header."""
+    table = rows_of(response)
+    at = next(i for i, row in enumerate(table) if row and row[0] == "الكود")
+    headers = table[at]
+    return headers, [dict(zip(headers, row, strict=False)) for row in table[at + 1 :] if row]
+
+
+@pytest.fixture
+def report_shop(product):
+    from promotions.tests.test_coupon_report import guest_order, plain_order
+
+    coupon = make_coupon("MIXED", holder_name="Dr. Mixed")
+    new_user = make_user("export-new@test.local", name="جديد")
+    old_user = make_user("export-old@test.local", name="قديم")
+    plain_order(old_user, [(product, 1, "100", "0")], days_ago=9)
+
+    make_order(coupon, new_user, [(product, 2, "100", "0")], coupon_discount="20.00")
+    make_order(coupon, old_user, [(product, 1, "100", "0")], coupon_discount="10.00")
+    guest_order(
+        coupon, "export-guest@test.local", [(product, 1, "100", "0")], coupon_discount="10.00"
+    )
+    return coupon
+
+
+def test_the_coupons_sheet_gains_the_buyer_columns_at_the_end(admin_client, report_shop):
+    headers, body = table_of(download(admin_client))
+    row = {r["الكود"]: r for r in body if r.get("الكود")}["MIXED"]
+
+    assert headers[-4:] == [
+        "طلبات المسجّلين",
+        "طلبات الزوار",
+        "عملاء جدد",
+        "نسبة الخصم من المبيعات (%)",
+    ]
+    assert headers[0] == "الكود" and "الخصم الممنوح" in headers  # the old columns are untouched
+    assert row["طلبات المسجّلين"] == 2
+    assert row["طلبات الزوار"] == 1
+    assert row["عملاء جدد"] == 2  # the new account and the first-time guest
+    assert Decimal(str(row["نسبة الخصم من المبيعات (%)"])) == Decimal("10.00")  # 40 over 400
+
+
+def test_the_sheet_agrees_with_the_screen_on_the_buyer_split(admin_client, report_shop):
+    from promotions.analytics_customers import Breakdown
+
+    block = Breakdown.load([report_shop.pk]).block([report_shop.pk])
+    _headers, body = table_of(download(admin_client))
+    row = {r["الكود"]: r for r in body if r.get("الكود")}["MIXED"]
+
+    assert row["طلبات الزوار"] == block["by_customer_type"]["guest"]["orders"]
+    assert row["عملاء جدد"] == block["new_customers"]["count"]
+
+
+def test_the_buyers_dataset_is_registered_with_a_contact_gate():
+    from core.permissions import CanManagePricing
+
+    dataset = registry.get("coupon_customers")
+
+    assert dataset is not None
+    assert dataset.permission is CanManagePricing
+    assert dataset.has_contact
+    plain = [c.header for c in dataset.columns(False)]
+    full = [c.header for c in dataset.columns(True)]
+    assert full[: len(plain)] == plain
+    assert {"الاسم", "البريد", "الهاتف"}.isdisjoint(plain)
+    assert {"الاسم", "البريد", "الهاتف"} <= set(full)
+
+
+def download_buyers(client, **params):
+    return client.get(reverse("v1:reporting:export-download", args=["coupon_customers"]), params)
+
+
+def test_the_buyers_sheet_has_one_row_per_coupon_and_buyer_without_contact(
+    admin_client, report_shop
+):
+    response = download_buyers(admin_client)
+    assert response.status_code == 200
+
+    headers, body = table_of(response)
+    rows = [r for r in body if r.get("الكود") == "MIXED"]
+
+    assert len(rows) == 3
+    assert "البريد" not in headers and "الاسم" not in headers
+    kinds = sorted((r["نوع العميل"], r["عميل جديد"]) for r in rows)
+    assert kinds == [("زائر", "نعم"), ("مسجّل", "لا"), ("مسجّل", "نعم")]
+    assert sum(Decimal(str(r["الخصم الممنوح"])) for r in rows) == Decimal("40.00")
+    assert b"export-guest@test.local" not in response.content
+
+
+def test_the_buyers_sheet_with_contact_carries_names_and_emails(admin_client, report_shop):
+    response = download_buyers(admin_client, include_contact="true")
+    assert response.status_code == 200
+
+    headers, body = table_of(response)
+    emails = {r["البريد"] for r in body if r.get("الكود") == "MIXED"}
+
+    assert {"الاسم", "البريد", "الهاتف"} <= set(headers)
+    assert "export-guest@test.local" in emails
+    assert "export-new@test.local" in emails
+
+
+def test_contact_columns_need_the_accounts_permission(report_shop):
+    """Pricing alone may read the buyers sheet, but not with names and e-mails."""
+    from django.contrib.auth.models import Permission
+
+    user = make_user("pricing-only@test.local")
+    user.account_type = AccountType.ADMIN
+    user.save()
+    apps.get_model("administration", "AdminProfile").objects.create(user=user)
+    user.user_permissions.add(Permission.objects.get(codename="change_pricelist"))
+    client = APIClient()
+    client.force_authenticate(user=User.objects.get(pk=user.pk))
+
+    assert download_buyers(client).status_code == 200
+    assert download_buyers(client, include_contact="true").status_code == 403
+
+
+def test_the_buyers_sheet_filters_by_coupon_search_and_period(admin_client, report_shop, product):
+    other = make_coupon("OTHER")
+    make_order(other, make_user("o@test.local"), [(product, 1, "100", "0")], coupon_discount="5")
+
+    _h, body = table_of(download_buyers(admin_client, search="MIXED"))
+    assert {r["الكود"] for r in body if r.get("الكود")} == {"MIXED"}
+
+    assert download_buyers(admin_client, start="2026-13-45").status_code == 400
+    assert download_buyers(admin_client, start="2026-10-10", end="2026-10-01").status_code == 400
+    assert download_buyers(admin_client, search="zzz-nothing").status_code == 404
+
+
+def test_a_customer_cannot_download_the_buyers_sheet():
+    client = APIClient()
+    client.force_authenticate(user=make_user("plain3@test.local"))
+
+    assert download_buyers(client).status_code == 403
+
+
+# ═══════════════════════════════════════════════════════════
+#  The referral members sheet
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.fixture
+def referral_shop(db):
+    from customers.models import CustomerProfile
+    from loyalty.models import ReferralCode, ReferralProgram, ReferralStatus
+    from loyalty.tests.test_referral_report import make_order as make_plain
+    from loyalty.tests.test_referral_report import refer
+
+    program = ReferralProgram.objects.create(
+        code="exp-ref", name_ar="إحالة", name_en="Ref", is_active=True
+    )
+    member = make_user("export-member@test.local", name="منى")
+    CustomerProfile.objects.get_or_create(user=member, defaults={"display_name_ar": "منى"})
+    ReferralCode.objects.create(user=member, code="EXPM10")
+    friend = make_user("export-friend@test.local", name="صديق")
+    profile = CustomerProfile.objects.create(user=friend, display_name_ar="صديق")
+    order = make_plain(profile, "250")
+    refer(program, member, friend, ReferralStatus.REWARDED, order=order)
+    pending = make_user("export-pending@test.local")
+    CustomerProfile.objects.create(user=pending, display_name_ar="x")
+    refer(program, member, pending, ReferralStatus.PENDING)
+    return member
+
+
+def download_members(client, **params):
+    return client.get(reverse("v1:reporting:export-download", args=["referral_members"]), params)
+
+
+def _member_row(response):
+    table = rows_of(response)
+    at = next(i for i, row in enumerate(table) if row and row[0] == "الترتيب")
+    return table[at], dict(zip(table[at], table[at + 1], strict=False))
+
+
+def test_the_referral_members_sheet(admin_client, referral_shop):
+    response = download_members(admin_client)
+    assert response.status_code == 200
+
+    headers, row = _member_row(response)
+
+    assert row["الترتيب"] == 1
+    assert row["العضو"] == "منى"
+    assert row["كود الإحالة"] == "EXPM10"
+    assert row["المدعوون"] == 2
+    assert row["المؤهَّلون"] == 1
+    assert Decimal(str(row["نسبة التحويل (%)"])) == Decimal("50.00")
+    assert Decimal(str(row["مبيعات العملاء الجدد"])) == Decimal("250.00")
+    assert "البريد" not in headers
+    assert b"export-member@test.local" not in response.content
+
+    assert (
+        b"export-member@test.local"
+        in download_members(admin_client, include_contact="true").content
+    )
+
+
+def test_the_referral_sheet_agrees_with_the_screen(admin_client, referral_shop):
+    from loyalty import report
+
+    entry = report.member_stats()[referral_shop.pk]
+    _headers, row = _member_row(download_members(admin_client))
+
+    assert row["المدعوون"] == entry["invited"]
+    assert row["النقاط الممنوحة"] == entry["points_awarded"]
+
+
+def test_a_customer_cannot_download_the_referral_sheet():
+    client = APIClient()
+    client.force_authenticate(user=make_user("plain4@test.local"))
+
+    assert download_members(client).status_code == 403

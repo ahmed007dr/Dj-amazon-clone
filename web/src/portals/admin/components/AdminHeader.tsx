@@ -3,6 +3,8 @@ import { NotificationBell } from '@/features/notifications/components/Notificati
 import { LanguageSwitch } from '@/shared/ui/LanguageSwitch';
 import { ThemeSwitch } from '@/shared/ui/ThemeSwitch';
 
+import { DocsHelpLink } from './DocsHelpLink';
+
 import './AdminHeader.css';
 
 /**
@@ -19,6 +21,9 @@ export function AdminHeader({ title }: { title?: string }) {
       {title ? <h1 className="admin-header__title truncate">{title}</h1> : null}
 
       <div className="admin-header__actions">
+        {/* ⚠️  First, apart from the switches: it is about the *screen*, not about the
+            interface. It renders nothing on a screen the guide does not cover. */}
+        <DocsHelpLink />
         <LanguageSwitch compact />
         <ThemeSwitch />
         {/* ⚠️  Out-of-stock and near-expiry alerts arrive as `INVENTORY` notifications

@@ -1,5 +1,14 @@
+/*
+  ⚠️  The column is `minmax(0, 1fr)`, not the implicit `auto`.
+
+      An `auto` track grows to its widest child's min-content, so one row that does not fit
+      (the header's buttons once did, at 467px) widened the header, the main area and the
+      footer past the screen while the shell itself stayed screen-wide — the page scrolled
+      sideways and the strip beside the shell showed the canvas behind it.
+*/
 .store-shell {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr auto;
   min-block-size: 100dvh;
 }

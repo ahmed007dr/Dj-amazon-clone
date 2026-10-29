@@ -37,10 +37,15 @@ class GuestCheckoutSerializer(serializers.Serializer):
 
     ⚠️  **There is no payment, coupon or address-book field to send.**
 
-        Payment is cash on delivery and is not a choice; coupons and saved
-        addresses belong to accounts. Fields that must not be sent are rejected
-        rather than silently ignored, so a client that thinks it applied a
-        coupon finds out instead of finding a missing discount on the invoice.
+        Payment is cash on delivery and is not a choice; saved addresses belong to
+        accounts. A guest *can* use a coupon, but it is applied to the **cart**
+        (`POST /cart/coupon/`) — never named in this body, so the checkout cannot
+        claim a code the cart did not validate. Fields that must not be sent are
+        rejected rather than silently ignored, so a client that thinks it applied a
+        coupon here finds out instead of finding a missing discount on the invoice.
+
+        The coupon's per-buyer rules (once per email / phone, first order only) are
+        judged on the `email` and `phone` below, when the order is placed.
     """
 
     recipient_name = serializers.CharField(min_length=2, max_length=200)
@@ -79,7 +84,14 @@ class GuestCheckoutSerializer(serializers.Serializer):
         present = [name for name in self.FORBIDDEN if hasattr(data, "get") and name in data]
         if present:
             raise serializers.ValidationError(
-                {name: "غير متاح للشراء كزائر — سجّل الدخول لاستخدامه" for name in present}
+                {
+                    name: (
+                        "طبّق الكوبون من السلة قبل إتمام الطلب"
+                        if name in ("coupon", "coupon_code")
+                        else "غير متاح للشراء كزائر — سجّل الدخول لاستخدامه"
+                    )
+                    for name in present
+                }
             )
         return super().to_internal_value(data)
 

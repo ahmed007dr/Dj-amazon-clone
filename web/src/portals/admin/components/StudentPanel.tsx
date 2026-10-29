@@ -7,11 +7,7 @@ import {
   useUniversities,
   type StudentRow,
 } from '@/features/academic/adminApi';
-import {
-  canRejectStudent,
-  canVerifyStudent,
-  useVerifyStudent,
-} from '@/features/academic/verificationApi';
+import { canVerifyStudent, useVerifyStudent } from '@/features/academic/verificationApi';
 import { useDebounced } from '@/shared/hooks/useDebounced';
 import { isApiError } from '@/shared/http';
 import { useLocalized } from '@/shared/i18n/useLocalized';
@@ -36,7 +32,8 @@ import './AcademicPanels.css';
  *
  * ⚠️  "Review" opens the student's data and documents before anything is decided;
  *     "Verify" on the row is the shortcut for a reviewer who already knows the
- *     student. "Reject" always opens the window — it needs a reason the student reads.
+ *     student. "Reject" always opens the window — it needs a reason the student reads —
+ *     and so does revoking an already verified student, which is offered inside it.
  *
  * ⚠️  The row says **who** the student is (name and email). Without them this was
  *     a list of faculties and years with no way to tell which student a row was —
@@ -168,7 +165,9 @@ export function StudentPanel() {
             </Button>
           ) : null}
 
-          {canRejectStudent(row.verification_status) ? (
+          {/* ⚠️  Revoking a verified student is reached through "Review" only: a red button
+              on every verified row invites a mis-click on the rarest and heaviest decision. */}
+          {row.verification_status === 'PENDING' ? (
             <Button
               variant="danger"
               size="sm"
@@ -176,9 +175,7 @@ export function StudentPanel() {
                 setReviewing({ student: row, rejecting: true });
               }}
             >
-              {row.verification_status === 'VERIFIED'
-                ? t('academic.student.revoke')
-                : t('academic.review.reject')}
+              {t('academic.review.reject')}
             </Button>
           ) : null}
         </div>

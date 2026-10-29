@@ -17,3 +17,67 @@
   gap: var(--space-2);
   margin-inline-start: auto;
 }
+
+/*
+  ⚠️  Unobtrusive: quiet text link, no fill. Between 576 and 767px only the "؟" remains,
+      and below 576px nothing: the header there is already wider than the screen without
+      it (burger + two switches + bell + account menu ≈ 390px), and one more control would
+      push the account menu off the edge. The guide is still one tap away in the menu drawer.
+*/
+.admin-header__help {
+  display: none;
+  align-items: center;
+  gap: var(--space-1);
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-2);
+
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  border-radius: var(--radius);
+}
+
+.admin-header__help:hover {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.admin-header__help-mark {
+  display: grid;
+  place-items: center;
+  inline-size: 1.375rem;
+  block-size: 1.375rem;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  line-height: 1;
+  border: 1.5px solid currentcolor;
+  border-radius: 50%;
+}
+
+@media (min-width: 576px) {
+  .admin-header__help {
+    display: inline-flex;
+  }
+}
+
+/* ⚠️  Visually hidden, not `display: none`: on a phone the "؟" glyph is decoration, so the
+       text is the link's only accessible name. */
+.admin-header__help-text {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .admin-header__help-text {
+    position: static;
+    inline-size: auto;
+    block-size: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+}

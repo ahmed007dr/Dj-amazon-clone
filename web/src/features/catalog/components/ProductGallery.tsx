@@ -121,8 +121,11 @@ export function ProductGallery({ images, alt }: { images: ProductImage[]; alt: s
     return (
       <div className="gallery gallery--empty" aria-hidden>
         <span className="gallery__placeholder">
+          {/* A picture glyph, not a cross: a plus in a dashed ring reads as "add a photo" */}
           <svg viewBox="0 0 24 24" className="gallery__placeholder-icon" focusable="false">
-            <path d="M9.5 3h5v6.5H21v5h-6.5V21h-5v-6.5H3v-5h6.5z" />
+            <rect x="3" y="4.5" width="18" height="15" rx="3" />
+            <circle cx="9" cy="10" r="1.6" />
+            <path d="M4 17.5l5-5 3.5 3.5 2.5-2.5 5 5" />
           </svg>
         </span>
       </div>

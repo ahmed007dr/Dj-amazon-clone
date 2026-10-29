@@ -368,3 +368,98 @@ export function useAdjustPoints() {
       ),
   );
 }
+
+// ═══════════════════════════════════════════════════════════
+//  Admin: the referral members report
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * ⚠️  **Who brought customers in** — one row per member who invited anyone, not one row
+ *     per invitation (the existing referral list is that). The owner's question is "through
+ *     which members did new customers arrive?", and a ranked list of members answers it.
+ *
+ *     Money is a string (ADR-31). `conversion_rate` is a percentage computed on the server —
+ *     it is displayed, never recomputed here, so the table and the export cannot disagree.
+ */
+export interface ReferralMemberRow {
+  /** Position in the current ordering (1 = first), across pages. */
+  rank?: number;
+  referrer: { id: string; name: string; email: string; account_type: string };
+  code: string;
+  invited: number;
+  qualified: number;
+  pending: number;
+  rejected: number;
+  referee_orders: number;
+  referee_net_sales: string;
+  points_awarded: number;
+  last_invited_at: string | null;
+  conversion_rate: number | string | null;
+}
+
+export interface ReferralMembersTotals {
+  members: number;
+  invited: number;
+  qualified: number;
+  pending?: number;
+  rejected?: number;
+  referee_orders?: number;
+  /** Net sales of the invited customers' counted orders (products after discounts). */
+  referee_net_sales?: string;
+  /** ⚠️  The brief called this `new_customer_sales`; the built report names it `referee_net_sales`. */
+  new_customer_sales?: string;
+  points_awarded: number;
+  conversion_rate?: number | string | null;
+}
+
+export interface ReferralMembersPage extends PagedResponse<ReferralMemberRow> {
+  totals: ReferralMembersTotals;
+}
+
+export interface ReferralMembersParams {
+  date_from?: string;
+  date_to?: string;
+  search?: string;
+  ordering?: string;
+  page?: number;
+}
+
+export function useReferralMembers(params: ReferralMembersParams, enabled = true) {
+  return useQuery({
+    queryKey: ['loyalty', 'admin', 'referral-members', params],
+    queryFn: () =>
+      http.get<ReferralMembersPage>('/loyalty/admin/referrals/members/', { params: { ...params } }),
+    enabled,
+  });
+}
+
+export interface ReferralRefereeRow {
+  id: string;
+  referee: { id: string; name: string; email: string };
+  status: 'PENDING' | 'REWARDED' | 'REJECTED' | 'QUALIFIED';
+  invited_at: string;
+  qualifying_order_number: string | null;
+  orders: number;
+  net_sales: string;
+  rewarded_at: string | null;
+  rejection_reason: string;
+}
+
+export interface ReferralMemberDetail {
+  summary: ReferralMemberRow;
+  referees: PagedResponse<ReferralRefereeRow>;
+}
+
+export function useReferralMember(
+  id: string | null,
+  params: Pick<ReferralMembersParams, 'date_from' | 'date_to' | 'search' | 'page'>,
+) {
+  return useQuery({
+    queryKey: ['loyalty', 'admin', 'referral-member', id, params],
+    queryFn: () =>
+      http.get<ReferralMemberDetail>(`/loyalty/admin/referrals/members/${id ?? ''}/`, {
+        params: { ...params },
+      }),
+    enabled: id !== null,
+  });
+}

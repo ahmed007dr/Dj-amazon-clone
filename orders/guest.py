@@ -15,8 +15,10 @@ The rules this module enforces (owner decisions):
     * public products only      — `revalidate` evaluates access for "no user",
                                   which allows PUBLIC policies and nothing else
     * cash on delivery only     — the payment method is not an input
-    * no coupons, no loyalty    — the coupon engine refuses a guest; loyalty and
-                                  referrals key on `order.customer`
+    * coupons yes, loyalty no   — a guest may use a coupon the owner has not closed to
+                                  guests (`Coupon.allow_guests`); the per-buyer limits then
+                                  count the email / phone typed at checkout. Loyalty and
+                                  referrals key on `order.customer`, so a guest earns none
     * the owner confirms by phone — so stock is held longer than the 30-minute
                                   card default, and an order nobody confirms is
                                   cancelled automatically (stock released)
@@ -53,6 +55,7 @@ from core.errors import BusinessError, ErrorCode
 from orders import services
 from orders.events import guest_order_placed
 from orders.models import Order, OrderChannel, OrderStatus
+from promotions import services as promotion_services
 
 logger = logging.getLogger(__name__)
 
@@ -642,14 +645,21 @@ def claim_orders(user) -> int:
     with transaction.atomic():
         # The filter is repeated on the update itself: between the read above and
         # here an order could have been claimed by a concurrent verification.
-        claimed = list(
-            Order.objects.filter(pk__in=ids, customer__isnull=True).values_list("number", flat=True)
+        still_free = list(
+            Order.objects.filter(pk__in=ids, customer__isnull=True).values_list("pk", "number")
         )
+        claimed = [number for _pk, number in still_free]
         now = timezone.now()
         updated = Order.objects.filter(pk__in=ids, customer__isnull=True).update(
             customer=profile, claimed_at=now, updated_at=now
         )
         if updated:
+            # ⚠️  The coupon uses on those orders now belong to the account too, so a
+            #     per-customer limit counts them once. They stay `is_guest` — that is how
+            #     the purchase was made, and the guest-sales figures must keep it.
+            promotion_services.attach_user_to_guest_redemptions(
+                [pk for pk, _number in still_free], user
+            )
             AuditLog.objects.create(
                 actor=user,
                 action=AuditAction.UPDATE,

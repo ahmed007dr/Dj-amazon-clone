@@ -37,7 +37,14 @@ class CouponAdmin(DomainModelAdmin):
         (_("قيمة الخصم"), {"fields": ("kind", "value", "max_discount_amount")}),
         (
             _("شروط الاستحقاق"),
-            {"fields": ("min_order_amount", "account_types", "first_order_only")},
+            {
+                "fields": (
+                    "min_order_amount",
+                    "account_types",
+                    "first_order_only",
+                    "allow_guests",
+                )
+            },
         ),
         (
             _("حدود الاستعمال"),
@@ -55,11 +62,13 @@ class CouponRedemptionAdmin(LogAdmin):
         "created_at",
         "coupon",
         "user",
+        "guest_email",
         "discount_amount",
         "order_amount",
+        "is_guest",
         "is_cancelled",
     )
-    list_filter = ("is_cancelled", "coupon", "created_at")
+    list_filter = ("is_cancelled", "is_guest", "coupon", "created_at")
     list_select_related = ("coupon", "user")
-    search_fields = ("coupon__code", "user__email", "reference_id")
+    search_fields = ("coupon__code", "user__email", "guest_email", "guest_phone", "reference_id")
     date_hierarchy = "created_at"

@@ -13,6 +13,14 @@
   margin: 0;
 }
 
+/* A phone shows two facts per row: one per row made the window three screens tall,
+   pushing the documents and the decision buttons out of sight. */
+@media (max-width: 30rem) {
+  .student-review__facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .student-review__fact dt {
   font-size: 0.8125rem;
   color: var(--color-text-muted);

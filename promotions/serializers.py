@@ -4,11 +4,46 @@ Coupon contracts.
 
 import re
 
+from django.db.models import Prefetch
 from rest_framework import serializers
 
+from catalog.models import Category, Product
 from core.money import ZERO, quantize
 from promotions import analytics
 from promotions.models import Coupon, CouponKind, CouponRedemption
+
+#: How many products / categories the scope summary names before saying "and N more"
+SCOPE_PREVIEW = 10
+
+
+def scope_prefetch() -> list:
+    """
+    What the coupon list and detail querysets prefetch — **a constant number of queries**
+    however many coupons are on the page.
+
+    ⚠️  Two prefetches per relation, on purpose:
+
+          * `products` / `categories` (live rows only) feed the writable id lists — a deleted
+            product must not come back in `products`, or saving the form unchanged would be
+            refused ("object does not exist");
+          * `scope_products` / `scope_categories` (deleted ones included) feed `scope_summary`.
+            A coupon made for ONE product whose product was later deleted is still scoped —
+            to nothing anyone can buy — and must not read as "all products" in the list.
+    """
+    return [
+        "products",
+        "categories",
+        Prefetch(
+            "products",
+            queryset=Product.all_objects.only("id", "sku", "name_ar", "name_en", "deleted_at"),
+            to_attr="scope_products",
+        ),
+        Prefetch(
+            "categories",
+            queryset=Category.all_objects.only("id", "name_ar", "name_en", "deleted_at"),
+            to_attr="scope_categories",
+        ),
+    ]
 
 
 def check_rules(kind, value, start, end) -> None:
@@ -58,6 +93,24 @@ class CouponSerializer(serializers.ModelSerializer):
     times_used = serializers.SerializerMethodField()
     net_sales = serializers.SerializerMethodField()
 
+    #: ⚠️  The scope, writable as plain id lists. A deleted product is refused like an unknown
+    #:     one (the default manager hides soft-deleted rows), so a coupon can never be pointed
+    #:     at something that is not for sale.
+    products = serializers.PrimaryKeyRelatedField(
+        many=True,
+        required=False,
+        queryset=Product.objects.all(),
+        error_messages={"does_not_exist": "منتج غير موجود أو محذوف: {pk_value}"},
+    )
+    categories = serializers.PrimaryKeyRelatedField(
+        many=True,
+        required=False,
+        queryset=Category.objects.all(),
+        error_messages={"does_not_exist": "فئة غير موجودة أو محذوفة: {pk_value}"},
+    )
+    #: Read-only description of the scope for the list and detail screens
+    scope_summary = serializers.SerializerMethodField()
+
     class Meta:
         model = Coupon
         fields = [
@@ -73,11 +126,13 @@ class CouponSerializer(serializers.ModelSerializer):
             "min_order_amount",
             "account_types",
             "first_order_only",
+            "allow_guests",
             "owner",
             "holder_name",
             "holder_note",
             "products",
             "categories",
+            "scope_summary",
             "usage_limit",
             "usage_limit_per_user",
             "usage_count",
@@ -100,6 +155,82 @@ class CouponSerializer(serializers.ModelSerializer):
                 cache[obj.pk] = analytics.summaries([obj.pk]).get(obj.pk, {})
             return cache[obj.pk]
         return stats.get(obj.pk, {})
+
+    def update(self, instance, validated_data):
+        """
+        ⚠️  The `scope_products` / `scope_categories` lists prefetched for the summary are plain
+            attributes, so DRF's own "clear the prefetch cache after an update" does not reach
+            them — without this the response to a save would describe the scope as it was
+            *before* the save.
+        """
+        instance = super().update(instance, validated_data)
+        for attr in ("scope_products", "scope_categories"):
+            instance.__dict__.pop(attr, None)
+        return instance
+
+    def get_scope_summary(self, obj) -> dict:
+        """
+        `{type, product_count, category_count, products, more, categories, categories_more}`.
+
+        ⚠️  Built from the prefetched `scope_products` / `scope_categories` — no query per row.
+            A single-object response (create / update) was not prefetched and asks for its own
+            two small lists. `type` follows what is *stored*: any linked row, even a deleted
+            product, means the coupon is scoped.
+        """
+        products = getattr(obj, "scope_products", None)
+        if products is None:
+            products = list(
+                Product.all_objects.filter(coupons=obj).only(
+                    "id", "sku", "name_ar", "name_en", "deleted_at"
+                )
+            )
+        categories = getattr(obj, "scope_categories", None)
+        if categories is None:
+            categories = list(
+                Category.all_objects.filter(coupons=obj).only(
+                    "id", "name_ar", "name_en", "deleted_at"
+                )
+            )
+
+        if products and categories:
+            kind = "MIXED"
+        elif products:
+            kind = "PRODUCTS"
+        elif categories:
+            kind = "CATEGORIES"
+        else:
+            kind = "ALL"
+
+        preview = sorted(products, key=lambda product: product.sku)[:SCOPE_PREVIEW]
+        category_preview = sorted(categories, key=lambda category: category.name_ar)[
+            :SCOPE_PREVIEW
+        ]
+        return {
+            "type": kind,
+            "product_count": len(products),
+            "category_count": len(categories),
+            "products": [
+                {
+                    "id": str(product.pk),
+                    "sku": product.sku,
+                    "name_ar": product.name_ar,
+                    "name_en": product.name_en,
+                    "is_deleted": product.deleted_at is not None,
+                }
+                for product in preview
+            ],
+            "more": max(len(products) - SCOPE_PREVIEW, 0),
+            "categories": [
+                {
+                    "id": str(category.pk),
+                    "name_ar": category.name_ar,
+                    "name_en": category.name_en,
+                    "is_deleted": category.deleted_at is not None,
+                }
+                for category in category_preview
+            ],
+            "categories_more": max(len(categories) - SCOPE_PREVIEW, 0),
+        }
 
     def get_times_used(self, obj) -> int:
         return int(self._stats(obj).get("times_used", 0))
@@ -148,7 +279,8 @@ class CouponRedemptionSerializer(serializers.ModelSerializer):
     """
 
     coupon_code = serializers.CharField(source="coupon.code", read_only=True)
-    user_email = serializers.EmailField(source="user.email", read_only=True)
+    #: The buyer's email: the account's, or the one a guest typed at checkout
+    user_email = serializers.SerializerMethodField()
 
     class Meta:
         model = CouponRedemption
@@ -158,6 +290,10 @@ class CouponRedemptionSerializer(serializers.ModelSerializer):
             "coupon_code",
             "user",
             "user_email",
+            # ⚠️  A guest purchase has no `user`; the identity the limits count is shown instead
+            "is_guest",
+            "guest_email",
+            "guest_phone",
             "reference_type",
             "reference_id",
             "discount_amount",
@@ -168,6 +304,9 @@ class CouponRedemptionSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+    def get_user_email(self, obj) -> str:
+        return obj.user.email if obj.user_id else obj.guest_email
 
 
 # ═══════════════════════════════════════════════════════════
@@ -219,6 +358,7 @@ class BulkCouponSerializer(serializers.Serializer):
         child=serializers.CharField(), required=False, default=list
     )
     first_order_only = serializers.BooleanField(required=False, default=False)
+    allow_guests = serializers.BooleanField(required=False, default=True)
     products = serializers.PrimaryKeyRelatedField(
         many=True, required=False, queryset=Coupon.products.rel.model.objects.all()
     )

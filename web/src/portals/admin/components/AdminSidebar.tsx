@@ -135,6 +135,17 @@ const SECTIONS: { key: string; links: AdminLink[] }[] = [
       { to: '/admin/branding', key: 'nav.branding', permission: 'branding.change_brandprofile' },
     ],
   },
+  {
+    // ⚠️  Its own last section, and `permission: null`.
+    //
+    //     Help is not a setting, so it does not belong in "system" — and it must be
+    //     visible to every account that enters the panel: the cashier who has just been
+    //     refused a screen is the one who most needs to read what it is for. Alone in
+    //     its group it also sits apart from the working menu, where it is not mistaken
+    //     for one more screen to configure.
+    key: 'help',
+    links: [{ to: '/admin/docs', key: 'nav.docs', permission: null }],
+  },
 ];
 
 export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {

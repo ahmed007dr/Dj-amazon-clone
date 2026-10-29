@@ -47,4 +47,15 @@ urlpatterns = [
         name="adjust-points",
     ),
     path("admin/referrals/", api.AdminReferralListAPI.as_view(), name="admin-referrals"),
+    # The members report — before nothing variable here, but keep literal segments first
+    path(
+        "admin/referrals/members/",
+        api.ReferralMembersAPI.as_view(),
+        name="referral-members",
+    ),
+    path(
+        "admin/referrals/members/<uuid:referrer_id>/",
+        api.ReferralMemberDetailAPI.as_view(),
+        name="referral-member-detail",
+    ),
 ]

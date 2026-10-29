@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from cart import services as cart_services
@@ -121,6 +122,39 @@ def resolve_address(profile, data: dict) -> dict:
     }
 
 
+def _phone_spellings(phone: str) -> list[str]:
+    """
+    The ways one Egyptian mobile is stored on orders: guest checkout keeps `+201001234567`,
+    an address book entry usually `01001234567`.
+    """
+    digits = promotion_services.normalise_phone_digits(phone)
+    if len(digits) == 12 and digits.startswith("20"):
+        local = "0" + digits[2:]
+        return [f"+{digits}", digits, local, local[1:]]
+    return [phone] if phone else []
+
+
+def has_previous_order(email: str, phone: str) -> bool:
+    """
+    Has this buyer (by email **or** phone) placed an order before? — the "first order" test
+    for a guest, who has no account statistics to read.
+
+    ⚠️  Guest *and* registered orders count: a customer who already bought with an account
+        is not a first-time buyer just because they checked out without signing in. A
+        cancelled order does not (nothing was bought), mirroring how a cancelled coupon use
+        is released.
+    """
+    match = Q()
+    if email:
+        match |= Q(contact_email__iexact=email) | Q(customer__user__email__iexact=email)
+    spellings = _phone_spellings(phone)
+    if spellings:
+        match |= Q(recipient_phone__in=spellings)
+    if not match:
+        return False
+    return Order.objects.filter(match).exclude(status=OrderStatus.CANCELLED).exists()
+
+
 def create_from_cart(
     cart: Cart,
     *,
@@ -155,11 +189,26 @@ def create_from_cart(
     """
     user = cart.user
 
+    # ⚠️  A cart with no owner is a guest's, and a guest has no account to key the coupon
+    #     limits on: the buyer is the email / phone typed on the checkout form. Handing the
+    #     identity to the same `revalidate` the cart page uses means the per-buyer rules
+    #     (once per email or phone, first order only) are enforced on the very calculation
+    #     that prices the order.
+    guest = None
+    if user is None and cart.coupon_code:
+        phone = address.get("phone", "")
+        guest = promotion_services.GuestIdentity.of(
+            contact_email,
+            phone,
+            previous_order_check=lambda: has_previous_order(contact_email, phone),
+        )
+
     snapshot = cart_services.revalidate(
         cart,
         user=user,
         governorate=address.get("governorate", ""),
         shipping_method_code=shipping_method_code,
+        guest=guest,
     )
 
     # ⚠️  The problems come **before** the empty check.
@@ -178,6 +227,17 @@ def create_from_cart(
 
     if not snapshot.lines:
         raise BusinessError(ErrorCode.CART_EMPTY)
+
+    # ⚠️  A guest whose coupon does not hold at checkout is **stopped, not repriced.**
+    #
+    #     They saw a discounted total; quietly dropping the discount would charge them more
+    #     than they agreed to on delivery. A coupon-specific 400 (the reason code and
+    #     message) leaves the cart untouched so they can remove the code and carry on.
+    #     Nothing has been created yet — no order, no stock held, no redemption.
+    #     (`CouponResult.__bool__` is `is_valid`, so test for `None` explicitly.)
+    result = snapshot.coupon_result
+    if guest is not None and result is not None and not result.is_valid:
+        raise promotion_services.rejection_error(result)
 
     if require_shipping_quote and snapshot.shipping_quote is None:
         raise BusinessError(
@@ -204,9 +264,11 @@ def create_from_cart(
         #     method that costs nothing anyway.
         shipping_discount=snapshot.shipping_discount,
         grand_total=priced.total,
-        # ⚠️  A guest cart carries no coupon (the engine refuses them) — never
-        #     stamp a code on an order that did not get its discount.
-        coupon_code=cart.coupon_code if user is not None else "",
+        # ⚠️  Only a code that actually applied — never stamp a code on an order that
+        #     did not get its discount.
+        coupon_code=(
+            cart.coupon_code if snapshot.coupon_result and snapshot.coupon_result.is_valid else ""
+        ),
         shipping_method_code=shipping_method_code,
         contact_email=contact_email,
         contact_language=contact_language,
@@ -261,6 +323,8 @@ def create_from_cart(
             order_amount=priced.total,
             reference_type=REFERENCE_TYPE,
             reference_id=order.pk,
+            # A guest's use is recorded against their email / phone (re-checked under the lock)
+            guest=guest,
         )
 
     # ── The shipment ───────────────────────────────────────

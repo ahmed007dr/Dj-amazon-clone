@@ -12,11 +12,13 @@ from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 
 from cart import serializers as s
 from cart import services
 from cart.models import CartLine
+from cart.throttles import CouponApplyThrottle
 from catalog.models import Product, ProductVariant
 from core.errors import BusinessError, ErrorCode
 
@@ -119,6 +121,9 @@ class CartLineDetailAPI(CartMixin, APIView):
 
 class CartCouponAPI(CartMixin, APIView):
     serializer_class = s.ApplyCouponSerializer
+    # ⚠️  Visitors may use coupons, so the box is open to anyone: the project-wide throttles
+    #     stay (setting this attribute replaces the defaults) and one more bounds code guessing.
+    throttle_classes = [AnonRateThrottle, UserRateThrottle, CouponApplyThrottle]
 
     def post(self, request):
         """

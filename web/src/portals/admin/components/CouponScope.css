@@ -1,0 +1,145 @@
+/* ═══════════════════════════════════════════════════════════
+   The coupon form's "Applies to" section.
+
+   ⚠️  Logical properties and tokens only (RTL, dark mode).
+   ═══════════════════════════════════════════════════════════ */
+
+.coupon-scope {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-inline-size: 0;
+  padding: var(--space-3);
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.coupon-scope legend {
+  padding-inline: var(--space-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* ── The two-way choice ───────────────────────────────────── */
+
+.coupon-scope__modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.coupon-scope__modes label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.9375rem;
+  text-align: center;
+  cursor: pointer;
+  background: var(--color-surface);
+}
+
+.coupon-scope__modes label + label {
+  border-inline-start: 1px solid var(--color-border);
+}
+
+/* The radio is visually replaced by the segment but stays focusable and in the a11y tree */
+.coupon-scope__modes input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.coupon-scope__modes label.is-on {
+  font-weight: 700;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
+
+.coupon-scope__modes label:has(input:focus-visible) {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -3px;
+}
+
+.coupon-scope__modes label.is-on:has(input:focus-visible) {
+  outline-color: var(--color-on-primary);
+}
+
+.coupon-scope__help {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+/* ── Products / categories panels ─────────────────────────── */
+
+.coupon-scope__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.coupon-scope__panels {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.coupon-scope__panels button {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.coupon-scope__panels button + button {
+  border-inline-start: 1px solid var(--color-border);
+}
+
+.coupon-scope__panels button[aria-pressed='true'] {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
+
+.coupon-scope__panels button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.coupon-scope__problem {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-danger);
+}
+
+.coupon-scope__clear {
+  align-self: flex-start;
+}
+
+/* ── The scope cell in the coupons table ──────────────────── */
+
+.coupon-scope-cell {
+  display: block;
+  margin-block-start: var(--space-1);
+}
+
+.coupon-scope-cell small {
+  display: block;
+  margin-block-start: 2px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}

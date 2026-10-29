@@ -106,15 +106,46 @@ class CartTotalsSerializer(serializers.Serializer):
 
 
 class CouponResultSerializer(serializers.Serializer):
+    """
+    The coupon as the cart sees it.
+
+    ⚠️  The **scope** is explained, not left to guesswork: `applies_to` is `ALL` when every
+        line gets the discount and `SOME` when the coupon is limited to certain products,
+        with `eligible_line_ids` naming the lines it covers and `eligible_subtotal` the
+        amount it was calculated on — so the storefront can say "Applies to 2 of 3 items".
+        All of it is computed by the server; the client never decides eligibility.
+    """
+
     is_valid = serializers.BooleanField(read_only=True)
     code = serializers.SerializerMethodField()
+    kind = serializers.SerializerMethodField()
+    #: The same figure as `discount_amount` — the name the scope contract uses
+    discount = MoneyField(source="discount_amount")
     discount_amount = MoneyField()
     free_shipping = serializers.BooleanField(read_only=True)
+    applies_to = serializers.CharField(read_only=True)
+    eligible_line_ids = serializers.SerializerMethodField()
+    eligible_count = serializers.SerializerMethodField()
+    line_count = serializers.IntegerField(read_only=True)
+    eligible_subtotal = MoneyField()
     reason = serializers.SerializerMethodField()
     message = serializers.CharField(read_only=True)
+    message_en = serializers.CharField(read_only=True)
 
     def get_code(self, obj) -> str:
         return obj.coupon.code if obj.coupon else ""
+
+    def get_kind(self, obj) -> str:
+        return obj.coupon.kind if obj.coupon else ""
+
+    def get_eligible_line_ids(self, obj) -> list:
+        # Only a valid result covers any line; the refs are cart line ids (strings)
+        if not obj.is_valid:
+            return []
+        return [ref for ref in obj.eligible_refs if isinstance(ref, str)]
+
+    def get_eligible_count(self, obj) -> int:
+        return len(obj.eligible_refs) if obj.is_valid else 0
 
     def get_reason(self, obj) -> str:
         return obj.reason.value if obj.reason else ""

@@ -58,6 +58,18 @@ export interface PriceOverride {
   is_running: boolean;
 }
 
+/** What a coupon applies to — a read-only summary; the writable side is `products` / `categories`. */
+export interface CouponScopeSummary {
+  type: 'ALL' | 'PRODUCTS' | 'CATEGORIES' | 'MIXED';
+  product_count: number;
+  category_count: number;
+  /** Only the first few (by SKU) — `more` says how many are not listed. */
+  products: { id: string; sku: string; name_ar: string; name_en: string; is_deleted?: boolean }[];
+  more: number;
+  categories?: { id: string; name_ar: string; name_en: string; is_deleted?: boolean }[];
+  categories_more?: number;
+}
+
 export interface Coupon {
   id: string;
   code: string;
@@ -75,8 +87,12 @@ export interface Coupon {
   /** Who the code was handed to — a label for reading sales against, not a restriction. */
   holder_name: string;
   holder_note: string;
+  /** Product ids the code is limited to. Empty on both lists = every product. */
   products: string[];
   categories: string[];
+  /** ⚠️  Optional on the wire so an older server does not break the screen: absent = allowed. */
+  allow_guests?: boolean;
+  scope_summary?: CouponScopeSummary;
   usage_limit: number | null;
   usage_limit_per_user: number;
   usage_count: number;
@@ -191,6 +207,10 @@ export function useCoupons(
   params: {
     search?: string;
     status?: string;
+    /** `all` · `products` · `categories` · `scoped` (either) — judged on the stored scope rows. */
+    scope?: string;
+    /** `allowed` · `blocked` — whether guests may use the code. */
+    guests?: string;
     page?: number;
     date_from?: string;
     date_to?: string;
@@ -297,7 +317,9 @@ export interface CouponSummary {
   failed_orders: number;
 }
 
-export interface CouponRankRow extends CouponSummary {
+export interface CouponRankRow extends CouponSummary, CouponCustomerReport {
+  /** Present when the server includes the scope in the ranking rows. */
+  scope_summary?: CouponScopeSummary;
   id: string;
   code: string;
   name_ar: string;
@@ -315,7 +337,7 @@ export interface CouponRankRow extends CouponSummary {
   remaining_total: number | null;
 }
 
-export interface CouponTotals extends CouponSummary {
+export interface CouponTotals extends CouponSummary, CouponCustomerReport {
   /** How many different coupons were used at least once in the period. */
   coupons_used: number;
 }
@@ -330,7 +352,9 @@ export interface CouponCounts {
   with_holder: number;
 }
 
-export interface CouponOverview extends PagedResponse<CouponRankRow> {
+export interface CouponOverview extends PagedResponse<CouponRankRow>, CouponCustomerReport {
+  /** Discount volume per day/month over the period, split registered / guest. */
+  discount_series?: CouponTypeSeries;
   totals: CouponTotals;
   counts: CouponCounts;
   period: { date_from: string | null; date_to: string | null };
@@ -383,7 +407,9 @@ export interface CouponInsights {
     categories_count: number;
   };
   period: { date_from: string | null; date_to: string | null };
-  summary: CouponSummary & {
+  discount_series?: CouponTypeSeries;
+  summary: CouponSummary &
+    CouponCustomerReport & {
     usage_limit: number | null;
     usage_count: number;
     usage_limit_per_user: number;
@@ -418,6 +444,202 @@ export interface CouponOrderRow {
 export interface CouponPeriod {
   date_from?: string;
   date_to?: string;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  The report: registered vs guest, new customers, holders
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * ⚠️  **Registered vs guest is read off the ORDER, not the buyer's account today.**
+ *     A guest who signs up afterwards is still a guest *purchase* — the report counts how
+ *     the sale was made. `has_account_now` (customers list) says they have since joined.
+ *
+ *     Every field below is optional on the wire: the screen renders from whatever the
+ *     server sent (`customerReport()` fills the gaps with zeros) instead of crashing on an
+ *     older response.
+ */
+export interface CustomerBucket {
+  orders: number;
+  customers: number;
+  gross: string;
+  discount: string;
+  net: string;
+  order_total: string;
+}
+
+export interface CustomerTypeSplit {
+  registered: CustomerBucket;
+  guest: CustomerBucket;
+}
+
+export interface NewCustomerBucket {
+  count: number;
+  orders?: number;
+  net_sales: string;
+  discount: string;
+}
+
+export interface CouponCustomerReport {
+  by_customer_type?: CustomerTypeSplit;
+  new_customers?: NewCustomerBucket;
+  returning_customers?: NewCustomerBucket;
+  /** Share of customers who were new, 0..100. */
+  new_customer_rate?: number | string | null;
+  discount_by_customer_type?: { registered: string; guest: string };
+  /** Discount as a share of gross sales, 0..100. */
+  discount_share_of_gross?: number | string | null;
+}
+
+export interface CouponTypeSeriesSide {
+  orders: number;
+  discount: string;
+  net_sales: string;
+}
+
+/** One day (or month): the totals and the registered / guest split of them. */
+export interface CouponTypeSeriesPoint {
+  date: string;
+  orders: number;
+  discount: string;
+  net_sales: string;
+  registered: CouponTypeSeriesSide;
+  guest: CouponTypeSeriesSide;
+}
+
+export interface CouponTypeSeries {
+  granularity: 'day' | 'month';
+  points: CouponTypeSeriesPoint[];
+}
+
+const EMPTY_BUCKET: CustomerBucket = {
+  orders: 0,
+  customers: 0,
+  gross: '0',
+  discount: '0',
+  net: '0',
+  order_total: '0',
+};
+
+const EMPTY_NEW: NewCustomerBucket = { count: 0, net_sales: '0', discount: '0' };
+
+/** The report fields with every gap filled, whichever object carried them. */
+export function customerReport(...sources: (CouponCustomerReport | null | undefined)[]) {
+  const pick = <K extends keyof CouponCustomerReport>(
+    key: K,
+  ): CouponCustomerReport[K] | undefined =>
+    sources.find((source) => source?.[key] != null)?.[key];
+
+  const split = pick('by_customer_type');
+  const discountSplit = pick('discount_by_customer_type');
+
+  return {
+    present: split !== undefined,
+    registered: { ...EMPTY_BUCKET, ...split?.registered },
+    guest: { ...EMPTY_BUCKET, ...split?.guest },
+    newCustomers: { ...EMPTY_NEW, ...pick('new_customers') },
+    returningCustomers: { ...EMPTY_NEW, ...pick('returning_customers') },
+    newCustomerRate: pick('new_customer_rate') ?? null,
+    discountShare: pick('discount_share_of_gross') ?? null,
+    discountByType: {
+      registered: discountSplit?.registered ?? split?.registered.discount ?? '0',
+      guest: discountSplit?.guest ?? split?.guest.discount ?? '0',
+    },
+  };
+}
+
+/**
+ * One holder's roll-up (`group_by=holder`): every code they hold, combined.
+ *
+ * ⚠️  Coupons with no holder are gathered in one `unassigned` row (empty `holder_name`), so
+ *     the rows still add up to the totals. `customers` is over the UNION of the holder's
+ *     codes — someone who used two of their codes is one customer.
+ */
+export interface CouponGroupRow extends CouponCustomerReport {
+  holder_name: string;
+  unassigned: boolean;
+  /** How many coupons the holder has. */
+  coupons: number;
+  codes: { id: string; code: string; is_running: boolean }[];
+  /** Members (accounts) who own some of the codes. */
+  members: { id: string; name: string; email: string; account_type: string; codes: string[] }[];
+  times_used: number;
+  orders: number;
+  registered_orders: number;
+  guest_orders: number;
+  customers: number;
+  gross_sales: string;
+  discount_given: string;
+  net_sales: string;
+  order_total: string;
+  last_used_at: string | null;
+}
+
+export interface CouponCustomerRow {
+  customer_key: string;
+  customer_type: 'REGISTERED' | 'GUEST';
+  /** How the purchase was made — a guest purchase stays a guest purchase. */
+  purchased_as: 'REGISTERED' | 'GUEST';
+  /** A guest buyer who has since opened an account. */
+  has_account_now: boolean;
+  customer_id: string | null;
+  customer_number: string | null;
+  name: string;
+  email: string;
+  phone: string;
+  orders: number;
+  gross_sales: string;
+  net_sales: string;
+  discount: string;
+  first_used_at: string | null;
+  last_used_at: string | null;
+  is_new_customer: boolean;
+}
+
+export interface CouponCustomerParams extends CouponPeriod {
+  search?: string;
+  ordering?: string;
+  page?: number;
+}
+
+/** The people who used one coupon — paginated, searchable, sortable. */
+export function useCouponCustomers(id: string | null, params: CouponCustomerParams) {
+  return useQuery({
+    queryKey: [...KEY, 'coupon-customers', id, params],
+    queryFn: () =>
+      http.get<PagedResponse<CouponCustomerRow>>(
+        `/promotions/admin/coupons/${id ?? ''}/customers/`,
+        { params: { ...params } },
+      ),
+    enabled: id !== null,
+  });
+}
+
+/**
+ * Coupons grouped by the person they were handed to (`group_by=holder`).
+ *
+ * ⚠️  A holder with three codes is one row: "what did Dr. Sara bring in?" is the question
+ *     the owner asks, not "what did each of her three codes bring in?".
+ */
+export interface CouponHolderOverview
+  extends PagedResponse<CouponGroupRow>,
+    CouponCustomerReport {
+  totals: CouponTotals;
+  discount_series?: CouponTypeSeries;
+}
+
+export function useCouponHolders(
+  params: CouponPeriod & { search?: string; ordering?: string; page?: number },
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: [...KEY, 'coupon-holders', params],
+    queryFn: () =>
+      http.get<CouponHolderOverview>('/promotions/admin/coupons/analytics/', {
+        params: { ...params, group_by: 'holder' },
+      }),
+    enabled,
+  });
 }
 
 /**

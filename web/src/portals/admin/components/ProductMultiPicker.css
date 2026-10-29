@@ -1,0 +1,230 @@
+/* ═══════════════════════════════════════════════════════════
+   The multi-product picker (coupon scope).
+
+   ⚠️  Logical properties and tokens only: Arabic-first (RTL), dark-mode safe.
+   ═══════════════════════════════════════════════════════════ */
+
+.mpicker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mpicker__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.mpicker__input {
+  min-block-size: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.mpicker__input.has-error {
+  border-color: var(--color-danger);
+}
+
+.mpicker__input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.mpicker__status {
+  min-block-size: 1.25rem;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* ── Results ──────────────────────────────────────────────── */
+
+.mpicker__results {
+  display: flex;
+  flex-direction: column;
+  max-block-size: 15rem;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* The previous page stays visible while the next loads — dimmed, so it reads as "updating" */
+.mpicker__results.is-stale {
+  opacity: 0.6;
+}
+
+.mpicker__results li + li {
+  border-block-start: 1px solid var(--color-border);
+}
+
+.mpicker__results label {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-block-size: var(--touch-target);
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.mpicker__results label:hover,
+.mpicker__results label:focus-within {
+  background: var(--color-bg);
+}
+
+.mpicker__results input {
+  flex: none;
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
+  accent-color: var(--color-primary);
+}
+
+.mpicker__results code {
+  flex: none;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.mpicker__name {
+  flex: 1;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Chosen rows: greyed, with a text tag so the state is not carried by colour alone */
+.mpicker__results li.is-chosen label {
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+}
+
+.mpicker__results em {
+  flex: none;
+  font-size: 0.75rem;
+  font-style: normal;
+  color: var(--color-text-muted);
+}
+
+.mpicker__tools {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mpicker__empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* ── Chosen ───────────────────────────────────────────────── */
+
+.mpicker__chosen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.mpicker__chosen-head {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.mpicker__clear {
+  min-block-size: 2rem;
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--color-primary);
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.mpicker__clear:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.mpicker__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  max-block-size: 10rem;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.mpicker__chip {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  max-inline-size: 100%;
+  padding-block: 2px;
+  padding-inline: var(--space-2) 2px;
+  font-size: 0.8125rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+.mpicker__chip code {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.mpicker__chip span {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mpicker__chip button {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: 50%;
+}
+
+.mpicker__chip button:hover:not(:disabled),
+.mpicker__chip button:focus-visible {
+  color: var(--color-danger);
+  background: var(--color-bg);
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.mpicker__error {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-danger);
+}
+
+/* A product deleted since the coupon was made: marked in text ("(deleted)") and by a dashed
+   border, so it can be found and removed — the server will not save it. */
+.mpicker__chip.is-deleted {
+  border-style: dashed;
+  border-color: var(--color-danger);
+}

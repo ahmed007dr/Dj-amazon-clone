@@ -234,6 +234,14 @@ const AdminPaymentsPage = lazy(() =>
   })),
 );
 
+// ⚠️  The guide's text is a sizeable static bundle; it loads only when someone opens the guide
+//     (and, in a separate chunk, for the header's "about this page" link) — never with the shell.
+const AdminDocsPage = lazy(() =>
+  import('@/portals/admin/pages/AdminDocsPage').then((module) => ({
+    default: module.AdminDocsPage,
+  })),
+);
+
 function Lazy({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<Spinner />}>{children}</Suspense>;
 }
@@ -646,6 +654,14 @@ const router = createBrowserRouter([
           </RequirePermission>
         ),
       },
+      // ⚠️  **No `RequirePermission`, on purpose.** The guide only explains; it reads and
+      //     changes nothing. A guard would hide the explanation of a screen from exactly
+      //     the person who was just refused it. The shell's own guard still applies.
+      //
+      //     One route with an optional segment (`/admin/docs` = welcome,
+      //     `/admin/docs/:sectionId` = a section, `#topicId` = a topic inside it), so moving
+      //     between sections keeps the page — and its search box — mounted.
+      { path: 'docs/:sectionId?', element: <Lazy><AdminDocsPage /></Lazy> },
     ],
   },
   {

@@ -82,10 +82,3 @@
 .staff-cell {
   align-items: flex-start;
 }
-
-.staff-cell__actions {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  justify-content: flex-end;
-}

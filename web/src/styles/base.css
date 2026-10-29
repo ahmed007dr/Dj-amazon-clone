@@ -21,6 +21,12 @@
 
 html {
   font-size: var(--font-size-base);
+
+  /* ⚠️  The canvas follows the app's theme, not the device's.
+       `index.html` paints it from `prefers-color-scheme` for the first frame only; left
+       like that, a light page on a dark phone shows a dark strip wherever the body does
+       not reach (an overflow, the rubber-band at the page's end). */
+  background: var(--color-bg);
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
 }

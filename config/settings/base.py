@@ -509,6 +509,10 @@ REST_FRAMEWORK = {
         # Reading / cancelling through the emailed link. The token is unguessable,
         # so this only blunts probing; generous because a tracking page is reloaded.
         "guest_token": env("THROTTLE_GUEST_TOKEN", default="60/minute"),
+        # ⚠️  Typing coupon codes into the cart, for visitors. Guests may use coupons now, so
+        #     the box is open to anyone: a human tries a handful of codes a minute, a script
+        #     guessing them tries thousands. Per client address, on top of the `anon` ceiling.
+        "coupon_apply": env("THROTTLE_COUPON_APPLY", default="20/minute"),
     },
     # ⚠️  **How many reverse proxies sit in front of Django.**
     #

@@ -27,5 +27,6 @@ def load_all() -> None:
         finance,
         inventory,
         purchasing,
+        referrals,
         sales,
     )

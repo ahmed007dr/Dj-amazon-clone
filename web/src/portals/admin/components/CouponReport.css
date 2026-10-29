@@ -1,0 +1,337 @@
+/* ═══════════════════════════════════════════════════════════
+   The coupon report — summary cards, registered/guest split, paired chart, grouped table,
+   customers list.
+
+   ⚠️  Logical properties and design tokens only: Arabic-first (RTL), dark-mode safe.
+   ⚠️  Two series are told apart by SHAPE as well as hue: registered = solid fill,
+       guest = diagonal hatch over the second hue. Colour is never the only carrier.
+   ═══════════════════════════════════════════════════════════ */
+
+.report {
+  display: grid;
+  gap: var(--space-4);
+  margin-block-start: var(--space-3);
+}
+
+.report-note {
+  max-inline-size: 70ch;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+.report-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+  gap: var(--space-3);
+}
+
+.report-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  gap: var(--space-3);
+}
+
+.report-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.report-toolbar h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.report-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ── Series swatches (shared by the split bar and the chart) ─ */
+
+.report-split__swatch {
+  flex: none;
+  display: inline-block;
+  inline-size: 0.875rem;
+  block-size: 0.875rem;
+  border-radius: 3px;
+}
+
+.report-split__swatch.is-registered,
+.report-split__seg.is-registered,
+.report-chart__bar.is-registered {
+  background: var(--color-primary);
+}
+
+.report-split__swatch.is-guest,
+.report-split__seg.is-guest,
+.report-chart__bar.is-guest {
+  background-color: var(--color-info);
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 3px,
+    color-mix(in srgb, var(--color-surface) 55%, transparent) 3px 5px
+  );
+}
+
+/* ── The split bar ────────────────────────────────────────── */
+
+.report-split {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  align-content: start;
+}
+
+.report-split h3 {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.report-split__bar {
+  display: flex;
+  gap: 2px;
+  block-size: 1rem;
+  overflow: hidden;
+  background: var(--color-bg);
+  border-radius: 4px;
+}
+
+.report-split__seg {
+  flex-grow: 0;
+  flex-shrink: 0;
+  min-inline-size: 3px;
+  border-radius: 3px;
+}
+
+.report-split__seg.is-empty {
+  flex: 1;
+  background: transparent;
+}
+
+.report-split__legend {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.report-split__legend li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.report-split__legend .report-split__swatch {
+  margin-block-start: 0.2rem;
+}
+
+.report-split__text {
+  display: grid;
+  gap: 1px;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-split__text small {
+  color: var(--color-text-muted);
+}
+
+.report-split__pct {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+/* ── The paired chart ─────────────────────────────────────── */
+
+.report-chart {
+  padding: var(--space-4);
+}
+
+.report-chart__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: var(--space-2);
+}
+
+.report-chart__head h3 {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.report-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding: 0;
+  margin: 0 0 var(--space-2);
+  font-size: 0.8125rem;
+  list-style: none;
+}
+
+.report-chart__legend li {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* ⚠️  `dir="ltr"`: time runs left to right whatever the language (see CouponDailyChart). */
+.report-chart__plot {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+  block-size: 9rem;
+  padding-block-end: 1px;
+  border-block-end: 1px solid var(--color-border);
+}
+
+.report-chart__plot:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.report-chart__group {
+  display: flex;
+  flex: 1 1 0;
+  gap: 2px;
+  align-items: flex-end;
+  block-size: 100%;
+  min-inline-size: 4px;
+  max-inline-size: 2.5rem;
+  padding-inline: 1px;
+  border-radius: 4px 4px 0 0;
+}
+
+.report-chart__group.is-active {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  outline: 1px solid var(--color-border);
+}
+
+.report-chart__bar {
+  flex: 1 1 0;
+  min-inline-size: 2px;
+  border-start-start-radius: 4px;
+  border-start-end-radius: 4px;
+}
+
+.report-chart__bar.is-empty {
+  opacity: 0.35;
+}
+
+/* ── The grouped table ────────────────────────────────────── */
+
+.report-groupby {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.report-groupby button {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.report-groupby button + button {
+  border-inline-start: 1px solid var(--color-border);
+}
+
+.report-groupby button[aria-pressed='true'] {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
+
+.report-groupby button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.report-codes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-block-start: var(--space-1);
+}
+
+.report-code {
+  min-block-size: 1.75rem;
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--color-primary);
+  cursor: pointer;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+.report-code:hover:not(:disabled) {
+  border-color: var(--color-primary);
+}
+
+.report-code:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.report-orders {
+  display: grid;
+  gap: 1px;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-orders span {
+  color: var(--color-text-muted);
+}
+
+.report-orders strong {
+  color: var(--color-text);
+}
+
+/* ── The customers list in the insights drawer ────────────── */
+
+.report-customers__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: var(--space-2);
+}
+
+.report-customers__head h3 {
+  margin: 0;
+}
+
+.report-customer {
+  display: grid;
+  gap: 2px;
+}
+
+.report-customer__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-block-start: var(--space-1);
+}
+
+.report-customer small {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
